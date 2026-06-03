@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { LayoutDashboard, LogOut, Building } from 'lucide-react';
+import { LayoutDashboard, LogOut, Building, Users } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -15,6 +15,7 @@ export const AppLayout: React.FC = () => {
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Users', path: '/users', icon: Users },
     { name: 'Organization', path: '/organization', icon: Building },
   ];
 

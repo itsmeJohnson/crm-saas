@@ -8,6 +8,7 @@ import { Login } from './modules/auth/Login';
 import { Register } from './modules/auth/Register';
 import { Home } from './modules/dashboard/Home';
 import { Profile } from './modules/organization/Profile';
+import { UsersPage } from './pages/UsersPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/organization" element={<Profile />} />
+              <Route path="/users" element={<UsersPage />} />
             </Route>
           </Route>
 
