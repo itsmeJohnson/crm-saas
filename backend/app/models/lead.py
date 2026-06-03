@@ -1,0 +1,20 @@
+import uuid
+from sqlalchemy import String, ForeignKey, Numeric
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import BaseModel
+
+class Lead(BaseModel):
+    __tablename__ = "leads"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="New", nullable=False)
+    source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    value: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)

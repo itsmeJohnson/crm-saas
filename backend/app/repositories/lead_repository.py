@@ -1,0 +1,87 @@
+import uuid
+from datetime import datetime, timezone
+from typing import Sequence, Tuple
+from sqlalchemy import select, func, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.lead import Lead
+from app.repositories.base import BaseRepository
+
+class LeadRepository(BaseRepository[Lead]):
+    def __init__(self, db: AsyncSession):
+        super().__init__(Lead, db)
+
+    async def create_lead(self, organization_id: uuid.UUID, lead_data: dict, created_by: uuid.UUID) -> Lead:
+        lead_data["organization_id"] = organization_id
+        lead_data["created_by"] = created_by
+        return await self.create(lead_data)
+
+    async def get_lead_by_id(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
+        query = select(self.model).filter(
+            self.model.id == lead_id,
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
+    async def paginate_leads(
+        self, 
+        organization_id: uuid.UUID, 
+        skip: int = 0, 
+        limit: int = 100, 
+        search_query: str | None = None,
+        status: str | None = None,
+        assigned_user_id: uuid.UUID | None = None
+    ) -> Tuple[Sequence[Lead], int]:
+        query = select(self.model).filter(
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False
+        )
+
+        if status:
+            query = query.filter(self.model.status == status)
+
+        if assigned_user_id:
+            query = query.filter(self.model.assigned_user_id == assigned_user_id)
+        
+        if search_query:
+            search_filter = f"%{search_query}%"
+            query = query.filter(
+                or_(
+                    self.model.first_name.ilike(search_filter),
+                    self.model.last_name.ilike(search_filter),
+                    self.model.email.ilike(search_filter),
+                    self.model.phone.ilike(search_filter),
+                    self.model.company_name.ilike(search_filter),
+                    self.model.title.ilike(search_filter),
+                    self.model.source.ilike(search_filter)
+                )
+            )
+        
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar_one()
+
+        # Get records ordered by created_at desc
+        records_query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
+        records_result = await self.db.execute(records_query)
+        records = records_result.scalars().all()
+
+        return records, total
+
+    async def update_lead(self, organization_id: uuid.UUID, lead_id: uuid.UUID, lead_data: dict) -> Lead | None:
+        lead = await self.get_lead_by_id(organization_id, lead_id)
+        if not lead:
+            return None
+        return await self.update(lead, lead_data)
+
+    async def soft_delete_lead(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
+        lead = await self.get_lead_by_id(organization_id, lead_id)
+        if not lead:
+            return None
+        lead.is_deleted = True
+        lead.deleted_at = datetime.now(timezone.utc)
+        self.db.add(lead)
+        await self.db.flush()
+        return lead
