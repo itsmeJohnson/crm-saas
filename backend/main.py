@@ -10,6 +10,7 @@ from app.api.v1.contacts import router as contacts_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.activities import router as activities_router
 from app.api.v1.notes import router as notes_router
+from app.api.v1.dashboard import router as dashboard_router
 from app.models.base import Base
 from app.core.database import engine
 
@@ -45,6 +46,7 @@ app.include_router(contacts_router, prefix=f"{settings.API_V1_STR}/contacts", ta
 app.include_router(leads_router, prefix=f"{settings.API_V1_STR}/leads", tags=["leads"])
 app.include_router(activities_router, prefix=f"{settings.API_V1_STR}/activities", tags=["activities"])
 app.include_router(notes_router, prefix=f"{settings.API_V1_STR}/notes", tags=["notes"])
+app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
 
 @app.get("/health")
 def health_check():

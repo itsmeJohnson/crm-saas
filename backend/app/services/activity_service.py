@@ -8,6 +8,7 @@ from app.repositories.contact_repository import ContactRepository
 from app.repositories.company_repository import CompanyRepository
 from app.repositories.user_repository import UserRepository
 from app.services.audit_service import AuditService
+from app.services.dashboard_service import DashboardService
 from app.models.user import User
 from app.models.activity import Activity
 
@@ -87,6 +88,7 @@ class ActivityService:
             resource_id=str(activity.id),
             action_metadata={"subject": activity.subject, "activity_type": activity.activity_type}
         )
+        await DashboardService.invalidate_cache(actor.organization_id)
         return activity
 
     async def paginate_activities(
@@ -154,6 +156,7 @@ class ActivityService:
             resource_id=str(activity_id),
             action_metadata={"updated_fields": list(activity_data.keys())}
         )
+        await DashboardService.invalidate_cache(actor.organization_id)
         return updated
 
     async def soft_delete_activity(self, actor: User, activity_id: uuid.UUID) -> Activity:
@@ -171,4 +174,5 @@ class ActivityService:
             resource_type="activity",
             resource_id=str(activity_id)
         )
+        await DashboardService.invalidate_cache(actor.organization_id)
         return deleted

@@ -7,6 +7,7 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.note_repository import NoteRepository
 from app.services.audit_service import AuditService
+from app.services.dashboard_service import DashboardService
 from app.models.user import User
 from app.models.lead import Lead
 
@@ -52,6 +53,7 @@ class LeadService:
             resource_id=str(lead.id),
             action_metadata={"title": lead.title, "status": lead.status}
         )
+        await DashboardService.invalidate_cache(actor.organization_id)
         return lead
 
     async def paginate_leads(
@@ -104,6 +106,7 @@ class LeadService:
             resource_id=str(lead_id),
             action_metadata={"updated_fields": list(lead_data.keys())}
         )
+        await DashboardService.invalidate_cache(actor.organization_id)
         return updated
 
     async def soft_delete_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
@@ -125,4 +128,5 @@ class LeadService:
             resource_type="lead",
             resource_id=str(lead_id)
         )
+        await DashboardService.invalidate_cache(actor.organization_id)
         return deleted
