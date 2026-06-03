@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
+// @vitest-environment happy-dom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { UserTable } from '../UserTable';
 import { useUserStore } from '../../../store/userStore';
 import { useAuthStore } from '../../../store/authStore';
@@ -61,18 +61,27 @@ describe('UserTable Component', () => {
       toggleUserStatus: mockToggleStatus,
       deleteUser: mockDeleteUser,
     });
+
+    // Mock auth store by default as OrgAdmin
+    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
+      const state = {
+        user: {
+          id: '1',
+          email: 'admin@org.com',
+          first_name: 'Admin',
+          last_name: 'User',
+          role: 'OrgAdmin',
+        }
+      };
+      return selector ? selector(state) : state;
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('renders user details and role badges correctly', () => {
-    // Current user is OrgAdmin
-    (useAuthStore as any).mockReturnValue({
-      id: '1',
-      email: 'admin@org.com',
-      first_name: 'Admin',
-      last_name: 'User',
-      role: 'OrgAdmin',
-    });
-
     render(<UserTable onEditClick={mockOnEditClick} />);
 
     // Check names are rendered
@@ -89,15 +98,6 @@ describe('UserTable Component', () => {
   });
 
   it('allows OrgAdmin to deactivate and delete other users but not themselves', () => {
-    // Current user is Admin User (id: '1')
-    (useAuthStore as any).mockReturnValue({
-      id: '1',
-      email: 'admin@org.com',
-      first_name: 'Admin',
-      last_name: 'User',
-      role: 'OrgAdmin',
-    });
-
     render(<UserTable onEditClick={mockOnEditClick} />);
 
     // OrgAdmin should see actions on employee (deactivate, edit, delete)
@@ -115,12 +115,17 @@ describe('UserTable Component', () => {
 
   it('restricts Employee users from deactivating or deleting any users', () => {
     // Current user is Employee User (id: '2')
-    (useAuthStore as any).mockReturnValue({
-      id: '2',
-      email: 'employee@org.com',
-      first_name: 'Employee',
-      last_name: 'User',
-      role: 'Employee',
+    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
+      const state = {
+        user: {
+          id: '2',
+          email: 'employee@org.com',
+          first_name: 'Employee',
+          last_name: 'User',
+          role: 'Employee',
+        }
+      };
+      return selector ? selector(state) : state;
     });
 
     render(<UserTable onEditClick={mockOnEditClick} />);

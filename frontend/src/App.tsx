@@ -9,6 +9,9 @@ import { Register } from './modules/auth/Register';
 import { Home } from './modules/dashboard/Home';
 import { Profile } from './modules/organization/Profile';
 import { UsersPage } from './pages/UsersPage';
+import { LeadsPage } from './pages/LeadsPage';
+import { CompaniesPage } from './pages/CompaniesPage';
+import { ContactsPage } from './pages/ContactsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +39,9 @@ export const App: React.FC = () => {
               <Route path="/" element={<Home />} />
               <Route path="/organization" element={<Profile />} />
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/leads" element={<LeadsPage />} />
+              <Route path="/companies" element={<CompaniesPage />} />
+              <Route path="/contacts" element={<ContactsPage />} />
             </Route>
           </Route>
 
