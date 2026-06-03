@@ -17,6 +17,7 @@ class UserUpdate(BaseModel):
     first_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, max_length=100)
     is_active: bool | None = None
+    role: str | None = Field(None, pattern="^(OrgAdmin|Manager|Employee)$")
 
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
@@ -25,5 +26,6 @@ class UserResponse(UserBase):
     organization_id: uuid.UUID
     is_active: bool
     is_verified: bool
+    is_invited: bool
     created_at: datetime
     updated_at: datetime

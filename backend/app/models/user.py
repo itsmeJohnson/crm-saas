@@ -14,6 +14,8 @@ class User(BaseModel):
     role: Mapped[str] = mapped_column(String(50), default="User")  # SuperAdmin, OrgAdmin, Manager, User
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    token_version: Mapped[int] = mapped_column(default=1, nullable=False)
+    is_invited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")
