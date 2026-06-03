@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.organization import router as org_router
+from app.api.v1.users import router as users_router
 from app.models.base import Base
 from app.core.database import engine
 
@@ -33,6 +34,7 @@ if settings.BACKEND_CORS_ORIGINS:
 
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(org_router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])
+app.include_router(users_router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 
 @app.get("/health")
 def health_check():
