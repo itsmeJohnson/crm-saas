@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import { leadApi, LeadResponse } from '../services/leadApi';
+import { 
+  leadApi, 
+  LeadResponse, 
+  ImportPreviewResponse, 
+  LeadImportProcessRequest, 
+  LeadImportResponse, 
+  AssignmentConfigResponse 
+} from '../services/leadApi';
 
 interface Filters {
   search: string;
@@ -18,6 +25,8 @@ interface LeadState {
   error: string | null;
   filters: Filters;
   pagination: Pagination;
+  assignmentConfig: AssignmentConfigResponse | null;
+  importHistory: LeadImportResponse[];
   setFilters: (filters: Partial<Filters>) => void;
   setPagination: (pagination: Partial<Pagination>) => void;
   resetFilters: () => void;
@@ -25,6 +34,14 @@ interface LeadState {
   createLead: (payload: Parameters<typeof leadApi.createLead>[0]) => Promise<LeadResponse>;
   updateLead: (leadId: string, payload: Parameters<typeof leadApi.updateLead>[1]) => Promise<LeadResponse>;
   deleteLead: (leadId: string) => Promise<void>;
+  fetchAssignmentConfig: () => Promise<void>;
+  toggleAssignmentConfig: (isActive: boolean) => Promise<void>;
+  fetchImportHistory: () => Promise<void>;
+  uploadImportFile: (file: File) => Promise<ImportPreviewResponse>;
+  previewGoogleSheets: (url: string) => Promise<ImportPreviewResponse>;
+  processImport: (payload: LeadImportProcessRequest) => Promise<LeadImportResponse>;
+  downloadTemplate: (format: 'csv' | 'xlsx') => Promise<Blob>;
+  downloadFailedRows: (importId: string) => Promise<Blob>;
 }
 
 export const useLeadStore = create<LeadState>((set, get) => ({
@@ -40,6 +57,8 @@ export const useLeadStore = create<LeadState>((set, get) => ({
     skip: 0,
     limit: 20,
   },
+  assignmentConfig: null,
+  importHistory: [],
 
   setFilters: (newFilters) => {
     set((state) => ({
@@ -122,4 +141,101 @@ export const useLeadStore = create<LeadState>((set, get) => ({
       throw new Error(errorMsg);
     }
   },
+
+  fetchAssignmentConfig: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const config = await leadApi.getAssignmentConfig();
+      set({ assignmentConfig: config, isLoading: false });
+    } catch (err: any) {
+      set({
+        error: err.response?.data?.detail || 'Failed to fetch assignment config',
+        isLoading: false,
+      });
+    }
+  },
+
+  toggleAssignmentConfig: async (isActive) => {
+    set({ isLoading: true, error: null });
+    try {
+      const config = await leadApi.updateAssignmentConfig(isActive);
+      set({ assignmentConfig: config, isLoading: false });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to update assignment config';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  fetchImportHistory: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const history = await leadApi.getImportHistory();
+      set({ importHistory: history, isLoading: false });
+    } catch (err: any) {
+      set({
+        error: err.response?.data?.detail || 'Failed to fetch import history',
+        isLoading: false,
+      });
+    }
+  },
+
+  uploadImportFile: async (file) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await leadApi.uploadImportFile(file);
+      set({ isLoading: false });
+      return res;
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to upload import file';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  previewGoogleSheets: async (url) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await leadApi.previewGoogleSheets(url);
+      set({ isLoading: false });
+      return res;
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to preview Google Sheets';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  processImport: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await leadApi.processImport(payload);
+      set({ isLoading: false });
+      await get().fetchLeads();
+      return res;
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to process import';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  downloadTemplate: async (format) => {
+    try {
+      return await leadApi.downloadTemplate(format);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to download template';
+      throw new Error(errorMsg);
+    }
+  },
+
+  downloadFailedRows: async (importId) => {
+    try {
+      return await leadApi.downloadFailedRows(importId);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to download failed rows';
+      throw new Error(errorMsg);
+    }
+  },
 }));
+

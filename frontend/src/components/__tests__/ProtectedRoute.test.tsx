@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import React from 'react';
 import { ProtectedRoute } from '../ProtectedRoute';
 import { useAuthStore } from '../../store/authStore';
 

@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import String, ForeignKey, Numeric
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
 
 class Lead(BaseModel):
@@ -18,3 +18,7 @@ class Lead(BaseModel):
     value: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    import_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("lead_imports.id"), nullable=True, index=True)
+
+    # Relationships
+    import_batch: Mapped["LeadImport | None"] = relationship("LeadImport", back_populates="leads")

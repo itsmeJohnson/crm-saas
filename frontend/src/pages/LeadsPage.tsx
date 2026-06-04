@@ -7,8 +7,10 @@ import { Pagination } from '../components/crm/Pagination';
 import { ActivityTimeline } from '../components/crm/ActivityTimeline';
 import { NotesPanel } from '../components/crm/NotesPanel';
 import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
+import { ImportModal } from '../components/crm/ImportModal';
+import { AssignmentToggle } from '../components/crm/AssignmentToggle';
 
 export const LeadsPage: React.FC = () => {
   const {
@@ -27,6 +29,7 @@ export const LeadsPage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadResponse | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLead, setDetailLead] = useState<LeadResponse | null>(null);
@@ -56,7 +59,7 @@ export const LeadsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/60 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/60 pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
             Leads
@@ -66,13 +69,25 @@ export const LeadsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Add Lead
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <AssignmentToggle />
+
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
+          >
+            <Upload className="w-4 h-4" />
+            Import Leads
+          </button>
+
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Add Lead
+          </button>
+        </div>
       </div>
 
       {/* Filters, Table, Pagination */}
@@ -128,6 +143,9 @@ export const LeadsPage: React.FC = () => {
 
       {/* Creation Modal */}
       <LeadModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+
+      {/* Import Modal */}
+      <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onSuccess={fetchLeads} />
 
       {/* Edit Modal */}
       <LeadModal

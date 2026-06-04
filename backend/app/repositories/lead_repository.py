@@ -24,6 +24,15 @@ class LeadRepository(BaseRepository[Lead]):
         result = await self.db.execute(query)
         return result.scalars().first()
 
+    async def get_lead_by_email(self, organization_id: uuid.UUID, email: str) -> Lead | None:
+        query = select(self.model).filter(
+            self.model.email == email,
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
     async def paginate_leads(
         self, 
         organization_id: uuid.UUID, 

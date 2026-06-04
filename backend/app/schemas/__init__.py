@@ -8,6 +8,8 @@ from app.schemas.contact import ContactBase, ContactCreate, ContactUpdate, Conta
 from app.schemas.lead import LeadBase, LeadCreate, LeadUpdate, LeadResponse
 from app.schemas.activity import ActivityBase, ActivityCreate, ActivityUpdate, ActivityResponse
 from app.schemas.note import NoteBase, NoteCreate, NoteUpdate, NoteResponse
+from app.schemas.lead_import import GoogleSheetsPreviewRequest, ImportPreviewResponse, LeadImportProcessRequest, LeadImportResponse
+from app.schemas.assignment_config import AssignmentConfigUpdate, AssignmentConfigResponse
 
 __all__ = [
     "OrganizationBase", "OrganizationCreate", "OrganizationUpdate", "OrganizationResponse",
@@ -19,5 +21,7 @@ __all__ = [
     "ContactBase", "ContactCreate", "ContactUpdate", "ContactResponse",
     "LeadBase", "LeadCreate", "LeadUpdate", "LeadResponse",
     "ActivityBase", "ActivityCreate", "ActivityUpdate", "ActivityResponse",
-    "NoteBase", "NoteCreate", "NoteUpdate", "NoteResponse"
+    "NoteBase", "NoteCreate", "NoteUpdate", "NoteResponse",
+    "GoogleSheetsPreviewRequest", "ImportPreviewResponse", "LeadImportProcessRequest", "LeadImportResponse",
+    "AssignmentConfigUpdate", "AssignmentConfigResponse"
 ]

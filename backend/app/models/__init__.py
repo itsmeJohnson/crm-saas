@@ -9,6 +9,8 @@ from app.models.contact import Contact
 from app.models.lead import Lead
 from app.models.activity import Activity
 from app.models.note import Note
+from app.models.lead_import import LeadImport
+from app.models.assignment_config import AssignmentConfig
 
 __all__ = [
     "Base", 
@@ -22,5 +24,7 @@ __all__ = [
     "Contact",
     "Lead",
     "Activity",
-    "Note"
+    "Note",
+    "LeadImport",
+    "AssignmentConfig"
 ]
