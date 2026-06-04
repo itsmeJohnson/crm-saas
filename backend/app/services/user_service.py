@@ -28,6 +28,8 @@ class UserService:
                 status_code=status.HTTP_404_NOT_FOUND, 
                 detail="User not found"
             )
+        if actor.id != user_id:
+            PermissionService.check_user_management_permission(actor, user.role)
         return user
 
     async def create_user(self, actor: User, user_data: dict) -> User:
@@ -206,5 +208,10 @@ class UserService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Actor account is deactivated"
+            )
+        if actor.role == "Employee":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have enough privileges"
             )
         return await self.user_repo.paginate_users(actor.organization_id, skip, limit, search_query)

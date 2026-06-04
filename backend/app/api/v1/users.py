@@ -26,7 +26,7 @@ async def create_user(
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_user_management_permission())],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),

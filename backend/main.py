@@ -11,8 +11,14 @@ from app.api.v1.leads import router as leads_router
 from app.api.v1.activities import router as activities_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.health import router as active_health_router
 from app.models.base import Base
 from app.core.database import engine
+import os
+from app.core.logging_config import setup_logging
+
+if os.getenv("LOG_JSON", "false").lower() == "true":
+    setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,6 +53,7 @@ app.include_router(leads_router, prefix=f"{settings.API_V1_STR}/leads", tags=["l
 app.include_router(activities_router, prefix=f"{settings.API_V1_STR}/activities", tags=["activities"])
 app.include_router(notes_router, prefix=f"{settings.API_V1_STR}/notes", tags=["notes"])
 app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
+app.include_router(active_health_router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
 
 @app.get("/health")
 def health_check():

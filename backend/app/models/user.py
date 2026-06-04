@@ -11,7 +11,7 @@ class User(BaseModel):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    role: Mapped[str] = mapped_column(String(50), default="User")  # SuperAdmin, OrgAdmin, Manager, User
+    role: Mapped[str] = mapped_column(String(50), default="Employee")  # SuperAdmin, OrgAdmin, Manager, Employee
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     token_version: Mapped[int] = mapped_column(default=1, nullable=False)

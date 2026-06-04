@@ -79,6 +79,11 @@ class InvitationService:
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Actor account is deactivated"
             )
+        if actor.role == "Employee":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have enough privileges"
+            )
         return await self.invite_repo.get_pending_invites(actor.organization_id)
 
     async def revoke_invite(self, actor: User, invite_id: uuid.UUID) -> UserInvitation:

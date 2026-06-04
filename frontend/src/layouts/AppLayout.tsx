@@ -13,14 +13,19 @@ export const AppLayout: React.FC = () => {
     navigate('/login');
   };
 
-  const navItems = [
+  const allNavItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Leads', path: '/leads', icon: FolderKanban },
     { name: 'Companies', path: '/companies', icon: Briefcase },
     { name: 'Contacts', path: '/contacts', icon: Contact },
-    { name: 'Users', path: '/users', icon: Users },
-    { name: 'Organization', path: '/organization', icon: Building },
+    { name: 'Users', path: '/users', icon: Users, roles: ['OrgAdmin', 'Manager'] },
+    { name: 'Organization', path: '/organization', icon: Building, roles: ['OrgAdmin'] },
   ];
+
+  const navItems = allNavItems.filter((item) => {
+    if (!item.roles) return true;
+    return user && item.roles.includes(user.role);
+  });
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">

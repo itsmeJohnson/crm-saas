@@ -37,11 +37,19 @@ export const App: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/organization" element={<Profile />} />
-              <Route path="/users" element={<UsersPage />} />
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/companies" element={<CompaniesPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
+              
+              {/* OrgAdmin only */}
+              <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+                <Route path="/organization" element={<Profile />} />
+              </Route>
+
+              {/* OrgAdmin & Manager only */}
+              <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                <Route path="/users" element={<UsersPage />} />
+              </Route>
             </Route>
           </Route>
 

@@ -145,6 +145,10 @@ async def test_list_users_scoping_and_pagination(client: AsyncClient, setup_user
     res_data = response.json()
     assert len(res_data) == 1
 
+    # Employee cannot list users
+    response = await client.get("/api/v1/users/", headers=data["headers_employee_a"])
+    assert response.status_code == 403
+
 @pytest.mark.asyncio
 async def test_get_user_by_id(client: AsyncClient, setup_users: dict):
     data = setup_users
@@ -161,6 +165,14 @@ async def test_get_user_by_id(client: AsyncClient, setup_users: dict):
     # Tenant isolation: Get Org B user details as Org A user (should fail)
     response = await client.get(f"/api/v1/users/{data['admin_b'].id}", headers=data["headers_admin_a"])
     assert response.status_code == 404
+
+    # Employee tries to get another user's details (should fail)
+    response = await client.get(f"/api/v1/users/{data['admin_a'].id}", headers=data["headers_employee_a"])
+    assert response.status_code == 403
+
+    # Manager tries to get Admin's details (should fail)
+    response = await client.get(f"/api/v1/users/{data['admin_a'].id}", headers=data["headers_manager_a"])
+    assert response.status_code == 403
 
 @pytest.mark.asyncio
 async def test_update_user(client: AsyncClient, setup_users: dict):
