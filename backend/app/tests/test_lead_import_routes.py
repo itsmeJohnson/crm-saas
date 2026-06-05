@@ -261,3 +261,155 @@ async def test_process_import_batch_with_duplicates_and_isolation(client: AsyncC
     # Admin B is blocked from downloading Org A's failed rows
     resp_csv_b = await client.get(f"/api/v1/leads/import/{import_id}/failed-rows", headers=data["headers_admin_b"])
     assert resp_csv_b.status_code == 404
+
+@pytest.mark.asyncio
+async def test_process_import_batch_assignment_modes_route(client: AsyncClient, setup_import_routes_data: dict, db: AsyncSession):
+    data = setup_import_routes_data
+    user_repo = UserRepository(db)
+
+    # Create active employee
+    emp_user = await user_repo.create_user(data["org_a"].id, {
+        "email": "active_emp_route@tenant-a.com",
+        "hashed_password": get_password_hash("password123"),
+        "first_name": "Active",
+        "last_name": "Employee",
+        "role": "Employee",
+        "is_active": True
+    })
+
+    # Create inactive employee
+    inactive_emp = await user_repo.create_user(data["org_a"].id, {
+        "email": "inactive_emp_route@tenant-a.com",
+        "hashed_password": get_password_hash("password123"),
+        "first_name": "Inactive",
+        "last_name": "Employee",
+        "role": "Employee",
+        "is_active": False
+    })
+    await db.commit()
+
+    column_mapping = {
+        "first_name": "First Name",
+        "last_name": "Last Name",
+        "email": "Email Address",
+        "title": "Job Title"
+    }
+
+    # Test 1: SPECIFIC_USER with active employee in Org A
+    csv_rows_1 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "route_assign_1@test.com", "Developer"]
+    ]
+    out_1 = io.StringIO()
+    csv.writer(out_1).writerows(csv_rows_1)
+    file_token_1 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_1}", out_1.getvalue(), ex=300)
+
+    payload_1 = {
+        "file_token": file_token_1,
+        "source_type": "file",
+        "column_mapping": column_mapping,
+        "assignment_mode": "SPECIFIC_USER",
+        "assigned_user_id": str(emp_user.id)
+    }
+    resp_1 = await client.post("/api/v1/leads/import/process", json=payload_1, headers=data["headers_admin_a"])
+    assert resp_1.status_code == 200
+    res_1 = resp_1.json()
+    assert res_1["status"] == "COMPLETED"
+    assert res_1["successful_rows"] == 1
+
+    # Test 2: SPECIFIC_USER with inactive employee
+    csv_rows_2 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "route_assign_2@test.com", "Developer"]
+    ]
+    out_2 = io.StringIO()
+    csv.writer(out_2).writerows(csv_rows_2)
+    file_token_2 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_2}", out_2.getvalue(), ex=300)
+
+    payload_2 = {
+        "file_token": file_token_2,
+        "source_type": "file",
+        "column_mapping": column_mapping,
+        "assignment_mode": "SPECIFIC_USER",
+        "assigned_user_id": str(inactive_emp.id)
+    }
+    resp_2 = await client.post("/api/v1/leads/import/process", json=payload_2, headers=data["headers_admin_a"])
+    assert resp_2.status_code == 400
+    assert "Invalid assignee" in resp_2.json()["detail"]
+
+    # Test 3: SPECIFIC_USER with non-existent ID
+    csv_rows_3 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "route_assign_3@test.com", "Developer"]
+    ]
+    out_3 = io.StringIO()
+    csv.writer(out_3).writerows(csv_rows_3)
+    file_token_3 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_3}", out_3.getvalue(), ex=300)
+
+    payload_3 = {
+        "file_token": file_token_3,
+        "source_type": "file",
+        "column_mapping": column_mapping,
+        "assignment_mode": "SPECIFIC_USER",
+        "assigned_user_id": str(uuid.uuid4())
+    }
+    resp_3 = await client.post("/api/v1/leads/import/process", json=payload_3, headers=data["headers_admin_a"])
+    assert resp_3.status_code == 400
+    assert "Invalid assignee" in resp_3.json()["detail"]
+
+    # Test 4: SPECIFIC_USER with employee in Org B (cross-tenant check)
+    emp_b = await user_repo.create_user(data["org_b"].id, {
+        "email": "active_emp_b_route@tenant-b.com",
+        "hashed_password": get_password_hash("password123"),
+        "first_name": "Active",
+        "last_name": "Employee B",
+        "role": "Employee",
+        "is_active": True
+    })
+    await db.commit()
+
+    csv_rows_4 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "route_assign_4@test.com", "Developer"]
+    ]
+    out_4 = io.StringIO()
+    csv.writer(out_4).writerows(csv_rows_4)
+    file_token_4 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_4}", out_4.getvalue(), ex=300)
+
+    payload_4 = {
+        "file_token": file_token_4,
+        "source_type": "file",
+        "column_mapping": column_mapping,
+        "assignment_mode": "SPECIFIC_USER",
+        "assigned_user_id": str(emp_b.id)
+    }
+    resp_4 = await client.post("/api/v1/leads/import/process", json=payload_4, headers=data["headers_admin_a"])
+    assert resp_4.status_code == 400
+    assert "Invalid assignee" in resp_4.json()["detail"]
+
+    # Test 5: NONE mode
+    csv_rows_5 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "route_assign_5@test.com", "Developer"]
+    ]
+    out_5 = io.StringIO()
+    csv.writer(out_5).writerows(csv_rows_5)
+    file_token_5 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_5}", out_5.getvalue(), ex=300)
+
+    payload_5 = {
+        "file_token": file_token_5,
+        "source_type": "file",
+        "column_mapping": column_mapping,
+        "assignment_mode": "NONE"
+    }
+    resp_5 = await client.post("/api/v1/leads/import/process", json=payload_5, headers=data["headers_admin_a"])
+    assert resp_5.status_code == 200
+    res_5 = resp_5.json()
+    assert res_5["status"] == "COMPLETED"
+    assert res_5["successful_rows"] == 1
+

@@ -176,6 +176,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     onClose();
   };
 
+  const handleReset = () => {
+    setStep('upload');
+    setSelectedFile(null);
+    setSheetsUrl('');
+    setPreviewData(null);
+    setColumnMapping({});
+    setErrorMsg(null);
+    setImportResult(null);
+    setSourceType('file');
+    setAutoAssign(true);
+  };
+
   const getStepProgressWidth = () => {
     if (step === 'upload') return '33%';
     if (step === 'preview_mapping') return '66%';
@@ -367,13 +379,22 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
           )}
 
           {step === 'summary' && (
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-900/80 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer"
-            >
-              Done & Close
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-900/80 active:bg-slate-900/60 rounded-xl text-xs font-semibold text-slate-300 transition-all cursor-pointer"
+              >
+                Import Another File
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-5 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 rounded-xl text-xs font-semibold text-white transition-all shadow-md shadow-brand-500/10 cursor-pointer"
+              >
+                Close
+              </button>
+            </>
           )}
         </div>
       </div>

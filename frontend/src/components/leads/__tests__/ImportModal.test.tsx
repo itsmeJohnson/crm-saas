@@ -170,4 +170,145 @@ describe('ImportModal Component', () => {
       expect(mockProcessImport).not.toHaveBeenCalled();
     });
   });
+
+  it('completes the import flow and supports resetting to import another file', async () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
+    const mockPreviewResponse = {
+      file_token: 'token-123',
+      headers: ['First Name', 'Last Name', 'Email', 'Job Title'],
+      suggested_mapping: {
+        first_name: { column: 'First Name', confidence: 1.0 },
+        last_name: { column: 'Last Name', confidence: 1.0 },
+        email: { column: 'Email', confidence: 1.0 },
+        title: { column: 'Job Title', confidence: 1.0 },
+      },
+      preview_rows: [
+        { 'First Name': 'John', 'Last Name': 'Doe', 'Email': 'john@test.com', 'Job Title': 'Developer' }
+      ]
+    };
+
+    const mockImportResponse = {
+      id: 'import-id-456',
+      organization_id: 'org-id',
+      filename: 'leads.csv',
+      status: 'COMPLETED',
+      total_rows: 1,
+      successful_rows: 1,
+      failed_rows: 0,
+      mapping_confidence: 1.0,
+      error_summary: [],
+      failed_rows_file_path: null,
+      created_by: 'user-id',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    mockUploadImportFile.mockResolvedValue(mockPreviewResponse);
+    mockProcessImport.mockResolvedValue(mockImportResponse);
+
+    render(
+      <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+    );
+
+    // Step 1: Upload file
+    const file = new File(['John,Doe,john@test.com,Developer'], 'leads.csv', { type: 'text/csv' });
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    }
+    fireEvent.click(screen.getByText('Next'));
+
+    // Step 2: Preview Mapping and Process Mapping
+    await waitFor(() => {
+      expect(screen.getByText('Map File Headers to Lead Properties')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText('Process Mapping'));
+
+    // Step 3: Summary screen
+    await waitFor(() => {
+      expect(screen.getByText('Import Batch Processed')).toBeDefined();
+      expect(screen.getByText('Import Another File')).toBeDefined();
+      expect(screen.getByText('Close')).toBeDefined();
+    });
+
+    // Test clicking "Import Another File" resets the flow
+    fireEvent.click(screen.getByText('Import Another File'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Local File Upload')).toBeDefined();
+      expect(screen.queryByText('Import Batch Processed')).toBeNull();
+    });
+  });
+
+  it('calls onSuccess and onClose when Close button is clicked on summary step', async () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
+    const mockPreviewResponse = {
+      file_token: 'token-123',
+      headers: ['First Name', 'Last Name', 'Email', 'Job Title'],
+      suggested_mapping: {
+        first_name: { column: 'First Name', confidence: 1.0 },
+        last_name: { column: 'Last Name', confidence: 1.0 },
+        email: { column: 'Email', confidence: 1.0 },
+        title: { column: 'Job Title', confidence: 1.0 },
+      },
+      preview_rows: [
+        { 'First Name': 'John', 'Last Name': 'Doe', 'Email': 'john@test.com', 'Job Title': 'Developer' }
+      ]
+    };
+
+    const mockImportResponse = {
+      id: 'import-id-456',
+      organization_id: 'org-id',
+      filename: 'leads.csv',
+      status: 'COMPLETED',
+      total_rows: 1,
+      successful_rows: 1,
+      failed_rows: 0,
+      mapping_confidence: 1.0,
+      error_summary: [],
+      failed_rows_file_path: null,
+      created_by: 'user-id',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    mockUploadImportFile.mockResolvedValue(mockPreviewResponse);
+    mockProcessImport.mockResolvedValue(mockImportResponse);
+
+    render(
+      <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+    );
+
+    // Step 1: Upload file
+    const file = new File(['John,Doe,john@test.com,Developer'], 'leads.csv', { type: 'text/csv' });
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    }
+    fireEvent.click(screen.getByText('Next'));
+
+    // Step 2: Process Mapping
+    await waitFor(() => {
+      expect(screen.getByText('Map File Headers to Lead Properties')).toBeDefined();
+    });
+    fireEvent.click(screen.getByText('Process Mapping'));
+
+    // Step 3: Summary screen
+    await waitFor(() => {
+      expect(screen.getByText('Import Batch Processed')).toBeDefined();
+    });
+
+    // Click Close
+    fireEvent.click(screen.getByText('Close'));
+    expect(mockOnSuccess).toHaveBeenCalled();
+    expect(mockOnClose).toHaveBeenCalled();
+  });
 });
+

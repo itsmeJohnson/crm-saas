@@ -140,7 +140,9 @@ async def process_import_batch(
         file_token=req.file_token,
         source_type=req.source_type,
         column_mapping=req.column_mapping,
-        auto_assign=req.auto_assign
+        auto_assign=req.auto_assign,
+        assignment_mode=req.assignment_mode,
+        assigned_user_id=req.assigned_user_id
     )
 
 @router.get("/import/history", response_model=List[LeadImportResponse])

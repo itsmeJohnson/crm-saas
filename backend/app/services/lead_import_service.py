@@ -16,6 +16,7 @@ from app.models.lead import Lead
 from app.models.lead_import import LeadImport, LeadImportStatus
 from app.core.redis import redis_client
 from app.repositories.lead_import_repository import LeadImportRepository
+from app.repositories.user_repository import UserRepository
 from app.repositories.lead_repository import LeadRepository
 from app.services.assignment_service import AssignmentService
 from app.services.audit_service import AuditService
@@ -79,6 +80,7 @@ class LeadImportService:
         self.db = db
         self.import_repo = LeadImportRepository(db)
         self.lead_repo = LeadRepository(db)
+        self.user_repo = UserRepository(db)
         self.assignment_service = AssignmentService(db)
         self.audit_service = AuditService(db)
 
@@ -246,12 +248,29 @@ class LeadImportService:
         file_token: str, 
         source_type: str, 
         column_mapping: Dict[str, str], 
-        auto_assign: bool
+        auto_assign: bool = True,
+        assignment_mode: str = "NONE",
+        assigned_user_id: uuid.UUID | None = None
     ) -> LeadImport:
         """
         Validate and import bulk leads under organization isolation.
         Saves successfully created leads and tracks/compiles failed rows report.
         """
+        # Validate SPECIFIC_USER assignment target
+        target_user = None
+        if assignment_mode == "SPECIFIC_USER":
+            if not assigned_user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Assigned user ID is required when assignment mode is SPECIFIC_USER"
+                )
+            target_user = await self.user_repo.get_user_by_id(actor.organization_id, assigned_user_id)
+            if not target_user or not target_user.is_active or target_user.role != "Employee":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid assignee. User must be an active employee in your organization."
+                )
+
         raw_content = await redis_client.get(f"import_file:{file_token}")
         if not raw_content:
             raise HTTPException(
@@ -363,8 +382,10 @@ class LeadImportService:
             self.db.add(lead_obj)
             await self.db.flush()
 
-            if auto_assign:
+            if assignment_mode == "AUTO":
                 await self.assignment_service.assign_lead(lead_obj)
+            elif assignment_mode == "SPECIFIC_USER" and target_user:
+                await self.assignment_service.assign_lead_to_user(lead_obj, target_user)
             
             success_count += 1
 
@@ -399,7 +420,9 @@ class LeadImportService:
             action_metadata={
                 "total_rows": len(data_rows),
                 "success_count": success_count,
-                "fail_count": fail_count
+                "fail_count": fail_count,
+                "assignment_mode": assignment_mode,
+                "assigned_user_id": str(assigned_user_id) if assigned_user_id else None
             }
         )
 

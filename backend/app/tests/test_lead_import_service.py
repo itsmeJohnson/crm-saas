@@ -2,6 +2,7 @@ import pytest
 import uuid
 import csv
 import io
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -185,3 +186,173 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
     assert "Import Error Reason" in failed_csv_report
     assert "No,Title,notitle@test.com,,Globex" in failed_csv_report
     assert "Job Title/Lead Title is a required field and is missing" in failed_csv_report
+
+@pytest.mark.asyncio
+async def test_process_import_batch_assignment_modes(db: AsyncSession, import_setup: dict):
+    data = import_setup
+    import_service = LeadImportService(db)
+    user_repo = UserRepository(db)
+    lead_repo = LeadRepository(db)
+
+    # Create active employee
+    employee = await user_repo.create_user(data["org"].id, {
+        "email": "emp@importorg.com",
+        "hashed_password": "hashedpassword123",
+        "first_name": "Bob",
+        "last_name": "Employee",
+        "role": "Employee",
+        "is_active": True
+    })
+
+    # Create inactive employee
+    inactive_employee = await user_repo.create_user(data["org"].id, {
+        "email": "inactive_emp@importorg.com",
+        "hashed_password": "hashedpassword123",
+        "first_name": "Inactive",
+        "last_name": "Employee",
+        "role": "Employee",
+        "is_active": False
+    })
+
+    # Create active admin (non-employee)
+    admin_user = await user_repo.create_user(data["org"].id, {
+        "email": "admin2@importorg.com",
+        "hashed_password": "hashedpassword123",
+        "first_name": "Charlie",
+        "last_name": "Admin",
+        "role": "OrgAdmin",
+        "is_active": True
+    })
+    await db.commit()
+
+    column_mapping = {
+        "first_name": "First Name",
+        "last_name": "Last Name",
+        "email": "Email Address",
+        "title": "Job Title"
+    }
+
+    # Test 1: assignment_mode="SPECIFIC_USER" with valid employee
+    csv_rows_1 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "john_assign_1@test.com", "Developer"]
+    ]
+    out_1 = io.StringIO()
+    writer_1 = csv.writer(out_1)
+    writer_1.writerows(csv_rows_1)
+    
+    file_token_1 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_1}", out_1.getvalue(), ex=300)
+    
+    import_log_1 = await import_service.process_import_batch(
+        actor=data["actor"],
+        file_token=file_token_1,
+        source_type="file",
+        column_mapping=column_mapping,
+        assignment_mode="SPECIFIC_USER",
+        assigned_user_id=employee.id
+    )
+    assert import_log_1.status == "COMPLETED"
+    
+    lead_1 = await lead_repo.get_lead_by_email(data["org"].id, "john_assign_1@test.com")
+    assert lead_1 is not None
+    assert lead_1.assigned_user_id == employee.id
+
+    # Test 2: assignment_mode="SPECIFIC_USER" with invalid/non-existent user
+    csv_rows_2 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "john_assign_2@test.com", "Developer"]
+    ]
+    out_2 = io.StringIO()
+    writer_2 = csv.writer(out_2)
+    writer_2.writerows(csv_rows_2)
+    
+    file_token_2 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_2}", out_2.getvalue(), ex=300)
+    
+    non_existent_id = uuid.uuid4()
+    with pytest.raises(HTTPException) as excinfo:
+        await import_service.process_import_batch(
+            actor=data["actor"],
+            file_token=file_token_2,
+            source_type="file",
+            column_mapping=column_mapping,
+            assignment_mode="SPECIFIC_USER",
+            assigned_user_id=non_existent_id
+        )
+    assert excinfo.value.status_code == 400
+    assert "Invalid assignee" in excinfo.value.detail
+
+    # Test 3: assignment_mode="SPECIFIC_USER" with inactive employee
+    csv_rows_3 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "john_assign_3@test.com", "Developer"]
+    ]
+    out_3 = io.StringIO()
+    writer_3 = csv.writer(out_3)
+    writer_3.writerows(csv_rows_3)
+    
+    file_token_3 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_3}", out_3.getvalue(), ex=300)
+    
+    with pytest.raises(HTTPException) as excinfo:
+        await import_service.process_import_batch(
+            actor=data["actor"],
+            file_token=file_token_3,
+            source_type="file",
+            column_mapping=column_mapping,
+            assignment_mode="SPECIFIC_USER",
+            assigned_user_id=inactive_employee.id
+        )
+    assert excinfo.value.status_code == 400
+    assert "Invalid assignee" in excinfo.value.detail
+
+    # Test 4: assignment_mode="SPECIFIC_USER" with non-employee (OrgAdmin) user
+    csv_rows_4 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "john_assign_4@test.com", "Developer"]
+    ]
+    out_4 = io.StringIO()
+    writer_4 = csv.writer(out_4)
+    writer_4.writerows(csv_rows_4)
+    
+    file_token_4 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_4}", out_4.getvalue(), ex=300)
+    
+    with pytest.raises(HTTPException) as excinfo:
+        await import_service.process_import_batch(
+            actor=data["actor"],
+            file_token=file_token_4,
+            source_type="file",
+            column_mapping=column_mapping,
+            assignment_mode="SPECIFIC_USER",
+            assigned_user_id=admin_user.id
+        )
+    assert excinfo.value.status_code == 400
+    assert "Invalid assignee" in excinfo.value.detail
+
+    # Test 5: assignment_mode="NONE"
+    csv_rows_5 = [
+        ["First Name", "Last Name", "Email Address", "Job Title"],
+        ["John", "Doe", "john_assign_5@test.com", "Developer"]
+    ]
+    out_5 = io.StringIO()
+    writer_5 = csv.writer(out_5)
+    writer_5.writerows(csv_rows_5)
+    
+    file_token_5 = str(uuid.uuid4())
+    await redis_client.set(f"import_file:{file_token_5}", out_5.getvalue(), ex=300)
+    
+    import_log_5 = await import_service.process_import_batch(
+        actor=data["actor"],
+        file_token=file_token_5,
+        source_type="file",
+        column_mapping=column_mapping,
+        assignment_mode="NONE"
+    )
+    assert import_log_5.status == "COMPLETED"
+    
+    lead_5 = await lead_repo.get_lead_by_email(data["org"].id, "john_assign_5@test.com")
+    assert lead_5 is not None
+    assert lead_5.assigned_user_id is None
+

@@ -96,3 +96,25 @@ class AssignmentService:
         )
 
         return next_user
+
+    async def assign_lead_to_user(self, lead: Lead, user: User) -> None:
+        """
+        Manually assign a Lead to a specific active Employee user.
+        """
+        lead.assigned_user_id = user.id
+        self.db.add(lead)
+        await self.db.flush()
+
+        # Log audit entry
+        await self.audit_service.log_event(
+            organization_id=lead.organization_id,
+            actor_user_id=lead.created_by,
+            action="LEAD_ASSIGNED",
+            resource_type="lead",
+            resource_id=str(lead.id),
+            action_metadata={
+                "assigned_user_id": str(user.id),
+                "assigned_email": user.email,
+                "reason": "specific_assignment"
+            }
+        )

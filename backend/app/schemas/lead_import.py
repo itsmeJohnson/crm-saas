@@ -1,8 +1,14 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing import List, Dict, Any
 from app.models.lead_import import LeadImportStatus
+
+class AssignmentMode(str, Enum):
+    AUTO = "AUTO"
+    SPECIFIC_USER = "SPECIFIC_USER"
+    NONE = "NONE"
 
 class GoogleSheetsPreviewRequest(BaseModel):
     url: str
@@ -22,6 +28,20 @@ class LeadImportProcessRequest(BaseModel):
     source_type: str  # "file" or "google_sheets"
     column_mapping: Dict[str, str]
     auto_assign: bool = True
+    assignment_mode: AssignmentMode = AssignmentMode.NONE
+    assigned_user_id: uuid.UUID | None = None
+
+    @model_validator(mode='after')
+    def validate_assigned_user(self) -> 'LeadImportProcessRequest':
+        if 'assignment_mode' not in self.model_fields_set:
+            if self.auto_assign:
+                self.assignment_mode = AssignmentMode.AUTO
+            else:
+                self.assignment_mode = AssignmentMode.NONE
+
+        if self.assignment_mode == AssignmentMode.SPECIFIC_USER and not self.assigned_user_id:
+            raise ValueError("assigned_user_id must be provided when assignment_mode is 'SPECIFIC_USER'")
+        return self
 
 class RowErrorDetail(BaseModel):
     row: int
