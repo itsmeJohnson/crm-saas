@@ -4,13 +4,22 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { ImportModal } from '../ImportModal';
 import { useLeadImportStore } from '../../../store/leadImportStore';
 import { useAuthStore } from '../../../store/authStore';
+import { userApi } from '../../../services/userApi';
 
 vi.mock('../../../store/leadImportStore', () => ({
-  useLeadImportStore: vi.fn(),
+  useLeadImportStore: vi.fn().mockReturnValue({
+    clearError: vi.fn(),
+  }),
 }));
 
 vi.mock('../../../store/authStore', () => ({
   useAuthStore: vi.fn(),
+}));
+
+vi.mock('../../../services/userApi', () => ({
+  userApi: {
+    getUsers: vi.fn(),
+  },
 }));
 
 describe('ImportModal Component', () => {
@@ -19,6 +28,7 @@ describe('ImportModal Component', () => {
   const mockProcessImport = vi.fn();
   const mockDownloadTemplate = vi.fn();
   const mockDownloadFailedRows = vi.fn();
+  const mockClearError = vi.fn();
   const mockOnClose = vi.fn();
   const mockOnSuccess = vi.fn();
 
@@ -30,7 +40,9 @@ describe('ImportModal Component', () => {
       processImport: mockProcessImport,
       downloadTemplate: mockDownloadTemplate,
       downloadFailedRows: mockDownloadFailedRows,
+      clearError: mockClearError,
     });
+    (userApi.getUsers as any).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -309,6 +321,94 @@ describe('ImportModal Component', () => {
     fireEvent.click(screen.getByText('Close'));
     expect(mockOnSuccess).toHaveBeenCalled();
     expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('resets all state on close/unmount and clears Zustand error', async () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
+    const { rerender } = render(
+      <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+    );
+
+    expect(screen.getByText('Bulk Import Leads')).toBeDefined();
+
+    // Rerender with isOpen = false
+    rerender(<ImportModal isOpen={false} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+
+    // Verify Zustand clearError was called
+    expect(mockClearError).toHaveBeenCalled();
+  });
+
+  it('fetches active employees when opened and handles dropdown states', async () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
+    const mockEmployeesList = [
+      {
+        id: 'emp-99',
+        email: 'employee99@tenant.com',
+        first_name: 'David',
+        last_name: 'Employee',
+        role: 'Employee',
+        is_active: true,
+        is_verified: true,
+        is_invited: false,
+        organization_id: 'org-1',
+        created_at: '',
+        updated_at: ''
+      }
+    ];
+
+    (userApi.getUsers as any).mockResolvedValue(mockEmployeesList);
+
+    const mockPreviewResponse = {
+      file_token: 'token-123',
+      headers: ['First Name', 'Last Name', 'Email', 'Job Title'],
+      suggested_mapping: {
+        first_name: { column: 'First Name', confidence: 1.0 },
+        last_name: { column: 'Last Name', confidence: 1.0 },
+        email: { column: 'Email', confidence: 1.0 },
+        title: { column: 'Job Title', confidence: 1.0 },
+      },
+      preview_rows: [
+        { 'First Name': 'John', 'Last Name': 'Doe', 'Email': 'john@test.com', 'Job Title': 'Developer' }
+      ]
+    };
+    mockUploadImportFile.mockResolvedValue(mockPreviewResponse);
+
+    render(
+      <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+    );
+
+    // Should fetch active employees on open
+    await waitFor(() => {
+      expect(userApi.getUsers).toHaveBeenCalledWith({ limit: 100, role: 'Employee', is_active: true });
+    });
+
+    // Advance to step 2 (preview_mapping)
+    const file = new File(['John,Doe,john@test.com,Developer'], 'leads.csv', { type: 'text/csv' });
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    }
+    fireEvent.click(screen.getByText('Next'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Map File Headers to Lead Properties')).toBeDefined();
+    });
+
+    // Toggle specific user mode radio
+    const radio = screen.getByDisplayValue('SPECIFIC_USER');
+    fireEvent.click(radio);
+
+    // Dropdown should render and contain the mock employee
+    await waitFor(() => {
+      expect(screen.getByText('Select Assignee')).toBeDefined();
+      expect(screen.getByText('David Employee (employee99@tenant.com)')).toBeDefined();
+    });
   });
 });
 

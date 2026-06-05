@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { MappingPreview } from '../MappingPreview';
 import { ImportPreviewResponse } from '../../../services/leadImportApi';
+import { UserResponse } from '../../../services/userApi';
 
 describe('MappingPreview Component', () => {
   const mockOnMappingChange = vi.fn();
-  const mockSetAutoAssign = vi.fn();
+  const mockSetAssignmentMode = vi.fn();
+  const mockSetAssignedUserId = vi.fn();
 
   const mockPreviewData: ImportPreviewResponse = {
     file_token: 'token-abc',
@@ -22,6 +24,22 @@ describe('MappingPreview Component', () => {
     ],
   };
 
+  const mockEmployees: UserResponse[] = [
+    {
+      id: 'emp-123',
+      email: 'emp1@test.com',
+      first_name: 'Bob',
+      last_name: 'Employee',
+      role: 'Employee',
+      is_active: true,
+      is_verified: true,
+      is_invited: false,
+      organization_id: 'org-123',
+      created_at: '',
+      updated_at: ''
+    }
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -30,7 +48,7 @@ describe('MappingPreview Component', () => {
     cleanup();
   });
 
-  it('renders standard layout fields, column mappings, and auto assignment checkbox', () => {
+  it('renders standard layout fields, column mappings, and assignment mode options', () => {
     const columnMapping = {
       first_name: 'First Name',
       last_name: 'Last Name',
@@ -43,8 +61,12 @@ describe('MappingPreview Component', () => {
         previewData={mockPreviewData}
         columnMapping={columnMapping}
         onMappingChange={mockOnMappingChange}
-        autoAssign={true}
-        setAutoAssign={mockSetAutoAssign}
+        assignmentMode="NONE"
+        setAssignmentMode={mockSetAssignmentMode}
+        assignedUserId={null}
+        setAssignedUserId={mockSetAssignedUserId}
+        employees={mockEmployees}
+        isLoadingEmployees={false}
       />
     );
 
@@ -60,9 +82,10 @@ describe('MappingPreview Component', () => {
     expect(screen.getByText('Alice')).toBeDefined();
     expect(screen.getByText('Green')).toBeDefined();
 
-    // Check checkbox
-    const checkbox = screen.getByLabelText('Trigger Auto Assignment Logic') as HTMLInputElement;
-    expect(checkbox.checked).toBe(true);
+    // Check assignment mode options
+    expect(screen.getByText('Unassigned')).toBeDefined();
+    expect(screen.getByText('Round Robin')).toBeDefined();
+    expect(screen.getByText('Assign to User')).toBeDefined();
   });
 
   it('triggers mapping changes when another column is selected', () => {
@@ -78,14 +101,15 @@ describe('MappingPreview Component', () => {
         previewData={mockPreviewData}
         columnMapping={columnMapping}
         onMappingChange={mockOnMappingChange}
-        autoAssign={true}
-        setAutoAssign={mockSetAutoAssign}
+        assignmentMode="NONE"
+        setAssignmentMode={mockSetAssignmentMode}
+        assignedUserId={null}
+        setAssignedUserId={mockSetAssignedUserId}
+        employees={mockEmployees}
+        isLoadingEmployees={false}
       />
     );
 
-    // Let's trigger a select change on 'Last Name' mapping selector
-    // Field Last Name is labeled 'Last Name *' or has ID
-    // We can select the dropdowns by finding them
     const selects = screen.getAllByRole('combobox');
     
     // Field 'title' (Job Title / Lead Title) is config[0], 'last_name' is config[1]
@@ -93,20 +117,47 @@ describe('MappingPreview Component', () => {
     expect(mockOnMappingChange).toHaveBeenCalledWith('last_name', 'Last Name');
   });
 
-  it('toggles auto assign checkbox state', () => {
+  it('triggers assignment mode changes when a radio is clicked', () => {
     const columnMapping = {};
     render(
       <MappingPreview
         previewData={mockPreviewData}
         columnMapping={columnMapping}
         onMappingChange={mockOnMappingChange}
-        autoAssign={true}
-        setAutoAssign={mockSetAutoAssign}
+        assignmentMode="NONE"
+        setAssignmentMode={mockSetAssignmentMode}
+        assignedUserId={null}
+        setAssignedUserId={mockSetAssignedUserId}
+        employees={mockEmployees}
+        isLoadingEmployees={false}
       />
     );
 
-    const checkbox = screen.getByLabelText('Trigger Auto Assignment Logic');
-    fireEvent.click(checkbox);
-    expect(mockSetAutoAssign).toHaveBeenCalledWith(false);
+    const roundRobinRadio = screen.getByDisplayValue('AUTO');
+    fireEvent.click(roundRobinRadio);
+    expect(mockSetAssignmentMode).toHaveBeenCalledWith('AUTO');
+  });
+
+  it('renders employee dropdown and handles selection when assignmentMode is SPECIFIC_USER', () => {
+    const columnMapping = {};
+    render(
+      <MappingPreview
+        previewData={mockPreviewData}
+        columnMapping={columnMapping}
+        onMappingChange={mockOnMappingChange}
+        assignmentMode="SPECIFIC_USER"
+        setAssignmentMode={mockSetAssignmentMode}
+        assignedUserId={null}
+        setAssignedUserId={mockSetAssignedUserId}
+        employees={mockEmployees}
+        isLoadingEmployees={false}
+      />
+    );
+
+    expect(screen.getByText('Select Assignee')).toBeDefined();
+    const selects = screen.getAllByRole('combobox');
+    const select = selects[selects.length - 1] as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'emp-123' } });
+    expect(mockSetAssignedUserId).toHaveBeenCalledWith('emp-123');
   });
 });

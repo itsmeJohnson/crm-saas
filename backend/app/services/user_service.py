@@ -202,7 +202,15 @@ class UserService:
 
         return deleted
 
-    async def paginate_users(self, actor: User, skip: int = 0, limit: int = 100, search_query: str | None = None) -> Tuple[Sequence[User], int]:
+    async def paginate_users(
+        self, 
+        actor: User, 
+        skip: int = 0, 
+        limit: int = 100, 
+        search_query: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None
+    ) -> Tuple[Sequence[User], int]:
         """Fetch paginated, searchable list of users belonging to the tenant."""
         if not actor.is_active:
             raise HTTPException(
@@ -214,4 +222,6 @@ class UserService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have enough privileges"
             )
-        return await self.user_repo.paginate_users(actor.organization_id, skip, limit, search_query)
+        return await self.user_repo.paginate_users(
+            actor.organization_id, skip, limit, search_query, role, is_active
+        )

@@ -145,6 +145,25 @@ async def test_list_users_scoping_and_pagination(client: AsyncClient, setup_user
     res_data = response.json()
     assert len(res_data) == 1
 
+    # List with role filter
+    response = await client.get("/api/v1/users/?role=Employee", headers=data["headers_admin_a"])
+    assert response.status_code == 200
+    res_data = response.json()
+    assert len(res_data) == 1
+    assert res_data[0]["email"] == "employee@org-a.com"
+
+    # List with active filter (true)
+    response = await client.get("/api/v1/users/?is_active=true", headers=data["headers_admin_a"])
+    assert response.status_code == 200
+    res_data = response.json()
+    assert len(res_data) == 3
+
+    # List with active filter (false)
+    response = await client.get("/api/v1/users/?is_active=false", headers=data["headers_admin_a"])
+    assert response.status_code == 200
+    res_data = response.json()
+    assert len(res_data) == 0
+
     # Employee cannot list users
     response = await client.get("/api/v1/users/", headers=data["headers_employee_a"])
     assert response.status_code == 403

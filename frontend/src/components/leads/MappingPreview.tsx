@@ -1,21 +1,30 @@
 import React from 'react';
 import { Sparkles, Table } from 'lucide-react';
 import { ImportPreviewResponse } from '../../services/leadImportApi';
+import { UserResponse } from '../../services/userApi';
 
 interface MappingPreviewProps {
   previewData: ImportPreviewResponse;
   columnMapping: Record<string, string>;
   onMappingChange: (field: string, val: string) => void;
-  autoAssign: boolean;
-  setAutoAssign: (val: boolean) => void;
+  assignmentMode: 'AUTO' | 'SPECIFIC_USER' | 'NONE';
+  setAssignmentMode: (mode: 'AUTO' | 'SPECIFIC_USER' | 'NONE') => void;
+  assignedUserId: string | null;
+  setAssignedUserId: (id: string | null) => void;
+  employees: UserResponse[];
+  isLoadingEmployees: boolean;
 }
 
 export const MappingPreview: React.FC<MappingPreviewProps> = ({
   previewData,
   columnMapping,
   onMappingChange,
-  autoAssign,
-  setAutoAssign,
+  assignmentMode,
+  setAssignmentMode,
+  assignedUserId,
+  setAssignedUserId,
+  employees,
+  isLoadingEmployees,
 }) => {
   const fieldsConfig = [
     { key: 'title', label: 'Lead Title / Job Title', required: true, desc: 'Position name or title of the lead' },
@@ -128,23 +137,124 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
         </div>
       </div>
 
-      {/* Auto assignment settings */}
-      <div className="p-4 bg-slate-950/20 border border-slate-800/80 rounded-2xl flex items-center gap-3">
-        <input
-          type="checkbox"
-          id="auto_assign"
-          checked={autoAssign}
-          onChange={(e) => setAutoAssign(e.target.checked)}
-          className="w-4.5 h-4.5 accent-brand-500 rounded border-slate-800 text-brand-600 focus:ring-0 focus:ring-offset-0 bg-slate-950 cursor-pointer"
-        />
+      {/* Lead Assignment Configuration */}
+      <div className="p-5 bg-slate-950/20 border border-slate-800/80 rounded-2xl space-y-4">
         <div>
-          <label htmlFor="auto_assign" className="text-xs font-semibold text-slate-200 cursor-pointer block">
-            Trigger Auto Assignment Logic
-          </label>
+          <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Lead Assignment Mode</h4>
           <p className="text-[10px] text-slate-500 mt-0.5">
-            Automatically distribute newly imported valid leads to active employees round-robin.
+            Choose how you want to distribute the imported leads.
           </p>
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* NONE Option */}
+          <label 
+            className={`p-3.5 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
+              assignmentMode === 'NONE' 
+                ? 'border-brand-500/50 bg-brand-500/5 text-slate-200' 
+                : 'border-slate-800 hover:border-slate-700 bg-slate-900/10 text-slate-400'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="assignmentMode"
+                value="NONE"
+                checked={assignmentMode === 'NONE'}
+                onChange={() => {
+                  setAssignmentMode('NONE');
+                  setAssignedUserId(null);
+                }}
+                className="w-4 h-4 accent-brand-500 cursor-pointer bg-slate-950"
+              />
+              <span className="text-xs font-semibold">Unassigned</span>
+            </div>
+            <span className="text-[9px] text-slate-500 mt-1.5 block">
+              Leads remain unassigned.
+            </span>
+          </label>
+
+          {/* AUTO Option */}
+          <label 
+            className={`p-3.5 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
+              assignmentMode === 'AUTO' 
+                ? 'border-brand-500/50 bg-brand-500/5 text-slate-200' 
+                : 'border-slate-800 hover:border-slate-700 bg-slate-900/10 text-slate-400'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="assignmentMode"
+                value="AUTO"
+                checked={assignmentMode === 'AUTO'}
+                onChange={() => {
+                  setAssignmentMode('AUTO');
+                  setAssignedUserId(null);
+                }}
+                className="w-4 h-4 accent-brand-500 cursor-pointer bg-slate-950"
+              />
+              <span className="text-xs font-semibold">Round Robin</span>
+            </div>
+            <span className="text-[9px] text-slate-500 mt-1.5 block">
+              Distribute to active employees equally.
+            </span>
+          </label>
+
+          {/* SPECIFIC_USER Option */}
+          <label 
+            className={`p-3.5 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
+              assignmentMode === 'SPECIFIC_USER' 
+                ? 'border-brand-500/50 bg-brand-500/5 text-slate-200' 
+                : 'border-slate-800 hover:border-slate-700 bg-slate-900/10 text-slate-400'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="assignmentMode"
+                value="SPECIFIC_USER"
+                checked={assignmentMode === 'SPECIFIC_USER'}
+                onChange={() => setAssignmentMode('SPECIFIC_USER')}
+                className="w-4 h-4 accent-brand-500 cursor-pointer bg-slate-950"
+              />
+              <span className="text-xs font-semibold">Assign to User</span>
+            </div>
+            <span className="text-[9px] text-slate-500 mt-1.5 block">
+              Assign all leads to one selected user.
+            </span>
+          </label>
+        </div>
+
+        {/* Specific User Dropdown */}
+        {assignmentMode === 'SPECIFIC_USER' && (
+          <div className="space-y-2 pt-2 border-t border-slate-850/50">
+            <label className="text-xs font-semibold text-slate-300">Select Assignee</label>
+            {isLoadingEmployees ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+                <span className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                Fetching active employees...
+              </div>
+            ) : employees.length === 0 ? (
+              <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl text-center text-xs text-slate-500">
+                No active employee users found in your organization.
+              </div>
+            ) : (
+              <select
+                value={assignedUserId || ''}
+                onChange={(e) => setAssignedUserId(e.target.value || null)}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-brand-500/40"
+              >
+                <option value="">-- Choose User --</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.first_name || ''} {emp.last_name || ''} ({emp.email})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLeadImportStore } from '../../store/leadImportStore';
 import { useAuthStore } from '../../store/authStore';
 import { 
@@ -9,6 +9,7 @@ import { UploadZone } from './UploadZone';
 import { MappingPreview } from './MappingPreview';
 import { FailedRowsDownload } from './FailedRowsDownload';
 import { ImportPreviewResponse, LeadImportResponse } from '../../services/leadImportApi';
+import { userApi, UserResponse } from '../../services/userApi';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -25,7 +26,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     previewGoogleSheets, 
     processImport, 
     downloadTemplate, 
-    downloadFailedRows 
+    downloadFailedRows,
+    clearError
   } = useLeadImportStore();
 
   const [step, setStep] = useState<ImportStep>('upload');
@@ -39,10 +41,58 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
   // Import Preview State
   const [previewData, setPreviewData] = useState<ImportPreviewResponse | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [autoAssign, setAutoAssign] = useState(true);
+  const [assignmentMode, setAssignmentMode] = useState<'AUTO' | 'SPECIFIC_USER' | 'NONE'>('NONE');
+  const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<UserResponse[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
   // Import Result State
   const [importResult, setImportResult] = useState<LeadImportResponse | null>(null);
+
+  // Fetch employees and reset states when modal opens or closes
+  useEffect(() => {
+    if (isOpen) {
+      setStep('upload');
+      setSelectedFile(null);
+      setSheetsUrl('');
+      setPreviewData(null);
+      setColumnMapping({});
+      setErrorMsg(null);
+      setImportResult(null);
+      setSourceType('file');
+      setAssignmentMode('NONE');
+      setAssignedUserId(null);
+      clearError();
+
+      const fetchEmployees = async () => {
+        setIsLoadingEmployees(true);
+        try {
+          const data = await userApi.getUsers({ limit: 100, role: 'Employee', is_active: true });
+          setEmployees(data);
+        } catch (err) {
+          console.error('Failed to fetch employees', err);
+        } finally {
+          setIsLoadingEmployees(false);
+        }
+      };
+
+      if (user && (user.role === 'OrgAdmin' || user.role === 'Manager')) {
+        fetchEmployees();
+      }
+    } else {
+      setStep('upload');
+      setSelectedFile(null);
+      setSheetsUrl('');
+      setPreviewData(null);
+      setColumnMapping({});
+      setErrorMsg(null);
+      setImportResult(null);
+      setSourceType('file');
+      setAssignmentMode('NONE');
+      setAssignedUserId(null);
+      clearError();
+    }
+  }, [isOpen, user]);
 
   if (!isOpen) return null;
 
@@ -133,6 +183,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       return;
     }
 
+    if (assignmentMode === 'SPECIFIC_USER' && !assignedUserId) {
+      setErrorMsg('Please select an assignee user for the SPECIFIC_USER assignment mode');
+      return;
+    }
+
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -141,7 +196,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
         file_token: previewData.file_token,
         source_type: sourceType,
         column_mapping: columnMapping,
-        auto_assign: autoAssign
+        auto_assign: assignmentMode === 'AUTO',
+        assignment_mode: assignmentMode,
+        assigned_user_id: assignedUserId
       });
       setImportResult(res);
       setStep('summary');
@@ -173,6 +230,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     if (step === 'summary' && importResult && importResult.successful_rows > 0) {
       onSuccess();
     }
+    handleReset();
     onClose();
   };
 
@@ -185,7 +243,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     setErrorMsg(null);
     setImportResult(null);
     setSourceType('file');
-    setAutoAssign(true);
+    setAssignmentMode('NONE');
+    setAssignedUserId(null);
+    clearError();
   };
 
   const getStepProgressWidth = () => {
@@ -265,8 +325,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
               previewData={previewData}
               columnMapping={columnMapping}
               onMappingChange={handleMappingChange}
-              autoAssign={autoAssign}
-              setAutoAssign={setAutoAssign}
+              assignmentMode={assignmentMode}
+              setAssignmentMode={setAssignmentMode}
+              assignedUserId={assignedUserId}
+              setAssignedUserId={setAssignedUserId}
+              employees={employees}
+              isLoadingEmployees={isLoadingEmployees}
             />
           )}
 

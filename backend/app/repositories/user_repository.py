@@ -62,11 +62,23 @@ class UserRepository(BaseRepository[User]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def paginate_users(self, organization_id: uuid.UUID, skip: int = 0, limit: int = 100, search_query: str | None = None) -> Tuple[Sequence[User], int]:
+    async def paginate_users(
+        self, 
+        organization_id: uuid.UUID, 
+        skip: int = 0, 
+        limit: int = 100, 
+        search_query: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None
+    ) -> Tuple[Sequence[User], int]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,
             self.model.is_deleted == False
         )
+        if role:
+            query = query.filter(self.model.role == role)
+        if is_active is not None:
+            query = query.filter(self.model.is_active == is_active)
         if search_query:
             search_filter = f"%{search_query}%"
             query = query.filter(

@@ -28,7 +28,7 @@ export interface InvitationResponse {
 }
 
 export const userApi = {
-  getUsers: async (params: { skip?: number; limit?: number; search?: string }) => {
+  getUsers: async (params: { skip?: number; limit?: number; search?: string; role?: string; is_active?: boolean }) => {
     const response = await api.get<UserResponse[]>('/users/', { params });
     return response.data;
   },
