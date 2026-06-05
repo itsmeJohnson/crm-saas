@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from typing import List, Dict, Any
+from app.models.lead_import import LeadImportStatus
 
 class GoogleSheetsPreviewRequest(BaseModel):
     url: str
@@ -33,12 +34,13 @@ class LeadImportResponse(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     filename: str
-    status: str
+    status: LeadImportStatus
     total_rows: int
     successful_rows: int
     failed_rows: int
     mapping_confidence: float
     error_summary: List[RowErrorDetail] | None = None
+    failed_rows_file_path: str | None = None
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime

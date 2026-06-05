@@ -1,0 +1,3 @@
+First Name,Last Name,Email Address,Phone Number,Company Name,Job Title,Deal Amount,Source,Import Error Reason
+Failed,Lead,existing_dup@tenant.com,555-4321,CorpB,Manager,20000,Direct,Lead with email already exists in your organization
+Row2,InBatch,duplicate_in_batch@test.com,555-9999,CorpC,Sales,30000,Web,Duplicate email address found within this file batch

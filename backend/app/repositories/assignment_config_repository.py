@@ -10,8 +10,7 @@ class AssignmentConfigRepository(BaseRepository[AssignmentConfig]):
 
     async def get_by_org(self, organization_id: uuid.UUID) -> AssignmentConfig | None:
         query = select(self.model).filter(
-            self.model.organization_id == organization_id,
-            self.model.is_deleted == False
+            self.model.organization_id == organization_id
         )
         result = await self.db.execute(query)
         return result.scalars().first()

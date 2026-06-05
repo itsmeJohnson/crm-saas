@@ -10,14 +10,19 @@ from typing import List, Dict, Tuple, Any
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import os
 from app.models.user import User
 from app.models.lead import Lead
-from app.models.lead_import import LeadImport
+from app.models.lead_import import LeadImport, LeadImportStatus
 from app.core.redis import redis_client
-from app.repositories.lead_import import LeadImportRepository
+from app.repositories.lead_import_repository import LeadImportRepository
 from app.repositories.lead_repository import LeadRepository
 from app.services.assignment_service import AssignmentService
 from app.services.audit_service import AuditService
+from app.services.import_.csv_parser import parse_csv
+from app.services.import_.excel_parser import parse_excel
+from app.services.import_.google_sheets_parser import fetch_google_sheet
+from app.services.import_.validation_engine import validate_import_rows
 
 # Define mappings and aliases for auto-matching
 MAPPING_ALIASES = {
@@ -155,17 +160,27 @@ class LeadImportService:
         """Parse file content, cache data in Redis, and return headers, suggestions, and preview rows."""
         file_token = str(uuid.uuid4())
         
-        # Detect type and parse
-        if filename.endswith(".xlsx"):
-            headers, rows = self.parse_xlsx_data(content)
-            # Store in base64 format inside redis
-            b64_content = base64.b64encode(content).decode("utf-8")
-            await redis_client.set(f"import_file:{file_token}", b64_content, ex=3600)
-        else:
-            # Assume CSV
-            text_content = content.decode("utf-8", errors="ignore")
-            headers, rows = self.parse_csv_data(text_content)
-            await redis_client.set(f"import_file:{file_token}", text_content, ex=3600)
+        try:
+            if filename.endswith(".xlsx"):
+                headers, rows = parse_excel(content)
+                # Store in base64 format inside redis
+                b64_content = base64.b64encode(content).decode("utf-8")
+                await redis_client.set(f"import_file:{file_token}", b64_content, ex=3600)
+            else:
+                # Assume CSV
+                headers, rows = parse_csv(content)
+                text_content = content.decode("utf-8", errors="ignore")
+                await redis_client.set(f"import_file:{file_token}", text_content, ex=3600)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to parse file: {str(e)}"
+            )
 
         if not headers:
             raise HTTPException(
@@ -185,14 +200,13 @@ class LeadImportService:
 
     async def get_preview_from_google_sheets(self, sheet_url: str) -> Dict[str, Any]:
         """Fetch Google Sheets publicly shared link, parse, cache in Redis, and return preview."""
-        export_url = self.extract_google_sheets_csv_url(sheet_url)
-        
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(export_url, follow_redirects=True)
-                if response.status_code != 200:
-                    raise ValueError("Failed to fetch Google Sheets. Verify spreadsheet link is public.")
-                csv_content = response.text
+            csv_content = await fetch_google_sheet(sheet_url)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -202,7 +216,14 @@ class LeadImportService:
         file_token = str(uuid.uuid4())
         await redis_client.set(f"import_file:{file_token}", csv_content, ex=3600)
 
-        headers, rows = self.parse_csv_data(csv_content)
+        try:
+            headers, rows = parse_csv(csv_content.encode("utf-8"))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+
         if not headers:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -239,20 +260,20 @@ class LeadImportService:
             )
 
         # Parse content
-        if source_type == "file" and not raw_content.startswith("First Name") and not raw_content.startswith("Last Name") and "," not in raw_content[:100]:
-            # Guess XLSX Base64 content
-            try:
-                xlsx_bytes = base64.b64decode(raw_content)
-                headers, data_rows = self.parse_xlsx_data(xlsx_bytes)
-            except Exception:
-                headers, data_rows = self.parse_csv_data(raw_content)
-        else:
-            headers, data_rows = self.parse_csv_data(raw_content)
-
-        if not headers:
+        try:
+            if source_type == "file" and not raw_content.startswith("First Name") and not raw_content.startswith("Last Name") and "," not in raw_content[:100]:
+                # Guess XLSX Base64 content
+                try:
+                    xlsx_bytes = base64.b64decode(raw_content)
+                    headers, data_rows = parse_excel(xlsx_bytes)
+                except Exception:
+                    headers, data_rows = parse_csv(raw_content.encode("utf-8"))
+            else:
+                headers, data_rows = parse_csv(raw_content.encode("utf-8"))
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid import file structure"
+                detail=str(e)
             )
 
         # 1. Initialize Log record
@@ -260,13 +281,13 @@ class LeadImportService:
             id=uuid.uuid4(),
             organization_id=actor.organization_id,
             filename="Uploaded_File.csv" if source_type == "file" else "Google_Sheet",
-            status="Processing",
+            status=LeadImportStatus.PROCESSING,
             total_rows=len(data_rows),
             successful_rows=0,
             failed_rows=0,
             mapping_confidence=0.0,
             error_summary=[],
-            failed_rows_csv="",
+            failed_rows_file_path=None,
             created_by=actor.id
         )
         self.db.add(import_record)
@@ -282,107 +303,88 @@ class LeadImportService:
         avg_confidence = score_sum / mapped_count if mapped_count > 0 else 0.0
         import_record.mapping_confidence = avg_confidence
 
+        # Define email check function for validation engine
+        async def check_existing_email(email: str) -> bool:
+            dup = await self.lead_repo.get_lead_by_email(actor.organization_id, email)
+            return dup is not None
+
+        # 2. Use Validation Engine to validate all rows
+        valid_rows, errors_log = await validate_import_rows(
+            rows=data_rows,
+            column_mapping=column_mapping,
+            check_existing_email_fn=check_existing_email
+        )
+
+        success_count = 0
+        fail_count = len(errors_log)
+
         # Keep track of failed rows structure for CSV report
         failed_csv_out = io.StringIO()
         csv_writer = csv.writer(failed_csv_out)
         csv_writer.writerow(headers + ["Import Error Reason"])
 
-        success_count = 0
-        fail_count = 0
-        errors_log = []
-        batch_processed_emails = set()
+        # Map rows in error log to actual CSV rows and append to CSV writer
+        errors_by_row = {err["row"]: err["reason"] for err in errors_log}
+        for idx, row in enumerate(data_rows, start=2):
+            if idx in errors_by_row:
+                raw_row_vals = [row.get(h, "") for h in headers]
+                csv_writer.writerow(raw_row_vals + [errors_by_row[idx]])
 
-        email_regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-
-        # Validate and insert rows
-        for row_idx, row in enumerate(data_rows, start=2): # Start index 2 to match file row numbers
-            row_errors = []
+        # Insert valid rows
+        for item in valid_rows:
+            mapped_values = item["data"]
+            row_idx = item["row_index"] - 2
+            raw_row = data_rows[row_idx]
             
-            # Map values
-            lead_values = {}
-            for field, col_name in column_mapping.items():
-                if col_name and col_name in row:
-                    lead_values[field] = row[col_name].strip()
-                else:
-                    lead_values[field] = ""
-
-            # Validations
-            # 1. Mandatory columns check
-            last_name = lead_values.get("last_name", "")
-            title = lead_values.get("title", "")
-            if not last_name:
-                row_errors.append("Last Name column value is missing")
-            if not title:
-                row_errors.append("Title column value is missing")
-
-            # 2. Email format validation & duplicate checks
-            email = lead_values.get("email", "")
-            if email:
-                if not re.match(email_regex, email):
-                    row_errors.append("Invalid email address format")
-                elif email in batch_processed_emails:
-                    row_errors.append("Duplicate email address found within this file batch")
-                else:
-                    # Tenant isolation check
-                    db_dup = await self.lead_repo.get_lead_by_email(actor.organization_id, email)
-                    if db_dup:
-                        row_errors.append("Lead with email already exists in your organization")
-
-            # 3. Numeric value validation
-            val_str = lead_values.get("value", "")
+            # Extract opportunity value
+            val_col = column_mapping.get("value")
+            val_str = raw_row.get(val_col, "").strip() if val_col else ""
+            val = None
             if val_str:
                 try:
-                    lead_values["value"] = float(val_str.replace("$", "").replace(",", "").strip())
+                    val = float(val_str.replace("$", "").replace(",", "").strip())
                 except ValueError:
-                    row_errors.append("Deal value must be a valid numeric amount")
-            else:
-                lead_values["value"] = None
+                    pass
 
-            if row_errors:
-                # Log error
-                fail_count += 1
-                reason_str = "; ".join(row_errors)
-                errors_log.append({
-                    "row": row_idx,
-                    "email": email or "N/A",
-                    "reason": reason_str
-                })
-                # Add row to failed rows CSV download report
-                raw_row_vals = [row.get(h, "") for h in headers]
-                csv_writer.writerow(raw_row_vals + [reason_str])
-            else:
-                # Save Lead
-                lead_obj = Lead(
-                    organization_id=actor.organization_id,
-                    first_name=lead_values.get("first_name") or None,
-                    last_name=last_name,
-                    email=email or None,
-                    phone=lead_values.get("phone") or None,
-                    company_name=lead_values.get("company_name") or None,
-                    title=title,
-                    status=lead_values.get("status") or "New",
-                    source=lead_values.get("source") or "Import",
-                    value=lead_values["value"],
-                    created_by=actor.id,
-                    import_id=import_record.id
-                )
-                self.db.add(lead_obj)
-                await self.db.flush()
+            lead_obj = Lead(
+                organization_id=actor.organization_id,
+                first_name=mapped_values.get("first_name") or None,
+                last_name=mapped_values.get("last_name"),
+                email=mapped_values.get("email") or None,
+                phone=mapped_values.get("phone") or None,
+                company_name=mapped_values.get("company_name") or None,
+                title=mapped_values.get("title"),
+                status=mapped_values.get("status") or "New",
+                source=mapped_values.get("source") or "Import",
+                value=val,
+                created_by=actor.id,
+                import_id=import_record.id
+            )
+            self.db.add(lead_obj)
+            await self.db.flush()
 
-                # Trigger Auto Assignment if true
-                if auto_assign:
-                    await self.assignment_service.assign_lead(lead_obj)
-
-                if email:
-                    batch_processed_emails.add(email)
-                success_count += 1
+            if auto_assign:
+                await self.assignment_service.assign_lead(lead_obj)
+            
+            success_count += 1
 
         # Commit transaction on successfully processed leads
         import_record.successful_rows = success_count
         import_record.failed_rows = fail_count
         import_record.error_summary = errors_log
-        import_record.failed_rows_csv = failed_csv_out.getvalue() if fail_count > 0 else ""
-        import_record.status = "Completed"
+        
+        # Save failed rows report to filesystem
+        if fail_count > 0:
+            uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+            os.makedirs(uploads_dir, exist_ok=True)
+            file_path = os.path.join(uploads_dir, f"failed_rows_{import_record.id}.csv")
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(failed_csv_out.getvalue())
+            import_record.failed_rows_file_path = file_path
+        else:
+            import_record.failed_rows_file_path = None
+            
+        import_record.status = LeadImportStatus.COMPLETED
 
         self.db.add(import_record)
         await self.db.flush()
@@ -409,9 +411,16 @@ class LeadImportService:
     async def get_failed_rows_report(self, organization_id: uuid.UUID, import_id: uuid.UUID) -> str:
         """Retrieve CSV report text of validation failures for downloading."""
         import_job = await self.import_repo.get_import_by_id(organization_id, import_id)
-        if not import_job or not import_job.failed_rows_csv:
+        if not import_job or not import_job.failed_rows_file_path:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Failed rows report not found for this import"
             )
-        return import_job.failed_rows_csv
+        try:
+            with open(import_job.failed_rows_file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read report file: {str(e)}"
+            )

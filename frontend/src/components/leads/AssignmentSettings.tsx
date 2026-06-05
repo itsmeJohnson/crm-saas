@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { useLeadStore } from '../../store/leadStore';
+import { useLeadImportStore } from '../../store/leadImportStore';
 import { useAuthStore } from '../../store/authStore';
 import { ToggleLeft, ToggleRight, Loader2, Users } from 'lucide-react';
 
-export const AssignmentToggle: React.FC = () => {
+export const AssignmentSettings: React.FC = () => {
   const { user } = useAuthStore();
-  const { assignmentConfig, fetchAssignmentConfig, toggleAssignmentConfig, isLoading } = useLeadStore();
+  const { 
+    assignmentConfig, 
+    fetchAssignmentConfig, 
+    toggleAssignmentConfig, 
+    isLoading 
+  } = useLeadImportStore();
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -40,6 +45,7 @@ export const AssignmentToggle: React.FC = () => {
         <span className="text-[10px] text-slate-500">Round-robin to active reps</span>
       </div>
       <button
+        type="button"
         onClick={handleToggle}
         disabled={isUpdating || isLoading}
         className="flex items-center transition-all focus:outline-none cursor-pointer disabled:opacity-50 ml-2"
@@ -56,3 +62,4 @@ export const AssignmentToggle: React.FC = () => {
     </div>
   );
 };
+export default AssignmentSettings;

@@ -2,10 +2,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { ImportModal } from '../ImportModal';
-import { useLeadStore } from '../../../store/leadStore';
+import { useLeadImportStore } from '../../../store/leadImportStore';
+import { useAuthStore } from '../../../store/authStore';
 
-vi.mock('../../../store/leadStore', () => ({
-  useLeadStore: vi.fn(),
+vi.mock('../../../store/leadImportStore', () => ({
+  useLeadImportStore: vi.fn(),
+}));
+
+vi.mock('../../../store/authStore', () => ({
+  useAuthStore: vi.fn(),
 }));
 
 describe('ImportModal Component', () => {
@@ -19,7 +24,7 @@ describe('ImportModal Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useLeadStore as any).mockReturnValue({
+    (useLeadImportStore as any).mockReturnValue({
       uploadImportFile: mockUploadImportFile,
       previewGoogleSheets: mockPreviewGoogleSheets,
       processImport: mockProcessImport,
@@ -33,13 +38,32 @@ describe('ImportModal Component', () => {
   });
 
   it('renders nothing when isOpen is false', () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
     const { container } = render(
       <ImportModal isOpen={false} onClose={mockOnClose} onSuccess={mockOnSuccess} />
     );
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders standard options and handles template downloads', () => {
+  it('renders nothing when user is Employee', () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'Employee' },
+    });
+
+    const { container } = render(
+      <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('renders layout and handles template downloads for privileged roles', () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
     render(
       <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
     );
@@ -48,7 +72,6 @@ describe('ImportModal Component', () => {
     expect(screen.getByText('Local File Upload')).toBeDefined();
     expect(screen.getByText('Google Sheets Link')).toBeDefined();
 
-    // Trigger CSV template download
     mockDownloadTemplate.mockResolvedValue(new Blob(['First Name,Last Name'], { type: 'text/csv' }));
     window.URL.createObjectURL = vi.fn().mockReturnValue('mock-url');
     window.URL.revokeObjectURL = vi.fn();
@@ -59,7 +82,11 @@ describe('ImportModal Component', () => {
     expect(mockDownloadTemplate).toHaveBeenCalledWith('csv');
   });
 
-  it('transitions to mapping step on successful file parse', async () => {
+  it('transitions to mapping step on successful upload', async () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
     const mockPreviewResponse = {
       file_token: 'token-123',
       headers: ['First Name', 'Last Name', 'Email', 'Job Title'],
@@ -70,7 +97,7 @@ describe('ImportModal Component', () => {
         title: { column: 'Job Title', confidence: 1.0 },
       },
       preview_rows: [
-        { 'First Name': 'John', 'Last Name': 'Doe', 'Email': 'john@test.com', 'Job Title': 'Dev' }
+        { 'First Name': 'John', 'Last Name': 'Doe', 'Email': 'john@test.com', 'Job Title': 'Developer' }
       ]
     };
     
@@ -80,8 +107,7 @@ describe('ImportModal Component', () => {
       <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
     );
 
-    // Mock file input interaction
-    const file = new File(['John,Doe,john@test.com,Dev'], 'leads.csv', { type: 'text/csv' });
+    const file = new File(['John,Doe,john@test.com,Developer'], 'leads.csv', { type: 'text/csv' });
     const fileInput = document.querySelector('input[type="file"]');
     expect(fileInput).not.toBeNull();
     
@@ -96,6 +122,52 @@ describe('ImportModal Component', () => {
       expect(mockUploadImportFile).toHaveBeenCalled();
       expect(screen.getByText('Map File Headers to Lead Properties')).toBeDefined();
       expect(screen.getByText('Source Data Preview')).toBeDefined();
+    });
+  });
+
+  it('displays validation error if required fields are missing during mapping', async () => {
+    (useAuthStore as any).mockReturnValue({
+      user: { role: 'OrgAdmin' },
+    });
+
+    const mockPreviewResponse = {
+      file_token: 'token-123',
+      headers: ['First Name', 'Last Name'],
+      suggested_mapping: {
+        first_name: { column: 'First Name', confidence: 1.0 },
+        last_name: { column: 'Last Name', confidence: 1.0 },
+      },
+      preview_rows: [
+        { 'First Name': 'John', 'Last Name': 'Doe' }
+      ]
+    };
+    
+    mockUploadImportFile.mockResolvedValue(mockPreviewResponse);
+
+    render(
+      <ImportModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+    );
+
+    // Skip to Step 2
+    const file = new File(['John,Doe'], 'leads.csv', { type: 'text/csv' });
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    }
+    const nextBtn = screen.getByText('Next');
+    fireEvent.click(nextBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Map File Headers to Lead Properties')).toBeDefined();
+    });
+
+    // Try processing mapping (missing Job Title/title)
+    const processBtn = screen.getByText('Process Mapping');
+    fireEvent.click(processBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Job Title\/Lead Title is a required field and is missing/)).toBeDefined();
+      expect(mockProcessImport).not.toHaveBeenCalled();
     });
   });
 });

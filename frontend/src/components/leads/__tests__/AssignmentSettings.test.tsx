@@ -1,19 +1,19 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { AssignmentToggle } from '../AssignmentToggle';
-import { useLeadStore } from '../../../store/leadStore';
+import { AssignmentSettings } from '../AssignmentSettings';
+import { useLeadImportStore } from '../../../store/leadImportStore';
 import { useAuthStore } from '../../../store/authStore';
 
-vi.mock('../../../store/leadStore', () => ({
-  useLeadStore: vi.fn(),
+vi.mock('../../../store/leadImportStore', () => ({
+  useLeadImportStore: vi.fn(),
 }));
 
 vi.mock('../../../store/authStore', () => ({
   useAuthStore: vi.fn(),
 }));
 
-describe('AssignmentToggle Component', () => {
+describe('AssignmentSettings Component', () => {
   const mockFetchAssignmentConfig = vi.fn();
   const mockToggleAssignmentConfig = vi.fn();
 
@@ -30,31 +30,31 @@ describe('AssignmentToggle Component', () => {
       user: { id: 'u1', role: 'Employee' },
     });
 
-    (useLeadStore as any).mockReturnValue({
+    (useLeadImportStore as any).mockReturnValue({
       assignmentConfig: null,
       fetchAssignmentConfig: mockFetchAssignmentConfig,
       toggleAssignmentConfig: mockToggleAssignmentConfig,
       isLoading: false,
     });
 
-    const { container } = render(<AssignmentToggle />);
+    const { container } = render(<AssignmentSettings />);
     expect(container.firstChild).toBeNull();
     expect(mockFetchAssignmentConfig).not.toHaveBeenCalled();
   });
 
-  it('renders and fetches config if user is OrgAdmin', () => {
+  it('renders and fetches config if user is Manager', () => {
     (useAuthStore as any).mockReturnValue({
-      user: { id: 'u1', role: 'OrgAdmin' },
+      user: { id: 'u1', role: 'Manager' },
     });
 
-    (useLeadStore as any).mockReturnValue({
+    (useLeadImportStore as any).mockReturnValue({
       assignmentConfig: { is_active: false, organization_id: 'org-1' },
       fetchAssignmentConfig: mockFetchAssignmentConfig,
       toggleAssignmentConfig: mockToggleAssignmentConfig,
       isLoading: false,
     });
 
-    render(<AssignmentToggle />);
+    render(<AssignmentSettings />);
     expect(screen.getByText('Auto Assignment')).toBeDefined();
     expect(mockFetchAssignmentConfig).toHaveBeenCalled();
   });
@@ -64,14 +64,14 @@ describe('AssignmentToggle Component', () => {
       user: { id: 'u1', role: 'OrgAdmin' },
     });
 
-    (useLeadStore as any).mockReturnValue({
+    (useLeadImportStore as any).mockReturnValue({
       assignmentConfig: { is_active: false, organization_id: 'org-1' },
       fetchAssignmentConfig: mockFetchAssignmentConfig,
       toggleAssignmentConfig: mockToggleAssignmentConfig,
       isLoading: false,
     });
 
-    render(<AssignmentToggle />);
+    render(<AssignmentSettings />);
     const button = screen.getByRole('button');
     fireEvent.click(button);
     expect(mockToggleAssignmentConfig).toHaveBeenCalledWith(true);

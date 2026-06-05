@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.lead import Lead
 from app.models.user import User
 from app.models.assignment_config import AssignmentConfig
-from app.repositories.assignment_config import AssignmentConfigRepository
+from app.repositories.assignment_config_repository import AssignmentConfigRepository
 from app.repositories.user_repository import UserRepository
 from app.services.audit_service import AuditService
 
@@ -19,8 +19,7 @@ class AssignmentService:
         """Fetch assignment configuration for organization, creating it if not present."""
         # Use with_for_update to lock config row during retrieval to prevent race conditions
         query = select(AssignmentConfig).filter(
-            AssignmentConfig.organization_id == organization_id,
-            AssignmentConfig.is_deleted == False
+            AssignmentConfig.organization_id == organization_id
         ).with_for_update()
         result = await self.db.execute(query)
         config = result.scalars().first()

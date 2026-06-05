@@ -13,7 +13,7 @@ from app.schemas.assignment_config import AssignmentConfigUpdate, AssignmentConf
 from app.services.lead_service import LeadService
 from app.services.lead_import_service import LeadImportService
 from app.services.assignment_service import AssignmentService
-from app.middleware.permissions import require_active_user
+from app.middleware.permissions import require_active_user, require_role
 
 router = APIRouter()
 
@@ -87,8 +87,8 @@ async def delete_lead(
 
 @router.get("/import/template")
 async def get_import_template(
-    format: str = Query("csv", pattern="^(csv|xlsx)$"),
-    actor: Annotated[User, Depends(require_active_user)] = None
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    format: str = Query("csv", pattern="^(csv|xlsx)$")
 ):
     """Download CSV or Excel template for bulk lead imports."""
     if format == "xlsx":
@@ -108,9 +108,9 @@ async def get_import_template(
 
 @router.post("/import/upload", response_model=ImportPreviewResponse)
 async def upload_import_file(
-    file: UploadFile = File(...),
-    actor: Annotated[User, Depends(require_active_user)] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...)
 ):
     """Upload bulk lead CSV/Excel and retrieve mapping suggestions and preview."""
     import_service = LeadImportService(db)
@@ -120,8 +120,8 @@ async def upload_import_file(
 @router.post("/import/google-sheets", response_model=ImportPreviewResponse)
 async def google_sheets_import_preview(
     req: GoogleSheetsPreviewRequest,
-    actor: Annotated[User, Depends(require_active_user)] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Fetch shared Google Sheets URL and retrieve mapping suggestions and preview."""
     import_service = LeadImportService(db)
@@ -130,7 +130,7 @@ async def google_sheets_import_preview(
 @router.post("/import/process", response_model=LeadImportResponse)
 async def process_import_batch(
     req: LeadImportProcessRequest,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Execute validation and lead creations based on mapped headers."""
@@ -145,7 +145,7 @@ async def process_import_batch(
 
 @router.get("/import/history", response_model=List[LeadImportResponse])
 async def list_import_history(
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100)
@@ -158,7 +158,7 @@ async def list_import_history(
 @router.get("/import/{import_id}/failed-rows")
 async def download_failed_rows(
     import_id: uuid.UUID,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Download CSV file of failed validation rows for a specific import job."""
@@ -174,7 +174,7 @@ async def download_failed_rows(
 
 @router.get("/assignment/config", response_model=AssignmentConfigResponse)
 async def get_assignment_config(
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Retrieve auto-assignment configuration for the tenant."""
@@ -184,7 +184,7 @@ async def get_assignment_config(
 @router.patch("/assignment/config", response_model=AssignmentConfigResponse)
 async def update_assignment_config(
     req: AssignmentConfigUpdate,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Enable or disable auto-assignment configuration."""

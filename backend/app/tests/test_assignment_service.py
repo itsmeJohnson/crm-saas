@@ -88,8 +88,6 @@ async def test_round_robin_distribution(db: AsyncSession, assignment_setup: dict
     )
     assigned_user1 = await assign_service.assign_lead(lead1)
     assert assigned_user1 is not None
-    # Depending on alphabetical ordering or database retrieval, it will pick A or B. Let's trace:
-    # Sorted by User.id, let's just make sure it is either emp_a or emp_b, but NOT emp_c!
     assert assigned_user1.id in [data["emp_a"].id, data["emp_b"].id]
     assert assigned_user1.id != data["emp_c"].id
     assert lead1.assigned_user_id == assigned_user1.id
@@ -135,7 +133,7 @@ async def test_auto_assignment_disabled(db: AsyncSession, assignment_setup: dict
     lead = Lead(
         organization_id=data["org"].id,
         first_name="Isolated",
-        last_name="Lead",
+        last_name="Isolated",
         title="CRM Deal",
         created_by=data["creator"].id
     )

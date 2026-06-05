@@ -2,8 +2,6 @@ import pytest
 import uuid
 import csv
 import io
-import base64
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -150,7 +148,7 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
         auto_assign=False
     )
 
-    assert import_log.status == "Completed"
+    assert import_log.status == "COMPLETED"
     assert import_log.total_rows == 4
     assert import_log.successful_rows == 2
     assert import_log.failed_rows == 2
@@ -161,7 +159,7 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
     
     # First failure on row 3 (Missing Title)
     assert import_log.error_summary[0]["row"] == 3
-    assert "Title column value is missing" in import_log.error_summary[0]["reason"]
+    assert "Job Title/Lead Title is a required field and is missing" in import_log.error_summary[0]["reason"]
 
     # Second failure on row 4 (Duplicate check)
     assert import_log.error_summary[1]["row"] == 4
@@ -186,4 +184,4 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
     failed_csv_report = await import_service.get_failed_rows_report(data["org"].id, import_log.id)
     assert "Import Error Reason" in failed_csv_report
     assert "No,Title,notitle@test.com,,Globex" in failed_csv_report
-    assert "Title column value is missing" in failed_csv_report
+    assert "Job Title/Lead Title is a required field and is missing" in failed_csv_report
