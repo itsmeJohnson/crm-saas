@@ -63,7 +63,9 @@ class LeadService:
         limit: int = 100, 
         search_query: str | None = None,
         status_filter: str | None = None,
-        assigned_user_id: uuid.UUID | None = None
+        assigned_user_id: uuid.UUID | None = None,
+        name: str | None = None,
+        city: str | None = None
     ) -> Tuple[Sequence[Lead], int]:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
@@ -77,7 +79,7 @@ class LeadService:
                 )
 
         return await self.lead_repo.paginate_leads(
-            actor.organization_id, skip, limit, search_query, status_filter, assigned_user_id
+            actor.organization_id, skip, limit, search_query, status_filter, assigned_user_id, name, city
         )
 
     async def update_lead(self, actor: User, lead_id: uuid.UUID, lead_data: dict) -> Lead:

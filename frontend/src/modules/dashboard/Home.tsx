@@ -4,6 +4,7 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { SummaryCards } from '../../components/dashboard/SummaryCards';
 import { LeadStatusChart } from '../../components/dashboard/LeadStatusChart';
 import { RecentActivitiesWidget } from '../../components/dashboard/RecentActivitiesWidget';
+import { AnalyticsDashboard } from '../../components/dashboard/AnalyticsDashboard';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
 
 export const Home: React.FC = () => {
@@ -68,6 +69,9 @@ export const Home: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Analytics Performance Dashboard */}
+      <AnalyticsDashboard />
 
       {/* KPI Cards Widget */}
       <SummaryCards summary={summary} isLoading={isLoadingSummary} />

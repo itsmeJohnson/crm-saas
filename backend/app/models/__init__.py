@@ -11,6 +11,8 @@ from app.models.activity import Activity
 from app.models.note import Note
 from app.models.lead_import import LeadImport, LeadImportStatus
 from app.models.assignment_config import AssignmentConfig, AssignmentStrategy
+from app.models.pipeline import PipelineStage
+from app.models.target import PerformanceTarget, TargetType, MetricType
 
 __all__ = [
     "Base", 
@@ -28,5 +30,9 @@ __all__ = [
     "LeadImport",
     "LeadImportStatus",
     "AssignmentConfig",
-    "AssignmentStrategy"
+    "AssignmentStrategy",
+    "PipelineStage",
+    "PerformanceTarget",
+    "TargetType",
+    "MetricType"
 ]

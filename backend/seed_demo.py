@@ -18,6 +18,9 @@ from app.models.note import Note
 from app.models.session import UserSession
 from app.models.invitation import UserInvitation
 from app.models.audit_log import AuditLog
+from app.models.pipeline import PipelineStage
+from app.repositories.organization import OrganizationRepository
+from app.models.target import PerformanceTarget, TargetType, MetricType
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("seed_demo")
@@ -40,6 +43,8 @@ async def seed():
             await session.execute(delete(Lead).filter(Lead.organization_id == org_id))
             await session.execute(delete(Contact).filter(Contact.organization_id == org_id))
             await session.execute(delete(Company).filter(Company.organization_id == org_id))
+            await session.execute(delete(PipelineStage).filter(PipelineStage.organization_id == org_id))
+            await session.execute(delete(PerformanceTarget).filter(PerformanceTarget.organization_id == org_id))
             
             user_ids_result = await session.execute(select(User.id).filter(User.organization_id == org_id))
             user_ids = user_ids_result.scalars().all()
@@ -55,56 +60,87 @@ async def seed():
             await session.commit()
             logger.info("Cleanup completed successfully.")
 
-        # 2. Create Organization
-        org = Organization(
-            name="Demo Corp",
-            slug="democorp",
-            is_active=True
-        )
-        session.add(org)
-        await session.flush()
+        # 2. Create Organization (using Repository to trigger default pipeline stages seeding)
+        org_repo = OrganizationRepository(session)
+        org = await org_repo.create({"name": "Demo Corp", "slug": "democorp"})
         logger.info(f"Created organization: {org.name} (id: {org.id})")
+
+        # Fetch the created pipeline stages
+        stages_result = await session.execute(
+            select(PipelineStage).filter(PipelineStage.organization_id == org.id)
+        )
+        stages = {stage.name: stage for stage in stages_result.scalars().all()}
+        logger.info(f"Fetched stages: {list(stages.keys())}")
 
         # 3. Create Users with hashed passwords ('password123')
         pwd_hash = get_password_hash("password123")
         
-        users = [
-            User(
-                organization_id=org.id,
-                email="demo_admin@democorp.com",
-                hashed_password=pwd_hash,
-                first_name="Alice",
-                last_name="Admin",
-                role="OrgAdmin",
-                is_active=True,
-                is_verified=True
-            ),
-            User(
-                organization_id=org.id,
-                email="demo_mgr@democorp.com",
-                hashed_password=pwd_hash,
-                first_name="Bob",
-                last_name="Manager",
-                role="Manager",
-                is_active=True,
-                is_verified=True
-            ),
-            User(
-                organization_id=org.id,
-                email="demo_emp@democorp.com",
-                hashed_password=pwd_hash,
-                first_name="Charlie",
-                last_name="Employee",
-                role="Employee",
-                is_active=True,
-                is_verified=True
-            )
-        ]
-        session.add_all(users)
+        # Create Admin and Manager first to resolve hierarchy foreign keys
+        admin_user = User(
+            organization_id=org.id,
+            email="demo_admin@democorp.com",
+            hashed_password=pwd_hash,
+            first_name="Alice",
+            last_name="Admin",
+            role="OrgAdmin",
+            is_active=True,
+            is_verified=True
+        )
+        mgr_user = User(
+            organization_id=org.id,
+            email="demo_mgr@democorp.com",
+            hashed_password=pwd_hash,
+            first_name="Bob",
+            last_name="Manager",
+            role="Manager",
+            is_active=True,
+            is_verified=True
+        )
+        session.add_all([admin_user, mgr_user])
+        await session.flush()
+
+        # Create Team Leader reporting to Manager
+        tl_user = User(
+            organization_id=org.id,
+            email="demo_tl@democorp.com",
+            hashed_password=pwd_hash,
+            first_name="Terry",
+            last_name="Leader",
+            role="Employee",
+            reporting_to_id=mgr_user.id,
+            is_active=True,
+            is_verified=True
+        )
+        session.add(tl_user)
+        await session.flush()
+
+        # Create Telecallers reporting to Team Leader
+        emp_user = User(
+            organization_id=org.id,
+            email="demo_emp@democorp.com",
+            hashed_password=pwd_hash,
+            first_name="Charlie",
+            last_name="Employee",
+            role="Employee",
+            reporting_to_id=tl_user.id,
+            is_active=True,
+            is_verified=True
+        )
+        tc_user = User(
+            organization_id=org.id,
+            email="demo_tc@democorp.com",
+            hashed_password=pwd_hash,
+            first_name="Teddy",
+            last_name="Caller",
+            role="Employee",
+            reporting_to_id=tl_user.id,
+            is_active=True,
+            is_verified=True
+        )
+        session.add_all([emp_user, tc_user])
         await session.flush()
         
-        admin_user, mgr_user, emp_user = users
-        logger.info("Created demo users: Alice (Admin), Bob (Manager), Charlie (Employee).")
+        logger.info("Created hierarchy users: Alice (Admin), Bob (Manager), Terry (TeamLeader), Charlie (Telecaller), Teddy (Telecaller).")
 
         # 4. Create Companies
         companies_data = [
@@ -191,7 +227,21 @@ async def seed():
         ]
 
         leads = []
+        stage_map = {
+            "New": "Fresh Leads",
+            "Contacted": "Contacted",
+            "Qualified": "Followup",
+            "Nurturing": "Followup",
+            "Lost": "Dropped",
+            "Converted": "Converted"
+        }
+
         for title, status, value, comp, contact, assignee in leads_data:
+            stage_name = stage_map.get(status, "Fresh Leads")
+            stage = stages.get(stage_name)
+            if not stage:
+                stage = list(stages.values())[0] # Fallback to first stage
+
             lead = Lead(
                 organization_id=org.id,
                 first_name=contact.first_name,
@@ -204,7 +254,8 @@ async def seed():
                 source="Direct Pitch" if value > 100000 else "Website Request",
                 value=value,
                 assigned_user_id=assignee.id,
-                created_by=admin_user.id
+                created_by=admin_user.id,
+                stage_id=stage.id
             )
             session.add(lead)
             leads.append((lead, comp, contact, assignee))
@@ -256,6 +307,33 @@ async def seed():
                 created_by=assignee.id
             )
             session.add(note)
+
+        # 8. Create Performance Targets
+        from datetime import date
+        today_date = date.today()
+        start_of_month = today_date.replace(day=1)
+        end_of_month = (start_of_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+        targets = [
+            PerformanceTarget(
+                organization_id=org.id,
+                target_type=TargetType.MONTHLY,
+                metric_type=MetricType.LEADS_CONVERTED,
+                target_value=20,
+                start_date=start_of_month,
+                end_date=end_of_month
+            ),
+            PerformanceTarget(
+                organization_id=org.id,
+                target_type=TargetType.DAILY,
+                metric_type=MetricType.CALLS_MADE,
+                target_value=100,
+                start_date=today_date,
+                end_date=today_date
+            )
+        ]
+        session.add_all(targets)
+        logger.info("Seeded active performance targets for Demo Corp.")
 
         await session.commit()
         logger.info("Database seeding successfully completed!")

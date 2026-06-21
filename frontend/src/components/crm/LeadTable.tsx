@@ -3,6 +3,7 @@ import { useLeadStore } from '../../store/leadStore';
 import { useUserStore } from '../../store/userStore';
 import { LeadResponse } from '../../services/leadApi';
 import { Edit3, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { MaskedField } from '../common/MaskedField';
 
 interface LeadTableProps {
   onEditClick: (lead: LeadResponse) => void;
@@ -107,6 +108,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Lead</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Value</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+              <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Phone</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Owner</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Actions</th>
             </tr>
@@ -160,6 +162,10 @@ export const LeadTable: React.FC<LeadTableProps> = ({
 
                     <td className="px-6 py-4 align-middle">
                       {getStatusBadge(lead.status)}
+                    </td>
+
+                    <td className="px-6 py-4 align-middle">
+                      <MaskedField value={lead.phone} />
                     </td>
 
                     <td className="px-6 py-4 align-middle">

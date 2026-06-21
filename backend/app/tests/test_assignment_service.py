@@ -60,12 +60,22 @@ async def assignment_setup(db: AsyncSession):
     })
     await db.commit()
 
+    from app.models.pipeline import PipelineStage
+    res = await db.execute(
+        select(PipelineStage.id).filter(
+            PipelineStage.organization_id == org.id,
+            PipelineStage.is_system_default == True
+        )
+    )
+    default_stage_id = res.scalar()
+
     return {
         "org": org,
         "creator": creator,
         "emp_a": emp_a,
         "emp_b": emp_b,
-        "emp_c": emp_c
+        "emp_c": emp_c,
+        "default_stage_id": default_stage_id
     }
 
 @pytest.mark.asyncio
@@ -84,7 +94,8 @@ async def test_round_robin_distribution(db: AsyncSession, assignment_setup: dict
         first_name="Lead",
         last_name="One",
         title="Software Opportunity",
-        created_by=data["creator"].id
+        created_by=data["creator"].id,
+        stage_id=data["default_stage_id"]
     )
     assigned_user1 = await assign_service.assign_lead(lead1)
     assert assigned_user1 is not None
@@ -102,7 +113,8 @@ async def test_round_robin_distribution(db: AsyncSession, assignment_setup: dict
         first_name="Lead",
         last_name="Two",
         title="Hardware Opportunity",
-        created_by=data["creator"].id
+        created_by=data["creator"].id,
+        stage_id=data["default_stage_id"]
     )
     assigned_user2 = await assign_service.assign_lead(lead2)
     assert assigned_user2 is not None
@@ -116,7 +128,8 @@ async def test_round_robin_distribution(db: AsyncSession, assignment_setup: dict
         first_name="Lead",
         last_name="Three",
         title="Consulting Opportunity",
-        created_by=data["creator"].id
+        created_by=data["creator"].id,
+        stage_id=data["default_stage_id"]
     )
     assigned_user3 = await assign_service.assign_lead(lead3)
     assert assigned_user3 is not None
@@ -135,7 +148,8 @@ async def test_auto_assignment_disabled(db: AsyncSession, assignment_setup: dict
         first_name="Isolated",
         last_name="Isolated",
         title="CRM Deal",
-        created_by=data["creator"].id
+        created_by=data["creator"].id,
+        stage_id=data["default_stage_id"]
     )
     assigned_user = await assign_service.assign_lead(lead)
     assert assigned_user is None

@@ -12,6 +12,9 @@ from app.api.v1.activities import router as activities_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.health import router as active_health_router
+from app.api.v1.pipelines import router as pipelines_router
+from app.api.v1.dialer import router as dialer_router
+from app.api.v1.analytics import router as analytics_router
 from app.models.base import Base
 from app.core.database import engine
 import os
@@ -54,6 +57,9 @@ app.include_router(activities_router, prefix=f"{settings.API_V1_STR}/activities"
 app.include_router(notes_router, prefix=f"{settings.API_V1_STR}/notes", tags=["notes"])
 app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
 app.include_router(active_health_router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
+app.include_router(pipelines_router, prefix=f"{settings.API_V1_STR}/pipelines", tags=["pipelines"])
+app.include_router(dialer_router, prefix=f"{settings.API_V1_STR}/dialer", tags=["dialer"])
+app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics", tags=["analytics"])
 
 @app.get("/health")
 def health_check():

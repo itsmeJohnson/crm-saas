@@ -5,6 +5,8 @@ interface Filters {
   search: string;
   status: string;
   assigned_user_id: string;
+  name: string;
+  city: string;
 }
 
 interface Pagination {
@@ -35,6 +37,8 @@ export const useLeadStore = create<LeadState>((set, get) => ({
     search: '',
     status: 'All',
     assigned_user_id: 'All',
+    name: '',
+    city: '',
   },
   pagination: {
     skip: 0,
@@ -58,7 +62,7 @@ export const useLeadStore = create<LeadState>((set, get) => ({
 
   resetFilters: () => {
     set({
-      filters: { search: '', status: 'All', assigned_user_id: 'All' },
+      filters: { search: '', status: 'All', assigned_user_id: 'All', name: '', city: '' },
       pagination: { skip: 0, limit: 20 },
     });
     get().fetchLeads();
@@ -71,8 +75,10 @@ export const useLeadStore = create<LeadState>((set, get) => ({
       const search = get().filters.search.trim() || undefined;
       const status = get().filters.status === 'All' ? undefined : get().filters.status;
       const assigned_user_id = get().filters.assigned_user_id === 'All' ? undefined : get().filters.assigned_user_id;
+      const name = get().filters.name.trim() || undefined;
+      const city = get().filters.city.trim() || undefined;
 
-      const data = await leadApi.getLeads({ skip, limit, search, status, assigned_user_id });
+      const data = await leadApi.getLeads({ skip, limit, search, status, assigned_user_id, name, city });
       set({ leads: data, isLoading: false });
     } catch (err: any) {
       set({

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Sequence, Tuple
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.user_repository import UserRepository
 from app.services.permission_service import PermissionService
@@ -42,6 +43,17 @@ class UserService:
         
         # Enforce RBAC Role Hierarchy: Manager can only create Employee, Employee cannot create anyone
         PermissionService.check_user_management_permission(actor, user_data.get("role", "Employee"))
+
+        role = user_data.get("role", "Employee")
+        reporting_to_id = user_data.get("reporting_to_id")
+        if reporting_to_id and isinstance(reporting_to_id, str):
+            reporting_to_id = uuid.UUID(reporting_to_id)
+        await self.validate_reporting_structure(
+            user_id=None,
+            role=role,
+            reporting_to_id=reporting_to_id,
+            organization_id=actor.organization_id
+        )
 
         # Check global email uniqueness
         existing = await self.user_repo.get_by_email_global(user_data["email"])
@@ -97,6 +109,19 @@ class UserService:
             PermissionService.check_user_management_permission(actor, target_user.role)
             if "role" in update_data:
                 PermissionService.check_user_management_permission(actor, update_data["role"])
+
+        # Validate reporting hierarchy if role or reporting_to_id is being updated
+        if "role" in update_data or "reporting_to_id" in update_data:
+            role = update_data.get("role", target_user.role)
+            reporting_to_id = update_data.get("reporting_to_id", target_user.reporting_to_id)
+            if reporting_to_id and isinstance(reporting_to_id, str):
+                reporting_to_id = uuid.UUID(reporting_to_id)
+            await self.validate_reporting_structure(
+                user_id=user_id,
+                role=role,
+                reporting_to_id=reporting_to_id,
+                organization_id=actor.organization_id
+            )
 
         # Prevent demoting the final OrgAdmin
         if target_user.role == "OrgAdmin" and "role" in update_data and update_data["role"] != "OrgAdmin":
@@ -225,3 +250,110 @@ class UserService:
         return await self.user_repo.paginate_users(
             actor.organization_id, skip, limit, search_query, role, is_active
         )
+
+    async def get_downline_user_ids(self, actor: User) -> set[uuid.UUID]:
+        """Fetch all downline user IDs in actor's reporting chain recursively."""
+        return await self.get_downline_user_ids_by_id(actor.organization_id, actor.id)
+
+    async def get_downline_user_ids_by_id(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> set[uuid.UUID]:
+        """Fetch all downline user IDs in a user's reporting chain recursively."""
+        query = select(User.id, User.reporting_to_id).where(
+            User.organization_id == organization_id,
+            User.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        rows = result.all()
+        
+        parent_to_children = {}
+        for uid, pid in rows:
+            if pid is not None:
+                parent_to_children.setdefault(pid, []).append(uid)
+                
+        downlines = set()
+        queue = [user_id]
+        while queue:
+            curr = queue.pop(0)
+            children = parent_to_children.get(curr, [])
+            for child in children:
+                if child not in downlines:
+                    downlines.add(child)
+                    queue.append(child)
+        return downlines
+
+    async def validate_reporting_structure(
+        self,
+        user_id: uuid.UUID | None,
+        role: str,
+        reporting_to_id: uuid.UUID | None,
+        organization_id: uuid.UUID
+    ) -> None:
+        """
+        Validate the strict 4-tier reporting line:
+        - OrgAdmin cannot report to anyone.
+        - Manager must report to an OrgAdmin.
+        - Employee (TL) must report to a Manager.
+        - Employee (Telecaller) must report to a TL (Employee who reports to a Manager).
+        """
+        if role == "OrgAdmin":
+            if reporting_to_id is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="OrgAdmin cannot report to anyone"
+                )
+            return
+
+        if reporting_to_id is None:
+            return
+
+        if user_id and reporting_to_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user cannot report to themselves"
+            )
+
+        # Prevent circular reporting dependency
+        if user_id:
+            downlines = await self.get_downline_user_ids_by_id(organization_id, user_id)
+            if reporting_to_id in downlines:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Circular reporting dependency detected: target manager reports to this user"
+                )
+
+        # Fetch parent
+        parent = await self.user_repo.get_user_by_id(organization_id, reporting_to_id)
+        if not parent:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reporting user not found or belongs to another organization"
+            )
+
+        if role == "Manager":
+            if parent.role != "OrgAdmin":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Managers must report to a Super Admin (OrgAdmin)"
+                )
+
+        elif role == "Employee":
+            if parent.role == "Manager":
+                # Valid TL
+                pass
+            elif parent.role == "Employee":
+                # Parent is Employee, must be a TL (so parent must report to a Manager)
+                if not parent.reporting_to_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Telecallers must report to a Team Leader who reports to a Manager"
+                    )
+                grandparent = await self.user_repo.get_user_by_id(organization_id, parent.reporting_to_id)
+                if not grandparent or grandparent.role != "Manager":
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Telecallers must report to a Team Leader who reports to a Manager"
+                    )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Employees must report to either a Manager (TL) or a Team Leader (Agent)"
+                )

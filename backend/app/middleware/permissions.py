@@ -1,10 +1,16 @@
 from typing import List, Annotated
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
+from app.core.database import get_db
+from app.core.context import mask_phone_ctx
 
 async def require_active_user(
-    current_user: Annotated[User, Depends(get_current_active_user)]
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
 ) -> User:
     """Dependency verifying that the user is active."""
     if not current_user.is_active:
@@ -12,6 +18,17 @@ async def require_active_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated"
         )
+    
+    # Check if the user is a Telecaller (Employee reporting to a TL/Employee)
+    mask_phone = False
+    if current_user.role == "Employee" and current_user.reporting_to_id:
+        parent_query = select(User.role).filter(User.id == current_user.reporting_to_id)
+        res = await db.execute(parent_query)
+        parent_role = res.scalar()
+        if parent_role == "Employee":
+            mask_phone = True
+            
+    mask_phone_ctx.set(mask_phone)
     return current_user
 
 class RoleRequired:

@@ -10,6 +10,12 @@ from app.schemas.activity import ActivityBase, ActivityCreate, ActivityUpdate, A
 from app.schemas.note import NoteBase, NoteCreate, NoteUpdate, NoteResponse
 from app.schemas.lead_import import GoogleSheetsPreviewRequest, ImportPreviewResponse, LeadImportProcessRequest, LeadImportResponse
 from app.schemas.assignment_config import AssignmentConfigUpdate, AssignmentConfigResponse
+from app.schemas.analytics import (
+    PerformanceTargetCreate, PerformanceTargetResponse,
+    TelecallerMetricsResponse, TeamLeaderMetricsResponse,
+    ManagerMetricsResponse, SuperAdminMetricsResponse,
+    UnifiedDashboardResponse
+)
 
 __all__ = [
     "OrganizationBase", "OrganizationCreate", "OrganizationUpdate", "OrganizationResponse",
@@ -23,5 +29,9 @@ __all__ = [
     "ActivityBase", "ActivityCreate", "ActivityUpdate", "ActivityResponse",
     "NoteBase", "NoteCreate", "NoteUpdate", "NoteResponse",
     "GoogleSheetsPreviewRequest", "ImportPreviewResponse", "LeadImportProcessRequest", "LeadImportResponse",
-    "AssignmentConfigUpdate", "AssignmentConfigResponse"
+    "AssignmentConfigUpdate", "AssignmentConfigResponse",
+    "PerformanceTargetCreate", "PerformanceTargetResponse",
+    "TelecallerMetricsResponse", "TeamLeaderMetricsResponse",
+    "ManagerMetricsResponse", "SuperAdminMetricsResponse",
+    "UnifiedDashboardResponse"
 ]

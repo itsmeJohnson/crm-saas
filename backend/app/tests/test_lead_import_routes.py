@@ -158,6 +158,24 @@ async def test_invalid_google_sheets_url(client: AsyncClient, setup_import_route
 async def test_process_import_batch_with_duplicates_and_isolation(client: AsyncClient, setup_import_routes_data: dict, db: AsyncSession):
     data = setup_import_routes_data
 
+    from app.models.pipeline import PipelineStage
+    from sqlalchemy import select
+    res_b = await db.execute(
+        select(PipelineStage.id).filter(
+            PipelineStage.organization_id == data["org_b"].id,
+            PipelineStage.is_system_default == True
+        )
+    )
+    stage_id_b = res_b.scalar()
+
+    res_a = await db.execute(
+        select(PipelineStage.id).filter(
+            PipelineStage.organization_id == data["org_a"].id,
+            PipelineStage.is_system_default == True
+        )
+    )
+    stage_id_a = res_a.scalar()
+
     # Create pre-existing duplicate lead inside Org B (other tenant)
     # The duplicate check should be isolated, so Org A can still import the lead.
     other_lead = Lead(
@@ -166,7 +184,8 @@ async def test_process_import_batch_with_duplicates_and_isolation(client: AsyncC
         last_name="Lead",
         email="test_dup@tenant.com",
         title="Manager",
-        created_by=data["admin_b"].id
+        created_by=data["admin_b"].id,
+        stage_id=stage_id_b
     )
     db.add(other_lead)
     await db.commit()
@@ -178,7 +197,8 @@ async def test_process_import_batch_with_duplicates_and_isolation(client: AsyncC
         last_name="Lead",
         email="existing_dup@tenant.com",
         title="Developer",
-        created_by=data["admin_a"].id
+        created_by=data["admin_a"].id,
+        stage_id=stage_id_a
     )
     db.add(existing_lead_a)
     await db.commit()

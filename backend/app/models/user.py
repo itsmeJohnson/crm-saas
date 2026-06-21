@@ -16,9 +16,12 @@ class User(BaseModel):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     token_version: Mapped[int] = mapped_column(default=1, nullable=False)
     is_invited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    reporting_to_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")
+    reporting_to: Mapped["User | None"] = relationship("User", remote_side="User.id", back_populates="downlines")
+    downlines: Mapped[list["User"]] = relationship("User", back_populates="reporting_to")
     sessions: Mapped[list["UserSession"]] = relationship(
         "UserSession", 
         back_populates="user", 

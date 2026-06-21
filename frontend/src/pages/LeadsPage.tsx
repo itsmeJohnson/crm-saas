@@ -121,6 +121,28 @@ export const LeadsPage: React.FC = () => {
             </select>
           </div>
 
+          {/* Name Filter input */}
+          <div className="w-full sm:w-48">
+            <input
+              type="text"
+              placeholder="Filter by Name..."
+              value={filters.name}
+              onChange={(e) => setFilters({ name: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+            />
+          </div>
+
+          {/* City Filter input */}
+          <div className="w-full sm:w-48">
+            <input
+              type="text"
+              placeholder="Filter by City..."
+              value={filters.city}
+              onChange={(e) => setFilters({ city: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+            />
+          </div>
+
           {/* Owner filter dropdown */}
           <div className="w-full sm:w-48">
             <select

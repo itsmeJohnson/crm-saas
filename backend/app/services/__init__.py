@@ -4,6 +4,7 @@ from app.services.user_service import UserService
 from app.services.invitation_service import InvitationService
 from app.services.audit_service import AuditService
 from app.services.permission_service import PermissionService
+from app.services.analytics_service import AnalyticsService
 
 __all__ = [
     "OrganizationService",
@@ -11,5 +12,6 @@ __all__ = [
     "UserService",
     "InvitationService",
     "AuditService",
-    "PermissionService"
+    "PermissionService",
+    "AnalyticsService"
 ]

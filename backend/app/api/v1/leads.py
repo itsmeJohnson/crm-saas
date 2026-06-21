@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.lead import LeadResponse, LeadCreate, LeadUpdate
 from app.schemas.lead_import import GoogleSheetsPreviewRequest, ImportPreviewResponse, LeadImportProcessRequest, LeadImportResponse
 from app.schemas.assignment_config import AssignmentConfigUpdate, AssignmentConfigResponse
+from app.schemas.lead_assign import LeadBulkAssignRequest, LeadBulkAssignResponse
 from app.services.lead_service import LeadService
 from app.services.lead_import_service import LeadImportService
 from app.services.assignment_service import AssignmentService
@@ -43,12 +44,14 @@ async def list_leads(
     limit: int = Query(20, ge=1, le=100),
     search: str | None = Query(None),
     status: str | None = Query(None),
-    assigned_user_id: uuid.UUID | None = Query(None)
+    assigned_user_id: uuid.UUID | None = Query(None),
+    name: str | None = Query(None),
+    city: str | None = Query(None)
 ):
     """List paginated, searchable leads scoped to the tenant organization."""
     lead_service = LeadService(db)
     records, _ = await lead_service.paginate_leads(
-        actor, skip, limit, search, status, assigned_user_id
+        actor, skip, limit, search, status, assigned_user_id, name, city
     )
     return list(records)
 
@@ -192,3 +195,13 @@ async def update_assignment_config(
     """Enable or disable auto-assignment configuration."""
     assign_service = AssignmentService(db)
     return await assign_service.toggle_assignment(actor.organization_id, req.is_active)
+
+@router.post("/assign-bulk", response_model=LeadBulkAssignResponse)
+async def assign_leads_bulk(
+    req: LeadBulkAssignRequest,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Bulk assign leads using SPLIT or RANGE strategy among downline users."""
+    assign_service = AssignmentService(db)
+    return await assign_service.assign_leads_bulk(actor, req)

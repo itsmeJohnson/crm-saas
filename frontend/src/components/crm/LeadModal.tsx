@@ -98,12 +98,11 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 
   const onSubmit = async (values: LeadFormValues) => {
     try {
-      const payload = {
+      const payload: any = {
         title: values.title,
         last_name: values.last_name,
         first_name: values.first_name || null,
         email: values.email || null,
-        phone: values.phone || null,
         company_name: values.company_name || null,
         status: values.status,
         source: values.source || null,
@@ -111,9 +110,19 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         assigned_user_id: values.assigned_user_id || null,
       };
 
+      // Safeguard: omit phone number if it contains asterisks to avoid overwriting real number in DB
+      if (values.phone && !values.phone.includes('*')) {
+        payload.phone = values.phone;
+      } else if (values.phone === '') {
+        payload.phone = null;
+      }
+
       if (lead) {
         await updateLead(lead.id, payload);
       } else {
+        if (values.phone && !values.phone.includes('*')) {
+          payload.phone = values.phone;
+        }
         await createLead(payload);
       }
       onClose();
@@ -182,12 +191,20 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               {errors.email && <p className="mt-1.5 text-xs text-red-400">{errors.email.message}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Phone</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Phone</label>
+                {lead?.phone?.includes('*') && (
+                  <span className="text-[10px] text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 select-none">
+                    Protected Number
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 {...register('phone')}
                 placeholder="e.g. +1 555-0900"
-                className="w-full px-4 py-3 rounded-xl glass-input"
+                readOnly={lead?.phone?.includes('*')}
+                className={`w-full px-4 py-3 rounded-xl glass-input ${lead?.phone?.includes('*') ? 'opacity-60 cursor-not-allowed border-slate-800/80 focus:border-slate-800/80' : ''}`}
               />
             </div>
           </div>

@@ -13,6 +13,27 @@ class LeadRepository(BaseRepository[Lead]):
     async def create_lead(self, organization_id: uuid.UUID, lead_data: dict, created_by: uuid.UUID) -> Lead:
         lead_data["organization_id"] = organization_id
         lead_data["created_by"] = created_by
+
+        if "stage_id" not in lead_data or not lead_data["stage_id"]:
+            from app.models.pipeline import PipelineStage
+            stage_query = select(PipelineStage.id).filter(
+                PipelineStage.organization_id == organization_id,
+                PipelineStage.is_system_default == True,
+                PipelineStage.is_deleted == False
+            ).limit(1)
+            res = await self.db.execute(stage_query)
+            stage_id = res.scalar()
+
+            if not stage_id:
+                stage_query_fallback = select(PipelineStage.id).filter(
+                    PipelineStage.organization_id == organization_id,
+                    PipelineStage.is_deleted == False
+                ).order_by(PipelineStage.order_position).limit(1)
+                res_fallback = await self.db.execute(stage_query_fallback)
+                stage_id = res_fallback.scalar()
+
+            lead_data["stage_id"] = stage_id
+
         return await self.create(lead_data)
 
     async def get_lead_by_id(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
@@ -40,7 +61,9 @@ class LeadRepository(BaseRepository[Lead]):
         limit: int = 100, 
         search_query: str | None = None,
         status: str | None = None,
-        assigned_user_id: uuid.UUID | None = None
+        assigned_user_id: uuid.UUID | None = None,
+        name: str | None = None,
+        city: str | None = None
     ) -> Tuple[Sequence[Lead], int]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,
@@ -53,6 +76,19 @@ class LeadRepository(BaseRepository[Lead]):
         if assigned_user_id:
             query = query.filter(self.model.assigned_user_id == assigned_user_id)
         
+        if name:
+            name_filter = f"%{name}%"
+            query = query.filter(
+                or_(
+                    self.model.first_name.ilike(name_filter),
+                    self.model.last_name.ilike(name_filter)
+                )
+            )
+
+        if city:
+            city_filter = f"%{city}%"
+            query = query.filter(self.model.city.ilike(city_filter))
+
         if search_query:
             search_filter = f"%{search_query}%"
             query = query.filter(
@@ -63,7 +99,8 @@ class LeadRepository(BaseRepository[Lead]):
                     self.model.phone.ilike(search_filter),
                     self.model.company_name.ilike(search_filter),
                     self.model.title.ilike(search_filter),
-                    self.model.source.ilike(search_filter)
+                    self.model.source.ilike(search_filter),
+                    self.model.city.ilike(search_filter)
                 )
             )
         

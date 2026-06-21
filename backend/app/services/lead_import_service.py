@@ -349,6 +349,48 @@ class LeadImportService:
                 raw_row_vals = [row.get(h, "") for h in headers]
                 csv_writer.writerow(raw_row_vals + [errors_by_row[idx]])
 
+        # Fetch or seed the default PipelineStage ID for the organization
+        from app.models.pipeline import PipelineStage
+        from sqlalchemy import select
+        stage_query = select(PipelineStage.id).filter(
+            PipelineStage.organization_id == actor.organization_id,
+            PipelineStage.is_system_default == True,
+            PipelineStage.is_deleted == False
+        ).limit(1)
+        res = await self.db.execute(stage_query)
+        stage_id = res.scalar()
+
+        if not stage_id:
+            stage_query_fallback = select(PipelineStage.id).filter(
+                PipelineStage.organization_id == actor.organization_id,
+                PipelineStage.is_deleted == False
+            ).order_by(PipelineStage.order_position).limit(1)
+            res_fallback = await self.db.execute(stage_query_fallback)
+            stage_id = res_fallback.scalar()
+
+        if not stage_id:
+            # Seed default stages if they don't exist
+            stages = [
+                ("Fresh Leads", 1, True),
+                ("Contacted", 2, False),
+                ("Followup", 3, False),
+                ("Dropped", 4, False),
+                ("Converted", 5, False)
+            ]
+            for name, pos, is_default in stages:
+                stage = PipelineStage(
+                    organization_id=actor.organization_id,
+                    name=name,
+                    order_position=pos,
+                    is_system_default=is_default
+                )
+                self.db.add(stage)
+            await self.db.flush()
+            
+            # Refetch
+            res = await self.db.execute(stage_query)
+            stage_id = res.scalar()
+
         # Insert valid rows
         for item in valid_rows:
             mapped_values = item["data"]
@@ -377,7 +419,8 @@ class LeadImportService:
                 source=mapped_values.get("source") or "Import",
                 value=val,
                 created_by=actor.id,
-                import_id=import_record.id
+                import_id=import_record.id,
+                stage_id=stage_id
             )
             self.db.add(lead_obj)
             await self.db.flush()
