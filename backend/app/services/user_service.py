@@ -242,13 +242,26 @@ class UserService:
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Actor account is deactivated"
             )
+        
+        reporting_to_id = None
         if actor.role == "Employee":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have enough privileges"
-            )
+            is_tl = False
+            if actor.reporting_to_id:
+                # Check if the parent role is Manager (so actor is TL)
+                parent_res = await self.db.execute(select(User.role).filter(User.id == actor.reporting_to_id))
+                parent_role = parent_res.scalar()
+                if parent_role == "Manager":
+                    is_tl = True
+            
+            if not is_tl:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have enough privileges"
+                )
+            reporting_to_id = actor.id
+
         return await self.user_repo.paginate_users(
-            actor.organization_id, skip, limit, search_query, role, is_active
+            actor.organization_id, skip, limit, search_query, role, is_active, reporting_to_id
         )
 
     async def get_downline_user_ids(self, actor: User) -> set[uuid.UUID]:

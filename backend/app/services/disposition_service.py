@@ -96,6 +96,9 @@ class DispositionService:
                 )
             lead.stage_id = custom_stage.id
 
+        # Update lead status to match the disposition status
+        lead.status = payload.status.value
+
         # 4. Transition agent's Redis state to IDLE
         state_service = AgentStateService()
         await state_service.set_agent_state(actor.organization_id, actor.id, "IDLE")
@@ -120,6 +123,15 @@ class DispositionService:
 
         db.add(lead)
         await db.commit()
-        await db.refresh(lead)
+
+        # Invalidate dashboard metrics cache immediately
+        from app.services.dashboard_service import DashboardService
+        await DashboardService.invalidate_cache(lead.organization_id)
+
+        # Re-fetch lead eagerly loading the updated stage relationship
+        from sqlalchemy.orm import selectinload
+        refetched_query = select(Lead).options(selectinload(Lead.stage)).filter(Lead.id == lead.id)
+        refetched_res = await db.execute(refetched_query)
+        lead = refetched_res.scalar_one()
 
         return lead

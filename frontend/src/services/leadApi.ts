@@ -48,6 +48,7 @@ export const leadApi = {
     city?: string | null;
     value?: number | null;
     assigned_user_id?: string | null;
+    stage_id?: string | null;
   }) => {
     const response = await api.post<LeadResponse>('/leads/', payload);
     return response.data;
@@ -70,6 +71,7 @@ export const leadApi = {
     city?: string | null;
     value?: number | null;
     assigned_user_id?: string | null;
+    stage_id?: string | null;
   }) => {
     const response = await api.patch<LeadResponse>(`/leads/${leadId}`, payload);
     return response.data;
@@ -77,6 +79,28 @@ export const leadApi = {
 
   deleteLead: async (leadId: string) => {
     const response = await api.delete<LeadResponse>(`/leads/${leadId}`);
+    return response.data;
+  },
+
+  assignLeadsBulk: async (payload: {
+    lead_ids?: string[] | null;
+    import_id?: string | null;
+    assignee_ids: string[];
+    strategy: 'RANGE' | 'SPLIT';
+    range_start?: number | null;
+    range_end?: number | null;
+  }) => {
+    const response = await api.post<{ assigned_count: number; lead_ids: string[]; assignee_ids: string[] }>('/leads/assign-bulk', payload);
+    return response.data;
+  },
+
+  transferLeads: async (payload: {
+    source_user_id: string;
+    destination_user_ids: string[];
+    quantity?: number | null;
+    lead_ids?: string[] | null;
+  }) => {
+    const response = await api.post<{ transferred_count: number; lead_ids: string[]; destination_user_ids: string[] }>('/leads/transfer', payload);
     return response.data;
   },
 };

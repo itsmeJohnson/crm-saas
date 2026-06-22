@@ -4,18 +4,27 @@ import { useUserStore } from '../../store/userStore';
 import { LeadResponse } from '../../services/leadApi';
 import { Edit3, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { MaskedField } from '../common/MaskedField';
+import { useAuthStore } from '../../store/authStore';
 
 interface LeadTableProps {
   onEditClick: (lead: LeadResponse) => void;
   onRowClick: (lead: LeadResponse) => void;
+  selectedLeadIds: string[];
+  onSelectLeads: (ids: string[]) => void;
+  hideCheckboxes?: boolean;
 }
 
 export const LeadTable: React.FC<LeadTableProps> = ({
   onEditClick,
-  onRowClick
+  onRowClick,
+  selectedLeadIds,
+  onSelectLeads,
+  hideCheckboxes = false
 }) => {
   const { leads, isLoading, error, deleteLead } = useLeadStore();
   const { users, fetchUsers } = useUserStore();
+  const { user } = useAuthStore();
+  const isEmployee = user?.role === 'Employee';
 
   useEffect(() => {
     if (users.length === 0) {
@@ -39,7 +48,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     onEditClick(lead);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, stageName?: string) => {
     switch (status) {
       case 'New':
         return (
@@ -69,6 +78,12 @@ export const LeadTable: React.FC<LeadTableProps> = ({
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
             Lost
+          </span>
+        );
+      case 'Picked':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            Picked {stageName ? `(${stageName})` : ''}
           </span>
         );
       default:
@@ -105,18 +120,36 @@ export const LeadTable: React.FC<LeadTableProps> = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-800/80 bg-slate-900/40">
+              {!hideCheckboxes && (
+                <th className="w-12 px-6 py-4.5">
+                  <input
+                    type="checkbox"
+                    checked={leads.length > 0 && selectedLeadIds.length === leads.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onSelectLeads(leads.map(l => l.id));
+                      } else {
+                        onSelectLeads([]);
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
+                  />
+                </th>
+              )}
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Lead</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Value</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Phone</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Owner</th>
-              <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+              {!isEmployee && (
+                <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/65 bg-slate-950/20">
             {leads.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-500">
+                <td colSpan={7 - (hideCheckboxes ? 1 : 0) - (isEmployee ? 1 : 0)} className="px-6 py-12 text-center text-sm text-slate-500">
                   No leads found. Add a lead opportunity to get started.
                 </td>
               </tr>
@@ -138,6 +171,22 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     onClick={() => onRowClick(lead)}
                     className="hover:bg-slate-900/30 transition-colors cursor-pointer"
                   >
+                    {!hideCheckboxes && (
+                      <td className="w-12 px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedLeadIds.includes(lead.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              onSelectLeads([...selectedLeadIds, lead.id]);
+                            } else {
+                              onSelectLeads(selectedLeadIds.filter(id => id !== lead.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/25 flex items-center justify-center font-bold text-brand-300 text-sm">
@@ -161,7 +210,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     </td>
 
                     <td className="px-6 py-4 align-middle">
-                      {getStatusBadge(lead.status)}
+                      {getStatusBadge(lead.status, lead.stage?.name)}
                     </td>
 
                     <td className="px-6 py-4 align-middle">
@@ -174,24 +223,26 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 text-right align-middle">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={(e) => handleEdit(e, lead)}
-                          title="Edit Lead"
-                          className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-lg text-slate-300 transition-all cursor-pointer"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => handleDelete(e, lead)}
-                          title="Delete Lead"
-                          className="p-2 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {!isEmployee && (
+                      <td className="px-6 py-4 text-right align-middle">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => handleEdit(e, lead)}
+                            title="Edit Lead"
+                            className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-lg text-slate-300 transition-all cursor-pointer"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDelete(e, lead)}
+                            title="Delete Lead"
+                            className="p-2 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })

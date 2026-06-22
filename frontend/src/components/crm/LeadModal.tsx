@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { LeadResponse } from '../../services/leadApi';
 import { useLeadStore } from '../../store/leadStore';
 import { useUserStore } from '../../store/userStore';
+import { usePipelineStore } from '../../store/pipelineStore';
 import { X, Loader2 } from 'lucide-react';
 
 const leadSchema = z.object({
@@ -18,6 +19,7 @@ const leadSchema = z.object({
   source: z.string().max(100).optional().or(z.literal('')),
   value: z.coerce.number().min(0, 'Value must be positive').optional().or(z.literal('')),
   assigned_user_id: z.string().optional().or(z.literal('')),
+  stage_id: z.string().optional().or(z.literal('')),
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -35,6 +37,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 }) => {
   const { createLead, updateLead } = useLeadStore();
   const { users, fetchUsers } = useUserStore();
+  const { stages, fetchStages } = usePipelineStore();
   const activeUsers = users.filter(u => u.is_active);
 
   const {
@@ -55,12 +58,16 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       source: '',
       value: '',
       assigned_user_id: '',
+      stage_id: '',
     }
   });
 
   useEffect(() => {
-    if (isOpen && users.length === 0) {
-      fetchUsers();
+    if (isOpen) {
+      if (users.length === 0) {
+        fetchUsers();
+      }
+      fetchStages().catch(() => {});
     }
   }, [isOpen]);
 
@@ -77,6 +84,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         source: lead.source || '',
         value: lead.value || '',
         assigned_user_id: lead.assigned_user_id || '',
+        stage_id: lead.stage_id || '',
       });
     } else {
       reset({
@@ -90,6 +98,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         source: '',
         value: '',
         assigned_user_id: '',
+        stage_id: '',
       });
     }
   }, [lead, reset, isOpen]);
@@ -108,6 +117,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         source: values.source || null,
         value: values.value !== '' ? Number(values.value) : null,
         assigned_user_id: values.assigned_user_id || null,
+        stage_id: values.stage_id || null,
       };
 
       // Safeguard: omit phone number if it contains asterisks to avoid overwriting real number in DB
@@ -257,19 +267,35 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Assign Owner</label>
-            <select
-              {...register('assigned_user_id')}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
-            >
-              <option value="">Unassigned</option>
-              {activeUsers.map(u => (
-                <option key={u.id} value={u.id}>
-                  {`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Assign Owner</label>
+              <select
+                {...register('assigned_user_id')}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+              >
+                <option value="">Unassigned</option>
+                {activeUsers.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Pipeline Stage</label>
+              <select
+                {...register('stage_id')}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+              >
+                <option value="">Default/None</option>
+                {stages.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">

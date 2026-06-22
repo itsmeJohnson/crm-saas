@@ -8,7 +8,12 @@ export interface AgentStateResponse {
 }
 
 export const dialerApi = {
-  getNextLead: async (payload: { collective_pooling: boolean } = { collective_pooling: false }) => {
+  getNextLead: async (payload: {
+    collective_pooling: boolean;
+    knowlarity_api_key?: string;
+    knowlarity_srn?: string;
+    agent_phone_number?: string;
+  } = { collective_pooling: false }) => {
     const response = await api.post<LeadResponse>('/dialer/next-lead', payload);
     return response.data;
   },

@@ -275,7 +275,7 @@ export const PipelineSettings: React.FC = () => {
                       type="button"
                       onClick={() => handleMoveUp(index)}
                       disabled={index === 0}
-                      className="p-1.5 bg-white hover:bg-slate-550 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-30 text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 transition"
+                      className="p-1.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-30 text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 transition"
                     >
                       <ArrowUp className="w-4 h-4" />
                     </button>
@@ -283,7 +283,7 @@ export const PipelineSettings: React.FC = () => {
                       type="button"
                       onClick={() => handleMoveDown(index)}
                       disabled={index === stages.length - 1}
-                      className="p-1.5 bg-white hover:bg-slate-550 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-30 text-slate-600 dark:text-slate-400 transition"
+                      className="p-1.5 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-30 text-slate-600 dark:text-slate-400 transition"
                     >
                       <ArrowDown className="w-4 h-4" />
                     </button>

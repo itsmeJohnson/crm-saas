@@ -34,10 +34,15 @@ class LeadRepository(BaseRepository[Lead]):
 
             lead_data["stage_id"] = stage_id
 
-        return await self.create(lead_data)
+        lead = await self.create(lead_data)
+        from sqlalchemy.orm import selectinload
+        refetched_query = select(Lead).options(selectinload(Lead.stage)).filter(Lead.id == lead.id)
+        refetched_res = await self.db.execute(refetched_query)
+        return refetched_res.scalar_one()
 
     async def get_lead_by_id(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
-        query = select(self.model).filter(
+        from sqlalchemy.orm import selectinload
+        query = select(self.model).options(selectinload(self.model.stage)).filter(
             self.model.id == lead_id,
             self.model.organization_id == organization_id,
             self.model.is_deleted == False
@@ -110,7 +115,8 @@ class LeadRepository(BaseRepository[Lead]):
         total = count_result.scalar_one()
 
         # Get records ordered by created_at desc
-        records_query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
+        from sqlalchemy.orm import selectinload
+        records_query = query.options(selectinload(self.model.stage)).order_by(self.model.created_at.desc()).offset(skip).limit(limit)
         records_result = await self.db.execute(records_query)
         records = records_result.scalars().all()
 
@@ -120,7 +126,11 @@ class LeadRepository(BaseRepository[Lead]):
         lead = await self.get_lead_by_id(organization_id, lead_id)
         if not lead:
             return None
-        return await self.update(lead, lead_data)
+        updated_lead = await self.update(lead, lead_data)
+        from sqlalchemy.orm import selectinload
+        refetched_query = select(Lead).options(selectinload(Lead.stage)).filter(Lead.id == updated_lead.id)
+        refetched_res = await self.db.execute(refetched_query)
+        return refetched_res.scalar_one()
 
     async def soft_delete_lead(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
         lead = await self.get_lead_by_id(organization_id, lead_id)

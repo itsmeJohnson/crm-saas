@@ -10,6 +10,7 @@ import { MappingPreview } from './MappingPreview';
 import { FailedRowsDownload } from './FailedRowsDownload';
 import { ImportPreviewResponse, LeadImportResponse } from '../../services/leadImportApi';
 import { userApi, UserResponse } from '../../services/userApi';
+import { useAnalyticsStore } from '../../store/analyticsStore';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -41,8 +42,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
   // Import Preview State
   const [previewData, setPreviewData] = useState<ImportPreviewResponse | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [assignmentMode, setAssignmentMode] = useState<'AUTO' | 'SPECIFIC_USER' | 'NONE'>('NONE');
+  const [assignmentMode, setAssignmentMode] = useState<'AUTO' | 'SPECIFIC_USER' | 'MULTIPLE_USERS' | 'NONE'>('NONE');
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
   const [employees, setEmployees] = useState<UserResponse[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
@@ -62,6 +64,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       setSourceType('file');
       setAssignmentMode('NONE');
       setAssignedUserId(null);
+      setAssignedUserIds([]);
       clearError();
 
       const fetchEmployees = async () => {
@@ -76,7 +79,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
         }
       };
 
-      if (user && (user.role === 'OrgAdmin' || user.role === 'Manager')) {
+      const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
+      if (user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL)) {
         fetchEmployees();
       }
     } else {
@@ -90,14 +94,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       setSourceType('file');
       setAssignmentMode('NONE');
       setAssignedUserId(null);
+      setAssignedUserIds([]);
       clearError();
     }
   }, [isOpen, user]);
 
+  const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
+  const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
+
   if (!isOpen) return null;
 
   // RBAC protection
-  if (!user || (user.role !== 'OrgAdmin' && user.role !== 'Manager')) {
+  if (!isPrivileged) {
     return null;
   }
 
@@ -188,6 +196,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       return;
     }
 
+    if (assignmentMode === 'MULTIPLE_USERS' && assignedUserIds.length === 0) {
+      setErrorMsg('Please select at least one assignee user for the MULTIPLE_USERS assignment mode');
+      return;
+    }
+
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -198,7 +211,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
         column_mapping: columnMapping,
         auto_assign: assignmentMode === 'AUTO',
         assignment_mode: assignmentMode,
-        assigned_user_id: assignedUserId
+        assigned_user_id: assignedUserId,
+        assigned_user_ids: assignedUserIds
       });
       setImportResult(res);
       setStep('summary');
@@ -245,6 +259,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     setSourceType('file');
     setAssignmentMode('NONE');
     setAssignedUserId(null);
+    setAssignedUserIds([]);
     clearError();
   };
 
@@ -329,6 +344,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
               setAssignmentMode={setAssignmentMode}
               assignedUserId={assignedUserId}
               setAssignedUserId={setAssignedUserId}
+              assignedUserIds={assignedUserIds}
+              setAssignedUserIds={setAssignedUserIds}
               employees={employees}
               isLoadingEmployees={isLoadingEmployees}
             />

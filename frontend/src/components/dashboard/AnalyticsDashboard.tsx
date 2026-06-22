@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { DialerConsole } from '../dialer/DialerConsole';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import {
   Phone,
@@ -21,6 +22,7 @@ import {
 
 export const AnalyticsDashboard: React.FC = () => {
   const { dashboardData, isLoading, error, fetchDashboardMetrics } = useAnalyticsStore();
+  const [enableDialer, setEnableDialer] = useState(false);
 
   useEffect(() => {
     fetchDashboardMetrics();
@@ -213,6 +215,32 @@ export const AnalyticsDashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Optional Team Leader Dialer Workspace */}
+        <div className="glass-panel p-6 rounded-2xl border border-slate-800/80 space-y-4 bg-gradient-to-tr from-slate-950/20 via-slate-900/5 to-brand-950/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-white">TL Dialer Workspace</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Enable dialer mode to make calls directly from your own lead queue.</p>
+            </div>
+            <button
+              onClick={() => setEnableDialer(!enableDialer)}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                enableDialer
+                  ? 'bg-brand-500/10 text-brand-300 border-brand-500/30 shadow-lg shadow-brand-500/5'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              {enableDialer ? 'Disable Dialer Mode' : 'Enable Dialer Mode'}
+            </button>
+          </div>
+
+          {enableDialer && (
+            <div className="pt-4 border-t border-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200">
+              <DialerConsole />
+            </div>
+          )}
         </div>
       </div>
     );

@@ -84,7 +84,14 @@ describe('LeadTable Component', () => {
   });
 
   it('renders lead columns, formatted currency value, status badges, and owners correctly', () => {
-    render(<LeadTable onEditClick={mockOnEditClick} onRowClick={mockOnRowClick} />);
+    render(
+      <LeadTable 
+        onEditClick={mockOnEditClick} 
+        onRowClick={mockOnRowClick} 
+        selectedLeadIds={[]}
+        onSelectLeads={vi.fn()}
+      />
+    );
 
     // Validate titles are rendered
     expect(screen.getByText('Acme Enterprise Deal')).toBeDefined();
@@ -104,7 +111,14 @@ describe('LeadTable Component', () => {
   });
 
   it('calls onRowClick when clicking a row', () => {
-    render(<LeadTable onEditClick={mockOnEditClick} onRowClick={mockOnRowClick} />);
+    render(
+      <LeadTable 
+        onEditClick={mockOnEditClick} 
+        onRowClick={mockOnRowClick} 
+        selectedLeadIds={[]}
+        onSelectLeads={vi.fn()}
+      />
+    );
 
     const row = screen.getByText('Acme Enterprise Deal').closest('tr');
     expect(row).not.toBeNull();
@@ -117,7 +131,14 @@ describe('LeadTable Component', () => {
   it('calls deleteLead when clicking the delete button', () => {
     vi.spyOn(window, 'confirm').mockImplementation(() => true);
 
-    render(<LeadTable onEditClick={mockOnEditClick} onRowClick={mockOnRowClick} />);
+    render(
+      <LeadTable 
+        onEditClick={mockOnEditClick} 
+        onRowClick={mockOnRowClick} 
+        selectedLeadIds={[]}
+        onSelectLeads={vi.fn()}
+      />
+    );
 
     const deleteButtons = screen.getAllByTitle('Delete Lead');
     fireEvent.click(deleteButtons[0]);
@@ -126,7 +147,14 @@ describe('LeadTable Component', () => {
   });
 
   it('calls onEditClick when clicking edit button', () => {
-    render(<LeadTable onEditClick={mockOnEditClick} onRowClick={mockOnRowClick} />);
+    render(
+      <LeadTable 
+        onEditClick={mockOnEditClick} 
+        onRowClick={mockOnRowClick} 
+        selectedLeadIds={[]}
+        onSelectLeads={vi.fn()}
+      />
+    );
 
     const editButtons = screen.getAllByTitle('Edit Lead');
     fireEvent.click(editButtons[0]);

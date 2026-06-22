@@ -8,6 +8,7 @@ from app.models.lead_import import LeadImportStatus
 class AssignmentMode(str, Enum):
     AUTO = "AUTO"
     SPECIFIC_USER = "SPECIFIC_USER"
+    MULTIPLE_USERS = "MULTIPLE_USERS"
     NONE = "NONE"
 
 class GoogleSheetsPreviewRequest(BaseModel):
@@ -30,6 +31,7 @@ class LeadImportProcessRequest(BaseModel):
     auto_assign: bool = True
     assignment_mode: AssignmentMode = AssignmentMode.NONE
     assigned_user_id: uuid.UUID | None = None
+    assigned_user_ids: List[uuid.UUID] | None = None
 
     @model_validator(mode='after')
     def validate_assigned_user(self) -> 'LeadImportProcessRequest':
@@ -41,6 +43,8 @@ class LeadImportProcessRequest(BaseModel):
 
         if self.assignment_mode == AssignmentMode.SPECIFIC_USER and not self.assigned_user_id:
             raise ValueError("assigned_user_id must be provided when assignment_mode is 'SPECIFIC_USER'")
+        if self.assignment_mode == AssignmentMode.MULTIPLE_USERS and not self.assigned_user_ids:
+            raise ValueError("assigned_user_ids must be provided when assignment_mode is 'MULTIPLE_USERS'")
         return self
 
 class RowErrorDetail(BaseModel):

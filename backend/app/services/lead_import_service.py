@@ -34,7 +34,8 @@ MAPPING_ALIASES = {
     "company_name": ["company", "organization", "org", "company name", "company_name"],
     "title": ["title", "job title", "position", "role", "job_title"],
     "value": ["value", "deal value", "deal_value", "opportunity value", "amount", "price", "deal amount", "deal_amount"],
-    "source": ["source", "lead source", "lead_source", "channel"]
+    "source": ["source", "lead source", "lead_source", "channel"],
+    "city": ["city", "town", "location", "municipality"]
 }
 
 def calculate_mapping_confidence(header: str, field_name: str) -> float:
@@ -55,7 +56,7 @@ def calculate_mapping_confidence(header: str, field_name: str) -> float:
 def suggest_mappings(headers: List[str]) -> Dict[str, Dict[str, Any]]:
     suggestions = {}
     used_headers = set()
-    fields = ["first_name", "last_name", "email", "phone", "company_name", "title", "value", "source"]
+    fields = ["first_name", "last_name", "email", "phone", "company_name", "title", "value", "source", "city"]
     
     for field in fields:
         best_header = None
@@ -250,7 +251,8 @@ class LeadImportService:
         column_mapping: Dict[str, str], 
         auto_assign: bool = True,
         assignment_mode: str = "NONE",
-        assigned_user_id: uuid.UUID | None = None
+        assigned_user_id: uuid.UUID | None = None,
+        assigned_user_ids: List[uuid.UUID] | None = None
     ) -> LeadImport:
         """
         Validate and import bulk leads under organization isolation.
@@ -258,6 +260,9 @@ class LeadImportService:
         """
         # Validate SPECIFIC_USER assignment target
         target_user = None
+        from app.services.user_service import UserService
+        from sqlalchemy import select
+        user_service = UserService(self.db)
         if assignment_mode == "SPECIFIC_USER":
             if not assigned_user_id:
                 raise HTTPException(
@@ -269,6 +274,46 @@ class LeadImportService:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid assignee. User must be an active employee in your organization."
+                )
+            # Verify if downline of actor
+            if actor.role not in ["SuperAdmin", "OrgAdmin"]:
+                downline_ids = await user_service.get_downline_user_ids(actor)
+                if target_user.id not in downline_ids:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"User {target_user.id} is not in your downline reporting chain"
+                    )
+
+        target_users = []
+        if assignment_mode == "MULTIPLE_USERS":
+            if not assigned_user_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Assigned user IDs are required when assignment mode is MULTIPLE_USERS"
+                )
+            # Verify all assignee_ids are downlines of actor
+            if actor.role not in ["SuperAdmin", "OrgAdmin"]:
+                downline_ids = await user_service.get_downline_user_ids(actor)
+                for uid in assigned_user_ids:
+                    if uid not in downline_ids:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"User {uid} is not in your downline reporting chain"
+                        )
+            
+            # Fetch active employees
+            users_query = select(User).filter(
+                User.id.in_(assigned_user_ids),
+                User.is_deleted == False,
+                User.is_active == True,
+                User.organization_id == actor.organization_id
+            ).order_by(User.id)
+            res = await self.db.execute(users_query)
+            target_users = list(res.scalars().all())
+            if len(target_users) != len(assigned_user_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more assignees are inactive, deleted, or do not exist in your organization."
                 )
 
         raw_content = await redis_client.get(f"import_file:{file_token}")
@@ -392,6 +437,7 @@ class LeadImportService:
             stage_id = res.scalar()
 
         # Insert valid rows
+        imported_leads = []
         for item in valid_rows:
             mapped_values = item["data"]
             row_idx = item["row_index"] - 2
@@ -414,6 +460,7 @@ class LeadImportService:
                 email=mapped_values.get("email") or None,
                 phone=mapped_values.get("phone") or None,
                 company_name=mapped_values.get("company_name") or None,
+                city=mapped_values.get("city") or None,
                 title=mapped_values.get("title"),
                 status=mapped_values.get("status") or "New",
                 source=mapped_values.get("source") or "Import",
@@ -423,14 +470,47 @@ class LeadImportService:
                 stage_id=stage_id
             )
             self.db.add(lead_obj)
-            await self.db.flush()
-
-            if assignment_mode == "AUTO":
-                await self.assignment_service.assign_lead(lead_obj)
-            elif assignment_mode == "SPECIFIC_USER" and target_user:
-                await self.assignment_service.assign_lead_to_user(lead_obj, target_user)
-            
+            imported_leads.append(lead_obj)
             success_count += 1
+
+        if success_count > 0:
+            await self.db.flush()
+            
+            if assignment_mode == "AUTO":
+                for lead_obj in imported_leads:
+                    await self.assignment_service.assign_lead(lead_obj)
+            elif assignment_mode == "SPECIFIC_USER" and target_user:
+                for lead_obj in imported_leads:
+                    await self.assignment_service.assign_lead_to_user(lead_obj, target_user)
+            elif assignment_mode == "MULTIPLE_USERS" and target_users:
+                # Chunk-split algorithm
+                num_leads = len(imported_leads)
+                num_assignees = len(target_users)
+                k = num_leads // num_assignees
+                r = num_leads % num_assignees
+                
+                idx = 0
+                for i, assignee in enumerate(target_users):
+                    chunk_size = k + (1 if i < r else 0)
+                    for _ in range(chunk_size):
+                        lead = imported_leads[idx]
+                        lead.assigned_user_id = assignee.id
+                        self.db.add(lead)
+                        # Log audit event for assignment
+                        await self.audit_service.log_event(
+                            organization_id=actor.organization_id,
+                            actor_user_id=actor.id,
+                            action="LEAD_ASSIGNED",
+                            resource_type="lead",
+                            resource_id=str(lead.id),
+                            action_metadata={
+                                "assigned_user_id": str(assignee.id),
+                                "assigned_email": assignee.email,
+                                "reason": "bulk_assignment_import",
+                                "strategy": "SPLIT"
+                            }
+                        )
+                        idx += 1
 
         # Commit transaction on successfully processed leads
         import_record.successful_rows = success_count

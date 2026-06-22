@@ -50,3 +50,28 @@ def require_role(allowed_roles: List[str]):
 def require_user_management_permission():
     """Dependency enforcing that the user has administrative/management rights."""
     return require_role(["OrgAdmin", "Manager"])
+
+async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
+    """Check if the user is a Team Leader (Employee who reports to a Manager)."""
+    if user.role != "Employee" or not user.reporting_to_id:
+        return False
+    parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+    parent_role = parent_res.scalar()
+    return parent_role == "Manager"
+
+async def require_tl_or_above(
+    current_user: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+) -> User:
+    """Dependency enforcing that the user is a Team Leader, Manager, or Admin."""
+    if current_user.role in ["SuperAdmin", "OrgAdmin", "Manager"]:
+        return current_user
+    
+    is_tl = await check_is_team_leader(current_user, db)
+    if is_tl:
+        return current_user
+        
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have enough privileges"
+    )

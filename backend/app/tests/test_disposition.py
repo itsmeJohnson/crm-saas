@@ -258,6 +258,7 @@ async def test_disposition_system_action_busy(client: AsyncClient, setup_disposi
     await db.refresh(lead)
     assert lead.call_attempts_count == 1
     assert lead.stage_id == data["fresh_stage_id"]  # Pipeline stage unchanged
+    assert lead.status == "Busy"
     assert lead.available_at is not None
     # available_at should be ~2 hours from now
     available_naive = lead.available_at.replace(tzinfo=None) if lead.available_at.tzinfo else lead.available_at
@@ -312,6 +313,7 @@ async def test_disposition_threshold_auto_drop(client: AsyncClient, setup_dispos
     await db.refresh(lead)
     assert lead.call_attempts_count == 5
     assert lead.stage_id == data["dropped_stage_id"]  # Advanced to system Dropped stage
+    assert lead.status == "RNR"
 
 @pytest.mark.asyncio
 async def test_disposition_invalid_entries_immediate_drop(client: AsyncClient, setup_disposition_data: dict, db: AsyncSession):
@@ -346,6 +348,7 @@ async def test_disposition_invalid_entries_immediate_drop(client: AsyncClient, s
     await db.refresh(lead)
     assert lead.call_attempts_count == 0  # Not incremented for invalid entry
     assert lead.stage_id == data["dropped_stage_id"]  # Advanced to system Dropped stage immediately
+    assert lead.status == "Out of Service"
 
 @pytest.mark.asyncio
 async def test_disposition_picked_success_advancement(client: AsyncClient, setup_disposition_data: dict, db: AsyncSession):
@@ -380,3 +383,4 @@ async def test_disposition_picked_success_advancement(client: AsyncClient, setup
 
     await db.refresh(lead)
     assert lead.stage_id == data["contacted_stage_id"]  # Advanced to custom contacted stage
+    assert lead.status == "Picked"

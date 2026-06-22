@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field, model_validator
 
 class NextLeadRequest(BaseModel):
     collective_pooling: bool = Field(default=False, description="Whether to fetch unassigned leads from the TL's queue if no direct leads are assigned.")
+    knowlarity_api_key: Optional[str] = Field(default=None, description="Optional Knowlarity API key for outbound dialer calls.")
+    knowlarity_srn: Optional[str] = Field(default=None, description="Optional Knowlarity Caller ID (SRN) number.")
+    agent_phone_number: Optional[str] = Field(default=None, description="Optional Agent phone number to bridge with the customer call.")
 
 class AgentStateUpdate(BaseModel):
     state: Literal["IDLE", "ACTIVE_CALLING", "BREAK"] = Field(..., description="The state to transition to: 'IDLE', 'ACTIVE_CALLING', 'BREAK'")

@@ -26,7 +26,7 @@ async def validate_import_rows(
         row_errors = []
         
         mapped_values = {}
-        for std_field in ["first_name", "last_name", "email", "phone", "company_name", "title", "source", "status", "assigned_email"]:
+        for std_field in ["first_name", "last_name", "email", "phone", "company_name", "title", "source", "status", "assigned_email", "city"]:
             col_name = column_mapping.get(std_field)
             val = row.get(col_name, "").strip() if col_name else ""
             mapped_values[std_field] = val
@@ -52,7 +52,8 @@ async def validate_import_rows(
             "title": 255,
             "source": 100,
             "status": 50,
-            "assigned_email": 255
+            "assigned_email": 255,
+            "city": 100
         }
         for field, max_len in lengths_config.items():
             val = mapped_values.get(field, "")

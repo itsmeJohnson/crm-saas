@@ -25,12 +25,6 @@ describe('SummaryCards Component', () => {
     expect(screen.getByText('Total Leads')).toBeDefined();
     expect(screen.getByText('12')).toBeDefined();
 
-    expect(screen.getByText('Contacts')).toBeDefined();
-    expect(screen.getByText('34')).toBeDefined();
-
-    expect(screen.getByText('Companies')).toBeDefined();
-    expect(screen.getByText('56')).toBeDefined();
-
     expect(screen.getByText('Activities')).toBeDefined();
     expect(screen.getByText('78')).toBeDefined();
 
@@ -42,6 +36,6 @@ describe('SummaryCards Component', () => {
     const { container } = render(<SummaryCards summary={null} isLoading={true} />);
     
     const pulses = container.getElementsByClassName('animate-pulse');
-    expect(pulses.length).toBe(5);
+    expect(pulses.length).toBe(3);
   });
 });

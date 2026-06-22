@@ -69,12 +69,15 @@ class UserRepository(BaseRepository[User]):
         limit: int = 100, 
         search_query: str | None = None,
         role: str | None = None,
-        is_active: bool | None = None
+        is_active: bool | None = None,
+        reporting_to_id: uuid.UUID | None = None
     ) -> Tuple[Sequence[User], int]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,
             self.model.is_deleted == False
         )
+        if reporting_to_id is not None:
+            query = query.filter(self.model.reporting_to_id == reporting_to_id)
         if role:
             query = query.filter(self.model.role == role)
         if is_active is not None:

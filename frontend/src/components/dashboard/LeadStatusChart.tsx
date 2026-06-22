@@ -13,6 +13,12 @@ const COLORS: Record<string, string> = {
   Qualified: '#10b981', // emerald-500
   Nurturing: '#6366f1', // indigo-500
   Lost: '#f43f5e', // rose-500
+  Picked: '#10b981', // emerald-500
+  RNR: '#f59e0b', // amber-500
+  'Switch Off': '#6b7280', // grey-500
+  Busy: '#a855f7', // purple-500
+  'Not Exist': '#ef4444', // red-500
+  'Out of Service': '#ec4899', // pink-500
   Unknown: '#64748b' // slate-500
 };
 

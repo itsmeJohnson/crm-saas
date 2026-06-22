@@ -34,6 +34,8 @@ class LeadUpdate(BaseModel):
     assigned_user_id: uuid.UUID | None = None
     stage_id: uuid.UUID | None = None
 
+from app.schemas.pipeline import PipelineStageResponse
+
 class LeadResponse(LeadBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +44,7 @@ class LeadResponse(LeadBase):
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    stage: PipelineStageResponse | None = None
 
     @field_serializer("phone")
     def serialize_phone(self, phone: str | None, info: SerializationInfo) -> str | None:

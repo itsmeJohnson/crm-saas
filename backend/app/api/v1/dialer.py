@@ -66,7 +66,8 @@ async def get_next_lead(
     else:
         filters.append(Lead.assigned_user_id == actor.id)
 
-    query = select(Lead).filter(*filters)
+    from sqlalchemy.orm import selectinload
+    query = select(Lead).options(selectinload(Lead.stage)).filter(*filters)
 
     # Dialect-aware locking for high throughput on PostgreSQL and compatibility with SQLite
     dialect_name = getattr(db.bind, "dialect", None)
@@ -90,11 +91,31 @@ async def get_next_lead(
         lead.assigned_user_id = actor.id
         db.add(lead)
 
+    # 4.5. Trigger Knowlarity Click-to-Call if telephony credentials are provided
+    if payload.knowlarity_api_key and payload.agent_phone_number:
+        try:
+            from app.services.knowlarity_service import trigger_knowlarity_call
+            await trigger_knowlarity_call(
+                api_key=payload.knowlarity_api_key,
+                srn=payload.knowlarity_srn or "",
+                agent_number=payload.agent_phone_number,
+                customer_number=lead.phone
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Outbound calling failed to initiate: {str(e)}"
+            )
+
     # 5. Transition agent's Redis state to ACTIVE_CALLING
     await state_service.set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")
 
     await db.commit()
-    await db.refresh(lead)
+    
+    from sqlalchemy.orm import selectinload
+    refetched_query = select(Lead).options(selectinload(Lead.stage)).filter(Lead.id == lead.id)
+    refetched_res = await db.execute(refetched_query)
+    lead = refetched_res.scalar_one()
 
     return lead
 

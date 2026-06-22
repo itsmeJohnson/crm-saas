@@ -65,6 +65,8 @@ describe('MappingPreview Component', () => {
         setAssignmentMode={mockSetAssignmentMode}
         assignedUserId={null}
         setAssignedUserId={mockSetAssignedUserId}
+        assignedUserIds={[]}
+        setAssignedUserIds={vi.fn()}
         employees={mockEmployees}
         isLoadingEmployees={false}
       />
@@ -105,6 +107,8 @@ describe('MappingPreview Component', () => {
         setAssignmentMode={mockSetAssignmentMode}
         assignedUserId={null}
         setAssignedUserId={mockSetAssignedUserId}
+        assignedUserIds={[]}
+        setAssignedUserIds={vi.fn()}
         employees={mockEmployees}
         isLoadingEmployees={false}
       />
@@ -128,6 +132,8 @@ describe('MappingPreview Component', () => {
         setAssignmentMode={mockSetAssignmentMode}
         assignedUserId={null}
         setAssignedUserId={mockSetAssignedUserId}
+        assignedUserIds={[]}
+        setAssignedUserIds={vi.fn()}
         employees={mockEmployees}
         isLoadingEmployees={false}
       />
@@ -149,6 +155,8 @@ describe('MappingPreview Component', () => {
         setAssignmentMode={mockSetAssignmentMode}
         assignedUserId={null}
         setAssignedUserId={mockSetAssignedUserId}
+        assignedUserIds={[]}
+        setAssignedUserIds={vi.fn()}
         employees={mockEmployees}
         isLoadingEmployees={false}
       />

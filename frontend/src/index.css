@@ -2,12 +2,142 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+  --slate-950: 2 6 23;
+}
+
+.light {
+  --slate-950: 248 250 252;
+  --slate-900: 255 255 255;
+  --slate-800: 241 245 249;
+  --slate-700: 226 232 240;
+  --slate-600: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-400: 71 85 105;
+  --slate-300: 51 65 85;
+  --slate-200: 30 41 59;
+  --slate-100: 15 23 42;
+  --slate-50: 2 6 23;
+
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+}
+
+.light body {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+}
+
+.light aside {
+  background-color: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+.light aside .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light aside .hover\:bg-slate-900\/80:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light aside .hover\:text-slate-100:hover {
+  color: #0f172a !important;
+}
+
+.light aside .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.light main {
+  background-color: #f8fafc !important;
+}
+
+.light .glass-panel,
+.light .bg-slate-900,
+.light .bg-slate-900\/60,
+.light .bg-slate-900\/50,
+.light .bg-slate-900\/40,
+.light [class*="bg-slate-900"] {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+}
+
+.light .border-slate-800,
+.light .border-slate-800\/60,
+.light .border-slate-800\/80,
+.light [class*="border-slate-800"],
+.light [class*="border-slate-700"] {
+  border-color: #e2e8f0 !important;
+}
+
+.light h1, .light h2, .light h3, .light h4, .light h5, .light h6,
+.light .text-white,
+.light .text-slate-100,
+.light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+.light button .text-white,
+.light button.text-white,
+.light a.text-white,
+.light .bg-brand-500 .text-white,
+.light .bg-brand-600 .text-white,
+.light .bg-brand-500,
+.light .bg-indigo-600,
+.light .bg-emerald-600,
+.light .bg-rose-600,
+.light .bg-blue-600 {
+  color: #ffffff !important;
+}
+
+.light .text-slate-300,
+.light .text-slate-400,
+.light .text-slate-500 {
+  color: #475569 !important;
+}
+
+.light .glass-input {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.light .glass-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.light th {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
+}
+
+.light tr:hover {
+  background-color: #f8fafc !important;
+}
+
 @layer base {
   body {
     font-family: 'Inter', sans-serif;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
+  }
+  .light h1, .light h2, .light h3, .light h4, .light h5, .light h6 {
+    font-family: 'Work Sans', 'Inter', sans-serif;
   }
 }
 
@@ -32,8 +162,19 @@
   outline: none;
 }
 
+.light .glass-input:focus {
+  border-color: rgba(82, 117, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(82, 117, 255, 0.2);
+}
+
 .gradient-text {
   background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.light .gradient-text {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -46,10 +187,70 @@
 ::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.2);
 }
+.light ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 99px;
 }
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Light Theme Dialer Console Contrast Fixes */
+.light .bg-slate-800\/40,
+.light [class*="bg-slate-800/40"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light .bg-slate-800,
+.light [class*="bg-slate-800"] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light .bg-slate-850,
+.light .bg-slate-900,
+.light .bg-slate-950,
+.light .bg-slate-950\/80,
+.light [class*="bg-slate-950/80"] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.light .hover\:bg-slate-700:hover,
+.light [class*="hover:bg-slate-700"]:hover,
+.light .hover\:bg-slate-800:hover,
+.light [class*="hover:bg-slate-800"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.light .absolute.bg-slate-800 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light .absolute.bg-slate-800 button {
+  color: #334155 !important;
+}
+
+.light .absolute.bg-slate-800 button:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+

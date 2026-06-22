@@ -12,8 +12,9 @@ export interface LeadImportProcessRequest {
   source_type: string;
   column_mapping: Record<string, string>;
   auto_assign: boolean;
-  assignment_mode?: 'AUTO' | 'SPECIFIC_USER' | 'NONE';
+  assignment_mode?: 'AUTO' | 'SPECIFIC_USER' | 'MULTIPLE_USERS' | 'NONE';
   assigned_user_id?: string | null;
+  assigned_user_ids?: string[] | null;
 }
 
 export interface LeadImportResponse {

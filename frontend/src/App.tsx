@@ -12,6 +12,7 @@ import { UsersPage } from './pages/UsersPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { ContactsPage } from './pages/ContactsPage';
+import { PipelineSettings } from './components/admin/PipelineSettings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,17 +39,18 @@ export const App: React.FC = () => {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/leads" element={<LeadsPage />} />
-              <Route path="/companies" element={<CompaniesPage />} />
-              <Route path="/contacts" element={<ContactsPage />} />
               
               {/* OrgAdmin only */}
               <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                 <Route path="/organization" element={<Profile />} />
+                <Route path="/pipelines" element={<PipelineSettings />} />
               </Route>
 
               {/* OrgAdmin & Manager only */}
               <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                 <Route path="/users" element={<UsersPage />} />
+                <Route path="/companies" element={<CompaniesPage />} />
+                <Route path="/contacts" element={<ContactsPage />} />
               </Route>
             </Route>
           </Route>

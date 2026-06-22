@@ -9,11 +9,14 @@ import {
   Building, 
   FileText,
   UserCheck,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { MaskedField } from '../common/MaskedField';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { useAnalyticsStore } from '../../store/analyticsStore';
 
 export const DialerConsole: React.FC = () => {
   const {
@@ -21,6 +24,7 @@ export const DialerConsole: React.FC = () => {
     currentLead,
     breakReason,
     callDuration,
+    stateTimestamp,
     isLoading,
     error,
     fetchCurrentState,
@@ -41,6 +45,59 @@ export const DialerConsole: React.FC = () => {
   const [collectivePooling, setCollectivePooling] = useState(false);
   const [showBreakMenu, setShowBreakMenu] = useState(false);
 
+  const [knowlarityApiKey, setKnowlarityApiKey] = useState(() => 
+    typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_knowlarity_api_key') || '') : ''
+  );
+  const [knowlaritySrn, setKnowlaritySrn] = useState(() => 
+    typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_knowlarity_srn') || '') : ''
+  );
+  const [agentPhoneNumber, setAgentPhoneNumber] = useState(() => 
+    typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_agent_phone_number') || '') : ''
+  );
+  const [autoDial, setAutoDial] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('crm_auto_dial');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  const [autoDialTimeoutId, setAutoDialTimeoutId] = useState<any>(null);
+  const [pendingBreakReason, setPendingBreakReason] = useState<string | null>(null);
+  const [showActiveBreakMenu, setShowActiveBreakMenu] = useState(false);
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_knowlarity_api_key', knowlarityApiKey);
+    }
+  }, [knowlarityApiKey]);
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_knowlarity_srn', knowlaritySrn);
+    }
+  }, [knowlaritySrn]);
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_agent_phone_number', agentPhoneNumber);
+    }
+  }, [agentPhoneNumber]);
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_auto_dial', String(autoDial));
+    }
+  }, [autoDial]);
+
+  useEffect(() => {
+    return () => {
+      if (autoDialTimeoutId) {
+        clearTimeout(autoDialTimeoutId);
+      }
+    };
+  }, [autoDialTimeoutId]);
+
   // Fetch initial dialer and pipeline stage details on mount
   useEffect(() => {
     fetchCurrentState().catch(() => {});
@@ -51,10 +108,17 @@ export const DialerConsole: React.FC = () => {
   useEffect(() => {
     let interval: any = null;
     if (agentState === 'BREAK') {
-      setBreakTimeRemaining(900);
-      interval = setInterval(() => {
-        setBreakTimeRemaining((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
+      const updateBreakTime = () => {
+        if (stateTimestamp) {
+          const elapsed = Math.floor((Date.now() - new Date(stateTimestamp).getTime()) / 1000);
+          setBreakTimeRemaining(Math.max(0, 900 - elapsed));
+        } else {
+          setBreakTimeRemaining(900);
+        }
+      };
+      
+      updateBreakTime();
+      interval = setInterval(updateBreakTime, 1000);
     } else {
       setBreakTimeRemaining(900);
       if (interval) clearInterval(interval);
@@ -62,7 +126,7 @@ export const DialerConsole: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [agentState]);
+  }, [agentState, stateTimestamp]);
 
   // Reset form inputs when current lead changes
   useEffect(() => {
@@ -70,6 +134,8 @@ export const DialerConsole: React.FC = () => {
       setSelectedStatus(null);
       setRemarks('');
       setTargetStageId('');
+      setPendingBreakReason(null);
+      setShowActiveBreakMenu(false);
     }
   }, [currentLead]);
 
@@ -81,7 +147,16 @@ export const DialerConsole: React.FC = () => {
 
   const handleStartDialing = async () => {
     try {
-      await startCalling(collectivePooling);
+      if (knowlarityApiKey && agentPhoneNumber) {
+        await startCalling(
+          collectivePooling,
+          knowlarityApiKey,
+          knowlaritySrn || undefined,
+          agentPhoneNumber
+        );
+      } else {
+        await startCalling(collectivePooling);
+      }
     } catch (err) {}
   };
 
@@ -103,12 +178,30 @@ export const DialerConsole: React.FC = () => {
     if (!selectedStatus || !remarks || (selectedStatus === 'Picked' && !targetStageId)) {
       return;
     }
+    const breakReasonToApply = pendingBreakReason;
     try {
       await submitDisposition({
         status: selectedStatus,
         remarks: remarks,
         custom_pipeline_stage_id: selectedStatus === 'Picked' ? targetStageId : undefined
       });
+
+      // Refresh dashboard data instantly on submission
+      try {
+        useDashboardStore.getState().fetchSummary();
+        useDashboardStore.getState().fetchRecentActivities();
+        useAnalyticsStore.getState().fetchDashboardMetrics();
+      } catch (dashErr) {}
+
+      if (breakReasonToApply) {
+        setPendingBreakReason(null);
+        await goOnBreak(breakReasonToApply);
+      } else if (autoDial) {
+        const timeoutId = setTimeout(async () => {
+          await handleStartDialing();
+        }, 1500);
+        setAutoDialTimeoutId(timeoutId);
+      }
     } catch (err) {}
   };
 
@@ -150,17 +243,32 @@ export const DialerConsole: React.FC = () => {
             {/* Layout based on Agent State */}
             {agentState === 'IDLE' && (
               <div className="space-y-6 py-4">
-                <div className="flex items-center gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800/60">
-                  <input
-                    id="collective-pooling"
-                    type="checkbox"
-                    checked={collectivePooling}
-                    onChange={(e) => setCollectivePooling(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
-                  />
-                  <label htmlFor="collective-pooling" className="text-sm text-slate-300 font-medium cursor-pointer select-none">
-                    Enable Collective Pooling (fetch from TL pool)
-                  </label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800/60">
+                    <input
+                      id="collective-pooling"
+                      type="checkbox"
+                      checked={collectivePooling}
+                      onChange={(e) => setCollectivePooling(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="collective-pooling" className="text-sm text-slate-300 font-medium cursor-pointer select-none">
+                      Enable Collective Pooling (fetch from TL pool)
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800/60">
+                    <input
+                      id="auto-dial"
+                      type="checkbox"
+                      checked={autoDial}
+                      onChange={(e) => setAutoDial(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="auto-dial" className="text-sm text-slate-300 font-medium cursor-pointer select-none">
+                      Auto-Dial Next Lead
+                    </label>
+                  </div>
                 </div>
 
                 <button
@@ -236,6 +344,117 @@ export const DialerConsole: React.FC = () => {
 
                 <div className="text-4xl font-mono font-bold text-amber-400 bg-slate-950/80 border border-slate-800/80 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider">
                   {formatDuration(callDuration)}
+                </div>
+
+                {/* Queue Break option during active call */}
+                <div className="relative border-t border-slate-800/60 pt-4 mt-4">
+                  {pendingBreakReason ? (
+                    <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 text-blue-400 p-3 rounded-xl">
+                      <span className="text-sm font-medium flex items-center gap-1.5">
+                        <Coffee className="w-4 h-4" />
+                        Pending Break: {pendingBreakReason}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPendingBreakReason(null)}
+                        className="text-xs text-slate-400 hover:text-slate-200 transition-colors underline cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowActiveBreakMenu(!showActiveBreakMenu)}
+                        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 px-4 rounded-xl transition-all duration-200 border border-slate-700/50 cursor-pointer"
+                      >
+                        <Coffee className="w-4 h-4 text-slate-400" />
+                        Take Break After Call
+                      </button>
+
+                      {showActiveBreakMenu && (
+                        <div className="absolute left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-20 animate-fade-in">
+                          {breakOptions.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setPendingBreakReason(opt);
+                                setShowActiveBreakMenu(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors duration-150 cursor-pointer"
+                            >
+                              {opt} Break
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Outbound Telephony Settings */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <button
+              type="button"
+              onClick={() => setShowSettings(!showSettings)}
+              className="w-full flex items-center justify-between font-semibold text-slate-100 focus:outline-none cursor-pointer"
+            >
+              <span className="flex items-center gap-2 text-sm uppercase tracking-wider text-indigo-400 font-bold">
+                <Settings className="w-4 h-4" />
+                Telephony Settings
+              </span>
+              <span className="text-slate-400 text-xs hover:text-slate-200 transition-colors">
+                {showSettings ? 'Hide' : 'Configure'}
+              </span>
+            </button>
+            
+            {showSettings && (
+              <div className="space-y-4 pt-4 border-t border-slate-800/60 animate-fade-in">
+                <div className="space-y-1.5">
+                  <label htmlFor="tele-api-key" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Knowlarity API Key
+                  </label>
+                  <input
+                    id="tele-api-key"
+                    type="password"
+                    value={knowlarityApiKey}
+                    onChange={(e) => setKnowlarityApiKey(e.target.value)}
+                    placeholder="Enter API Key"
+                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label htmlFor="tele-srn" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Caller ID (SRN)
+                  </label>
+                  <input
+                    id="tele-srn"
+                    type="text"
+                    value={knowlaritySrn}
+                    onChange={(e) => setKnowlaritySrn(e.target.value)}
+                    placeholder="e.g. +91XXXXXXXXXX"
+                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="tele-agent-num" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Agent Phone Number
+                  </label>
+                  <input
+                    id="tele-agent-num"
+                    type="text"
+                    value={agentPhoneNumber}
+                    onChange={(e) => setAgentPhoneNumber(e.target.value)}
+                    placeholder="e.g. +91XXXXXXXXXX"
+                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
                 </div>
               </div>
             )}

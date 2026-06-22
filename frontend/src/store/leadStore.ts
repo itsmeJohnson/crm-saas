@@ -27,6 +27,8 @@ interface LeadState {
   createLead: (payload: Parameters<typeof leadApi.createLead>[0]) => Promise<LeadResponse>;
   updateLead: (leadId: string, payload: Parameters<typeof leadApi.updateLead>[1]) => Promise<LeadResponse>;
   deleteLead: (leadId: string) => Promise<void>;
+  assignLeadsBulk: (payload: Parameters<typeof leadApi.assignLeadsBulk>[0]) => Promise<void>;
+  transferLeads: (payload: Parameters<typeof leadApi.transferLeads>[0]) => Promise<void>;
 }
 
 export const useLeadStore = create<LeadState>((set, get) => ({
@@ -124,6 +126,32 @@ export const useLeadStore = create<LeadState>((set, get) => ({
       await get().fetchLeads();
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || 'Failed to delete lead';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  assignLeadsBulk: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await leadApi.assignLeadsBulk(payload);
+      set({ isLoading: false });
+      await get().fetchLeads();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed bulk assignment';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  transferLeads: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await leadApi.transferLeads(payload);
+      set({ isLoading: false });
+      await get().fetchLeads();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed lead transfer';
       set({ error: errorMsg, isLoading: false });
       throw new Error(errorMsg);
     }

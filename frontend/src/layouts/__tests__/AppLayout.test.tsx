@@ -40,8 +40,7 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
 
     expect(screen.getByText('Dashboard')).toBeDefined();
     expect(screen.getByText('Leads')).toBeDefined();
-    expect(screen.getByText('Companies')).toBeDefined();
-    expect(screen.getByText('Contacts')).toBeDefined();
+    expect(screen.getByText('Pipelines')).toBeDefined();
     expect(screen.getByText('Users')).toBeDefined();
     expect(screen.getByText('Organization')).toBeDefined();
   });
@@ -65,9 +64,8 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
 
     expect(screen.getByText('Dashboard')).toBeDefined();
     expect(screen.getByText('Leads')).toBeDefined();
-    expect(screen.getByText('Companies')).toBeDefined();
-    expect(screen.getByText('Contacts')).toBeDefined();
     expect(screen.getByText('Users')).toBeDefined();
+    expect(screen.queryByText('Pipelines')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
   });
 
@@ -90,8 +88,7 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
 
     expect(screen.getByText('Dashboard')).toBeDefined();
     expect(screen.getByText('Leads')).toBeDefined();
-    expect(screen.getByText('Companies')).toBeDefined();
-    expect(screen.getByText('Contacts')).toBeDefined();
+    expect(screen.queryByText('Pipelines')).toBeNull();
     expect(screen.queryByText('Users')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
   });

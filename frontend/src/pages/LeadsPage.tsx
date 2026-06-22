@@ -7,16 +7,22 @@ import { Pagination } from '../components/crm/Pagination';
 import { ActivityTimeline } from '../components/crm/ActivityTimeline';
 import { NotesPanel } from '../components/crm/NotesPanel';
 import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { ImportModal } from '../components/leads/ImportModal';
 import { AssignmentSettings } from '../components/leads/AssignmentSettings';
 import { ImportHistoryTable } from '../components/leads/ImportHistoryTable';
 import { useAuthStore } from '../store/authStore';
+import { useAnalyticsStore } from '../store/analyticsStore';
+import { BulkAssignModal } from '../components/crm/BulkAssignModal';
+import { LeadTransferModal } from '../components/crm/LeadTransferModal';
 
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
-  const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager');
+  const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
+  
+  const isTL = dashboardData?.role === 'TeamLeader';
+  const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
 
   const {
     leads,
@@ -31,6 +37,10 @@ export const LeadsPage: React.FC = () => {
   const { users, fetchUsers } = useUserStore();
   const activeUsers = users.filter(u => u.is_active);
 
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+  const [isLeadTransferOpen, setIsLeadTransferOpen] = useState(false);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadResponse | null>(null);
@@ -42,7 +52,10 @@ export const LeadsPage: React.FC = () => {
   useEffect(() => {
     fetchLeads();
     if (users.length === 0) fetchUsers();
+    fetchDashboardMetrics();
   }, []);
+
+  const selectedLeadsList = leads.filter(l => selectedLeadIds.includes(l.id));
 
   const handleEditClick = (lead: LeadResponse) => {
     setSelectedLead(lead);
@@ -87,13 +100,15 @@ export const LeadsPage: React.FC = () => {
             </button>
           )}
 
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Add Lead
-          </button>
+          {isPrivileged && (
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add Lead
+            </button>
+          )}
         </div>
       </div>
 
@@ -121,28 +136,6 @@ export const LeadsPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Name Filter input */}
-          <div className="w-full sm:w-48">
-            <input
-              type="text"
-              placeholder="Filter by Name..."
-              value={filters.name}
-              onChange={(e) => setFilters({ name: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
-            />
-          </div>
-
-          {/* City Filter input */}
-          <div className="w-full sm:w-48">
-            <input
-              type="text"
-              placeholder="Filter by City..."
-              value={filters.city}
-              onChange={(e) => setFilters({ city: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
-            />
-          </div>
-
           {/* Owner filter dropdown */}
           <div className="w-full sm:w-48">
             <select
@@ -160,7 +153,13 @@ export const LeadsPage: React.FC = () => {
           </div>
         </Filters>
 
-        <LeadTable onEditClick={handleEditClick} onRowClick={handleRowClick} />
+        <LeadTable 
+          onEditClick={handleEditClick} 
+          onRowClick={handleRowClick}
+          selectedLeadIds={selectedLeadIds}
+          onSelectLeads={setSelectedLeadIds}
+          hideCheckboxes={!isPrivileged}
+        />
         
         <Pagination
           skip={pagination.skip}
@@ -181,6 +180,62 @@ export const LeadsPage: React.FC = () => {
 
       {/* Import Modal */}
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onSuccess={fetchLeads} />
+
+      {/* Bulk Assign Modal */}
+      <BulkAssignModal 
+        isOpen={isBulkAssignOpen} 
+        onClose={() => setIsBulkAssignOpen(false)} 
+        selectedLeadIds={selectedLeadIds} 
+        onSuccess={() => {
+          setSelectedLeadIds([]);
+          fetchLeads();
+        }} 
+      />
+
+      {/* Lead Transfer Modal */}
+      <LeadTransferModal 
+        isOpen={isLeadTransferOpen} 
+        onClose={() => setIsLeadTransferOpen(false)} 
+        selectedLeads={selectedLeadsList} 
+        onSuccess={() => {
+          setSelectedLeadIds([]);
+          fetchLeads();
+        }} 
+      />
+
+      {/* Floating Bulk Action Bar */}
+      {selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4 px-6 py-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center text-[10px] font-black text-white">
+              {selectedLeadIds.length}
+            </span>
+            <span className="text-xs text-slate-300 font-semibold">Leads Selected</span>
+          </div>
+          <div className="w-[1px] h-6 bg-slate-800"></div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsBulkAssignOpen(true)}
+              className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer"
+            >
+              Assign Selected
+            </button>
+            <button
+              onClick={() => setIsLeadTransferOpen(true)}
+              className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              Transfer Selected
+            </button>
+            <button
+              onClick={() => setSelectedLeadIds([])}
+              className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       <LeadModal
@@ -283,6 +338,14 @@ export const LeadsPage: React.FC = () => {
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Phone</p>
                   <p className="text-sm font-medium text-slate-200 mt-0.5">{detailLead.phone || '—'}</p>
                 </div>
+                {detailLead.stage?.name && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Pipeline Stage</p>
+                    <p className="text-sm font-semibold text-indigo-400 mt-0.5">
+                      {detailLead.stage.name}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/60">

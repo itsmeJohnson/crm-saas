@@ -8,7 +8,7 @@ from app.schemas.user import UserResponse, UserCreate, UserUpdate
 from app.schemas.invitation import InvitationResponse, InvitationCreate, InvitationAccept
 from app.services.user_service import UserService
 from app.services.invitation_service import InvitationService
-from app.middleware.permissions import require_active_user, require_role, require_user_management_permission
+from app.middleware.permissions import require_active_user, require_role, require_user_management_permission, require_tl_or_above
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ async def create_user(
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
-    actor: Annotated[User, Depends(require_user_management_permission())],
+    actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),

@@ -7,10 +7,12 @@ interface MappingPreviewProps {
   previewData: ImportPreviewResponse;
   columnMapping: Record<string, string>;
   onMappingChange: (field: string, val: string) => void;
-  assignmentMode: 'AUTO' | 'SPECIFIC_USER' | 'NONE';
-  setAssignmentMode: (mode: 'AUTO' | 'SPECIFIC_USER' | 'NONE') => void;
+  assignmentMode: 'AUTO' | 'SPECIFIC_USER' | 'MULTIPLE_USERS' | 'NONE';
+  setAssignmentMode: (mode: 'AUTO' | 'SPECIFIC_USER' | 'MULTIPLE_USERS' | 'NONE') => void;
   assignedUserId: string | null;
   setAssignedUserId: (id: string | null) => void;
+  assignedUserIds: string[];
+  setAssignedUserIds: (ids: string[]) => void;
   employees: UserResponse[];
   isLoadingEmployees: boolean;
 }
@@ -23,6 +25,8 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
   setAssignmentMode,
   assignedUserId,
   setAssignedUserId,
+  assignedUserIds,
+  setAssignedUserIds,
   employees,
   isLoadingEmployees,
 }) => {
@@ -146,7 +150,7 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* NONE Option */}
           <label 
             className={`p-3.5 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
@@ -215,13 +219,43 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
                 name="assignmentMode"
                 value="SPECIFIC_USER"
                 checked={assignmentMode === 'SPECIFIC_USER'}
-                onChange={() => setAssignmentMode('SPECIFIC_USER')}
+                onChange={() => {
+                  setAssignmentMode('SPECIFIC_USER');
+                  setAssignedUserIds([]);
+                }}
                 className="w-4 h-4 accent-brand-500 cursor-pointer bg-slate-950"
               />
               <span className="text-xs font-semibold">Assign to User</span>
             </div>
             <span className="text-[9px] text-slate-500 mt-1.5 block">
               Assign all leads to one selected user.
+            </span>
+          </label>
+
+          {/* MULTIPLE_USERS Option */}
+          <label 
+            className={`p-3.5 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
+              assignmentMode === 'MULTIPLE_USERS' 
+                ? 'border-brand-500/50 bg-brand-500/5 text-slate-200' 
+                : 'border-slate-800 hover:border-slate-700 bg-slate-900/10 text-slate-400'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="assignmentMode"
+                value="MULTIPLE_USERS"
+                checked={assignmentMode === 'MULTIPLE_USERS'}
+                onChange={() => {
+                  setAssignmentMode('MULTIPLE_USERS');
+                  setAssignedUserId(null);
+                }}
+                className="w-4 h-4 accent-brand-500 cursor-pointer bg-slate-950"
+              />
+              <span className="text-xs font-semibold">Assign to Multiple</span>
+            </div>
+            <span className="text-[9px] text-slate-500 mt-1.5 block">
+              Split leads equally among chosen users.
             </span>
           </label>
         </div>
@@ -252,6 +286,48 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
                   </option>
                 ))}
               </select>
+            )}
+          </div>
+        )}
+
+        {/* Multiple Users Checklist */}
+        {assignmentMode === 'MULTIPLE_USERS' && (
+          <div className="space-y-2 pt-2 border-t border-slate-850/50">
+            <label className="text-xs font-semibold text-slate-300">Select Multiple Assignees</label>
+            {isLoadingEmployees ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+                <span className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                Fetching active employees...
+              </div>
+            ) : employees.length === 0 ? (
+              <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl text-center text-xs text-slate-500">
+                No active employee users found in your organization.
+              </div>
+            ) : (
+              <div className="border border-slate-800 rounded-xl max-h-40 overflow-y-auto divide-y divide-slate-850 bg-slate-950/20 px-3 py-1">
+                {employees.map((emp) => {
+                  const isChecked = assignedUserIds.includes(emp.id);
+                  return (
+                    <label key={emp.id} className="flex items-center gap-2.5 py-2 cursor-pointer text-xs text-slate-300 hover:text-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAssignedUserIds([...assignedUserIds, emp.id]);
+                          } else {
+                            setAssignedUserIds(assignedUserIds.filter(id => id !== emp.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-brand-500/20"
+                      />
+                      <span>
+                        {emp.first_name || ''} {emp.last_name || ''} <span className="text-slate-500">({emp.email})</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

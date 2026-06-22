@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from datetime import datetime, date, timezone, timedelta
+from datetime import datetime, date, timezone, timedelta, time
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -159,7 +159,7 @@ async def test_telecaller_metrics_aggregation(db: AsyncSession, setup_analytics_
 
     # Seed audit logs for agent1 on today
     today = date.today()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.combine(today, time(12, 0)).replace(tzinfo=timezone.utc)
 
     # Log 1: standard call (not converted)
     log1 = AuditLog(
@@ -213,7 +213,7 @@ async def test_team_leader_performer_calculations(db: AsyncSession, setup_analyt
     org = data["org"]
 
     today = date.today()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.combine(today, time(12, 0)).replace(tzinfo=timezone.utc)
 
     # Agent1: 4 calls, 2 conversions (50% rate)
     logs_agent1 = [
@@ -273,7 +273,7 @@ async def test_manager_metrics_scoping(db: AsyncSession, setup_analytics_data):
     org = data["org"]
 
     today = date.today()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.combine(today, time(12, 0)).replace(tzinfo=timezone.utc)
 
     # Seed call for agent1 (reports to tl, who reports to manager)
     log = AuditLog(
@@ -301,7 +301,7 @@ async def test_super_admin_rollups_and_targets(db: AsyncSession, setup_analytics
     agent1 = data["agent1"]
 
     today = date.today()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.combine(today, time(12, 0)).replace(tzinfo=timezone.utc)
 
     # Create target: 10 calls today
     target = PerformanceTarget(

@@ -5,6 +5,8 @@ import { SummaryCards } from '../../components/dashboard/SummaryCards';
 import { LeadStatusChart } from '../../components/dashboard/LeadStatusChart';
 import { RecentActivitiesWidget } from '../../components/dashboard/RecentActivitiesWidget';
 import { AnalyticsDashboard } from '../../components/dashboard/AnalyticsDashboard';
+import { useAnalyticsStore } from '../../store/analyticsStore';
+import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
 
 export const Home: React.FC = () => {
@@ -22,13 +24,16 @@ export const Home: React.FC = () => {
     setPage
   } = useDashboardStore();
 
+  const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
+
   const handleRefresh = async () => {
-    await Promise.all([fetchSummary(), fetchRecentActivities()]);
+    await Promise.all([fetchSummary(), fetchRecentActivities(), fetchDashboardMetrics()]);
   };
 
   useEffect(() => {
     fetchSummary();
     fetchRecentActivities();
+    fetchDashboardMetrics();
   }, []);
 
   return (
@@ -69,6 +74,17 @@ export const Home: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Relocated Telecaller Dialer Workspace at the absolute top */}
+      {dashboardData?.role === 'Telecaller' && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-white">Agent Dialer cockpit</h3>
+            <p className="text-xs text-slate-400 mt-1">Start your dialing session to contact leads assigned to your queue.</p>
+          </div>
+          <DialerConsole />
+        </div>
+      )}
 
       {/* Analytics Performance Dashboard */}
       <AnalyticsDashboard />
