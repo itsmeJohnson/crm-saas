@@ -24,6 +24,7 @@ interface UserState {
   resetFilters: () => void;
   fetchUsers: () => Promise<void>;
   fetchInvitations: () => Promise<void>;
+  createUser: (payload: Parameters<typeof userApi.createUser>[0]) => Promise<void>;
   inviteUser: (payload: { email: string; role: string }) => Promise<void>;
   updateUser: (userId: string, payload: Parameters<typeof userApi.updateUser>[1]) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
@@ -98,6 +99,20 @@ export const useUserStore = create<UserState>((set, get) => ({
         error: err.response?.data?.detail || 'Failed to fetch invitations',
         isLoading: false,
       });
+    }
+  },
+
+  createUser: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await userApi.createUser(payload);
+      set({ isLoading: false });
+      // Refresh list of users
+      await get().fetchUsers();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to create user';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
     }
   },
 

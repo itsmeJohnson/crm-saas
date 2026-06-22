@@ -1,14 +1,21 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
-from app.schemas.auth import RegisterTenantRequest, LoginRequest, Token, RefreshTokenRequest, AuthMeResponse
+from app.schemas.auth import (
+    RegisterTenantRequest, LoginRequest, Token, RefreshTokenRequest, 
+    AuthMeResponse, ForgotPasswordRequest, ResetPasswordRequest
+)
 from app.services.auth_service import AuthService
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
 from app.repositories.organization import OrganizationRepository
 from app.schemas.user import UserResponse
 from app.schemas.organization import OrganizationResponse
+from app.middleware.permissions import check_is_team_leader
+from datetime import datetime, timedelta, timezone
+import secrets
 
 router = APIRouter()
 
@@ -74,7 +81,66 @@ async def me(
 ):
     org_repo = OrganizationRepository(db)
     org = await org_repo.get(current_user.organization_id)
+    # Check if they are a Team Leader and set it dynamically
+    current_user.is_team_leader = await check_is_team_leader(current_user, db)
     return AuthMeResponse(
         user=UserResponse.model_validate(current_user),
         organization=OrganizationResponse.model_validate(org)
     )
+
+@router.post("/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    # Find user by email
+    query = select(User).where(User.email == payload.email, User.is_deleted == False)
+    res = await db.execute(query)
+    user = res.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No user registered with this email address"
+        )
+    
+    # Generate token (6 digit hex is easy to type for demo/reset)
+    token = secrets.token_hex(3).upper() # e.g. E5A3F1
+    user.reset_token = token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+    
+    await db.commit()
+    
+    return {
+        "detail": f"Reset code generated successfully: {token}",
+        "token": token
+    }
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    now = datetime.now(timezone.utc)
+    query = select(User).where(
+        User.reset_token == payload.token,
+        User.reset_token_expires > now,
+        User.is_deleted == False
+    )
+    res = await db.execute(query)
+    user = res.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token"
+        )
+    
+    from app.core.security import get_password_hash
+    user.hashed_password = get_password_hash(payload.password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    
+    await db.commit()
+    
+    return {"detail": "Password has been reset successfully"}

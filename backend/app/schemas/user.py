@@ -31,3 +31,4 @@ class UserResponse(UserBase):
     is_invited: bool
     created_at: datetime
     updated_at: datetime
+    is_team_leader: bool = False

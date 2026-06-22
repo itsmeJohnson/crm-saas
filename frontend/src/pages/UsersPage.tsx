@@ -4,6 +4,7 @@ import { UserTable } from '../components/users/UserTable';
 import { Pagination } from '../components/users/Pagination';
 import { InviteModal } from '../components/users/InviteModal';
 import { EditUserModal } from '../components/users/EditUserModal';
+import { CreateMemberModal } from '../components/users/CreateMemberModal';
 import { useUserStore } from '../store/userStore';
 import { useAuthStore } from '../store/authStore';
 import { UserPlus, Mail, Calendar, ShieldAlert } from 'lucide-react';
@@ -14,6 +15,7 @@ export const UsersPage: React.FC = () => {
   const currentUser = useAuthStore((state) => state.user);
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
 
@@ -30,6 +32,9 @@ export const UsersPage: React.FC = () => {
   };
 
   const showInviteButton = currentUser?.role === 'OrgAdmin' || currentUser?.role === 'Manager';
+  const showCreateButton = currentUser?.role === 'OrgAdmin' ||
+                           currentUser?.role === 'Manager' ||
+                           (currentUser?.role === 'Employee' && currentUser?.is_team_leader);
   const showInvitationsPanel = currentUser?.role === 'OrgAdmin' || currentUser?.role === 'Manager';
 
   return (
@@ -45,15 +50,27 @@ export const UsersPage: React.FC = () => {
           </p>
         </div>
 
-        {showInviteButton && (
-          <button
-            onClick={() => setIsInviteOpen(true)}
-            className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            Invite Member
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {showCreateButton && (
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-brand-400" />
+              Create Member
+            </button>
+          )}
+
+          {showInviteButton && (
+            <button
+              onClick={() => setIsInviteOpen(true)}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer"
+            >
+              <Mail className="w-4 h-4" />
+              Invite Member
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Grid */}
@@ -126,6 +143,9 @@ export const UsersPage: React.FC = () => {
 
       {/* Invite Modal */}
       <InviteModal isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)} />
+
+      {/* Create Member Modal */}
+      <CreateMemberModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
 
       {/* Edit User Modal */}
       <EditUserModal

@@ -8,6 +8,7 @@ export interface User {
   role: string;
   is_active: boolean;
   is_verified: boolean;
+  is_team_leader?: boolean;
 }
 
 export interface Organization {

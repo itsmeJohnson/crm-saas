@@ -230,8 +230,13 @@ async def test_toggle_user_status(client: AsyncClient, setup_users: dict):
     response = await client.patch(f"/api/v1/users/{data['admin_a'].id}/status?is_active=false", headers=data["headers_admin_a"])
     assert response.status_code == 400
 
-    # Manager tries to deactivate Employee (should fail due to route RBAC, returning 403 since Manager is active)
+    # Manager deactivates Employee (should succeed under relaxed rules)
     response = await client.patch(f"/api/v1/users/{data['employee_a'].id}/status?is_active=false", headers=data["headers_manager_a"])
+    assert response.status_code == 200
+    assert response.json()["is_active"] is False
+
+    # Manager tries to deactivate Admin (should fail)
+    response = await client.patch(f"/api/v1/users/{data['admin_a'].id}/status?is_active=false", headers=data["headers_manager_a"])
     assert response.status_code == 403
 
     # Deactivated Employee tries to perform an action (should be blocked with 400 Inactive User)
@@ -253,6 +258,21 @@ async def test_delete_user(client: AsyncClient, setup_users: dict):
     response = await client.delete(f"/api/v1/users/{data['admin_a'].id}", headers=data["headers_admin_a"])
     assert response.status_code == 400
 
-    # Manager tries to delete Employee A (should fail - OrgAdmin only)
-    response = await client.delete(f"/api/v1/users/{data['manager_a'].id}", headers=data["headers_manager_a"])
+    # Manager tries to delete Admin A (should fail)
+    response = await client.delete(f"/api/v1/users/{data['admin_a'].id}", headers=data["headers_manager_a"])
     assert response.status_code == 403
+
+@pytest.mark.asyncio
+async def test_manager_admin_change_reporting_manager(client: AsyncClient, setup_users: dict):
+    data = setup_users
+    # Manager changes employee_a reporting manager to manager_a
+    payload = {"reporting_to_id": str(data["manager_a"].id)}
+    response = await client.patch(f"/api/v1/users/{data['employee_a'].id}", json=payload, headers=data["headers_manager_a"])
+    assert response.status_code == 200
+    assert response.json()["reporting_to_id"] == str(data["manager_a"].id)
+
+    # OrgAdmin changes employee_a reporting manager to None
+    payload = {"reporting_to_id": None}
+    response = await client.patch(f"/api/v1/users/{data['employee_a'].id}", json=payload, headers=data["headers_admin_a"])
+    assert response.status_code == 200
+    assert response.json()["reporting_to_id"] is None

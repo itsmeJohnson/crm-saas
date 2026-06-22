@@ -13,6 +13,7 @@ import { LeadsPage } from './pages/LeadsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
+import { TenantsPage } from './pages/TenantsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,11 +47,20 @@ export const App: React.FC = () => {
                 <Route path="/pipelines" element={<PipelineSettings />} />
               </Route>
 
+              {/* OrgAdmin, Manager, or Team Leader */}
+              <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} allowTeamLeader={true} />}>
+                <Route path="/users" element={<UsersPage />} />
+              </Route>
+
               {/* OrgAdmin & Manager only */}
               <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
-                <Route path="/users" element={<UsersPage />} />
                 <Route path="/companies" element={<CompaniesPage />} />
                 <Route path="/contacts" element={<ContactsPage />} />
+              </Route>
+
+              {/* SuperAdmin only */}
+              <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
+                <Route path="/tenants" element={<TenantsPage />} />
               </Route>
             </Route>
           </Route>

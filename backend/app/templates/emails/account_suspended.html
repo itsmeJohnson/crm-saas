@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; border: 1px solid #eaeaea; border-radius: 8px; padding: 30px; }
+        .header { border-bottom: 2px solid #7f1d1d; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h2 { color: #7f1d1d; margin: 0; }
+        .footer { font-size: 12px; color: #777; margin-top: 30px; border-top: 1px solid #eaeaea; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Your Account Has Been Suspended</h2>
+        </div>
+        <p>Hello <strong>{{ org_name }}</strong>,</p>
+        <p>We regret to inform you that your organization's subscription has been <strong>SUSPENDED</strong> due to non-payment or administrative decision.</p>
+        <p>All user access to the CRM has been temporarily blocked. To resolve this matter and reinstate your account, please get in touch with our billing team.</p>
+        <p>Contact Email: <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+        <div class="footer">
+            This is an automated billing notification from TeleCRM.
+        </div>
+    </div>
+</body>
+</html>

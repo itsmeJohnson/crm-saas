@@ -14,8 +14,18 @@ export const UserTable: React.FC<UserTableProps> = ({ onEditClick }) => {
 
   // Client-side filtering for role and status
   const filteredUsers = users.filter((u) => {
-    if (filters.role !== 'All' && u.role !== filters.role) {
-      return false;
+    if (filters.role !== 'All') {
+      if (filters.role === 'TeamLeader') {
+        if (u.role !== 'Employee' || !u.is_team_leader) {
+          return false;
+        }
+      } else if (filters.role === 'Employee') {
+        if (u.role !== 'Employee' || u.is_team_leader) {
+          return false;
+        }
+      } else if (u.role !== filters.role) {
+        return false;
+      }
     }
     if (filters.status !== 'All') {
       const wantActive = filters.status === 'Active';
@@ -26,8 +36,8 @@ export const UserTable: React.FC<UserTableProps> = ({ onEditClick }) => {
     return true;
   });
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
+  const getRoleBadge = (user: UserResponse) => {
+    switch (user.role) {
       case 'OrgAdmin':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
@@ -42,6 +52,13 @@ export const UserTable: React.FC<UserTableProps> = ({ onEditClick }) => {
           </span>
         );
       case 'Employee':
+        if (user.is_team_leader) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse">
+              Team Leader
+            </span>
+          );
+        }
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
             Employee
@@ -50,7 +67,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onEditClick }) => {
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-            {role}
+            {user.role}
           </span>
         );
     }
@@ -62,19 +79,26 @@ export const UserTable: React.FC<UserTableProps> = ({ onEditClick }) => {
     if (currentUser.id === target.id) return true; // Can always edit self profile
     if (currentUser.role === 'OrgAdmin') return true; // Admin can edit anyone
     if (currentUser.role === 'Manager' && target.role === 'Employee') return true; // Manager can edit employees
+    if (currentUser.role === 'Employee' && currentUser.is_team_leader && target.role === 'Employee' && target.reporting_to_id === currentUser.id) return true; // Team Leader can edit downline employees
     return false;
   };
 
   const canDeactivate = (target: UserResponse) => {
     if (!currentUser) return false;
     if (currentUser.id === target.id) return false; // Cannot deactivate self
-    return currentUser.role === 'OrgAdmin'; // Only admin can toggle status
+    if (currentUser.role === 'OrgAdmin') return true; // Only admin can toggle status by default, but managers/TLs can toggle their downline
+    if (currentUser.role === 'Manager' && target.role === 'Employee') return true;
+    if (currentUser.role === 'Employee' && currentUser.is_team_leader && target.role === 'Employee' && target.reporting_to_id === currentUser.id) return true;
+    return false;
   };
 
   const canDelete = (target: UserResponse) => {
     if (!currentUser) return false;
     if (currentUser.id === target.id) return false; // Cannot delete self
-    return currentUser.role === 'OrgAdmin'; // Only admin can delete
+    if (currentUser.role === 'OrgAdmin') return true; // Only admin can delete by default, but managers/TLs can delete their downline
+    if (currentUser.role === 'Manager' && target.role === 'Employee') return true;
+    if (currentUser.role === 'Employee' && currentUser.is_team_leader && target.role === 'Employee' && target.reporting_to_id === currentUser.id) return true;
+    return false;
   };
 
   const handleToggleStatus = async (user: UserResponse) => {
@@ -163,7 +187,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onEditClick }) => {
 
                     {/* Role */}
                     <td className="px-6 py-4 align-middle">
-                      {getRoleBadge(user.role)}
+                      {getRoleBadge(user)}
                     </td>
 
                     {/* Status */}

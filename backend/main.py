@@ -15,20 +15,59 @@ from app.api.v1.health import router as active_health_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.dialer import router as dialer_router
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.super_admin import router as super_admin_router
+from app.api.v1.subscription import router as subscription_router
 from app.models.base import Base
-from app.core.database import engine
+from app.core.database import engine, async_session_maker
 import os
-from app.core.logging_config import setup_logging
+import asyncio
+import logging
+from datetime import datetime, timezone, timedelta
+from app.cron.subscription_cron import run_daily_subscription_check
 
 if os.getenv("LOG_JSON", "false").lower() == "true":
     setup_logging()
+
+async def subscription_cron_scheduler():
+    logger = logging.getLogger("app.cron")
+    logger.info("Subscription cron scheduler loop started.")
+    # Run immediately on startup to ensure all states are fresh
+    try:
+        await run_daily_subscription_check(async_session_maker)
+    except Exception as e:
+        logger.error("Initial startup subscription check failed: %s", e)
+
+    while True:
+        try:
+            # Calculate seconds until next midnight
+            now = datetime.now(timezone.utc)
+            tomorrow = now + timedelta(days=1)
+            midnight = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 0, 0, 0, tzinfo=timezone.utc)
+            sleep_seconds = (midnight - now).total_seconds()
+            logger.info("Subscription cron sleeping for %d seconds until next run at %s", sleep_seconds, midnight)
+            await asyncio.sleep(sleep_seconds)
+            
+            # Execute daily check at midnight
+            await run_daily_subscription_check(async_session_maker)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Error in subscription_cron_scheduler loop: %s", e)
+            await asyncio.sleep(60) # Sleep 1 minute before retrying on error
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Automatically create tables in database on start
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+    cron_task = asyncio.create_task(subscription_cron_scheduler())
     yield
+    cron_task.cancel()
+    try:
+        await cron_task
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -60,6 +99,8 @@ app.include_router(active_health_router, prefix=f"{settings.API_V1_STR}/health",
 app.include_router(pipelines_router, prefix=f"{settings.API_V1_STR}/pipelines", tags=["pipelines"])
 app.include_router(dialer_router, prefix=f"{settings.API_V1_STR}/dialer", tags=["dialer"])
 app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics", tags=["analytics"])
+app.include_router(super_admin_router, prefix=f"{settings.API_V1_STR}/super-admin", tags=["super-admin"])
+app.include_router(subscription_router, prefix=f"{settings.API_V1_STR}/tenant", tags=["subscription"])
 
 @app.get("/health")
 def health_check():

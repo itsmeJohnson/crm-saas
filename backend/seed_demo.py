@@ -82,7 +82,7 @@ async def seed():
             hashed_password=pwd_hash,
             first_name="Alice",
             last_name="Admin",
-            role="OrgAdmin",
+            role="SuperAdmin",
             is_active=True,
             is_verified=True
         )

@@ -16,6 +16,14 @@ class UserService:
         self.user_repo = UserRepository(db)
         self.audit_service = AuditService(db)
 
+    async def is_team_leader(self, user: User) -> bool:
+        """Check if the user is a Team Leader (Employee reporting to a Manager)."""
+        if user.role != "Employee" or not user.reporting_to_id:
+            return False
+        parent_res = await self.db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+        parent_role = parent_res.scalar()
+        return parent_role == "Manager"
+
     async def get_user_by_id(self, actor: User, user_id: uuid.UUID) -> User:
         """Fetch a specific user inside the same organization."""
         if not actor.is_active:
@@ -30,7 +38,11 @@ class UserService:
                 detail="User not found"
             )
         if actor.id != user_id:
-            PermissionService.check_user_management_permission(actor, user.role)
+            is_tl = await self.is_team_leader(actor)
+            PermissionService.check_user_management_permission(
+                actor, user.role, user.reporting_to_id, is_tl
+            )
+        user.is_team_leader = await self.is_team_leader(user)
         return user
 
     async def create_user(self, actor: User, user_data: dict) -> User:
@@ -41,13 +53,37 @@ class UserService:
                 detail="Actor account is deactivated"
             )
         
-        # Enforce RBAC Role Hierarchy: Manager can only create Employee, Employee cannot create anyone
-        PermissionService.check_user_management_permission(actor, user_data.get("role", "Employee"))
-
         role = user_data.get("role", "Employee")
         reporting_to_id = user_data.get("reporting_to_id")
         if reporting_to_id and isinstance(reporting_to_id, str):
             reporting_to_id = uuid.UUID(reporting_to_id)
+            user_data["reporting_to_id"] = reporting_to_id
+
+        # Enforce RBAC Role Hierarchy
+        is_tl = await self.is_team_leader(actor)
+        
+        # If actor is a Team Leader, they can only create Employees reporting directly to them
+        if actor.role == "Employee":
+            if not is_tl:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Telecallers cannot create users"
+                )
+            if role != "Employee":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Team Leaders can only create Employees"
+                )
+            if reporting_to_id != actor.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Team Leaders can only create team members reporting to themselves"
+                )
+        
+        PermissionService.check_user_management_permission(
+            actor, role, reporting_to_id, is_tl
+        )
+
         await self.validate_reporting_structure(
             user_id=None,
             role=role,
@@ -67,6 +103,7 @@ class UserService:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
         
         user = await self.user_repo.create_user(actor.organization_id, user_data)
+        user.is_team_leader = await self.is_team_leader(user)
         
         # Write Audit Log
         await self.audit_service.log_event(
@@ -105,10 +142,28 @@ class UserService:
                     detail="You cannot deactivate yourself"
                 )
         else:
-            # Manager cannot edit OrgAdmin or Manager, Employee cannot edit anyone
-            PermissionService.check_user_management_permission(actor, target_user.role)
+            is_tl = await self.is_team_leader(actor)
+            PermissionService.check_user_management_permission(
+                actor, target_user.role, target_user.reporting_to_id, is_tl
+            )
+            
+            # TL constraints
+            if actor.role == "Employee" and is_tl:
+                if "role" in update_data and update_data["role"] != target_user.role:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Team Leaders cannot change the role of team members"
+                    )
+                if "reporting_to_id" in update_data and update_data["reporting_to_id"] != target_user.reporting_to_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Team Leaders cannot reassign team members"
+                    )
+            
             if "role" in update_data:
-                PermissionService.check_user_management_permission(actor, update_data["role"])
+                PermissionService.check_user_management_permission(
+                    actor, update_data["role"], update_data.get("reporting_to_id"), is_tl
+                )
 
         # Validate reporting hierarchy if role or reporting_to_id is being updated
         if "role" in update_data or "reporting_to_id" in update_data:
@@ -136,6 +191,8 @@ class UserService:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
 
         updated = await self.user_repo.update_user(actor.organization_id, user_id, update_data)
+        if updated:
+            updated.is_team_leader = await self.is_team_leader(updated)
         
         await self.audit_service.log_event(
             organization_id=actor.organization_id,
@@ -164,7 +221,10 @@ class UserService:
                 detail="You cannot deactivate yourself"
             )
 
-        PermissionService.check_user_management_permission(actor, target_user.role)
+        is_tl = await self.is_team_leader(actor)
+        PermissionService.check_user_management_permission(
+            actor, target_user.role, target_user.reporting_to_id, is_tl
+        )
 
         # Prevent deactivating the last OrgAdmin
         if target_user.role == "OrgAdmin" and not is_active:
@@ -176,6 +236,8 @@ class UserService:
                 )
 
         updated = await self.user_repo.toggle_active(actor.organization_id, user_id, is_active)
+        if updated:
+            updated.is_team_leader = await self.is_team_leader(updated)
 
         action_name = "USER_ACTIVATED" if is_active else "USER_DEACTIVATED"
         await self.audit_service.log_event(
@@ -204,7 +266,10 @@ class UserService:
                 detail="You cannot delete yourself"
             )
 
-        PermissionService.check_user_management_permission(actor, target_user.role)
+        is_tl = await self.is_team_leader(actor)
+        PermissionService.check_user_management_permission(
+            actor, target_user.role, target_user.reporting_to_id, is_tl
+        )
 
         # Prevent deleting the last OrgAdmin
         if target_user.role == "OrgAdmin":
@@ -216,6 +281,8 @@ class UserService:
                 )
 
         deleted = await self.user_repo.soft_delete_user(actor.organization_id, user_id)
+        if deleted:
+            deleted.is_team_leader = await self.is_team_leader(deleted)
 
         await self.audit_service.log_event(
             organization_id=actor.organization_id,
@@ -260,9 +327,12 @@ class UserService:
                 )
             reporting_to_id = actor.id
 
-        return await self.user_repo.paginate_users(
+        records, total = await self.user_repo.paginate_users(
             actor.organization_id, skip, limit, search_query, role, is_active, reporting_to_id
         )
+        for u in records:
+            u.is_team_leader = await self.is_team_leader(u)
+        return records, total
 
     async def get_downline_user_ids(self, actor: User) -> set[uuid.UUID]:
         """Fetch all downline user IDs in actor's reporting chain recursively."""

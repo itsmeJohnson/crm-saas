@@ -66,4 +66,13 @@ class Settings(BaseSettings):
         port = data.get("REDIS_PORT", 6379)
         return f"redis://{host}:{port}/0"
 
+    # SMTP / Emails
+    SMTP_TLS: bool = True
+    SMTP_PORT: int = 587
+    SMTP_HOST: str | None = None
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    EMAILS_FROM_EMAIL: str = "info@telecrm-saas.com"
+    EMAILS_FROM_NAME: str = "TeleCRM Billing"
+
 settings = Settings()

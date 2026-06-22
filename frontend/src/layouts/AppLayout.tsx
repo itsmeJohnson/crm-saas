@@ -18,6 +18,7 @@ export const AppLayout: React.FC = () => {
 
   const allNavItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Tenants', path: '/tenants', icon: Building, roles: ['SuperAdmin'] },
     { name: 'Leads', path: '/leads', icon: FolderKanban },
     { name: 'Pipelines', path: '/pipelines', icon: Workflow, roles: ['OrgAdmin'] },
     { name: 'Users', path: '/users', icon: Users, roles: ['OrgAdmin', 'Manager'] },
@@ -26,7 +27,11 @@ export const AppLayout: React.FC = () => {
 
   const navItems = allNavItems.filter((item) => {
     if (!item.roles) return true;
-    return user && item.roles.includes(user.role);
+    if (!user) return false;
+    if (item.name === 'Users' && user.role === 'Employee' && user.is_team_leader) {
+      return true; // Allow Team Leaders to access the Users link
+    }
+    return item.roles.includes(user.role);
   });
 
   const sidebarContent = (

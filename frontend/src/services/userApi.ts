@@ -10,8 +10,10 @@ export interface UserResponse {
   is_verified: boolean;
   is_invited: boolean;
   organization_id: string;
+  reporting_to_id?: string | null;
   created_at: string;
   updated_at: string;
+  is_team_leader?: boolean;
 }
 
 export interface InvitationResponse {
@@ -40,6 +42,7 @@ export const userApi = {
     role: string;
     password?: string;
     organization_id: string;
+    reporting_to_id?: string | null;
   }) => {
     const response = await api.post<UserResponse>('/users/', payload);
     return response.data;
@@ -52,6 +55,7 @@ export const userApi = {
     role?: string;
     is_active?: boolean;
     password?: string;
+    reporting_to_id?: string | null;
   }) => {
     const response = await api.patch<UserResponse>(`/users/${userId}`, payload);
     return response.data;

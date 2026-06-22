@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from sqlalchemy import String, Boolean, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
@@ -17,6 +18,11 @@ class User(BaseModel):
     token_version: Mapped[int] = mapped_column(default=1, nullable=False)
     is_invited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reporting_to_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    
+    # Password Reset
+    reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reset_token_expires: Mapped[datetime | None] = mapped_column(nullable=True)
+
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")

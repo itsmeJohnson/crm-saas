@@ -9,6 +9,7 @@ from app.schemas.invitation import InvitationResponse, InvitationCreate, Invitat
 from app.services.user_service import UserService
 from app.services.invitation_service import InvitationService
 from app.middleware.permissions import require_active_user, require_role, require_user_management_permission, require_tl_or_above
+from app.middleware.subscription_guard import check_user_creation_limit_dep, check_user_invite_limit_dep
 
 router = APIRouter()
 
@@ -17,8 +18,9 @@ router = APIRouter()
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_in: UserCreate,
-    actor: Annotated[User, Depends(require_user_management_permission())],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _limit_check: Annotated[None, Depends(check_user_creation_limit_dep)] = None
 ):
     """Create a new user within the organization."""
     user_service = UserService(db)
@@ -29,7 +31,7 @@ async def list_users(
     actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=500),
     search: str | None = Query(None),
     role: str | None = Query(None),
     is_active: bool | None = Query(None)
@@ -45,7 +47,8 @@ async def list_users(
 async def invite_user(
     invite_in: InvitationCreate,
     actor: Annotated[User, Depends(require_user_management_permission())],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _limit_check: Annotated[None, Depends(check_user_invite_limit_dep)] = None
 ):
     """Invite a new user to the organization."""
     invite_service = InvitationService(db)
@@ -101,7 +104,7 @@ async def update_user(
 @router.delete("/{user_id}", response_model=UserResponse)
 async def delete_user(
     user_id: uuid.UUID,
-    actor: Annotated[User, Depends(require_role(["OrgAdmin"]))],
+    actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Soft delete user from the organization list."""
@@ -111,7 +114,7 @@ async def delete_user(
 @router.patch("/{user_id}/status", response_model=UserResponse)
 async def toggle_user_status(
     user_id: uuid.UUID,
-    actor: Annotated[User, Depends(require_role(["OrgAdmin"]))],
+    actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
     is_active: bool = Query(...)
 ):

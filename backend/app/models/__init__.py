@@ -13,6 +13,9 @@ from app.models.lead_import import LeadImport, LeadImportStatus
 from app.models.assignment_config import AssignmentConfig, AssignmentStrategy
 from app.models.pipeline import PipelineStage
 from app.models.target import PerformanceTarget, TargetType, MetricType
+from app.models.invoice import Invoice
+from app.models.plan import Plan
+from app.models.tenant_subscription import TenantSubscription
 
 __all__ = [
     "Base", 
@@ -34,5 +37,8 @@ __all__ = [
     "PipelineStage",
     "PerformanceTarget",
     "TargetType",
-    "MetricType"
+    "MetricType",
+    "Invoice",
+    "Plan",
+    "TenantSubscription"
 ]

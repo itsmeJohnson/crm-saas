@@ -42,6 +42,7 @@ export const UserFilters: React.FC = () => {
             <option value="All">All Roles</option>
             <option value="OrgAdmin">Admins</option>
             <option value="Manager">Managers</option>
+            <option value="TeamLeader">Team Leaders</option>
             <option value="Employee">Employees</option>
           </select>
         </div>

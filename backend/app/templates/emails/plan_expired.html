@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; border: 1px solid #eaeaea; border-radius: 8px; padding: 30px; }
+        .header { border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h2 { color: #dc2626; margin: 0; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #2563eb; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .footer { font-size: 12px; color: #777; margin-top: 30px; border-top: 1px solid #eaeaea; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Your Subscription Has Expired</h2>
+        </div>
+        <p>Hello <strong>{{ org_name }}</strong>,</p>
+        <p>Your subscription has expired. Access to your CRM account is currently restricted, and your agents will not be able to perform tasks.</p>
+        <p>To reactivate your account, please pay your outstanding invoice or select a plan.</p>
+        <p><a href="{{ renew_url }}" class="button">Renew Subscription</a></p>
+        <div class="footer">
+            This is an automated billing notification from TeleCRM.
+        </div>
+    </div>
+</body>
+</html>
