@@ -14,6 +14,12 @@ class ActivityBase(BaseModel):
     lead_id: uuid.UUID | None = None
     contact_id: uuid.UUID | None = None
     company_id: uuid.UUID | None = None
+    
+    # Call integration fields
+    call_sid: str | None = None
+    recording_url: str | None = None
+    call_duration: int | None = None
+    call_direction: str | None = None
 
 class ActivityCreate(ActivityBase):
     pass

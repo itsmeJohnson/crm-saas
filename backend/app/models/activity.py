@@ -21,3 +21,9 @@ class Activity(BaseModel):
     company_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True)
     
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    
+    # Call recording & integration fields
+    call_sid: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    recording_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    call_duration: Mapped[int | None] = mapped_column(nullable=True)
+    call_direction: Mapped[str | None] = mapped_column(String(20), nullable=True)

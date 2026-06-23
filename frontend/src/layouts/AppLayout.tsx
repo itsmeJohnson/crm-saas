@@ -3,6 +3,7 @@ import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { LayoutDashboard, LogOut, Building, Users, FolderKanban, Workflow, Sun, Moon, Menu, X } from 'lucide-react';
+import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -125,6 +126,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden flex-col md:flex-row">
+      <InboundCallPopup />
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex md:w-64 glass-panel border-r border-slate-800 flex-col justify-between z-25">
         {sidebarContent}

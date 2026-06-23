@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLeadStore } from '../store/leadStore';
 import { LeadTable } from '../components/crm/LeadTable';
 import { LeadModal } from '../components/crm/LeadModal';
@@ -16,10 +17,13 @@ import { useAuthStore } from '../store/authStore';
 import { useAnalyticsStore } from '../store/analyticsStore';
 import { BulkAssignModal } from '../components/crm/BulkAssignModal';
 import { LeadTransferModal } from '../components/crm/LeadTransferModal';
+import { useDialerStore } from '../store/dialerStore';
+import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
+  const { agentState, currentLead } = useDialerStore();
   
   const isTL = dashboardData?.role === 'TeamLeader';
   const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
@@ -49,11 +53,34 @@ export const LeadsPage: React.FC = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLead, setDetailLead] = useState<LeadResponse | null>(null);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryLeadId = searchParams.get('leadId');
+
   useEffect(() => {
     fetchLeads();
     if (users.length === 0) fetchUsers();
     fetchDashboardMetrics();
   }, []);
+
+  useEffect(() => {
+    if (queryLeadId) {
+      const loadLead = async () => {
+        try {
+          const { leadApi } = await import('../services/leadApi');
+          const lead = await leadApi.getLead(queryLeadId);
+          if (lead) {
+            setDetailLead(lead);
+            setIsDetailOpen(true);
+            searchParams.delete('leadId');
+            setSearchParams(searchParams);
+          }
+        } catch (e) {
+          console.error("Failed to auto-load lead details from query param:", e);
+        }
+      };
+      loadLead();
+    }
+  }, [queryLeadId]);
 
   const selectedLeadsList = leads.filter(l => selectedLeadIds.includes(l.id));
 
@@ -291,6 +318,11 @@ export const LeadsPage: React.FC = () => {
 
             {/* Scrollable details view */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Active Call Control/Disposition */}
+              {agentState === 'ACTIVE_CALLING' && currentLead?.id === detailLead.id && (
+                <ActiveCallDisposition />
+              )}
+
               {/* Quick Details Card */}
               <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
                 <div>

@@ -92,20 +92,43 @@ async def get_next_lead(
         db.add(lead)
 
     # 4.5. Trigger Knowlarity Click-to-Call if telephony credentials are provided
+    call_sid = f"outbound-{uuid.uuid4()}"
     if payload.knowlarity_api_key and payload.agent_phone_number:
         try:
             from app.services.knowlarity_service import trigger_knowlarity_call
-            await trigger_knowlarity_call(
+            call_res = await trigger_knowlarity_call(
                 api_key=payload.knowlarity_api_key,
                 srn=payload.knowlarity_srn or "",
                 agent_number=payload.agent_phone_number,
                 customer_number=lead.phone
             )
+            if call_res and isinstance(call_res, dict):
+                success_data = call_res.get("success", {})
+                if isinstance(success_data, dict):
+                    call_sid = success_data.get("call_id") or call_res.get("call_id") or call_sid
+                else:
+                    call_sid = call_res.get("call_id") or call_sid
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Outbound calling failed to initiate: {str(e)}"
             )
+
+    # Pre-create outbound call activity
+    from app.models.activity import Activity
+    new_call_activity = Activity(
+        organization_id=actor.organization_id,
+        activity_type="Call",
+        subject=f"Outbound Call to {lead.first_name or ''} {lead.last_name or ''}".strip(),
+        description="Outbound call initiated.",
+        status="Planned",
+        assigned_user_id=actor.id,
+        lead_id=lead.id,
+        created_by=actor.id,
+        call_sid=str(call_sid),
+        call_direction="OUTBOUND"
+    )
+    db.add(new_call_activity)
 
     # 5. Transition agent's Redis state to ACTIVE_CALLING
     await state_service.set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")

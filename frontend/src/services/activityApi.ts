@@ -15,6 +15,10 @@ export interface ActivityResponse {
   created_by: string;
   created_at: string;
   updated_at: string;
+  call_sid?: string | null;
+  recording_url?: string | null;
+  call_duration?: number | null;
+  call_direction?: string | null;
 }
 
 export const activityApi = {

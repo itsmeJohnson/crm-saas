@@ -27,6 +27,7 @@ interface DialerState {
   }) => Promise<void>;
   goOnBreak: (reason: string) => Promise<void>;
   endBreak: () => Promise<void>;
+  answerInboundCall: (lead: LeadResponse) => Promise<void>;
   resetStore: () => void;
 }
 
@@ -189,6 +190,28 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       });
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to end break';
+      set({ error: errMsg, isLoading: false });
+      throw err;
+    }
+  },
+
+  answerInboundCall: async (lead) => {
+    set({ isLoading: true, error: null });
+    try {
+      await dialerApi.updateState({ state: 'ACTIVE_CALLING' });
+      const nowStr = new Date().toISOString();
+      set({
+        currentLead: lead,
+        agentState: 'ACTIVE_CALLING',
+        stateTimestamp: nowStr,
+        isLoading: false,
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+      }
+      startTimer(set, 0);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to answer inbound call';
       set({ error: errMsg, isLoading: false });
       throw err;
     }

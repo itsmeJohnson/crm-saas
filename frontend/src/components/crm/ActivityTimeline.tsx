@@ -257,6 +257,13 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
             const assigneeUser = users.find(u => u.id === activity.assigned_user_id);
             const assigneeName = assigneeUser ? `${assigneeUser.first_name || ''} ${assigneeUser.last_name || ''}`.trim() : null;
 
+            const formatDuration = (seconds?: number | null) => {
+              if (seconds === undefined || seconds === null) return null;
+              const m = Math.floor(seconds / 60);
+              const s = seconds % 60;
+              return m > 0 ? `${m}m ${s}s` : `${s}s`;
+            };
+
             return (
               <div key={activity.id} className="relative group">
                 {/* Timeline Dot */}
@@ -294,9 +301,15 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                   </div>
 
                   {activity.description && (
-                    <p className="text-xs text-slate-400 pl-6 leading-relaxed">
+                    <p className="text-xs text-slate-400 pl-6 leading-relaxed whitespace-pre-line">
                       {activity.description}
                     </p>
+                  )}
+
+                  {activity.activity_type === 'Call' && activity.recording_url && (
+                    <div className="pl-6 pt-1">
+                      <audio src={activity.recording_url} controls className="h-8 max-w-full rounded bg-slate-900 border border-slate-800" />
+                    </div>
                   )}
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 pl-6 pt-1">
@@ -312,6 +325,20 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     {assigneeName && (
                       <span className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-400 rounded">
                         {assigneeName}
+                      </span>
+                    )}
+                    {activity.activity_type === 'Call' && activity.call_direction && (
+                      <span className={`px-1.5 py-0.5 rounded font-medium border ${
+                        activity.call_direction === 'INBOUND' 
+                          ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
+                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      }`}>
+                        {activity.call_direction}
+                      </span>
+                    )}
+                    {activity.activity_type === 'Call' && activity.call_duration !== undefined && activity.call_duration !== null && (
+                      <span className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-400 rounded">
+                        {formatDuration(activity.call_duration)}
                       </span>
                     )}
                   </div>

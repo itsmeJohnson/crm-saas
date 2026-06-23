@@ -99,6 +99,40 @@ class DispositionService:
         # Update lead status to match the disposition status
         lead.status = payload.status.value
 
+        # 3.5. Update latest Call activity for this lead
+        from app.models.activity import Activity
+        activity_query = select(Activity).filter(
+            Activity.lead_id == lead.id,
+            Activity.activity_type == "Call",
+            Activity.assigned_user_id == actor.id
+        ).order_by(Activity.created_at.desc()).limit(1)
+        
+        act_res = await db.execute(activity_query)
+        latest_call_activity = act_res.scalar()
+        
+        remarks_str = payload.remarks or ""
+        desc_str = f"Disposition: {payload.status.value}\nRemarks: {remarks_str}"
+        
+        if latest_call_activity:
+            latest_call_activity.status = "Completed"
+            latest_call_activity.subject = f"Call: {payload.status.value}"
+            latest_call_activity.description = desc_str
+            db.add(latest_call_activity)
+        else:
+            # Fallback: create completed activity
+            new_call_activity = Activity(
+                organization_id=lead.organization_id,
+                activity_type="Call",
+                subject=f"Call: {payload.status.value}",
+                description=desc_str,
+                status="Completed",
+                assigned_user_id=actor.id,
+                lead_id=lead.id,
+                created_by=actor.id,
+                call_direction="OUTBOUND"
+            )
+            db.add(new_call_activity)
+
         # 4. Transition agent's Redis state to IDLE
         state_service = AgentStateService()
         await state_service.set_agent_state(actor.organization_id, actor.id, "IDLE")
