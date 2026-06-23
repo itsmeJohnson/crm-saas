@@ -28,6 +28,7 @@ from app.models.plan_feature import PlanFeature
 from app.models.payment import Payment
 from app.models.system_setting import SystemSetting
 from app.models.invoice_config import InvoiceConfig
+from app.models.commercial_settings import CommercialSettings
 from app.repositories.organization import OrganizationRepository
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -84,6 +85,7 @@ async def seed():
         await session.execute(delete(Feature))
         await session.execute(delete(SystemSetting))
         await session.execute(delete(InvoiceConfig))
+        await session.execute(delete(CommercialSettings))
         await session.commit()
         logger.info("Database purge completed.")
 
@@ -159,7 +161,52 @@ async def seed():
         )
         session.add(invoice_config)
         
-        # 6. Commit all changes
+        # 6. Seed default commercial settings
+        logger.info("Seeding default commercial settings...")
+        commercial_settings = CommercialSettings(
+            id="default",
+            default_currency="INR",
+            currency_symbol="₹",
+            default_timezone="Asia/Kolkata",
+            default_gst=18.0,
+            gst_inclusive=False,
+            tax_label="GST",
+            default_trial_days=14,
+            allow_trial=True,
+            trial_reminder_days=3,
+            default_min_contract=3,
+            auto_renewal=True,
+            notice_period_days=15,
+            default_setup_charge=0.0,
+            allow_setup_discount=True,
+            free_setup_on_annual=True,
+            default_extra_user_price=0.0,
+            minimum_users=10,
+            maximum_users=None,
+            default_discount_percentage=0.0,
+            maximum_discount_percentage=25.0,
+            late_payment_charge=0.0,
+            late_payment_type="flat",
+            grace_period_days=7,
+            auto_suspend_days=30,
+            auto_reactivate=True,
+            reminder_schedule="{}",
+            invoice_reminder_days="7,3,1",
+            subscription_reminder_days="15,7,3,0",
+            payment_reminder_days="0,3,7,15",
+            default_plan_id=None,
+            default_recording_retention_days=90,
+            default_storage_gb=50,
+            invoice_reminder_template="Dear {customer_name},\n\nThis is a reminder for your upcoming invoice {invoice_number}.\n\nRegards,\nManagement",
+            renewal_reminder_template="Dear {customer_name},\n\nYour subscription is renewing soon.\n\nRegards,\nManagement",
+            trial_expiry_template="Dear {customer_name},\n\nYour trial is expiring in {days_left} days. Upgrade now!\n\nRegards,\nManagement",
+            payment_success_template="Dear {customer_name},\n\nPayment for invoice {invoice_number} was successful.\n\nRegards,\nManagement",
+            payment_failed_template="Dear {customer_name},\n\nPayment for invoice {invoice_number} has failed. Please verify.\n\nRegards,\nManagement",
+            welcome_template="Dear {customer_name},\n\nWelcome to our platform!\n\nRegards,\nManagement"
+        )
+        session.add(commercial_settings)
+        
+        # 7. Commit all changes
         await session.commit()
         logger.info("SaaS Database Seeding successfully completed!")
 

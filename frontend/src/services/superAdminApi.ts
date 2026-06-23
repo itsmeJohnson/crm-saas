@@ -203,6 +203,16 @@ export const superAdminApi = {
     const response = await api.delete<InvoiceConfigResponse>('/super-admin/invoice-config/qr');
     return response.data;
   },
+
+  // Commercial Settings CRUD
+  getCommercialSettings: async () => {
+    const response = await api.get<CommercialSettingsResponse>('/super-admin/commercial-settings');
+    return response.data;
+  },
+  updateCommercialSettings: async (payload: CommercialSettingsUpdate) => {
+    const response = await api.put<CommercialSettingsResponse>('/super-admin/commercial-settings', payload);
+    return response.data;
+  },
 };
 
 export interface InvoiceConfigUpdate {
@@ -310,5 +320,55 @@ export interface PlanFeatureResponse {
 export interface SystemSettingResponse {
   key: string;
   value: any;
+}
+
+export interface CommercialSettingsUpdate {
+  default_currency: string;
+  currency_symbol: string;
+  default_timezone: string;
+  default_gst: number;
+  gst_inclusive: boolean;
+  tax_label: string;
+  default_trial_days: number;
+  allow_trial: boolean;
+  trial_reminder_days: number;
+  default_min_contract: number;
+  auto_renewal: boolean;
+  notice_period_days: number;
+  default_setup_charge: number;
+  allow_setup_discount: boolean;
+  free_setup_on_annual: boolean;
+  default_extra_user_price: number;
+  minimum_users: number;
+  maximum_users?: number | null;
+  default_discount_percentage: number;
+  maximum_discount_percentage: number;
+  allow_custom_discount: boolean;
+  allow_promo_code: boolean;
+  late_payment_charge: number;
+  late_payment_type: string;
+  grace_period_days: number;
+  auto_suspend_days: number;
+  auto_reactivate: boolean;
+  reminder_schedule: string;
+  invoice_reminder_days: string;
+  subscription_reminder_days: string;
+  payment_reminder_days: string;
+  default_plan_id?: string | null;
+  default_recording_retention_days: number;
+  default_storage_gb: number;
+  invoice_reminder_template?: string | null;
+  renewal_reminder_template?: string | null;
+  trial_expiry_template?: string | null;
+  payment_success_template?: string | null;
+  payment_failed_template?: string | null;
+  welcome_template?: string | null;
+  reason?: string;
+}
+
+export interface CommercialSettingsResponse extends CommercialSettingsUpdate {
+  id: string;
+  created_at: string;
+  updated_at: string;
 }
 

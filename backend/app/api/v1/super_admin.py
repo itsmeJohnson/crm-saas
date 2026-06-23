@@ -5,6 +5,8 @@ from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from app.schemas.invoice_config import InvoiceConfigResponse, InvoiceConfigUpdate
 from app.services.invoice_config_service import InvoiceConfigService
+from app.schemas.commercial_settings import CommercialSettingsResponse, CommercialSettingsUpdate
+from app.services.commercial_settings_service import CommercialSettingsService
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 
@@ -906,4 +908,35 @@ async def delete_payment_qr(
         user_agent=user_agent
     )
     return await service.get_config()
+
+
+@router.get("/commercial-settings", response_model=CommercialSettingsResponse)
+async def get_commercial_settings(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Retrieve global commercial configuration settings."""
+    service = CommercialSettingsService(db)
+    return await service.get_settings()
+
+
+@router.put("/commercial-settings", response_model=CommercialSettingsResponse)
+async def update_commercial_settings(
+    payload: CommercialSettingsUpdate,
+    request: Request,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Update global commercial/business rules configuration."""
+    service = CommercialSettingsService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    return await service.update_settings(
+        payload=payload,
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+
 

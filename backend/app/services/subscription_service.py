@@ -249,27 +249,61 @@ class SubscriptionService:
             self.db.add(invoice_config)
             await self.db.flush()
 
-        # Create Invoice dynamically using configuration
+        # Load CommercialSettings dynamically
+        from app.models.commercial_settings import CommercialSettings
+        comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
+        comm_res = await self.db.execute(comm_stmt)
+        comm_settings = comm_res.scalar_one_or_none()
+        if not comm_settings:
+            comm_settings = CommercialSettings(id="default")
+            self.db.add(comm_settings)
+            await self.db.flush()
+
+        # Create Invoice dynamically using configurations
         prefix = invoice_config.invoice_prefix or "INV"
-        currency = invoice_config.currency or "INR"
+        currency = invoice_config.currency or comm_settings.default_currency or "INR"
         invoice_num = f"{prefix}-{uuid.uuid4().hex[:8].upper()}-{int(now.timestamp())}"
         
         amount = float(plan.price_inr)
-        setup_charges = float(plan.setup_charges) if hasattr(plan, "setup_charges") else 0.0
-        discount_percentage = float(plan.discount_percentage) if hasattr(plan, "discount_percentage") else 0.0
-        gst_percentage = float(plan.gst_percentage) if hasattr(plan, "gst_percentage") else 0.0
         
-        discount_amount = amount * (discount_percentage / 100.0)
-        taxable_amount = amount - discount_amount
-        gst_amount = taxable_amount * (gst_percentage / 100.0)
-        total_amount = taxable_amount + setup_charges + gst_amount
+        # Determine Setup Charge fallback
+        setup_charges = float(plan.setup_charges) if plan.setup_charges is not None else float(comm_settings.default_setup_charge)
+        if comm_settings.free_setup_on_annual and plan.billing_cycle_days >= 360:
+            setup_charges = 0.0
+
+        # Determine Discount fallback
+        discount_percentage = float(plan.discount_percentage) if plan.discount_percentage is not None else float(comm_settings.default_discount_percentage)
+        if not comm_settings.allow_custom_discount:
+            discount_percentage = float(comm_settings.default_discount_percentage)
+        if discount_percentage > float(comm_settings.maximum_discount_percentage):
+            discount_percentage = float(comm_settings.maximum_discount_percentage)
+
+        # Determine GST fallback
+        gst_percentage = float(plan.gst_percentage) if plan.gst_percentage is not None else float(comm_settings.default_gst)
+        if gst_percentage == 0.0:
+            gst_percentage = float(comm_settings.default_gst)
+
+        # Apply GST inclusive vs exclusive calculations
+        if comm_settings.gst_inclusive:
+            # Base amount includes GST: base_price = taxable + gst
+            total_sub_after_discount = amount * (1.0 - (discount_percentage / 100.0))
+            gst_amount = total_sub_after_discount * (gst_percentage / (100.0 + gst_percentage))
+            taxable_amount = total_sub_after_discount - gst_amount
+            discount_amount = amount * (discount_percentage / 100.0) / (1.0 + (gst_percentage / 100.0))
+            total_amount = total_sub_after_discount + setup_charges
+        else:
+            # Base amount does not include GST
+            discount_amount = amount * (discount_percentage / 100.0)
+            taxable_amount = amount - discount_amount
+            gst_amount = taxable_amount * (gst_percentage / 100.0)
+            total_amount = taxable_amount + setup_charges + gst_amount
 
         invoice = Invoice(
             organization_id=organization_id,
             invoice_number=invoice_num,
             amount=total_amount,
             status="Paid",  # Simulating immediate paid status on renewal
-            due_date=now + timedelta(days=7),
+            due_date=now + timedelta(days=comm_settings.grace_period_days),
             plan_name=plan.name,
             amount_inr=total_amount if currency == "INR" else 0.0,
             currency=currency,
@@ -297,3 +331,4 @@ class SubscriptionService:
         await self.db.commit()
         await self.db.refresh(sub)
         return sub
+

@@ -16,15 +16,19 @@
         <div class="header">
             <h2>Subscription Renewal Reminder</h2>
         </div>
-        <p>Hello <strong>{{ org_name }}</strong>,</p>
-        <p>This is a friendly reminder that your subscription to the <strong>{{ plan_name }}</strong> plan is scheduled to renew on <strong>{{ renewal_date }}</strong>.</p>
-        <p>Renewal Details:</p>
-        <ul>
-            <li><strong>Plan:</strong> {{ plan_name }}</li>
-            <li><strong>Amount:</strong> INR {{ amount }}</li>
-            <li><strong>Renewal Date:</strong> {{ renewal_date }}</li>
-        </ul>
-        <p>If you have auto-renew enabled, no action is required. Your payment method will be charged automatically. Otherwise, please visit the billing page to complete your payment.</p>
+        {% if custom_body %}
+            {{ custom_body|safe }}
+        {% else %}
+            <p>Hello <strong>{{ org_name }}</strong>,</p>
+            <p>This is a friendly reminder that your subscription to the <strong>{{ plan_name }}</strong> plan is scheduled to renew on <strong>{{ renewal_date }}</strong>.</p>
+            <p>Renewal Details:</p>
+            <ul>
+                <li><strong>Plan:</strong> {{ plan_name }}</li>
+                <li><strong>Amount:</strong> INR {{ amount }}</li>
+                <li><strong>Renewal Date:</strong> {{ renewal_date }}</li>
+            </ul>
+            <p>If you have auto-renew enabled, no action is required. Your payment method will be charged automatically. Otherwise, please visit the billing page to complete your payment.</p>
+        {% endif %}
         <div class="footer">
             This is an automated billing notification from TeleCRM.
         </div>

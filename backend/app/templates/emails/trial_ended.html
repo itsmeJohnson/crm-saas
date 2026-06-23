@@ -16,11 +16,15 @@
         <div class="header">
             <h2>Your Free Trial Has Ended</h2>
         </div>
-        <p>Hello <strong>{{ org_name }}</strong>,</p>
-        <p>Your free trial has ended, and your account has been transitioned to a grace period/expired status. Access to create or modify CRM data has been restricted.</p>
-        <p>To restore full access for you and your team, please select a subscription plan today.</p>
-        <p><a href="{{ upgrade_url }}" class="button">Choose a Plan</a></p>
-        <p>Thank you for trying out TeleCRM!</p>
+        {% if custom_body %}
+            {{ custom_body|safe }}
+        {% else %}
+            <p>Hello <strong>{{ org_name }}</strong>,</p>
+            <p>Your free trial has ended, and your account has been transitioned to a grace period/expired status. Access to create or modify CRM data has been restricted.</p>
+            <p>To restore full access for you and your team, please select a subscription plan today.</p>
+            <p><a href="{{ upgrade_url }}" class="button">Choose a Plan</a></p>
+            <p>Thank you for trying out TeleCRM!</p>
+        {% endif %}
         <div class="footer">
             This is an automated billing notification from TeleCRM.
         </div>

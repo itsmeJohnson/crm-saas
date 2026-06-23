@@ -16,11 +16,15 @@
         <div class="header">
             <h2>Your Free Trial is Ending Soon</h2>
         </div>
-        <p>Hello <strong>{{ org_name }}</strong>,</p>
-        <p>We hope you are enjoying your experience with TeleCRM! This is a quick heads-up that your free trial is ending in <strong>{{ days_left }} days</strong> on <strong>{{ trial_end_date }}</strong>.</p>
-        <p>To avoid any disruption in service for your calling agents, please upgrade to a paid subscription plan.</p>
-        <p><a href="{{ upgrade_url }}" class="button">Upgrade My Plan</a></p>
-        <p>If you need more time or have questions about our plans, feel free to contact our support team.</p>
+        {% if custom_body %}
+            {{ custom_body|safe }}
+        {% else %}
+            <p>Hello <strong>{{ org_name }}</strong>,</p>
+            <p>We hope you are enjoying your experience with TeleCRM! This is a quick heads-up that your free trial is ending in <strong>{{ days_left }} days</strong> on <strong>{{ trial_end_date }}</strong>.</p>
+            <p>To avoid any disruption in service for your calling agents, please upgrade to a paid subscription plan.</p>
+            <p><a href="{{ upgrade_url }}" class="button">Upgrade My Plan</a></p>
+            <p>If you need more time or have questions about our plans, feel free to contact our support team.</p>
+        {% endif %}
         <div class="footer">
             This is an automated billing notification from TeleCRM.
         </div>

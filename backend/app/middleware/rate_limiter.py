@@ -35,7 +35,11 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             self.redis_client = None
 
     async def dispatch(self, request: Request, call_next):
-        # Allow health checks and docs to bypass rate limiting
+        # Allow health checks, docs, and test environment to bypass rate limiting
+        import os
+        if os.getenv("TESTING") == "true":
+            return await call_next(request)
+
         path = request.url.path
         if path.startswith("/health") or path.startswith("/api/v1/health") or path in ["/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)

@@ -28,6 +28,16 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
     """
     logger.info("Starting subscription state transitions evaluation for date: %s", reference_date)
     
+    # Load CommercialSettings
+    from app.models.commercial_settings import CommercialSettings
+    comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
+    comm_res = await db.execute(comm_stmt)
+    comm_settings = comm_res.scalar_one_or_none()
+    if not comm_settings:
+        comm_settings = CommercialSettings(id="default")
+        db.add(comm_settings)
+        await db.flush()
+
     stmt = select(TenantSubscription).where(
         TenantSubscription.is_deleted == False
     )
@@ -58,31 +68,39 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                 transition_count += 1
                 
                 if admin_email:
+                    subject = "Your Free Trial Has Ended"
+                    custom_body = None
+                    if comm_settings.trial_expiry_template:
+                        custom_body = comm_settings.trial_expiry_template.replace("{customer_name}", org.name).replace("{days_left}", "0")
                     send_email(
                         to_email=admin_email,
-                        subject="Your Free Trial Has Ended",
+                        subject=subject,
                         template_name="trial_ended.html",
                         context={
                             "org_name": org.name,
-                            "upgrade_url": "/subscription"
+                            "upgrade_url": "/subscription",
+                            "custom_body": custom_body
                         }
                     )
-            elif sub.trial_end_date and (sub.trial_end_date - reference_date) <= timedelta(days=3):
-                # Alert trial ending soon if not already sent (we can check if flagged in features or context)
-                # For simplicity, we send if it's within the 3 day window.
-                # In real life we'd check if we already sent, but let's send for notification correctness.
+            elif sub.trial_end_date and (sub.trial_end_date - reference_date) <= timedelta(days=comm_settings.trial_reminder_days):
+                # Alert trial ending soon
                 if sub.trial_end_date > reference_date:
                     days_left = (sub.trial_end_date - reference_date).days + 1
                     if admin_email:
+                        subject = "Your Free Trial is Ending Soon"
+                        custom_body = None
+                        if comm_settings.trial_expiry_template:
+                            custom_body = comm_settings.trial_expiry_template.replace("{customer_name}", org.name).replace("{days_left}", str(days_left))
                         send_email(
                             to_email=admin_email,
-                            subject="Your Free Trial is Ending Soon",
+                            subject=subject,
                             template_name="trial_ending_soon.html",
                             context={
                                 "org_name": org.name,
                                 "days_left": days_left,
                                 "trial_end_date": sub.trial_end_date.strftime("%B %d, %Y"),
-                                "upgrade_url": "/subscription"
+                                "upgrade_url": "/subscription",
+                                "custom_body": custom_body
                             }
                         )
 
@@ -102,13 +120,18 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                         org.subscription_status = "expired"
                         transition_count += 1
                         if admin_email:
+                            subject = "Your Subscription Has Expired"
+                            custom_body = None
+                            if comm_settings.payment_failed_template:
+                                custom_body = comm_settings.payment_failed_template.replace("{customer_name}", org.name).replace("{invoice_number}", "Auto-Renew")
                             send_email(
                                 to_email=admin_email,
-                                subject="Your Subscription Has Expired",
+                                subject=subject,
                                 template_name="plan_expired.html",
                                 context={
                                     "org_name": org.name,
-                                    "renew_url": "/subscription"
+                                    "renew_url": "/subscription",
+                                    "custom_body": custom_body
                                 }
                             )
                 else:
@@ -116,13 +139,16 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                     org.subscription_status = "expired"
                     transition_count += 1
                     if admin_email:
+                        subject = "Your Subscription Has Expired"
+                        custom_body = None
                         send_email(
                             to_email=admin_email,
-                            subject="Your Subscription Has Expired",
+                            subject=subject,
                             template_name="plan_expired.html",
                             context={
                                 "org_name": org.name,
-                                "renew_url": "/subscription"
+                                "renew_url": "/subscription",
+                                "custom_body": custom_body
                               }
                         )
             elif (sub.end_date - reference_date) <= timedelta(days=3):
@@ -133,22 +159,27 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                     transition_count += 1
                     
                 if admin_email:
+                    subject = "Subscription Renewal Reminder"
+                    custom_body = None
+                    if comm_settings.renewal_reminder_template:
+                        custom_body = comm_settings.renewal_reminder_template.replace("{customer_name}", org.name).replace("{renewal_date}", sub.end_date.strftime("%B %d, %Y"))
                     send_email(
                         to_email=admin_email,
-                        subject="Subscription Renewal Reminder",
+                        subject=subject,
                         template_name="renewal_reminder.html",
                         context={
                             "org_name": org.name,
                             "plan_name": sub.plan.name if sub.plan else org.subscription_plan,
                             "renewal_date": sub.end_date.strftime("%B %d, %Y"),
-                            "amount": str(sub.plan.price_inr) if (sub.plan) else "0.00"
+                            "amount": str(sub.plan.price_inr) if (sub.plan) else "0.00",
+                            "custom_body": custom_body
                         }
                     )
 
         # 3. EXPIRED transitions -> SUSPENDED
         elif sub.status == "expired":
-            # Grace period is 7 days. If end_date was more than 7 days ago:
-            if (reference_date - sub.end_date) >= timedelta(days=7):
+            # Grace period is loaded dynamically from CommercialSettings
+            if (reference_date - sub.end_date) >= timedelta(days=comm_settings.grace_period_days):
                 sub.status = "suspended"
                 org.subscription_status = "suspended"
                 transition_count += 1

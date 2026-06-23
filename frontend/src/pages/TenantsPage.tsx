@@ -9,19 +9,22 @@ import {
 import { 
   superAdminApi, TenantResponse, TenantUserResponse, TenantInvoiceResponse,
   SubscriptionUpdateRequest, InvoiceCreateRequest, CreateTenantRequest,
-  PlanResponse, FeatureResponse, PlanFeatureResponse, PlanCreatePayload
+  PlanResponse, FeatureResponse, PlanFeatureResponse, PlanCreatePayload,
+  CommercialSettingsUpdate
 } from '../services/superAdminApi';
 
 export const TenantsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'features' | 'invoice-settings' | 'system-settings'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'features' | 'invoice-settings' | 'commercial-settings' | 'system-settings'>('tenants');
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [plans, setPlans] = useState<PlanResponse[]>([]);
   const [features, setFeatures] = useState<FeatureResponse[]>([]);
   const [mappings, setMappings] = useState<PlanFeatureResponse[]>([]);
   const [settingsData, setSettingsData] = useState<Record<string, any>>({});
-  const [invoiceConfig, setInvoiceConfig] = useState<any>(null);
   const [editedConfig, setEditedConfig] = useState<any>(null);
   const [invoiceConfigSubTab, setInvoiceConfigSubTab] = useState<'general' | 'branding' | 'tax' | 'invoice' | 'payment' | 'email' | 'footer'>('general');
+  
+  const [editedCommSettings, setEditedCommSettings] = useState<CommercialSettingsUpdate | null>(null);
+  const [commSettingsSubTab, setCommSettingsSubTab] = useState<'general' | 'pricing' | 'tax' | 'contracts' | 'setup' | 'discounts' | 'late-fees' | 'renewals' | 'reminders' | 'emails' | 'advanced'>('general');
   const [isUploading, setIsUploading] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -61,8 +64,12 @@ export const TenantsPage: React.FC = () => {
         setMappings(mData);
       } else if (activeTab === 'invoice-settings') {
         const data = await superAdminApi.getInvoiceConfig();
-        setInvoiceConfig(data);
         setEditedConfig(data);
+      } else if (activeTab === 'commercial-settings') {
+        const data = await superAdminApi.getCommercialSettings();
+        setEditedCommSettings({ ...data, reason: '' });
+        const pData = await superAdminApi.getPlans();
+        setPlans(pData);
       } else if (activeTab === 'system-settings') {
         const data = await superAdminApi.getSystemSettings();
         const configMap: Record<string, any> = {};
@@ -439,11 +446,29 @@ export const TenantsPage: React.FC = () => {
     setGlobalError(null);
     try {
       const updated = await superAdminApi.updateInvoiceConfig(editedConfig);
-      setInvoiceConfig(updated);
       setEditedConfig(updated);
       showSuccess("Invoice configuration updated successfully.");
     } catch (err: any) {
       setGlobalError(err.response?.data?.detail || "Failed to update configuration.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveCommSettings = async () => {
+    if (!editedCommSettings) return;
+    if (!editedCommSettings.reason) {
+      setGlobalError("Reason for update is required for audit logs tracking.");
+      return;
+    }
+    setIsLoading(true);
+    setGlobalError(null);
+    try {
+      const updated = await superAdminApi.updateCommercialSettings(editedCommSettings);
+      setEditedCommSettings({ ...updated, reason: '' });
+      showSuccess("Commercial settings updated successfully.");
+    } catch (err: any) {
+      setGlobalError(err.response?.data?.detail || "Failed to update commercial settings.");
     } finally {
       setIsLoading(false);
     }
@@ -456,7 +481,6 @@ export const TenantsPage: React.FC = () => {
     setGlobalError(null);
     try {
       const updated = await superAdminApi.uploadCompanyLogo(file);
-      setInvoiceConfig(updated);
       setEditedConfig(updated);
       showSuccess("Company logo uploaded successfully.");
     } catch (err: any) {
@@ -473,7 +497,6 @@ export const TenantsPage: React.FC = () => {
     setGlobalError(null);
     try {
       const updated = await superAdminApi.uploadPaymentQr(file);
-      setInvoiceConfig(updated);
       setEditedConfig(updated);
       showSuccess("Payment QR code uploaded successfully.");
     } catch (err: any) {
@@ -489,7 +512,6 @@ export const TenantsPage: React.FC = () => {
     setGlobalError(null);
     try {
       const updated = await superAdminApi.deleteCompanyLogo();
-      setInvoiceConfig(updated);
       setEditedConfig(updated);
       showSuccess("Company logo deleted.");
     } catch (err: any) {
@@ -505,7 +527,6 @@ export const TenantsPage: React.FC = () => {
     setGlobalError(null);
     try {
       const updated = await superAdminApi.deletePaymentQr();
-      setInvoiceConfig(updated);
       setEditedConfig(updated);
       showSuccess("Payment QR code deleted.");
     } catch (err: any) {
@@ -605,6 +626,15 @@ export const TenantsPage: React.FC = () => {
           >
             <FileText className="w-4 h-4" />
             Invoice Config
+          </button>
+          <button 
+            onClick={() => setActiveTab('commercial-settings')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+              activeTab === 'commercial-settings' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
+            }`}
+          >
+            <DollarSign className="w-4 h-4" />
+            Commercial Settings
           </button>
           <button 
             onClick={() => setActiveTab('system-settings')}
@@ -1632,6 +1662,678 @@ export const TenantsPage: React.FC = () => {
                     <div className="border-t border-slate-800/80 pt-3 text-[9px] text-slate-500 leading-normal space-y-1">
                       {editedConfig.payment_terms && <p><strong>Terms:</strong> {editedConfig.payment_terms}</p>}
                       <p className="text-center font-medium italic text-slate-400/80 mt-1">{editedConfig.footer_text || 'Thank you for choosing Johnson Softwares!'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              TAB 4B: COMMERCIAL SETTINGS
+             ========================================== */}
+          {activeTab === 'commercial-settings' && editedCommSettings && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* Left Column: Config Forms (col-span-2) */}
+              <div className="xl:col-span-2 space-y-6">
+                <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-indigo-400" />
+                      Dynamic Commercial Configuration Engine
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Configure dynamic prices, grace periods, auto-renewals, discounts, tax structures, setup charges, reminders, and customized templates globally.
+                    </p>
+                  </div>
+
+                  {/* Sub-tab Navigation */}
+                  <div className="flex border-b border-slate-800 pb-2 overflow-x-auto gap-1.5 scrollbar-thin">
+                    {[
+                      { id: 'general', label: 'General', icon: Building },
+                      { id: 'pricing', label: 'Pricing & Seats', icon: Users },
+                      { id: 'tax', label: 'Tax', icon: Percent },
+                      { id: 'contracts', label: 'Contracts', icon: Workflow },
+                      { id: 'setup', label: 'Setup Charges', icon: CreditCard },
+                      { id: 'discounts', label: 'Discounts', icon: Image },
+                      { id: 'late-fees', label: 'Late Payments', icon: AlertCircle },
+                      { id: 'renewals', label: 'Renewals & Suspension', icon: Lock },
+                      { id: 'reminders', label: 'Billing Schedules', icon: Clock },
+                      { id: 'emails', label: 'Email Templates', icon: Mail },
+                      { id: 'advanced', label: 'Advanced', icon: Settings }
+                    ].map((subTab) => (
+                      <button
+                        key={subTab.id}
+                        type="button"
+                        onClick={() => setCommSettingsSubTab(subTab.id as any)}
+                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
+                          commSettingsSubTab === subTab.id
+                            ? 'bg-brand-500/10 text-brand-400 border-brand-500/30'
+                            : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 border-transparent'
+                        }`}
+                      >
+                        <subTab.icon className="w-3.5 h-3.5" />
+                        {subTab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Forms Content */}
+                  <div className="space-y-4 pt-2">
+                    {/* General Section */}
+                    {commSettingsSubTab === 'general' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Currency</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.default_currency || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_currency: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. INR"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Symbol</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.currency_symbol || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, currency_symbol: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. ₹"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default System Timezone</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.default_timezone || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_timezone: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. Asia/Kolkata"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pricing Section */}
+                    {commSettingsSubTab === 'pricing' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Minimum User Seats Limit</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedCommSettings.minimum_users || 10}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, minimum_users: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Maximum User Seats Limit</label>
+                          <input
+                            type="number"
+                            value={editedCommSettings.maximum_users || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, maximum_users: e.target.value ? Number(e.target.value) : null })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="Leave empty for unlimited seats"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Extra Seat Price (per seat/month)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editedCommSettings.default_extra_user_price || 0}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_extra_user_price: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tax Section */}
+                    {commSettingsSubTab === 'tax' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tax Rate (GST %)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={editedCommSettings.default_gst || 18.0}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_gst: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tax label</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.tax_label || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, tax_label: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. GST"
+                          />
+                        </div>
+                        <div className="md:col-span-2 flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl mt-2">
+                          <input
+                            type="checkbox"
+                            id="gst_inclusive"
+                            checked={editedCommSettings.gst_inclusive || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, gst_inclusive: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="gst_inclusive" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            GST Inclusive Pricing (Prices in plan templates already include GST tax)
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Contracts Section */}
+                    {commSettingsSubTab === 'contracts' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Minimum Contract Period (Months)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedCommSettings.default_min_contract || 3}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_min_contract: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Termination Notice Period (Days)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editedCommSettings.notice_period_days || 15}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, notice_period_days: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div className="md:col-span-2 flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl mt-2">
+                          <input
+                            type="checkbox"
+                            id="auto_renewal"
+                            checked={editedCommSettings.auto_renewal || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, auto_renewal: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="auto_renewal" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Enable Auto-Renewal by default for new subscriptions
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Setup Charges Section */}
+                    {commSettingsSubTab === 'setup' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Setup Charges</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editedCommSettings.default_setup_charge || 0}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_setup_charge: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <input
+                            type="checkbox"
+                            id="allow_setup_discount"
+                            checked={editedCommSettings.allow_setup_discount || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_setup_discount: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="allow_setup_discount" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Allow Setup Fee Discounts
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <input
+                            type="checkbox"
+                            id="free_setup_on_annual"
+                            checked={editedCommSettings.free_setup_on_annual || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, free_setup_on_annual: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="free_setup_on_annual" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Waive Setup Fee on Annual billing
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Discounts Section */}
+                    {commSettingsSubTab === 'discounts' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Discount Percentage</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={editedCommSettings.default_discount_percentage || 0}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_discount_percentage: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Maximum Permitted Discount %</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={editedCommSettings.maximum_discount_percentage || 25}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, maximum_discount_percentage: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <input
+                            type="checkbox"
+                            id="allow_custom_discount"
+                            checked={editedCommSettings.allow_custom_discount || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_custom_discount: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="allow_custom_discount" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Allow manual/custom discounts overrides
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <input
+                            type="checkbox"
+                            id="allow_promo_code"
+                            checked={editedCommSettings.allow_promo_code || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_promo_code: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="allow_promo_code" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Enable promo codes support
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Late Payments Section */}
+                    {commSettingsSubTab === 'late-fees' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Late Payment Charge Amount/Value</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editedCommSettings.late_payment_charge || 0}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, late_payment_charge: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Late Payment Charge type</label>
+                          <select
+                            value={editedCommSettings.late_payment_type || 'flat'}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, late_payment_type: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          >
+                            <option value="flat">Flat Charge</option>
+                            <option value="percentage">Percentage per month (%)</option>
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Payment Grace Period (Days)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editedCommSettings.grace_period_days || 7}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, grace_period_days: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="Days allowed before late fee/restriction starts"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Renewals & Suspension Section */}
+                    {commSettingsSubTab === 'renewals' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Auto-Suspend Threshold (Days after renewal due)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editedCommSettings.auto_suspend_days || 30}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, auto_suspend_days: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Trial period duration (Days)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editedCommSettings.default_trial_days || 14}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_trial_days: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Plan Template ID for new signups</label>
+                          <select
+                            value={editedCommSettings.default_plan_id || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_plan_id: e.target.value || null })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          >
+                            <option value="">No Default Plan (Manual upgrade required)</option>
+                            {plans.map(plan => (
+                              <option key={plan.id} value={plan.id}>{plan.display_name || plan.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl mt-6">
+                          <input
+                            type="checkbox"
+                            id="auto_reactivate"
+                            checked={editedCommSettings.auto_reactivate || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, auto_reactivate: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="auto_reactivate" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Auto-reactivate suspension on payment receipt
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl md:col-span-2">
+                          <input
+                            type="checkbox"
+                            id="allow_trial"
+                            checked={editedCommSettings.allow_trial || false}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_trial: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="allow_trial" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                            Allow Trial Periods for new registration instances
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Billing Schedules / Reminders Section */}
+                    {commSettingsSubTab === 'reminders' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice reminders (days before due, comma-separated)</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.invoice_reminder_days || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, invoice_reminder_days: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. 7,3,1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subscription warnings (days before renew, comma-separated)</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.subscription_reminder_days || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, subscription_reminder_days: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. 15,7,3,0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Payment Reminders (days after due, comma-separated)</label>
+                          <input
+                            type="text"
+                            value={editedCommSettings.payment_reminder_days || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, payment_reminder_days: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. 0,3,7,15"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Trial warnings offset (Days before expiry)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editedCommSettings.trial_reminder_days || 3}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, trial_reminder_days: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email Templates Section */}
+                    {commSettingsSubTab === 'emails' && (
+                      <div className="space-y-6 text-left">
+                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Welcome Email Override Template</label>
+                          <textarea
+                            rows={3}
+                            value={editedCommSettings.welcome_template || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, welcome_template: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            placeholder="Use variables like {customer_name}"
+                          />
+                        </div>
+                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Trial Expiration Notice Template</label>
+                          <textarea
+                            rows={3}
+                            value={editedCommSettings.trial_expiry_template || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, trial_expiry_template: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            placeholder="Use variables like {customer_name}, {days_left}"
+                          />
+                        </div>
+                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Subscription Renewal Reminder Template</label>
+                          <textarea
+                            rows={3}
+                            value={editedCommSettings.renewal_reminder_template || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, renewal_reminder_template: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            placeholder="Use variables like {customer_name}, {renewal_date}"
+                          />
+                        </div>
+                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Invoice Reminder Template</label>
+                          <textarea
+                            rows={3}
+                            value={editedCommSettings.invoice_reminder_template || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, invoice_reminder_template: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            placeholder="Use variables like {customer_name}, {invoice_number}"
+                          />
+                        </div>
+                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Payment Success Template</label>
+                          <textarea
+                            rows={3}
+                            value={editedCommSettings.payment_success_template || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, payment_success_template: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            placeholder="Use variables like {customer_name}, {invoice_number}"
+                          />
+                        </div>
+                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Payment Failed Template</label>
+                          <textarea
+                            rows={3}
+                            value={editedCommSettings.payment_failed_template || ''}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, payment_failed_template: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            placeholder="Use variables like {customer_name}, {invoice_number}"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Advanced Section */}
+                    {commSettingsSubTab === 'advanced' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Recording Retention Period (Days)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedCommSettings.default_recording_retention_days || 90}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_recording_retention_days: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Storage Boundary (GB)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedCommSettings.default_storage_gb || 50}
+                            onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_storage_gb: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Save Settings Trigger & Audit Reason */}
+                  <div className="pt-4 border-t border-slate-800/80 space-y-4">
+                    <div className="text-left">
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        Reason for Update (Required for Audit Trail Logs)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editedCommSettings.reason || ''}
+                        onChange={(e) => setEditedCommSettings({ ...editedCommSettings, reason: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                        placeholder="e.g. Revised default currency rules / updated late fee metrics"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSaveCommSettings}
+                        disabled={isLoading || !editedCommSettings.reason}
+                        className="flex items-center justify-center gap-1.5 px-6 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-brand-500/10 cursor-pointer disabled:opacity-50"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            Save Rules & Settings
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Live Mock Commercial Card preview */}
+              <div className="xl:col-span-1">
+                <div className="sticky top-6 space-y-4">
+                  <div className="flex justify-between items-baseline px-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Live Active Summary</h4>
+                    <span className="text-[10px] text-slate-500 italic">Reactive summary card</span>
+                  </div>
+
+                  <div className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl p-6 bg-slate-950/60 text-slate-300 space-y-6 text-left relative">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+                        Commercial Engine Status
+                      </h4>
+                      <p className="text-[10px] text-slate-500 mt-1">Reflects active global default fallbacks</p>
+                    </div>
+
+                    <div className="space-y-4 pt-2 border-t border-slate-800/60 text-xs leading-relaxed">
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Default Localization</p>
+                        <p className="text-slate-300 font-mono">
+                          Currency: <strong className="text-slate-100">{editedCommSettings.default_currency || 'INR'} ({editedCommSettings.currency_symbol || '₹'})</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Timezone: <strong className="text-slate-100">{editedCommSettings.default_timezone || 'Asia/Kolkata'}</strong>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Seats Pricing & Constraints</p>
+                        <p className="text-slate-300 font-mono">
+                          Seat limits: <strong className="text-slate-100">{editedCommSettings.minimum_users || 10} - {editedCommSettings.maximum_users || 'Unlimited'}</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Extra Seat charge: <strong className="text-slate-100">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_extra_user_price || 0.00}/month</strong>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Trial Periods Policy</p>
+                        <p className="text-slate-300 font-mono">
+                          Trials: <strong className="text-slate-100">{editedCommSettings.allow_trial ? 'Allowed (' + (editedCommSettings.default_trial_days || 14) + ' days)' : 'Disabled'}</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Reminder offset: <strong className="text-slate-100">{editedCommSettings.trial_reminder_days || 3} days before expiry</strong>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Tax & GST Details</p>
+                        <p className="text-slate-300 font-mono">
+                          GST rate: <strong className="text-slate-100">{editedCommSettings.default_gst || 18.0}% ({editedCommSettings.tax_label || 'GST'})</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Price model: <strong className="text-slate-100">{editedCommSettings.gst_inclusive ? 'Tax Inclusive' : 'Tax Exclusive'}</strong>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Setup Fees Policy</p>
+                        <p className="text-slate-300 font-mono">
+                          Setup charges: <strong className="text-slate-100">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_setup_charge || 0.00}</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Waived on Annual: <strong className="text-slate-100">{editedCommSettings.free_setup_on_annual ? 'Yes' : 'No'}</strong>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Grace & Suspension bounds</p>
+                        <p className="text-slate-300 font-mono">
+                          Late fee: <strong className="text-slate-100">{editedCommSettings.late_payment_charge || 0.00} ({editedCommSettings.late_payment_type || 'flat'})</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Payment grace: <strong className="text-slate-100">{editedCommSettings.grace_period_days || 7} days</strong>
+                        </p>
+                        <p className="text-slate-300 font-mono">
+                          Suspends after: <strong className="text-slate-100">{editedCommSettings.auto_suspend_days || 30} days overdue</strong>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                        <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Automation schedules</p>
+                        <p className="text-slate-500 font-mono leading-tight">
+                          Invoice notifications: <strong className="text-slate-300">{editedCommSettings.invoice_reminder_days || '7,3,1'} days before due</strong>
+                        </p>
+                        <p className="text-slate-500 font-mono leading-tight">
+                          Renewal warnings: <strong className="text-slate-300">{editedCommSettings.subscription_reminder_days || '15,7,3,0'} days before renewal</strong>
+                        </p>
+                        <p className="text-slate-500 font-mono leading-tight">
+                          Overdue payment reminders: <strong className="text-slate-300">{editedCommSettings.payment_reminder_days || '0,3,7,15'} days after due</strong>
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
