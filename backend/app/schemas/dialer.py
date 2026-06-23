@@ -25,16 +25,25 @@ class CallDispositionStatus(str, Enum):
     NOT_EXIST = "Not Exist"
     OUT_OF_SERVICE = "Out of Service"
     PICKED = "Picked"
+    # Inbound specific dispositions
+    INBOUND_RESOLVED = "Answered / Resolved"
+    INBOUND_CALLBACK = "Callback Requested"
+    INBOUND_INTERESTED = "Interested"
+    INBOUND_NOT_INTERESTED = "Not Interested"
+    INBOUND_SPAM = "Spam / Junk"
 
 class CallDispositionRequest(BaseModel):
     status: CallDispositionStatus
     remarks: str = Field(..., min_length=1, description="Remarks are required and must not be empty.")
-    custom_pipeline_stage_id: Optional[uuid.UUID] = Field(default=None, description="Pipeline stage to advance to when status is Picked.")
+    custom_pipeline_stage_id: Optional[uuid.UUID] = Field(default=None, description="Pipeline stage to advance to when status is Picked or Interested.")
 
     @model_validator(mode="after")
     def validate_picked_stage(self) -> "CallDispositionRequest":
-        if self.status == CallDispositionStatus.PICKED and not self.custom_pipeline_stage_id:
-            raise ValueError("custom_pipeline_stage_id is required when status is 'Picked'.")
-        if self.status != CallDispositionStatus.PICKED and self.custom_pipeline_stage_id is not None:
-            raise ValueError("custom_pipeline_stage_id can only be specified when status is 'Picked'.")
+        requires_stage = {CallDispositionStatus.PICKED, CallDispositionStatus.INBOUND_INTERESTED}
+        allows_stage = {CallDispositionStatus.PICKED, CallDispositionStatus.INBOUND_INTERESTED, CallDispositionStatus.INBOUND_RESOLVED, CallDispositionStatus.INBOUND_CALLBACK}
+        
+        if self.status in requires_stage and not self.custom_pipeline_stage_id:
+            raise ValueError(f"custom_pipeline_stage_id is required when status is '{self.status.value}'.")
+        if self.status not in allows_stage and self.custom_pipeline_stage_id is not None:
+            raise ValueError(f"custom_pipeline_stage_id can only be specified for Picked, Interested, Resolved, or Callback statuses.")
         return self

@@ -12,6 +12,7 @@ interface DialerState {
   stateTimestamp: string | null;
   isLoading: boolean;
   error: string | null;
+  callDirection: 'INBOUND' | 'OUTBOUND' | null;
   
   fetchCurrentState: () => Promise<void>;
   startCalling: (
@@ -58,6 +59,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   stateTimestamp: null,
   isLoading: false,
   error: null,
+  callDirection: null,
 
   fetchCurrentState: async () => {
     set({ isLoading: true, error: null });
@@ -65,13 +67,22 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       const data = await dialerApi.getState();
       
       let lead = get().currentLead;
-      if (data.state === 'ACTIVE_CALLING' && !lead) {
-        const cachedLead = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_dialer_current_lead') : null;
-        if (cachedLead) {
-          try {
-            lead = JSON.parse(cachedLead);
-          } catch (e) {}
+      let direction = get().callDirection;
+      if (data.state === 'ACTIVE_CALLING') {
+        if (!lead && typeof localStorage !== 'undefined') {
+          const cachedLead = localStorage.getItem('crm_dialer_current_lead');
+          if (cachedLead) {
+            try {
+              lead = JSON.parse(cachedLead);
+            } catch (e) {}
+          }
         }
+        if (!direction && typeof localStorage !== 'undefined') {
+          direction = localStorage.getItem('crm_dialer_call_direction') as 'INBOUND' | 'OUTBOUND' | null;
+        }
+      } else {
+        lead = null;
+        direction = null;
       }
 
       const elapsed = data.timestamp ? Math.floor((Date.now() - new Date(data.timestamp).getTime()) / 1000) : 0;
@@ -79,7 +90,8 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       set({
         agentState: data.state,
         breakReason: data.state === 'BREAK' ? (data.metadata?.break_reason || null) : null,
-        currentLead: data.state === 'ACTIVE_CALLING' ? lead : null,
+        currentLead: lead,
+        callDirection: direction,
         stateTimestamp: data.timestamp || null,
         isLoading: false,
       });
@@ -115,11 +127,13 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       set({
         currentLead: lead,
         agentState: 'ACTIVE_CALLING',
+        callDirection: 'OUTBOUND',
         stateTimestamp: nowStr,
         isLoading: false,
       });
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+        localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
       }
       startTimer(set, 0);
     } catch (err: any) {
@@ -142,11 +156,13 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         currentLead: null,
         callDuration: 0,
         agentState: 'IDLE',
+        callDirection: null,
         stateTimestamp: null,
         isLoading: false,
       });
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('crm_dialer_current_lead');
+        localStorage.removeItem('crm_dialer_call_direction');
       }
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to submit disposition';
@@ -203,11 +219,13 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       set({
         currentLead: lead,
         agentState: 'ACTIVE_CALLING',
+        callDirection: 'INBOUND',
         stateTimestamp: nowStr,
         isLoading: false,
       });
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+        localStorage.setItem('crm_dialer_call_direction', 'INBOUND');
       }
       startTimer(set, 0);
     } catch (err: any) {
@@ -227,9 +245,11 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       stateTimestamp: null,
       isLoading: false,
       error: null,
+      callDirection: null,
     });
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('crm_dialer_current_lead');
+      localStorage.removeItem('crm_dialer_call_direction');
     }
   },
 }));

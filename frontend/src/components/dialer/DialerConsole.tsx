@@ -27,6 +27,7 @@ export const DialerConsole: React.FC = () => {
     stateTimestamp,
     isLoading,
     error,
+    callDirection,
     fetchCurrentState,
     startCalling,
     submitDisposition,
@@ -175,7 +176,9 @@ export const DialerConsole: React.FC = () => {
 
   const handleDispositionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStatus || !remarks || (selectedStatus === 'Picked' && !targetStageId)) {
+    const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
+    const isStageAllowed = ['Picked', 'Interested', 'Answered / Resolved', 'Callback Requested'].includes(selectedStatus || '');
+    if (!selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId)) {
       return;
     }
     const breakReasonToApply = pendingBreakReason;
@@ -183,7 +186,7 @@ export const DialerConsole: React.FC = () => {
       await submitDisposition({
         status: selectedStatus,
         remarks: remarks,
-        custom_pipeline_stage_id: selectedStatus === 'Picked' ? targetStageId : undefined
+        custom_pipeline_stage_id: isStageAllowed ? (targetStageId || undefined) : undefined
       });
 
       // Refresh dashboard data instantly on submission
@@ -206,9 +209,12 @@ export const DialerConsole: React.FC = () => {
   };
 
   const breakOptions = ['Lunch', 'Tea', 'Meeting', 'General'];
-  const dispositionOptions = ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked'];
+  const dispositionOptions = callDirection === 'INBOUND'
+    ? ['Answered / Resolved', 'Callback Requested', 'Interested', 'Not Interested', 'Spam / Junk']
+    : ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked'];
 
-  const isSubmitDisabled = !selectedStatus || !remarks.trim() || (selectedStatus === 'Picked' && !targetStageId) || isLoading;
+  const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
+  const isSubmitDisabled = !selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || isLoading;
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -521,7 +527,7 @@ export const DialerConsole: React.FC = () => {
                 </div>
 
                 {/* Smooth expansion for Picked Dynamic Pipeline Selector */}
-                {selectedStatus === 'Picked' && (
+                {['Picked', 'Interested', 'Answered / Resolved', 'Callback Requested'].includes(selectedStatus || '') && (
                   <div className="space-y-2 p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl animate-slide-down">
                     <label htmlFor="pipeline-stage" className="text-xs font-semibold text-indigo-400 uppercase tracking-wider block">
                       Advance Lead to Pipeline Stage

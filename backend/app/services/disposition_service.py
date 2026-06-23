@@ -64,8 +64,8 @@ class DispositionService:
                     )
                 lead.stage_id = dropped_stage.id
                 
-        elif payload.status in {CallDispositionStatus.NOT_EXIST, CallDispositionStatus.OUT_OF_SERVICE}:
-            # Invalid entry: immediate drop
+        elif payload.status in {CallDispositionStatus.NOT_EXIST, CallDispositionStatus.OUT_OF_SERVICE, CallDispositionStatus.INBOUND_SPAM}:
+            # Invalid entry or Spam: immediate drop
             dropped_query = select(PipelineStage).filter(
                 PipelineStage.organization_id == lead.organization_id,
                 PipelineStage.name == "Dropped",
@@ -80,21 +80,22 @@ class DispositionService:
                 )
             lead.stage_id = dropped_stage.id
             
-        elif payload.status == CallDispositionStatus.PICKED:
-            # Successful connection: advance to specified custom stage
-            custom_stage_query = select(PipelineStage).filter(
-                PipelineStage.id == payload.custom_pipeline_stage_id,
-                PipelineStage.organization_id == lead.organization_id,
-                PipelineStage.is_deleted == False
-            )
-            custom_res = await db.execute(custom_stage_query)
-            custom_stage = custom_res.scalar()
-            if not custom_stage:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="The specified custom pipeline stage does not exist in this organization."
+        elif payload.status in {CallDispositionStatus.PICKED, CallDispositionStatus.INBOUND_RESOLVED, CallDispositionStatus.INBOUND_CALLBACK, CallDispositionStatus.INBOUND_INTERESTED}:
+            # Successful connection or inbound match: advance to specified custom stage if provided
+            if payload.custom_pipeline_stage_id:
+                custom_stage_query = select(PipelineStage).filter(
+                    PipelineStage.id == payload.custom_pipeline_stage_id,
+                    PipelineStage.organization_id == lead.organization_id,
+                    PipelineStage.is_deleted == False
                 )
-            lead.stage_id = custom_stage.id
+                custom_res = await db.execute(custom_stage_query)
+                custom_stage = custom_res.scalar()
+                if not custom_stage:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="The specified custom pipeline stage does not exist in this organization."
+                    )
+                lead.stage_id = custom_stage.id
 
         # Update lead status to match the disposition status
         lead.status = payload.status.value

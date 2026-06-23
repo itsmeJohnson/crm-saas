@@ -11,6 +11,7 @@ export const ActiveCallDisposition: React.FC = () => {
     callDuration,
     isLoading,
     error,
+    callDirection,
     submitDisposition
   } = useDialerStore();
 
@@ -41,16 +42,19 @@ export const ActiveCallDisposition: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
+  const isStageAllowed = ['Picked', 'Interested', 'Answered / Resolved', 'Callback Requested'].includes(selectedStatus || '');
+
   const handleDispositionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStatus || !remarks.trim() || (selectedStatus === 'Picked' && !targetStageId)) {
+    if (!selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId)) {
       return;
     }
     try {
       await submitDisposition({
         status: selectedStatus,
         remarks: remarks,
-        custom_pipeline_stage_id: selectedStatus === 'Picked' ? targetStageId : undefined
+        custom_pipeline_stage_id: isStageAllowed ? (targetStageId || undefined) : undefined
       });
 
       // Refresh dashboard statistics
@@ -62,8 +66,11 @@ export const ActiveCallDisposition: React.FC = () => {
     } catch (err) {}
   };
 
-  const dispositionOptions = ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked'];
-  const isSubmitDisabled = !selectedStatus || !remarks.trim() || (selectedStatus === 'Picked' && !targetStageId) || isLoading;
+  const dispositionOptions = callDirection === 'INBOUND'
+    ? ['Answered / Resolved', 'Callback Requested', 'Interested', 'Not Interested', 'Spam / Junk']
+    : ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked'];
+
+  const isSubmitDisabled = !selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || isLoading;
 
   return (
     <div className="bg-slate-900 border border-brand-500/20 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
@@ -74,7 +81,9 @@ export const ActiveCallDisposition: React.FC = () => {
             <Phone className="w-4.5 h-4.5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Active Inbound Call</p>
+            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+              Active {callDirection === 'INBOUND' ? 'Inbound' : 'Outbound'} Call
+            </p>
             <p className="text-xs text-slate-400 mt-0.5">Logging outcome for {currentLead.first_name || ''} {currentLead.last_name}</p>
           </div>
         </div>
@@ -103,7 +112,7 @@ export const ActiveCallDisposition: React.FC = () => {
             <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
             Select Call Status
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {dispositionOptions.map((opt) => (
               <button
                 key={opt}
@@ -122,10 +131,10 @@ export const ActiveCallDisposition: React.FC = () => {
         </div>
 
         {/* Stage selection */}
-        {selectedStatus === 'Picked' && (
+        {isStageAllowed && (
           <div className="space-y-1.5 p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl animate-in fade-in slide-in-from-top-2 duration-200">
             <label htmlFor="timeline-pipeline-stage" className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">
-              Advance Stage
+              {isStageRequired ? 'Advance Stage (Required)' : 'Advance Stage (Optional)'}
             </label>
             <select
               id="timeline-pipeline-stage"
@@ -133,7 +142,7 @@ export const ActiveCallDisposition: React.FC = () => {
               onChange={(e) => setTargetStageId(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 py-1.5 px-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-xs"
             >
-              <option value="" disabled>-- Select Stage --</option>
+              <option value="">-- Keep Current Stage --</option>
               {stages
                 .filter((s) => s.name !== 'Fresh Leads')
                 .map((stage) => (
