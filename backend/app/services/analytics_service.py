@@ -335,12 +335,6 @@ class AnalyticsService:
         stmt = select(PerformanceTarget).where(
             PerformanceTarget.organization_id == org_id,
             PerformanceTarget.is_deleted == False
-        ).order_index = select(PerformanceTarget).order_by(PerformanceTarget.created_at.desc())
-        
-        # Wait, the ordering code above has a slight typo. Let's fix that.
-        stmt = select(PerformanceTarget).where(
-            PerformanceTarget.organization_id == org_id,
-            PerformanceTarget.is_deleted == False
         ).order_by(PerformanceTarget.created_at.desc())
         
         res = await db.execute(stmt)

@@ -83,9 +83,42 @@ async def me(
     org = await org_repo.get(current_user.organization_id)
     # Check if they are a Team Leader and set it dynamically
     current_user.is_team_leader = await check_is_team_leader(current_user, db)
+
+    # Fetch active features for user/organization
+    from app.models.tenant_subscription import TenantSubscription
+    from app.models.plan_feature import PlanFeature
+    from app.models.feature import Feature
+
+    feature_codes = []
+    if current_user.role == "SuperAdmin":
+        f_stmt = select(Feature.code).where(Feature.active == True, Feature.is_deleted == False)
+        f_res = await db.execute(f_stmt)
+        feature_codes = list(f_res.scalars().all())
+    else:
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == current_user.organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+        if sub and sub.status in ["active", "trial"]:
+            pf_stmt = (
+                select(Feature.code)
+                .join(PlanFeature, PlanFeature.feature_id == Feature.id)
+                .where(
+                    PlanFeature.plan_id == sub.plan_id,
+                    PlanFeature.enabled == True,
+                    Feature.active == True,
+                    Feature.is_deleted == False
+                )
+            )
+            pf_res = await db.execute(pf_stmt)
+            feature_codes = list(pf_res.scalars().all())
+
     return AuthMeResponse(
         user=UserResponse.model_validate(current_user),
-        organization=OrganizationResponse.model_validate(org)
+        organization=OrganizationResponse.model_validate(org),
+        features=feature_codes
     )
 
 @router.post("/forgot-password")

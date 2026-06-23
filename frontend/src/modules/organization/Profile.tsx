@@ -45,7 +45,7 @@ export const Profile: React.FC = () => {
     onSuccess: (updatedOrg) => {
       queryClient.setQueryData(['my-organization'], updatedOrg);
       if (authStore.user && authStore.accessToken && authStore.refreshToken) {
-        setAuth(authStore.user, updatedOrg, authStore.accessToken, authStore.refreshToken);
+        setAuth(authStore.user, updatedOrg, authStore.features, authStore.accessToken, authStore.refreshToken);
       }
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);

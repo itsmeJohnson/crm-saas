@@ -16,6 +16,10 @@ from app.models.target import PerformanceTarget, TargetType, MetricType
 from app.models.invoice import Invoice
 from app.models.plan import Plan
 from app.models.tenant_subscription import TenantSubscription
+from app.models.feature import Feature
+from app.models.plan_feature import PlanFeature
+from app.models.payment import Payment
+from app.models.system_setting import SystemSetting
 
 __all__ = [
     "Base", 
@@ -40,5 +44,9 @@ __all__ = [
     "MetricType",
     "Invoice",
     "Plan",
-    "TenantSubscription"
+    "TenantSubscription",
+    "Feature",
+    "PlanFeature",
+    "Payment",
+    "SystemSetting"
 ]

@@ -25,6 +25,7 @@ class RefreshTokenRequest(BaseModel):
 class AuthMeResponse(BaseModel):
     user: UserResponse
     organization: OrganizationResponse
+    features: list[str] = []
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr

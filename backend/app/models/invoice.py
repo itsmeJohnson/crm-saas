@@ -20,5 +20,16 @@ class Invoice(BaseModel):
     issue_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     payment_status: Mapped[str] = mapped_column(String(50), default="unpaid", nullable=False)  # paid, unpaid, overdue
 
+    # Detailed commercial invoicing
+    subscription_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tenant_subscriptions.id", ondelete="SET NULL"), nullable=True, index=True)
+    setup_charges: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    extra_users_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    discount_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    gst_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    total_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    pdf_file_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization")
+    payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="invoice", cascade="all, delete-orphan", lazy="selectin")
+

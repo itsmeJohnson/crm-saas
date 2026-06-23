@@ -97,4 +97,131 @@ export const superAdminApi = {
     const response = await api.delete<{ detail: string }>(`/super-admin/tenants/${orgId}`);
     return response.data;
   },
+
+  // Plans CRUD
+  getPlans: async () => {
+    const response = await api.get<PlanResponse[]>('/super-admin/plans');
+    return response.data;
+  },
+  createPlan: async (payload: PlanCreatePayload) => {
+    const response = await api.post<PlanResponse>('/super-admin/plans', payload);
+    return response.data;
+  },
+  updatePlan: async (planId: string, payload: Partial<PlanCreatePayload>) => {
+    const response = await api.patch<PlanResponse>(`/super-admin/plans/${planId}`, payload);
+    return response.data;
+  },
+  deletePlan: async (planId: string) => {
+    const response = await api.delete<{ detail: string }>(`/super-admin/plans/${planId}`);
+    return response.data;
+  },
+  reorderPlans: async (planIds: string[]) => {
+    const response = await api.post<{ detail: string }>('/super-admin/plans/reorder', planIds);
+    return response.data;
+  },
+
+  // Features CRUD
+  getFeatures: async () => {
+    const response = await api.get<FeatureResponse[]>('/super-admin/features');
+    return response.data;
+  },
+  updateFeature: async (featureId: string, payload: Partial<FeatureResponse>) => {
+    const response = await api.patch<FeatureResponse>(`/super-admin/features/${featureId}`, payload);
+    return response.data;
+  },
+
+  // Plan Feature Mappings
+  getPlanFeatures: async () => {
+    const response = await api.get<PlanFeatureResponse[]>('/super-admin/plan-features');
+    return response.data;
+  },
+  togglePlanFeature: async (payload: { plan_id: string; feature_id: string; enabled: boolean }) => {
+    const response = await api.post<PlanFeatureResponse>('/super-admin/plan-features/toggle', payload);
+    return response.data;
+  },
+  clonePlanFeatures: async (payload: { from_plan_id: string; to_plan_id: string }) => {
+    const response = await api.post<{ detail: string }>('/super-admin/plan-features/clone', payload);
+    return response.data;
+  },
+
+  // System Settings
+  getSystemSettings: async () => {
+    const response = await api.get<SystemSettingResponse[]>('/super-admin/system-settings');
+    return response.data;
+  },
+  upsertSystemSetting: async (payload: { key: string; value: any }) => {
+    const response = await api.post<SystemSettingResponse>('/super-admin/system-settings', payload);
+    return response.data;
+  },
+
+  // Manual Overrides
+  suspendTenant: async (orgId: string) => {
+    const response = await api.post<TenantResponse>(`/super-admin/tenants/${orgId}/suspend`);
+    return response.data;
+  },
+  resetTenantOwnerPassword: async (orgId: string, newPassword: string) => {
+    const response = await api.post<{ detail: string }>(`/super-admin/tenants/${orgId}/reset-password`, null, {
+      params: { new_password: newPassword }
+    });
+    return response.data;
+  },
+  createManualInvoice: async (orgId: string, payload: InvoiceCreateRequest) => {
+    const response = await api.post<TenantInvoiceResponse>(`/super-admin/tenants/${orgId}/invoices/manual`, payload);
+    return response.data;
+  },
 };
+
+export interface PlanCreatePayload {
+  name: string;
+  display_name: string;
+  description?: string;
+  monthly_price: number;
+  quarterly_price: number;
+  annual_price: number;
+  currency: string;
+  max_users: number;
+  max_admins: number;
+  max_managers: number;
+  max_team_leads: number;
+  max_employees: number;
+  storage_limit_gb: number;
+  recording_retention_days: number;
+  priority_support: boolean;
+  api_access: boolean;
+  display_order: number;
+  setup_charges: number;
+  minimum_users: number;
+  maximum_users: number;
+  minimum_contract_months: number;
+}
+
+export interface PlanResponse extends PlanCreatePayload {
+  id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeatureResponse {
+  id: string;
+  code: string;
+  display_name: string;
+  description: string | null;
+  category: string;
+  icon: string | null;
+  active: boolean;
+}
+
+export interface PlanFeatureResponse {
+  id: string;
+  plan_id: string;
+  feature_id: string;
+  enabled: boolean;
+  feature?: FeatureResponse;
+}
+
+export interface SystemSettingResponse {
+  key: string;
+  value: any;
+}
+

@@ -56,8 +56,18 @@ async def subscription_cron_scheduler():
             logger.error("Error in subscription_cron_scheduler loop: %s", e)
             await asyncio.sleep(60) # Sleep 1 minute before retrying on error
 
+from app.middleware.rate_limiter import RateLimiterMiddleware
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Prevent server startup if the default JWT_SECRET_KEY is present
+    DEFAULT_KEY = "supersecretkeychangeinproduction1234567890"
+    if settings.JWT_SECRET_KEY == DEFAULT_KEY:
+        raise ValueError(
+            "CRITICAL SECURITY FAILURE: Default JWT_SECRET_KEY value detected. "
+            "Configure JWT_SECRET_KEY environment variable with a custom secure value."
+        )
+
     # Automatically create tables in database on start
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -86,6 +96,8 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+app.add_middleware(RateLimiterMiddleware, limit_per_minute=120)
 
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(org_router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])

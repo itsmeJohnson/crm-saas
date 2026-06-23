@@ -7,13 +7,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 
 from app.core.database import get_db
+from app.core.security import get_password_hash
 from app.models.organization import Organization
 from app.models.user import User
 from app.models.invoice import Invoice
+from app.models.plan import Plan
+from app.models.feature import Feature
+from app.models.plan_feature import PlanFeature
+from app.models.system_setting import SystemSetting
+from app.models.tenant_subscription import TenantSubscription
+from app.models.payment import Payment
 from app.dependencies.auth import get_current_active_user, RoleChecker
 from app.schemas.super_admin import (
     SubscriptionUpdateRequest, TenantResponse, TenantUserResponse,
-    TenantInvoiceResponse, InvoiceCreateRequest
+    TenantInvoiceResponse, InvoiceCreateRequest,
+    PlanCreate, PlanResponse, FeatureResponse, PlanFeatureResponse,
+    PlanFeatureToggle, PlanFeatureClone, SystemSettingRequest, SystemSettingResponse
 )
 from app.services.auth_service import AuthService
 from app.schemas.auth import RegisterTenantRequest
@@ -433,3 +442,301 @@ async def delete_tenant(
     await db.commit()
 
     return {"detail": "Tenant organization and all related data deleted successfully"}
+
+
+# ==========================================
+# PLANS CRUD
+# ==========================================
+
+@router.get("/plans", response_model=List[PlanResponse])
+async def list_plans(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """List all available subscription plans, ordered by display_order."""
+    stmt = select(Plan).where(Plan.is_deleted == False).order_by(Plan.display_order.asc(), Plan.created_at.desc())
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+@router.post("/plans", response_model=PlanResponse, status_code=status.HTTP_201_CREATED)
+async def create_plan(
+    payload: PlanCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Create a new plan."""
+    plan = Plan(
+        name=payload.name,
+        display_name=payload.display_name,
+        description=payload.description,
+        monthly_price=payload.monthly_price,
+        quarterly_price=payload.quarterly_price,
+        annual_price=payload.annual_price,
+        currency=payload.currency,
+        max_users=payload.max_users,
+        max_admins=payload.max_admins,
+        max_managers=payload.max_managers,
+        max_team_leads=payload.max_team_leads,
+        max_employees=payload.max_employees,
+        storage_limit_gb=payload.storage_limit_gb,
+        recording_retention_days=payload.recording_retention_days,
+        priority_support=payload.priority_support,
+        api_access=payload.api_access,
+        display_order=payload.display_order,
+        setup_charges=payload.setup_charges,
+        minimum_users=payload.minimum_users,
+        maximum_users=payload.maximum_users,
+        minimum_contract_months=payload.minimum_contract_months,
+        price_inr=payload.monthly_price,  # Backwards compatibility
+        is_active=True
+    )
+    db.add(plan)
+    await db.commit()
+    await db.refresh(plan)
+    return plan
+
+@router.patch("/plans/{plan_id}", response_model=PlanResponse)
+async def update_plan(
+    plan_id: uuid.UUID,
+    payload: dict,  # Freeform dict to allow partial updates
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Partially update a plan."""
+    plan = await db.get(Plan, plan_id)
+    if not plan or plan.is_deleted:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    for key, val in payload.items():
+        if hasattr(plan, key):
+            setattr(plan, key, val)
+            
+    # Keep price_inr in sync with monthly_price
+    if "monthly_price" in payload:
+        plan.price_inr = payload["monthly_price"]
+
+    await db.commit()
+    await db.refresh(plan)
+    return plan
+
+@router.delete("/plans/{plan_id}", status_code=status.HTTP_200_OK)
+async def delete_plan(
+    plan_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Soft delete a plan."""
+    plan = await db.get(Plan, plan_id)
+    if not plan or plan.is_deleted:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    plan.is_deleted = True
+    await db.commit()
+    return {"detail": "Plan deleted successfully"}
+
+@router.post("/plans/reorder", status_code=status.HTTP_200_OK)
+async def reorder_plans(
+    plan_ids: List[uuid.UUID],
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Reorder plans by updating display_order based on order of IDs provided."""
+    for idx, pid in enumerate(plan_ids):
+        plan = await db.get(Plan, pid)
+        if plan:
+            plan.display_order = idx
+    await db.commit()
+    return {"detail": "Plans order updated successfully"}
+
+
+# ==========================================
+# FEATURES MASTER
+# ==========================================
+
+@router.get("/features", response_model=List[FeatureResponse])
+async def list_features(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """List all features in the master registry."""
+    stmt = select(Feature).where(Feature.is_deleted == False).order_by(Feature.category.asc(), Feature.code.asc())
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+@router.patch("/features/{feature_id}", response_model=FeatureResponse)
+async def update_feature(
+    feature_id: uuid.UUID,
+    payload: dict,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Update a feature's display or active status."""
+    feature = await db.get(Feature, feature_id)
+    if not feature or feature.is_deleted:
+        raise HTTPException(status_code=404, detail="Feature not found")
+    for key, val in payload.items():
+        if hasattr(feature, key):
+            setattr(feature, key, val)
+    await db.commit()
+    await db.refresh(feature)
+    return feature
+
+
+# ==========================================
+# PLAN FEATURE MAPPINGS
+# ==========================================
+
+@router.get("/plan-features", response_model=List[PlanFeatureResponse])
+async def list_plan_features(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Get all plan to feature mappings."""
+    stmt = select(PlanFeature).where(PlanFeature.is_deleted == False)
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+@router.post("/plan-features/toggle", response_model=PlanFeatureResponse)
+async def toggle_plan_feature(
+    payload: PlanFeatureToggle,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Toggle a feature mapping for a plan."""
+    # Check if plan and feature exist
+    plan = await db.get(Plan, payload.plan_id)
+    feature = await db.get(Feature, payload.feature_id)
+    if not plan or plan.is_deleted or not feature or feature.is_deleted:
+        raise HTTPException(status_code=404, detail="Plan or Feature not found")
+
+    stmt = select(PlanFeature).where(
+        PlanFeature.plan_id == payload.plan_id,
+        PlanFeature.feature_id == payload.feature_id
+    )
+    res = await db.execute(stmt)
+    mapping = res.scalar_one_or_none()
+
+    if mapping:
+        mapping.enabled = payload.enabled
+    else:
+        mapping = PlanFeature(
+            plan_id=payload.plan_id,
+            feature_id=payload.feature_id,
+            enabled=payload.enabled
+        )
+        db.add(mapping)
+
+    await db.commit()
+    await db.refresh(mapping)
+    return mapping
+
+@router.post("/plan-features/clone", status_code=status.HTTP_200_OK)
+async def clone_plan_features(
+    payload: PlanFeatureClone,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Clone all feature mappings from one plan to another."""
+    from_plan = await db.get(Plan, payload.from_plan_id)
+    to_plan = await db.get(Plan, payload.to_plan_id)
+    if not from_plan or not to_plan:
+        raise HTTPException(status_code=404, detail="Source or target plan not found")
+
+    # Clear target mappings first
+    await db.execute(delete(PlanFeature).filter(PlanFeature.plan_id == payload.to_plan_id))
+
+    # Fetch source mappings
+    stmt = select(PlanFeature).where(PlanFeature.plan_id == payload.from_plan_id, PlanFeature.enabled == True)
+    res = await db.execute(stmt)
+    source_mappings = res.scalars().all()
+
+    for mapping in source_mappings:
+        new_mapping = PlanFeature(
+            plan_id=payload.to_plan_id,
+            feature_id=mapping.feature_id,
+            enabled=True
+        )
+        db.add(new_mapping)
+
+    await db.commit()
+    return {"detail": f"Cloned {len(source_mappings)} features successfully"}
+
+
+# ==========================================
+# SYSTEM SETTINGS
+# ==========================================
+
+@router.get("/system-settings", response_model=List[SystemSettingResponse])
+async def list_system_settings(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Get all key-value settings."""
+    stmt = select(SystemSetting)
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+@router.post("/system-settings", response_model=SystemSettingResponse)
+async def upsert_system_setting(
+    payload: SystemSettingRequest,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Create or update a system setting key/value pair."""
+    setting = await db.get(SystemSetting, payload.key)
+    if setting:
+        setting.value = payload.value
+    else:
+        setting = SystemSetting(key=payload.key, value=payload.value)
+        db.add(setting)
+
+    await db.commit()
+    await db.refresh(setting)
+    return setting
+
+
+# ==========================================
+# TENANT / ORG CONTROLS OVERRIDES
+# ==========================================
+
+@router.post("/tenants/{org_id}/suspend", response_model=TenantResponse)
+async def suspend_tenant(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Suspend a tenant organization."""
+    return await toggle_tenant_subscription_status(org_id=org_id, actor=actor, db=db, status_val="suspended")
+
+@router.post("/tenants/{org_id}/reset-password")
+async def reset_tenant_owner_password(
+    org_id: uuid.UUID,
+    new_password: str,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Reset the password of the OrgAdmin for the tenant."""
+    stmt = select(User).where(
+        User.organization_id == org_id,
+        User.role == "OrgAdmin",
+        User.is_deleted == False
+    )
+    res = await db.execute(stmt)
+    admin_user = res.scalar_one_or_none()
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="OrgAdmin not found for this tenant")
+
+    admin_user.hashed_password = get_password_hash(new_password)
+    admin_user.token_version += 1 # Invalidate existing sessions/tokens
+    await db.commit()
+    return {"detail": f"Password reset successfully for {admin_user.email}"}
+
+@router.post("/tenants/{org_id}/invoices/manual", response_model=TenantInvoiceResponse)
+async def create_manual_invoice(
+    org_id: uuid.UUID,
+    payload: InvoiceCreateRequest,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Generate a manual invoice for a tenant."""
+    return await create_tenant_invoice(org_id=org_id, payload=payload, actor=actor, db=db)
+

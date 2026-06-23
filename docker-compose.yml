@@ -33,6 +33,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=crm
       - REDIS_HOST=redis
+      - JWT_SECRET_KEY=dev_secret_key_1234567890_saas_johnson
     ports:
       - "8000:8000"
     volumes:

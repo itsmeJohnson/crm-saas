@@ -74,8 +74,8 @@ export const Login: React.FC = () => {
         },
       });
 
-      const { user, organization } = meRes.data;
-      setAuth(user, organization, access_token, refresh_token);
+      const { user, organization, features } = meRes.data;
+      setAuth(user, organization, features || [], access_token, refresh_token);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'An error occurred during login. Please try again.');

@@ -23,7 +23,8 @@ interface AuthState {
   refreshToken: string | null;
   user: User | null;
   organization: Organization | null;
-  setAuth: (user: User, organization: Organization, accessToken: string, refreshToken: string) => void;
+  features: string[];
+  setAuth: (user: User, organization: Organization, features: string[], accessToken: string, refreshToken: string) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   logout: () => void;
 }
@@ -33,13 +34,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   refreshToken: localStorage.getItem('refresh_token'),
   user: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null,
   organization: localStorage.getItem('organization') ? JSON.parse(localStorage.getItem('organization')!) : null,
+  features: localStorage.getItem('features') ? JSON.parse(localStorage.getItem('features')!) : [],
 
-  setAuth: (user, organization, accessToken, refreshToken) => {
+  setAuth: (user, organization, features, accessToken, refreshToken) => {
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('organization', JSON.stringify(organization));
-    set({ user, organization, accessToken, refreshToken });
+    localStorage.setItem('features', JSON.stringify(features));
+    set({ user, organization, features, accessToken, refreshToken });
   },
 
   setTokens: (accessToken, refreshToken) => {
@@ -53,6 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     localStorage.removeItem('organization');
-    set({ accessToken: null, refreshToken: null, user: null, organization: null });
+    localStorage.removeItem('features');
+    set({ accessToken: null, refreshToken: null, user: null, organization: null, features: [] });
   },
 }));

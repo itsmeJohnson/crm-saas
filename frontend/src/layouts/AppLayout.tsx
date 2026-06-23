@@ -20,19 +20,30 @@ export const AppLayout: React.FC = () => {
   const allNavItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Tenants', path: '/tenants', icon: Building, roles: ['SuperAdmin'] },
-    { name: 'Leads', path: '/leads', icon: FolderKanban },
-    { name: 'Pipelines', path: '/pipelines', icon: Workflow, roles: ['OrgAdmin'] },
-    { name: 'Users', path: '/users', icon: Users, roles: ['OrgAdmin', 'Manager'] },
+    { name: 'Leads', path: '/leads', icon: FolderKanban, featureCode: 'LEAD_MANAGEMENT' },
+    { name: 'Pipelines', path: '/pipelines', icon: Workflow, roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE' },
+    { name: 'Users', path: '/users', icon: Users, roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
     { name: 'Organization', path: '/organization', icon: Building, roles: ['OrgAdmin'] },
   ];
 
+  const features = useAuthStore((state) => state.features);
+
   const navItems = allNavItems.filter((item) => {
-    if (!item.roles) return true;
     if (!user) return false;
-    if (item.name === 'Users' && user.role === 'Employee' && user.is_team_leader) {
-      return true; // Allow Team Leaders to access the Users link
+    
+    // 1. Role Check
+    if (item.roles) {
+      const hasRole = item.roles.includes(user.role);
+      const isTeamLeaderUsers = item.name === 'Users' && user.role === 'Employee' && user.is_team_leader;
+      if (!hasRole && !isTeamLeaderUsers) return false;
     }
-    return item.roles.includes(user.role);
+
+    // 2. Feature Check (SuperAdmin has full override bypass)
+    if (item.featureCode && user.role !== 'SuperAdmin') {
+      if (!features.includes(item.featureCode)) return false;
+    }
+
+    return true;
   });
 
   const sidebarContent = (

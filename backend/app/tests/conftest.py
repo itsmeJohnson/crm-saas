@@ -1,3 +1,7 @@
+import os
+os.environ["JWT_SECRET_KEY"] = "test_secure_key_1234567890_saas_johnson"
+os.environ["TESTING"] = "true"
+
 import asyncio
 import pytest
 from httpx import ASGITransport, AsyncClient

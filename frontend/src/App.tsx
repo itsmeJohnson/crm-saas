@@ -24,6 +24,8 @@ const queryClient = new QueryClient({
   },
 });
 
+import { FeatureGuardRoute } from './components/common/FeatureGuardRoute';
+
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -39,23 +41,35 @@ export const App: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/leads" element={<LeadsPage />} />
               
-              {/* OrgAdmin only */}
+              {/* Lead Management Feature Guard */}
+              <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>
+                <Route path="/leads" element={<LeadsPage />} />
+                
+                {/* OrgAdmin & Manager only */}
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                  <Route path="/companies" element={<CompaniesPage />} />
+                  <Route path="/contacts" element={<ContactsPage />} />
+                </Route>
+              </Route>
+              
+              {/* Sales Pipeline Feature Guard */}
+              <Route element={<FeatureGuardRoute featureCode="SALES_PIPELINE" />}>
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+                  <Route path="/pipelines" element={<PipelineSettings />} />
+                </Route>
+              </Route>
+
+              {/* Role-Based Access Feature Guard */}
+              <Route element={<FeatureGuardRoute featureCode="ROLE_BASED_ACCESS" />}>
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} allowTeamLeader={true} />}>
+                  <Route path="/users" element={<UsersPage />} />
+                </Route>
+              </Route>
+
+              {/* OrgAdmin only (general profile always allowed) */}
               <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                 <Route path="/organization" element={<Profile />} />
-                <Route path="/pipelines" element={<PipelineSettings />} />
-              </Route>
-
-              {/* OrgAdmin, Manager, or Team Leader */}
-              <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} allowTeamLeader={true} />}>
-                <Route path="/users" element={<UsersPage />} />
-              </Route>
-
-              {/* OrgAdmin & Manager only */}
-              <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
-                <Route path="/companies" element={<CompaniesPage />} />
-                <Route path="/contacts" element={<ContactsPage />} />
               </Route>
 
               {/* SuperAdmin only */}

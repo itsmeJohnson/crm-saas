@@ -116,6 +116,20 @@ class UserRepository(BaseRepository[User]):
             return None
         user.is_active = is_active
         self.db.add(user)
+        
+        # If deactivating, unassign their leads
+        if not is_active:
+            from app.models.lead import Lead
+            from sqlalchemy import update
+            await self.db.execute(
+                update(Lead)
+                .where(
+                    Lead.organization_id == organization_id,
+                    Lead.assigned_user_id == user_id
+                )
+                .values(assigned_user_id=None)
+            )
+            
         await self.db.flush()
         return user
 
@@ -126,6 +140,19 @@ class UserRepository(BaseRepository[User]):
         user.is_deleted = True
         user.deleted_at = datetime.now(timezone.utc)
         self.db.add(user)
+        
+        # Unassign their leads
+        from app.models.lead import Lead
+        from sqlalchemy import update
+        await self.db.execute(
+            update(Lead)
+            .where(
+                Lead.organization_id == organization_id,
+                Lead.assigned_user_id == user_id
+            )
+            .values(assigned_user_id=None)
+        )
+        
         await self.db.flush()
         return user
 
