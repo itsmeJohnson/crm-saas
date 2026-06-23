@@ -20,6 +20,7 @@ from app.models.feature import Feature
 from app.models.plan_feature import PlanFeature
 from app.models.payment import Payment
 from app.models.system_setting import SystemSetting
+from app.models.invoice_config import InvoiceConfig
 
 __all__ = [
     "Base", 
@@ -48,5 +49,6 @@ __all__ = [
     "Feature",
     "PlanFeature",
     "Payment",
-    "SystemSetting"
+    "SystemSetting",
+    "InvoiceConfig"
 ]

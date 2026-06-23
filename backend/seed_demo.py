@@ -27,6 +27,7 @@ from app.models.feature import Feature
 from app.models.plan_feature import PlanFeature
 from app.models.payment import Payment
 from app.models.system_setting import SystemSetting
+from app.models.invoice_config import InvoiceConfig
 from app.repositories.organization import OrganizationRepository
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -82,6 +83,7 @@ async def seed():
         await session.execute(delete(Plan))
         await session.execute(delete(Feature))
         await session.execute(delete(SystemSetting))
+        await session.execute(delete(InvoiceConfig))
         await session.commit()
         logger.info("Database purge completed.")
 
@@ -118,8 +120,46 @@ async def seed():
                 active=True
             )
             session.add(feature)
+
+        # 5. Seed default invoice configuration
+        logger.info("Seeding default invoice configuration...")
+        invoice_config = InvoiceConfig(
+            id="default",
+            company_name="Johnson Softwares",
+            tagline="Enterprise CRM & Telephony Solutions",
+            website="www.johnsonsoftwares.com",
+            support_email="support@johnsonsoftwares.com",
+            phone_number="+1-123-456-7890",
+            address="101, Antigravity Heights, Google DeepMind St, BKC, Mumbai - 400051",
+            gst_number="27AAAAA1111A1Z1",
+            pan="ABCDE1234F",
+            business_registration_number="U12345MH2026PTC123456",
+            invoice_prefix="INV-2026",
+            starting_invoice_number=1001,
+            currency="INR",
+            currency_symbol="₹",
+            bank_name="HDFC Bank",
+            account_holder="Johnson Softwares Private Limited",
+            account_number="50100012345678",
+            ifsc="HDFC0000123",
+            branch="BKC Branch",
+            upi_id="johnsonsoftwares@upi",
+            payment_terms="<p>Payment Due within 15 Days</p><p>Late Fee Applicable</p><p>Subscription Suspended after 30 Days</p>",
+            footer_text="<p>Thank you for choosing Johnson Softwares.</p><p>This invoice is system generated.</p>",
+            invoice_subject="Invoice {invoice_number} from Johnson Softwares",
+            invoice_body="Dear {customer_name},\n\nPlease find attached invoice {invoice_number} for your subscription.\n\nBest regards,\nJohnson Softwares",
+            reminder_subject="Payment Reminder: Invoice {invoice_number}",
+            reminder_body="Dear {customer_name},\n\nThis is a friendly reminder that invoice {invoice_number} is due on {due_date}.\n\nBest regards,\nJohnson Softwares",
+            payment_success_subject="Payment Received: Invoice {invoice_number}",
+            payment_success_body="Dear {customer_name},\n\nWe have received payment for invoice {invoice_number}. Thank you!\n\nBest regards,\nJohnson Softwares",
+            payment_failed_subject="Payment Failed: Invoice {invoice_number}",
+            payment_failed_body="Dear {customer_name},\n\nWe attempted to charge your account for invoice {invoice_number}, but the payment failed.\n\nPlease update your payment details.\n\nBest regards,\nJohnson Softwares",
+            renewal_reminder_subject="Your Subscription Renewal is Coming Up",
+            renewal_reminder_body="Dear {customer_name},\n\nYour subscription will renew on {renewal_date}.\n\nBest regards,\nJohnson Softwares"
+        )
+        session.add(invoice_config)
         
-        # 5. Commit all changes
+        # 6. Commit all changes
         await session.commit()
         logger.info("SaaS Database Seeding successfully completed!")
 

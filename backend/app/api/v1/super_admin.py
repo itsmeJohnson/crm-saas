@@ -2,7 +2,9 @@ import uuid
 import secrets
 from datetime import datetime, timezone
 from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
+from app.schemas.invoice_config import InvoiceConfigResponse, InvoiceConfigUpdate
+from app.services.invoice_config_service import InvoiceConfigService
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 
@@ -488,11 +490,36 @@ async def create_plan(
         maximum_users=payload.maximum_users,
         minimum_contract_months=payload.minimum_contract_months,
         price_inr=payload.monthly_price,  # Backwards compatibility
-        is_active=True
+        trial_days=payload.trial_days,
+        extra_user_price=payload.extra_user_price,
+        discount_percentage=payload.discount_percentage,
+        gst_percentage=payload.gst_percentage,
+        plan_color=payload.plan_color,
+        plan_badge=payload.plan_badge,
+        popular_plan=payload.popular_plan,
+        recommended_plan=payload.recommended_plan,
+        allow_upgrade=payload.allow_upgrade,
+        allow_downgrade=payload.allow_downgrade,
+        allow_trial=payload.allow_trial,
+        auto_renew=payload.auto_renew,
+        plan_active=payload.plan_active,
+        is_active=payload.plan_active
     )
     db.add(plan)
     await db.commit()
     await db.refresh(plan)
+
+    from app.services.audit_service import AuditService
+    audit_service = AuditService(db)
+    await audit_service.log_event(
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        action="PLAN_CREATED",
+        resource_type="Plan",
+        resource_id=str(plan.id),
+        action_metadata={"plan_name": plan.name}
+    )
+
     return plan
 
 @router.patch("/plans/{plan_id}", response_model=PlanResponse)
@@ -507,16 +534,44 @@ async def update_plan(
     if not plan or plan.is_deleted:
         raise HTTPException(status_code=404, detail="Plan not found")
     
+    old_val = {}
+    new_val = {}
+    
     for key, val in payload.items():
         if hasattr(plan, key):
-            setattr(plan, key, val)
+            current_value = getattr(plan, key)
+            if current_value != val:
+                old_val[key] = str(current_value) if current_value is not None else ""
+                new_val[key] = str(val) if val is not None else ""
+                setattr(plan, key, val)
             
     # Keep price_inr in sync with monthly_price
     if "monthly_price" in payload:
         plan.price_inr = payload["monthly_price"]
 
+    # Keep is_active in sync with plan_active if updated
+    if "plan_active" in payload:
+        plan.is_active = payload["plan_active"]
+
     await db.commit()
     await db.refresh(plan)
+
+    if old_val:
+        from app.services.audit_service import AuditService
+        audit_service = AuditService(db)
+        await audit_service.log_event(
+            organization_id=actor.organization_id,
+            actor_user_id=actor.id,
+            action="PLAN_UPDATED",
+            resource_type="Plan",
+            resource_id=str(plan.id),
+            action_metadata={
+                "plan_name": plan.name,
+                "old": old_val,
+                "new": new_val
+            }
+        )
+
     return plan
 
 @router.delete("/plans/{plan_id}", status_code=status.HTTP_200_OK)
@@ -739,4 +794,116 @@ async def create_manual_invoice(
 ):
     """Generate a manual invoice for a tenant."""
     return await create_tenant_invoice(org_id=org_id, payload=payload, actor=actor, db=db)
+
+@router.get("/invoice-config", response_model=InvoiceConfigResponse)
+async def get_invoice_config(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Retrieve global billing/invoice configuration."""
+    service = InvoiceConfigService(db)
+    return await service.get_config()
+
+@router.put("/invoice-config", response_model=InvoiceConfigResponse)
+async def update_invoice_config(
+    payload: InvoiceConfigUpdate,
+    request: Request,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Update global invoice/billing configuration text fields and settings."""
+    service = InvoiceConfigService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    return await service.update_config(
+        payload=payload,
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+
+@router.post("/invoice-config/upload-logo", response_model=InvoiceConfigResponse)
+async def upload_company_logo(
+    request: Request,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...)
+):
+    """Upload company logo file for branding invoices."""
+    service = InvoiceConfigService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    file_bytes = await file.read()
+    await service.upload_logo(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "logo.png",
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    return await service.get_config()
+
+@router.post("/invoice-config/upload-qr", response_model=InvoiceConfigResponse)
+async def upload_payment_qr(
+    request: Request,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...)
+):
+    """Upload payment QR code image for invoicing."""
+    service = InvoiceConfigService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    file_bytes = await file.read()
+    await service.upload_qr_code(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "qr.png",
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    return await service.get_config()
+
+@router.delete("/invoice-config/logo", response_model=InvoiceConfigResponse)
+async def delete_company_logo(
+    request: Request,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Delete currently saved company branding logo."""
+    service = InvoiceConfigService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    await service.delete_logo(
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    return await service.get_config()
+
+@router.delete("/invoice-config/qr", response_model=InvoiceConfigResponse)
+async def delete_payment_qr(
+    request: Request,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Delete currently saved payment QR code."""
+    service = InvoiceConfigService(db)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    await service.delete_qr_code(
+        organization_id=actor.organization_id,
+        actor_user_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    return await service.get_config()
 

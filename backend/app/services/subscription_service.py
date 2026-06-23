@@ -239,21 +239,48 @@ class SubscriptionService:
         sub.status = "active"
         sub.updated_at = now
         
-        # Create Invoice
-        invoice_num = f"INV-{uuid.uuid4().hex[:8].upper()}-{int(now.timestamp())}"
-        amount = float(plan.price_inr)
+        # Load Invoice Configuration dynamically
+        from app.models.invoice_config import InvoiceConfig
+        config_stmt = select(InvoiceConfig).where(InvoiceConfig.id == "default")
+        config_res = await self.db.execute(config_stmt)
+        invoice_config = config_res.scalar_one_or_none()
+        if not invoice_config:
+            invoice_config = InvoiceConfig(id="default")
+            self.db.add(invoice_config)
+            await self.db.flush()
+
+        # Create Invoice dynamically using configuration
+        prefix = invoice_config.invoice_prefix or "INV"
+        currency = invoice_config.currency or "INR"
+        invoice_num = f"{prefix}-{uuid.uuid4().hex[:8].upper()}-{int(now.timestamp())}"
         
+        amount = float(plan.price_inr)
+        setup_charges = float(plan.setup_charges) if hasattr(plan, "setup_charges") else 0.0
+        discount_percentage = float(plan.discount_percentage) if hasattr(plan, "discount_percentage") else 0.0
+        gst_percentage = float(plan.gst_percentage) if hasattr(plan, "gst_percentage") else 0.0
+        
+        discount_amount = amount * (discount_percentage / 100.0)
+        taxable_amount = amount - discount_amount
+        gst_amount = taxable_amount * (gst_percentage / 100.0)
+        total_amount = taxable_amount + setup_charges + gst_amount
+
         invoice = Invoice(
             organization_id=organization_id,
             invoice_number=invoice_num,
-            amount=amount,
+            amount=total_amount,
             status="Paid",  # Simulating immediate paid status on renewal
             due_date=now + timedelta(days=7),
             plan_name=plan.name,
-            amount_inr=amount,
-            currency="INR",
+            amount_inr=total_amount if currency == "INR" else 0.0,
+            currency=currency,
             issue_date=now,
-            payment_status="paid"
+            payment_status="paid",
+            subscription_id=sub.id,
+            setup_charges=setup_charges,
+            extra_users_amount=0.0,
+            discount_amount=discount_amount,
+            gst_amount=gst_amount,
+            total_amount=total_amount
         )
         self.db.add(invoice)
         

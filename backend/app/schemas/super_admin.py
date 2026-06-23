@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 class SubscriptionUpdateRequest(BaseModel):
     subscription_plan: str
@@ -11,8 +11,8 @@ class SubscriptionUpdateRequest(BaseModel):
 class TenantUserResponse(BaseModel):
     id: uuid.UUID
     email: str
-    first_name: str | None
-    last_name: str | None
+    first_name: str | None = None
+    last_name: str | None = None
     role: str
     is_active: bool
 
@@ -30,7 +30,7 @@ class TenantResponse(BaseModel):
     slug: str
     is_active: bool
     subscription_plan: str
-    subscription_expires_at: datetime | None
+    subscription_expires_at: datetime | None = None
     subscription_status: str
     max_users: int
     user_count: int
@@ -63,6 +63,47 @@ class PlanCreate(BaseModel):
     minimum_users: int = 1
     maximum_users: int = 1000
     minimum_contract_months: int = 1
+    trial_days: int = 0
+    extra_user_price: float = 0.0
+    discount_percentage: float = 0.0
+    gst_percentage: float = 0.0
+    plan_color: str | None = None
+    plan_badge: str | None = None
+    popular_plan: bool = False
+    recommended_plan: bool = False
+    allow_upgrade: bool = True
+    allow_downgrade: bool = True
+    allow_trial: bool = True
+    auto_renew: bool = True
+    plan_active: bool = True
+
+    @field_validator("trial_days")
+    @classmethod
+    def validate_trial_days(cls, v: int) -> int:
+        if v < 0 or v > 365:
+            raise ValueError("Trial days must be between 0 and 365")
+        return v
+
+    @field_validator("discount_percentage")
+    @classmethod
+    def validate_discount(cls, v: float) -> float:
+        if v < 0.0 or v > 100.0:
+            raise ValueError("Discount must be between 0% and 100%")
+        return v
+
+    @field_validator("gst_percentage")
+    @classmethod
+    def validate_gst(cls, v: float) -> float:
+        if v < 0.0 or v > 100.0:
+            raise ValueError("GST must be between 0% and 100%")
+        return v
+
+    @field_validator("extra_user_price")
+    @classmethod
+    def validate_extra_user_price(cls, v: float) -> float:
+        if v < 0.0:
+            raise ValueError("Extra user price must be greater than or equal to zero")
+        return v
 
 class PlanResponse(BaseModel):
     id: uuid.UUID
@@ -88,6 +129,19 @@ class PlanResponse(BaseModel):
     maximum_users: int
     minimum_contract_months: int
     is_active: bool
+    trial_days: int | None = None
+    extra_user_price: float
+    discount_percentage: float
+    gst_percentage: float
+    plan_color: str | None = None
+    plan_badge: str | None = None
+    popular_plan: bool
+    recommended_plan: bool
+    allow_upgrade: bool
+    allow_downgrade: bool
+    allow_trial: bool
+    auto_renew: bool
+    plan_active: bool
     created_at: datetime
     updated_at: datetime
 

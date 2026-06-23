@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { 
   Building, Users, FileText, Edit, Plus, X, ShieldAlert, 
   Loader2, Calendar, DollarSign, CheckCircle2, AlertCircle, Clock, Trash2,
-  Workflow, CheckSquare, Settings, Lock, Check, Key, ArrowUpDown, FolderKanban
+  Workflow, CheckSquare, Settings, Lock, Check, Key, ArrowUpDown, FolderKanban,
+  Upload, Mail, CreditCard, Image, Receipt, Percent
 } from 'lucide-react';
 import { 
   superAdminApi, TenantResponse, TenantUserResponse, TenantInvoiceResponse,
@@ -18,6 +19,10 @@ export const TenantsPage: React.FC = () => {
   const [features, setFeatures] = useState<FeatureResponse[]>([]);
   const [mappings, setMappings] = useState<PlanFeatureResponse[]>([]);
   const [settingsData, setSettingsData] = useState<Record<string, any>>({});
+  const [invoiceConfig, setInvoiceConfig] = useState<any>(null);
+  const [editedConfig, setEditedConfig] = useState<any>(null);
+  const [invoiceConfigSubTab, setInvoiceConfigSubTab] = useState<'general' | 'branding' | 'tax' | 'invoice' | 'payment' | 'email' | 'footer'>('general');
+  const [isUploading, setIsUploading] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -54,7 +59,11 @@ export const TenantsPage: React.FC = () => {
         setPlans(pData);
         setFeatures(fData);
         setMappings(mData);
-      } else if (activeTab === 'invoice-settings' || activeTab === 'system-settings') {
+      } else if (activeTab === 'invoice-settings') {
+        const data = await superAdminApi.getInvoiceConfig();
+        setInvoiceConfig(data);
+        setEditedConfig(data);
+      } else if (activeTab === 'system-settings') {
         const data = await superAdminApi.getSystemSettings();
         const configMap: Record<string, any> = {};
         data.forEach(item => {
@@ -279,7 +288,18 @@ export const TenantsPage: React.FC = () => {
         setup_charges: Number(data.setup_charges),
         minimum_users: Number(data.minimum_users),
         maximum_users: Number(data.maximum_users),
-        minimum_contract_months: Number(data.minimum_contract_months)
+        minimum_contract_months: Number(data.minimum_contract_months),
+        trial_days: Number(data.trial_days || 0),
+        extra_user_price: Number(data.extra_user_price || 0),
+        discount_percentage: Number(data.discount_percentage || 0),
+        gst_percentage: Number(data.gst_percentage || 0),
+        popular_plan: Boolean(data.popular_plan),
+        recommended_plan: Boolean(data.recommended_plan),
+        allow_upgrade: Boolean(data.allow_upgrade),
+        allow_downgrade: Boolean(data.allow_downgrade),
+        allow_trial: Boolean(data.allow_trial),
+        auto_renew: Boolean(data.auto_renew),
+        plan_active: Boolean(data.plan_active)
       });
       showSuccess(`Pricing plan template added.`);
       await fetchAllData();
@@ -312,7 +332,18 @@ export const TenantsPage: React.FC = () => {
         setup_charges: Number(data.setup_charges),
         minimum_users: Number(data.minimum_users),
         maximum_users: Number(data.maximum_users),
-        minimum_contract_months: Number(data.minimum_contract_months)
+        minimum_contract_months: Number(data.minimum_contract_months),
+        trial_days: Number(data.trial_days || 0),
+        extra_user_price: Number(data.extra_user_price || 0),
+        discount_percentage: Number(data.discount_percentage || 0),
+        gst_percentage: Number(data.gst_percentage || 0),
+        popular_plan: Boolean(data.popular_plan),
+        recommended_plan: Boolean(data.recommended_plan),
+        allow_upgrade: Boolean(data.allow_upgrade),
+        allow_downgrade: Boolean(data.allow_downgrade),
+        allow_trial: Boolean(data.allow_trial),
+        auto_renew: Boolean(data.auto_renew),
+        plan_active: Boolean(data.plan_active)
       });
       showSuccess(`Pricing plan updated.`);
       await fetchAllData();
@@ -400,25 +431,87 @@ export const TenantsPage: React.FC = () => {
   };
 
   // ==========================================
-  // SYSTEM SETTINGS ACTIONS
+  // INVOICE DYNAMIC CONFIGURATION ACTIONS
   // ==========================================
-  const handleSaveInvoiceSettings = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const value = {
-      company_name: formData.get('company_name'),
-      gst_number: formData.get('gst_number'),
-      billing_address: formData.get('billing_address'),
-      invoice_prefix: formData.get('invoice_prefix') || 'INV'
-    };
+  const handleSaveConfig = async () => {
+    if (!editedConfig) return;
     setIsLoading(true);
+    setGlobalError(null);
     try {
-      await superAdminApi.upsertSystemSetting({ key: 'invoice_settings', value });
-      showSuccess('Invoicing configuration saved.');
+      const updated = await superAdminApi.updateInvoiceConfig(editedConfig);
+      setInvoiceConfig(updated);
+      setEditedConfig(updated);
+      showSuccess("Invoice configuration updated successfully.");
     } catch (err: any) {
-      setGlobalError('Failed to save invoice settings');
+      setGlobalError(err.response?.data?.detail || "Failed to update configuration.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setIsUploading(true);
+    setGlobalError(null);
+    try {
+      const updated = await superAdminApi.uploadCompanyLogo(file);
+      setInvoiceConfig(updated);
+      setEditedConfig(updated);
+      showSuccess("Company logo uploaded successfully.");
+    } catch (err: any) {
+      setGlobalError(err.response?.data?.detail || "Failed to upload logo.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setIsUploading(true);
+    setGlobalError(null);
+    try {
+      const updated = await superAdminApi.uploadPaymentQr(file);
+      setInvoiceConfig(updated);
+      setEditedConfig(updated);
+      showSuccess("Payment QR code uploaded successfully.");
+    } catch (err: any) {
+      setGlobalError(err.response?.data?.detail || "Failed to upload QR code.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    if (!confirm("Are you sure you want to delete the company logo?")) return;
+    setIsUploading(true);
+    setGlobalError(null);
+    try {
+      const updated = await superAdminApi.deleteCompanyLogo();
+      setInvoiceConfig(updated);
+      setEditedConfig(updated);
+      showSuccess("Company logo deleted.");
+    } catch (err: any) {
+      setGlobalError(err.response?.data?.detail || "Failed to delete logo.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteQr = async () => {
+    if (!confirm("Are you sure you want to delete the payment QR code?")) return;
+    setIsUploading(true);
+    setGlobalError(null);
+    try {
+      const updated = await superAdminApi.deletePaymentQr();
+      setInvoiceConfig(updated);
+      setEditedConfig(updated);
+      showSuccess("Payment QR code deleted.");
+    } catch (err: any) {
+      setGlobalError(err.response?.data?.detail || "Failed to delete QR code.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -873,66 +966,675 @@ export const TenantsPage: React.FC = () => {
           {/* ==========================================
               TAB 4: INVOICE CONFIGURATION
              ========================================== */}
-          {activeTab === 'invoice-settings' && (
-            <div className="max-w-2xl">
-              <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-indigo-400" />
-                    Invoicing Settings
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">Configure company billing address, prefix logs, and tax/GST rules for invoice generations.</p>
+          {activeTab === 'invoice-settings' && editedConfig && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* Left Column: Config Forms (col-span-2) */}
+              <div className="xl:col-span-2 space-y-6">
+                <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-indigo-400" />
+                      Dynamic Invoice Ledger settings
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Configure dynamic values, bank specifications, pan details, prefix parameters, and transaction details.
+                    </p>
+                  </div>
+
+                  {/* Sub-tab Navigation */}
+                  <div className="flex border-b border-slate-800 pb-2 overflow-x-auto gap-1.5 scrollbar-thin">
+                    {[
+                      { id: 'general', label: 'General', icon: Building },
+                      { id: 'branding', label: 'Branding', icon: Image },
+                      { id: 'tax', label: 'Tax details', icon: Percent },
+                      { id: 'invoice', label: 'Invoices', icon: Receipt },
+                      { id: 'payment', label: 'Payment Specs', icon: CreditCard },
+                      { id: 'email', label: 'Email Templates', icon: Mail },
+                      { id: 'footer', label: 'Footer & Terms', icon: Clock }
+                    ].map((subTab) => (
+                      <button
+                        key={subTab.id}
+                        type="button"
+                        onClick={() => setInvoiceConfigSubTab(subTab.id as any)}
+                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
+                          invoiceConfigSubTab === subTab.id
+                            ? 'bg-brand-500/10 text-brand-400 border-brand-500/30'
+                            : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 border-transparent'
+                        }`}
+                      >
+                        <subTab.icon className="w-3.5 h-3.5" />
+                        {subTab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Forms content */}
+                  <div className="space-y-4 pt-2">
+                    {/* General Settings */}
+                    {invoiceConfigSubTab === 'general' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Company Name (Billing Issuer)</label>
+                          <input
+                            type="text"
+                            value={editedConfig.company_name || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, company_name: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="Enter company billing name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tagline</label>
+                          <input
+                            type="text"
+                            value={editedConfig.tagline || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, tagline: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. Beyond boundaries"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Website</label>
+                          <input
+                            type="text"
+                            value={editedConfig.website || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, website: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. www.johnsonsoftwares.com"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Support Contact Email</label>
+                          <input
+                            type="email"
+                            value={editedConfig.support_email || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, support_email: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. billing@johnsonsoftwares.com"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
+                          <input
+                            type="text"
+                            value={editedConfig.phone_number || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, phone_number: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. +91 22 5097 2233"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Billing Address</label>
+                          <textarea
+                            rows={3}
+                            value={editedConfig.address || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, address: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="Enter physical billing address"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Branding logo/qr uploads */}
+                    {invoiceConfigSubTab === 'branding' && (
+                      <div className="space-y-6 text-left">
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Company Logo branding</h4>
+                          <p className="text-xs text-slate-500">Served dynamically at the top header of client invoice cards.</p>
+                          {editedConfig.company_logo_url ? (
+                            <div className="flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                              <img
+                                src={editedConfig.company_logo_url}
+                                alt="Company Logo"
+                                className="max-h-16 max-w-[200px] object-contain rounded bg-slate-950 p-2"
+                              />
+                              <div>
+                                <p className="text-xs font-semibold text-slate-300">Logo active</p>
+                                <button
+                                  type="button"
+                                  onClick={handleDeleteLogo}
+                                  className="mt-2 text-xs text-red-400 hover:text-red-300 font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Delete logo
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="relative border-2 border-dashed border-slate-800 hover:border-brand-500/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-slate-950/20 text-center">
+                              {isUploading ? (
+                                <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-2" />
+                              ) : (
+                                <Upload className="w-8 h-8 text-slate-500 mb-2" />
+                              )}
+                              <label className="text-xs font-semibold text-brand-400 cursor-pointer">
+                                <span>Upload logo file</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleLogoUpload}
+                                  className="hidden"
+                                />
+                              </label>
+                              <span className="text-[10px] text-slate-500 mt-1">PNG, JPG, SVG up to 2MB</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tax & GST settings */}
+                    {invoiceConfigSubTab === 'tax' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">GSTIN / Tax ID Number</label>
+                          <input
+                            type="text"
+                            value={editedConfig.gst_number || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, gst_number: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. 27AAAAA1111A1Z1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">PAN Number</label>
+                          <input
+                            type="text"
+                            value={editedConfig.pan || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, pan: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. ABCDE1234F"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Business Registration Number</label>
+                          <input
+                            type="text"
+                            value={editedConfig.business_registration_number || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, business_registration_number: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. CIN / U12345MH2026PTC123456"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Invoice setup prefix */}
+                    {invoiceConfigSubTab === 'invoice' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice Number Prefix</label>
+                          <input
+                            type="text"
+                            value={editedConfig.invoice_prefix || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, invoice_prefix: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. TELE-INV"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Starting Invoice Number</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedConfig.starting_invoice_number || 1000}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, starting_invoice_number: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Code</label>
+                          <input
+                            type="text"
+                            value={editedConfig.currency || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, currency: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. INR, USD"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Symbol</label>
+                          <input
+                            type="text"
+                            value={editedConfig.currency_symbol || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, currency_symbol: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. ₹, $"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment specifications */}
+                    {invoiceConfigSubTab === 'payment' && (
+                      <div className="space-y-4 text-left">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Bank Name</label>
+                            <input
+                              type="text"
+                              value={editedConfig.bank_name || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, bank_name: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              placeholder="e.g. HDFC Bank"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Account Holder</label>
+                            <input
+                              type="text"
+                              value={editedConfig.account_holder || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, account_holder: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              placeholder="e.g. Johnson Softwares Limited"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Account Number</label>
+                            <input
+                              type="text"
+                              value={editedConfig.account_number || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, account_number: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              placeholder="e.g. 50100123456789"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">IFSC Code</label>
+                            <input
+                              type="text"
+                              value={editedConfig.ifsc || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, ifsc: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              placeholder="e.g. HDFC0000101"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Branch Name</label>
+                            <input
+                              type="text"
+                              value={editedConfig.branch || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, branch: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              placeholder="e.g. BKC Branch, Mumbai"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">UPI ID</label>
+                            <input
+                              type="text"
+                              value={editedConfig.upi_id || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, upi_id: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              placeholder="e.g. johnsonsoftwares@hdfc"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment QR Code image</h4>
+                          <p className="text-xs text-slate-500">Rendered on the footer of client invoices for direct scan & pay.</p>
+                          {editedConfig.qr_code_url ? (
+                            <div className="flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                              <img
+                                src={editedConfig.qr_code_url}
+                                alt="Payment QR"
+                                className="w-24 h-24 object-contain rounded bg-white p-1"
+                              />
+                              <div>
+                                <p className="text-xs font-semibold text-slate-300">QR Code active</p>
+                                <button
+                                  type="button"
+                                  onClick={handleDeleteQr}
+                                  className="mt-2 text-xs text-red-400 hover:text-red-300 font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Delete QR code
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="relative border-2 border-dashed border-slate-800 hover:border-brand-500/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-slate-950/20 text-center">
+                              {isUploading ? (
+                                <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-2" />
+                              ) : (
+                                <Upload className="w-8 h-8 text-slate-500 mb-2" />
+                              )}
+                              <label className="text-xs font-semibold text-brand-400 cursor-pointer">
+                                <span>Upload QR code file</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleQrUpload}
+                                  className="hidden"
+                                />
+                              </label>
+                              <span className="text-[10px] text-slate-500 mt-1">PNG, JPG up to 2MB</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email Templates settings */}
+                    {invoiceConfigSubTab === 'email' && (
+                      <div className="space-y-6 text-left">
+                        {/* Issued email */}
+                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Invoice Issued Notification</h4>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <input
+                              type="text"
+                              value={editedConfig.invoice_subject || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, invoice_subject: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Body (Rich text markdown supported)</label>
+                            <textarea
+                              rows={3}
+                              value={editedConfig.invoice_body || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, invoice_body: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Reminder email */}
+                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Payment Overdue Reminder</h4>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <input
+                              type="text"
+                              value={editedConfig.reminder_subject || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, reminder_subject: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <textarea
+                              rows={3}
+                              value={editedConfig.reminder_body || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, reminder_body: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Payment Success email */}
+                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Payment Success Confirmation</h4>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <input
+                              type="text"
+                              value={editedConfig.payment_success_subject || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, payment_success_subject: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <textarea
+                              rows={3}
+                              value={editedConfig.payment_success_body || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, payment_success_body: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Payment Failed email */}
+                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Payment Transaction Failed</h4>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <input
+                              type="text"
+                              value={editedConfig.payment_failed_subject || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, payment_failed_subject: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <textarea
+                              rows={3}
+                              value={editedConfig.payment_failed_body || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, payment_failed_body: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Renewal Reminder email */}
+                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Renewal Reminder Notification</h4>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <input
+                              type="text"
+                              value={editedConfig.renewal_reminder_subject || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, renewal_reminder_subject: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <textarea
+                              rows={3}
+                              value={editedConfig.renewal_reminder_body || ''}
+                              onChange={(e) => setEditedConfig({ ...editedConfig, renewal_reminder_body: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Terms & Footer notes */}
+                    {invoiceConfigSubTab === 'footer' && (
+                      <div className="grid grid-cols-1 gap-4 text-left">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Standard Payment Terms & Conditions</label>
+                          <textarea
+                            rows={4}
+                            value={editedConfig.payment_terms || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, payment_terms: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. Invoice payment is due within 7 days of issue. Standard SLA rates apply."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice Footer text note</label>
+                          <textarea
+                            rows={3}
+                            value={editedConfig.footer_text || ''}
+                            onChange={(e) => setEditedConfig({ ...editedConfig, footer_text: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            placeholder="e.g. Thank you for your business! Reach billing@johnsonsoftwares.com for support."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Save Configuration Trigger */}
+                  <div className="flex justify-end pt-4 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={handleSaveConfig}
+                      disabled={isLoading || isUploading}
+                      className="flex items-center justify-center gap-1.5 px-6 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-brand-500/10 cursor-pointer disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Save Configuration
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
+              </div>
 
-                <form onSubmit={handleSaveInvoiceSettings} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Company Name (Billing Issuer)</label>
-                    <input
-                      type="text"
-                      name="company_name"
-                      defaultValue={settingsData['invoice_settings']?.company_name || 'Johnson Softwares Ltd.'}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                    />
+              {/* Right Column: Live Mock Invoice Card preview */}
+              <div className="xl:col-span-1">
+                <div className="sticky top-6 space-y-4">
+                  <div className="flex justify-between items-baseline px-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Live Invoice Mockup</h4>
+                    <span className="text-[10px] text-slate-500 italic">Auto updates as you type</span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tax / GST Number</label>
-                      <input
-                        type="text"
-                        name="gst_number"
-                        defaultValue={settingsData['invoice_settings']?.gst_number || '27AAAAA1111A1Z1'}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                      />
+                  <div className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl p-6 bg-slate-950/60 text-slate-300 space-y-6 text-left relative">
+                    {/* Header: Company branding */}
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="space-y-1 max-w-[60%]">
+                        {editedConfig.company_logo_url ? (
+                          <img
+                            src={editedConfig.company_logo_url}
+                            alt="Logo preview"
+                            className="max-h-10 max-w-[120px] object-contain rounded"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-indigo-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-black text-xs">
+                            {editedConfig.company_name?.substring(0, 2).toUpperCase() || 'JS'}
+                          </div>
+                        )}
+                        <h4 className="text-sm font-bold text-slate-100 mt-2">{editedConfig.company_name || 'Acme Corporation Ltd.'}</h4>
+                        {editedConfig.tagline && <p className="text-[10px] text-slate-500 font-medium italic">{editedConfig.tagline}</p>}
+                      </div>
+
+                      <div className="text-right text-[10px] text-slate-500 space-y-0.5">
+                        <p>{editedConfig.website || 'www.acmepower.com'}</p>
+                        <p>{editedConfig.support_email || 'billing@acmepower.com'}</p>
+                        <p>{editedConfig.phone_number || '+91 22 5555 1234'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice Number Prefix</label>
-                      <input
-                        type="text"
-                        name="invoice_prefix"
-                        defaultValue={settingsData['invoice_settings']?.invoice_prefix || 'INV'}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                      />
+
+                    {/* Address issuer */}
+                    <div className="border-t border-slate-800/80 pt-3 text-[10px] text-slate-400 space-y-1">
+                      <p className="font-semibold text-slate-300">ISSUER ADDRESS & REGISTER DETAILS:</p>
+                      <p className="whitespace-pre-line text-slate-500 font-medium leading-relaxed">{editedConfig.address || '101, Antigravity Heights, Google DeepMind St, BKC, Mumbai - 400051.'}</p>
+                      <div className="grid grid-cols-2 gap-2 mt-1 pt-1.5 border-t border-slate-900/60 font-mono">
+                        {editedConfig.gst_number && <p><strong>GSTIN:</strong> {editedConfig.gst_number}</p>}
+                        {editedConfig.pan && <p><strong>PAN:</strong> {editedConfig.pan}</p>}
+                        {editedConfig.business_registration_number && (
+                          <p className="col-span-2"><strong>Reg No:</strong> {editedConfig.business_registration_number}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Invoice ID/Dates */}
+                    <div className="border-t border-slate-800/80 pt-3 grid grid-cols-2 gap-4 text-[10px]">
+                      <div>
+                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Invoice Number</p>
+                        <p className="text-slate-200 font-mono text-xs font-bold mt-0.5">
+                          {editedConfig.invoice_prefix || 'INV'}-{editedConfig.starting_invoice_number || '1001'}
+                        </p>
+                      </div>
+                      <div className="text-right font-mono">
+                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Issue Date</p>
+                        <p className="text-slate-300 mt-0.5">{new Date().toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Bill To</p>
+                        <p className="text-slate-200 font-bold mt-0.5">Demo Corporation Ltd.</p>
+                        <p className="text-slate-500 font-mono">billing@democorp.com</p>
+                      </div>
+                      <div className="text-right font-mono">
+                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Payment Due</p>
+                        <p className="text-rose-400 font-semibold mt-0.5">
+                          {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Table charges */}
+                    <div className="border-t border-slate-800/80 pt-3 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                        <span>Line Item description</span>
+                        <span>Total amount</span>
+                      </div>
+                      <div className="flex justify-between items-start text-xs border-b border-slate-900/60 pb-2">
+                        <div>
+                          <p className="text-slate-200 font-semibold">Enterprise Pro CRM Subscription</p>
+                          <p className="text-[10px] text-slate-500">Includes active system dialers & API credential matrix (Monthly)</p>
+                        </div>
+                        <span className="text-slate-200 font-mono font-bold">
+                          {editedConfig.currency_symbol || '$'} 1500.00
+                        </span>
+                      </div>
+
+                      {/* Math Summary */}
+                      <div className="space-y-1 text-[10px] text-slate-400 pt-1.5">
+                        <div className="flex justify-between">
+                          <span>Subtotal</span>
+                          <span className="font-mono">{editedConfig.currency_symbol || '$'} 1500.00</span>
+                        </div>
+                        <div className="flex justify-between text-amber-400/90">
+                          <span>Contract Discount (10.0%)</span>
+                          <span className="font-mono">-{editedConfig.currency_symbol || '$'} 150.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>CGST / SGST Tax (18.0%)</span>
+                          <span className="font-mono">{editedConfig.currency_symbol || '$'} 270.00</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-100 font-bold pt-2 border-t border-slate-800/60">
+                          <span>Total Payable ({editedConfig.currency || 'USD'})</span>
+                          <span className="font-mono text-brand-400">
+                            {editedConfig.currency_symbol || '$'} 1620.00
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Payment specifications details */}
+                    {(editedConfig.bank_name || editedConfig.upi_id) && (
+                      <div className="border-t border-slate-800/80 pt-3 text-[10px] space-y-2">
+                        <p className="font-semibold text-slate-300 uppercase tracking-wider">Payment Instructions:</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {editedConfig.bank_name && (
+                            <div className="col-span-2 space-y-0.5 text-slate-500 font-mono">
+                              <p><strong className="text-slate-400 font-sans">Bank:</strong> {editedConfig.bank_name}</p>
+                              {editedConfig.account_holder && <p><strong className="text-slate-400 font-sans">Holder:</strong> {editedConfig.account_holder}</p>}
+                              {editedConfig.account_number && <p><strong className="text-slate-400 font-sans">A/C No:</strong> {editedConfig.account_number}</p>}
+                              {editedConfig.ifsc && <p><strong className="text-slate-400 font-sans">IFSC:</strong> {editedConfig.ifsc}</p>}
+                              {editedConfig.branch && <p><strong className="text-slate-400 font-sans">Branch:</strong> {editedConfig.branch}</p>}
+                              {editedConfig.upi_id && <p className="mt-1 pt-1 border-t border-slate-900/60"><strong className="text-slate-400 font-sans">UPI:</strong> {editedConfig.upi_id}</p>}
+                            </div>
+                          )}
+                          <div className="col-span-1 flex flex-col items-end justify-center">
+                            {editedConfig.qr_code_url ? (
+                              <img
+                                src={editedConfig.qr_code_url}
+                                alt="Payment Scan QR"
+                                className="w-16 h-16 object-contain rounded bg-white p-0.5 border border-slate-800"
+                              />
+                            ) : editedConfig.upi_id ? (
+                              <div className="w-16 h-16 rounded border border-dashed border-slate-800 flex items-center justify-center text-center p-1 text-[8px] text-slate-600 bg-slate-900/10 leading-tight">
+                                Scan QR Code
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer text note */}
+                    <div className="border-t border-slate-800/80 pt-3 text-[9px] text-slate-500 leading-normal space-y-1">
+                      {editedConfig.payment_terms && <p><strong>Terms:</strong> {editedConfig.payment_terms}</p>}
+                      <p className="text-center font-medium italic text-slate-400/80 mt-1">{editedConfig.footer_text || 'Thank you for choosing Johnson Softwares!'}</p>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Billing Address & Support Contact</label>
-                    <textarea
-                      name="billing_address"
-                      rows={4}
-                      defaultValue={settingsData['invoice_settings']?.billing_address || '101, Antigravity Heights, Google DeepMind St, BKC, Mumbai - 400051.\nSupport: billing@johnsonsoftwares.com'}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="flex items-center justify-center gap-1.5 px-5 py-3 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-brand-500/10 cursor-pointer"
-                  >
-                    Save Invoice Config
-                  </button>
-                </form>
+                </div>
               </div>
             </div>
           )}
@@ -1308,6 +2010,138 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-3 border-t border-slate-800/80 pt-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Trial Days (0-365)</label>
+                  <input
+                    type="number"
+                    {...regPlan('trial_days', { required: true, min: 0, max: 365 })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  {planErrors.trial_days && <p className="text-[10px] text-red-400 mt-1">{planErrors.trial_days.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Extra User Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...regPlan('extra_user_price', { required: true, min: 0 })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  {planErrors.extra_user_price && <p className="text-[10px] text-red-400 mt-1">{planErrors.extra_user_price.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Discount % (0-100)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    {...regPlan('discount_percentage', { required: true, min: 0, max: 100 })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  {planErrors.discount_percentage && <p className="text-[10px] text-red-400 mt-1">{planErrors.discount_percentage.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">GST Tax % (0-100)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    {...regPlan('gst_percentage', { required: true, min: 0, max: 100 })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  {planErrors.gst_percentage && <p className="text-[10px] text-red-400 mt-1">{planErrors.gst_percentage.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Plan Color Hex (e.g. #3b82f6)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      {...regPlan('plan_color')}
+                      className="w-10 h-10 p-0.5 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      placeholder="#3b82f6"
+                      {...regPlan('plan_color')}
+                      className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Plan Badge (e.g. Popular, Best Value)</label>
+                  <input
+                    type="text"
+                    placeholder="Enter plan badge"
+                    {...regPlan('plan_badge')}
+                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 border-t border-slate-800/80 pt-4">
+                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('popular_plan')}
+                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Popular Plan Badge
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('recommended_plan')}
+                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Recommended Plan
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('plan_active')}
+                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Plan Active / Visible
+                </label>
+              </div>
+
+              <div className="grid grid-cols-4 gap-3 border-t border-slate-800/80 pt-4 col-span-2">
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('allow_upgrade')}
+                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Allow Upgrade
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('allow_downgrade')}
+                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Allow Downgrade
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('allow_trial')}
+                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Allow Trial
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...regPlan('auto_renew')}
+                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  Auto Renew
+                </label>
               </div>
 
               <div className="flex gap-6 border-t border-slate-800/80 pt-4">

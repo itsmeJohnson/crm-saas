@@ -80,6 +80,9 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
+from fastapi.staticfiles import StaticFiles
+import os
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
@@ -98,6 +101,10 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 app.add_middleware(RateLimiterMiddleware, limit_per_minute=120)
+
+# Serve branding uploads statically
+os.makedirs("uploads/branding", exist_ok=True)
+app.mount("/api/v1/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(org_router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])

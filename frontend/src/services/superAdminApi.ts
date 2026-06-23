@@ -169,7 +169,81 @@ export const superAdminApi = {
     const response = await api.post<TenantInvoiceResponse>(`/super-admin/tenants/${orgId}/invoices/manual`, payload);
     return response.data;
   },
+
+  // Invoice Config CRUD
+  getInvoiceConfig: async () => {
+    const response = await api.get<InvoiceConfigResponse>('/super-admin/invoice-config');
+    return response.data;
+  },
+  updateInvoiceConfig: async (payload: InvoiceConfigUpdate) => {
+    const response = await api.put<InvoiceConfigResponse>('/super-admin/invoice-config', payload);
+    return response.data;
+  },
+  uploadCompanyLogo: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<InvoiceConfigResponse>('/super-admin/invoice-config/upload-logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+  uploadPaymentQr: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<InvoiceConfigResponse>('/super-admin/invoice-config/upload-qr', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+  deleteCompanyLogo: async () => {
+    const response = await api.delete<InvoiceConfigResponse>('/super-admin/invoice-config/logo');
+    return response.data;
+  },
+  deletePaymentQr: async () => {
+    const response = await api.delete<InvoiceConfigResponse>('/super-admin/invoice-config/qr');
+    return response.data;
+  },
 };
+
+export interface InvoiceConfigUpdate {
+  company_name: string;
+  tagline?: string;
+  website?: string;
+  support_email?: string;
+  phone_number?: string;
+  address?: string;
+  gst_number?: string;
+  pan?: string;
+  business_registration_number?: string;
+  invoice_prefix: string;
+  starting_invoice_number: number;
+  currency: string;
+  currency_symbol: string;
+  bank_name?: string;
+  account_holder?: string;
+  account_number?: string;
+  ifsc?: string;
+  branch?: string;
+  upi_id?: string;
+  payment_terms?: string;
+  footer_text?: string;
+  invoice_subject?: string;
+  invoice_body?: string;
+  reminder_subject?: string;
+  reminder_body?: string;
+  payment_success_subject?: string;
+  payment_success_body?: string;
+  payment_failed_subject?: string;
+  payment_failed_body?: string;
+  renewal_reminder_subject?: string;
+  renewal_reminder_body?: string;
+}
+
+export interface InvoiceConfigResponse extends InvoiceConfigUpdate {
+  company_logo_url?: string;
+  qr_code_url?: string;
+  updated_at: string;
+}
 
 export interface PlanCreatePayload {
   name: string;
@@ -193,6 +267,19 @@ export interface PlanCreatePayload {
   minimum_users: number;
   maximum_users: number;
   minimum_contract_months: number;
+  trial_days: number;
+  extra_user_price: number;
+  discount_percentage: number;
+  gst_percentage: number;
+  plan_color?: string;
+  plan_badge?: string;
+  popular_plan: boolean;
+  recommended_plan: boolean;
+  allow_upgrade: boolean;
+  allow_downgrade: boolean;
+  allow_trial: boolean;
+  auto_renew: boolean;
+  plan_active: boolean;
 }
 
 export interface PlanResponse extends PlanCreatePayload {

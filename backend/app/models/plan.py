@@ -39,6 +39,20 @@ class Plan(BaseModel):
     promo_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     promo_end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Expanded Dynamic SaaS Settings
+    extra_user_price: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    discount_percentage: Mapped[float] = mapped_column(Numeric(5, 2), default=0.0, nullable=False)
+    gst_percentage: Mapped[float] = mapped_column(Numeric(5, 2), default=0.0, nullable=False)
+    plan_color: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    plan_badge: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    popular_plan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    recommended_plan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    allow_upgrade: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    allow_downgrade: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    allow_trial: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    plan_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     # Relationships
     plan_features: Mapped[list["PlanFeature"]] = relationship(
         "PlanFeature", 
