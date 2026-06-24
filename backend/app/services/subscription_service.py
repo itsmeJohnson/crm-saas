@@ -33,7 +33,8 @@ class SubscriptionService:
         """
         stmt = select(User).where(
             User.organization_id == organization_id,
-            User.is_deleted == False
+            User.is_deleted == False,
+            User.seat_number.isnot(None)
         )
         res = await self.db.execute(stmt)
         users = res.scalars().all()

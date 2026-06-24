@@ -23,6 +23,10 @@ class User(BaseModel):
     reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reset_token_expires: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # Seat Licensing Extensions
+    seat_number: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    inactive_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")

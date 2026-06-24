@@ -14,6 +14,39 @@ export interface UserResponse {
   created_at: string;
   updated_at: string;
   is_team_leader?: boolean;
+  seat_number?: string | null;
+  inactive_reason?: string | null;
+  phone?: string | null;
+}
+
+export interface ReplaceEmployeeRequest {
+  old_user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  reporting_to_id?: string | null;
+  password?: string;
+  role: string;
+  phone?: string;
+}
+
+export interface SeatUtilizationResponse {
+  licensed_seats: number;
+  active_users: number;
+  inactive_assigned_seats: number;
+  available_new_seats: number;
+  replace_employee_available: number;
+}
+
+export interface SeatHistoryResponse {
+  id: string;
+  seat_number: string;
+  user_id: string | null;
+  user_name: string | null;
+  action: string;
+  created_at: string;
+  performed_by_name: string | null;
+  remarks: string | null;
 }
 
 export interface InvitationResponse {
@@ -66,10 +99,32 @@ export const userApi = {
     return response.data;
   },
 
-  toggleUserStatus: async (userId: string, isActive: boolean) => {
-    const response = await api.patch<UserResponse>(`/users/${userId}/status`, null, {
-      params: { is_active: isActive }
-    });
+  toggleUserStatus: async (userId: string, isActive: boolean, inactiveReason?: string | null) => {
+    const params: any = { is_active: isActive };
+    if (inactiveReason) {
+      params.inactive_reason = inactiveReason;
+    }
+    const response = await api.patch<UserResponse>(`/users/${userId}/status`, null, { params });
+    return response.data;
+  },
+
+  getSeatUtilization: async () => {
+    const response = await api.get<SeatUtilizationResponse>('/users/seat-utilization');
+    return response.data;
+  },
+
+  getSeatHistory: async () => {
+    const response = await api.get<SeatHistoryResponse[]>('/users/seat-history');
+    return response.data;
+  },
+
+  getInactiveEmployees: async () => {
+    const response = await api.get<UserResponse[]>('/users/inactive-employees');
+    return response.data;
+  },
+
+  replaceEmployee: async (payload: ReplaceEmployeeRequest) => {
+    const response = await api.post<UserResponse>('/users/replace-employee', payload);
     return response.data;
   },
 

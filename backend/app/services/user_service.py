@@ -2,19 +2,54 @@ import uuid
 from datetime import datetime, timezone
 from typing import Sequence, Tuple
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.user_repository import UserRepository
 from app.services.permission_service import PermissionService
 from app.services.audit_service import AuditService
 from app.core.security import get_password_hash
 from app.models.user import User
+from app.models.seat_history import SeatAssignmentHistory
+from app.models.organization import Organization
+from app.models.tenant_subscription import TenantSubscription
 
 class UserService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.user_repo = UserRepository(db)
         self.audit_service = AuditService(db)
+
+    async def _get_licensed_seats(self, organization_id: uuid.UUID) -> int:
+        # Check active subscription
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+        if sub:
+            return sub.users_purchased
+        
+        # Fallback to organization max_users
+        org_stmt = select(Organization.max_users).where(Organization.id == organization_id)
+        org_res = await self.db.execute(org_stmt)
+        val = org_res.scalar()
+        return val if val is not None else 5
+
+    async def _get_occupied_seats(self, organization_id: uuid.UUID) -> set[str]:
+        stmt = select(User.seat_number).where(
+            User.organization_id == organization_id,
+            User.is_deleted == False,
+            User.seat_number.isnot(None)
+        )
+        res = await self.db.execute(stmt)
+        return {row for row in res.scalars().all() if row}
+
+    async def _get_available_seat_numbers(self, organization_id: uuid.UUID) -> list[str]:
+        limit = await self._get_licensed_seats(organization_id)
+        occupied = await self._get_occupied_seats(organization_id)
+        all_seats = {f"Seat-{i:03d}" for i in range(1, limit + 1)}
+        return sorted(list(all_seats - occupied))
 
     async def is_team_leader(self, user: User) -> bool:
         """Check if the user is a Team Leader (Employee reporting to a Manager)."""
@@ -99,11 +134,32 @@ class UserService:
                 detail="Email already registered"
             )
 
+        # Allocate and assign seat
+        available_seats = await self._get_available_seat_numbers(actor.organization_id)
+        if not available_seats:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No available seats. Please purchase additional seats or replace an existing inactive employee."
+            )
+        assigned_seat = available_seats[0]
+        user_data["seat_number"] = assigned_seat
+
         if "password" in user_data:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
         
         user = await self.user_repo.create_user(actor.organization_id, user_data)
         user.is_team_leader = await self.is_team_leader(user)
+
+        # Create Seat Assignment History
+        history = SeatAssignmentHistory(
+            organization_id=actor.organization_id,
+            seat_number=assigned_seat,
+            user_id=user.id,
+            action="Assigned",
+            performed_by_id=actor.id,
+            remarks="Assigned seat during user creation"
+        )
+        self.db.add(history)
         
         # Write Audit Log
         await self.audit_service.log_event(
@@ -112,7 +168,7 @@ class UserService:
             action="USER_CREATED",
             resource_type="user",
             resource_id=str(user.id),
-            action_metadata={"email": user.email, "role": user.role}
+            action_metadata={"email": user.email, "role": user.role, "seat_number": assigned_seat}
         )
         
         return user
@@ -205,7 +261,7 @@ class UserService:
 
         return updated
 
-    async def toggle_active(self, actor: User, user_id: uuid.UUID, is_active: bool) -> User:
+    async def toggle_active(self, actor: User, user_id: uuid.UUID, is_active: bool, inactive_reason: str | None = None) -> User:
         """Activate or deactivate user account status."""
         if not actor.is_active:
             raise HTTPException(
@@ -235,8 +291,55 @@ class UserService:
                     detail="Cannot deactivate the final OrgAdmin user of this organization"
                 )
 
+        # Handle seat licensing allocation / deactivation details
+        assigned_seat = None
+        if not is_active:
+            # We are deactivating the user.
+            target_user.inactive_reason = inactive_reason
+            # Write seat history record for "Inactive"
+            if target_user.seat_number:
+                history = SeatAssignmentHistory(
+                    organization_id=actor.organization_id,
+                    seat_number=target_user.seat_number,
+                    user_id=target_user.id,
+                    action="Inactive",
+                    performed_by_id=actor.id,
+                    remarks=f"User marked Inactive. Reason: {inactive_reason or 'No reason provided'}"
+                )
+                self.db.add(history)
+        else:
+            # We are activating the user.
+            target_user.inactive_reason = None
+            if not target_user.seat_number:
+                # User currently has no seat (was replaced). We must assign them a new seat!
+                available_seats = await self._get_available_seat_numbers(actor.organization_id)
+                if not available_seats:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No available seats to activate this user. Please purchase additional seats."
+                    )
+                assigned_seat = available_seats[0]
+                target_user.seat_number = assigned_seat
+
+                history = SeatAssignmentHistory(
+                    organization_id=actor.organization_id,
+                    seat_number=assigned_seat,
+                    user_id=target_user.id,
+                    action="Assigned",
+                    performed_by_id=actor.id,
+                    remarks="Assigned seat during user activation"
+                )
+                self.db.add(history)
+
         updated = await self.user_repo.toggle_active(actor.organization_id, user_id, is_active)
         if updated:
+            if not is_active:
+                updated.inactive_reason = inactive_reason
+            else:
+                updated.inactive_reason = None
+                if assigned_seat:
+                    updated.seat_number = assigned_seat
+            
             updated.is_team_leader = await self.is_team_leader(updated)
 
         action_name = "USER_ACTIVATED" if is_active else "USER_DEACTIVATED"
@@ -245,7 +348,8 @@ class UserService:
             actor_user_id=actor.id,
             action=action_name,
             resource_type="user",
-            resource_id=str(user_id)
+            resource_id=str(user_id),
+            action_metadata={"inactive_reason": inactive_reason} if not is_active else {}
         )
 
         return updated
@@ -440,3 +544,177 @@ class UserService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Employees must report to either a Manager (TL) or a Team Leader (Agent)"
                 )
+
+    async def replace_employee(
+        self,
+        actor: User,
+        old_user_id: uuid.UUID,
+        new_user_data: dict,
+        ip_address: str | None = None,
+        browser_info: str | None = None
+    ) -> Tuple[User, str]:
+        """
+        Replace an inactive employee with a new employee under the same seat.
+        """
+        if not actor.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Actor account is deactivated"
+            )
+
+        # 1. Fetch old employee
+        old_user = await self.user_repo.get_user_by_id(actor.organization_id, old_user_id)
+        if not old_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Old employee not found"
+            )
+
+        # 2. Check if old employee is inactive and holds a seat
+        if old_user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employee must be inactive (marked Resigned/Terminated etc.) to be replaced."
+            )
+        if not old_user.seat_number:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employee has no seat number assigned. They cannot be replaced."
+            )
+
+        # 3. Enforce RBAC permissions to manage this role
+        is_tl = await self.is_team_leader(actor)
+        role = new_user_data.get("role", "Employee")
+        reporting_to_id = new_user_data.get("reporting_to_id")
+        if reporting_to_id and isinstance(reporting_to_id, str):
+            reporting_to_id = uuid.UUID(reporting_to_id)
+            new_user_data["reporting_to_id"] = reporting_to_id
+
+        # Check actor management permission over target role
+        PermissionService.check_user_management_permission(
+            actor, role, reporting_to_id, is_tl
+        )
+
+        # Validate reporting structure for new user
+        await self.validate_reporting_structure(
+            user_id=None,
+            role=role,
+            reporting_to_id=reporting_to_id,
+            organization_id=actor.organization_id
+        )
+
+        # 4. Check global email uniqueness for new user
+        existing = await self.user_repo.get_by_email_global(new_user_data["email"])
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Email already registered"
+            )
+
+        # 5. Capture the seat
+        seat_to_transfer = old_user.seat_number
+
+        # 6. Deactivate old login's seat association
+        old_user.seat_number = None
+
+        # 7. Create new user with the transferred seat
+        new_user_data["seat_number"] = seat_to_transfer
+        if "password" in new_user_data:
+            new_user_data["hashed_password"] = get_password_hash(new_user_data.pop("password"))
+
+        new_user = await self.user_repo.create_user(actor.organization_id, new_user_data)
+        new_user.is_team_leader = await self.is_team_leader(new_user)
+
+        # 8. Record seat release for old user
+        release_history = SeatAssignmentHistory(
+            organization_id=actor.organization_id,
+            seat_number=seat_to_transfer,
+            user_id=old_user.id,
+            action="Released",
+            performed_by_id=actor.id,
+            remarks=f"Released seat {seat_to_transfer} due to employee replacement by {new_user.email}"
+        )
+        self.db.add(release_history)
+
+        # 9. Record seat assignment for new user
+        assign_history = SeatAssignmentHistory(
+            organization_id=actor.organization_id,
+            seat_number=seat_to_transfer,
+            user_id=new_user.id,
+            action="Assigned",
+            performed_by_id=actor.id,
+            remarks=f"Assigned seat {seat_to_transfer} from replaced employee {old_user.email}"
+        )
+        self.db.add(assign_history)
+
+        # 10. Write Audit Log
+        await self.audit_service.log_event(
+            organization_id=actor.organization_id,
+            actor_user_id=actor.id,
+            action="EMPLOYEE_REPLACED",
+            resource_type="user",
+            resource_id=str(new_user.id),
+            action_metadata={
+                "old_employee_id": str(old_user.id),
+                "old_employee_email": old_user.email,
+                "new_employee_id": str(new_user.id),
+                "new_employee_email": new_user.email,
+                "seat_number": seat_to_transfer,
+                "ip_address": ip_address,
+                "browser": browser_info
+            }
+        )
+
+        success_msg = f"Employee Replaced Successfully. Seat transferred successfully. No additional billing applied."
+        return new_user, success_msg
+
+    async def get_seat_utilization(self, organization_id: uuid.UUID) -> dict:
+        licensed = await self._get_licensed_seats(organization_id)
+        
+        # Get active users count (is_active = True and seat_number IS NOT NULL)
+        active_stmt = select(func.count(User.id)).where(
+            User.organization_id == organization_id,
+            User.is_deleted == False,
+            User.is_active == True,
+            User.seat_number.isnot(None)
+        )
+        active_res = await self.db.execute(active_stmt)
+        active_users = active_res.scalar() or 0
+
+        # Get inactive assigned seats count (is_active = False and seat_number IS NOT NULL)
+        inactive_stmt = select(func.count(User.id)).where(
+            User.organization_id == organization_id,
+            User.is_deleted == False,
+            User.is_active == False,
+            User.seat_number.isnot(None)
+        )
+        inactive_res = await self.db.execute(inactive_stmt)
+        inactive_assigned_seats = inactive_res.scalar() or 0
+
+        available_new_seats = max(0, licensed - (active_users + inactive_assigned_seats))
+        replace_employee_available = inactive_assigned_seats
+
+        return {
+            "licensed_seats": licensed,
+            "active_users": active_users,
+            "inactive_assigned_seats": inactive_assigned_seats,
+            "available_new_seats": available_new_seats,
+            "replace_employee_available": replace_employee_available
+        }
+
+    async def get_seat_history(self, organization_id: uuid.UUID) -> list[SeatAssignmentHistory]:
+        stmt = select(SeatAssignmentHistory).where(
+            SeatAssignmentHistory.organization_id == organization_id
+        ).order_by(SeatAssignmentHistory.created_at.desc())
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())
+
+    async def get_inactive_employees(self, organization_id: uuid.UUID) -> list[User]:
+        stmt = select(User).where(
+            User.organization_id == organization_id,
+            User.is_deleted == False,
+            User.is_active == False,
+            User.seat_number.isnot(None)
+        )
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())

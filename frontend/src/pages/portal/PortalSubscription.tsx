@@ -211,6 +211,103 @@ export const PortalSubscription: React.FC = () => {
       ) : (
         <p className="text-slate-500 text-sm">No active subscription records found for this organization.</p>
       )}
+
+      {/* Commercial Terms & Conditions */}
+      <div className="glass-panel border border-slate-900 rounded-2xl p-6 text-left space-y-4">
+        <div className="flex items-center gap-2 pb-2 border-b border-slate-900">
+          <Shield className="w-5 h-5 text-indigo-400" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">Commercial Terms & Conditions</h3>
+            <p className="text-[10px] text-slate-500">Johnson Softwares Enterprise CRM SaaS Platform v1.0</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div className="space-y-3">
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">1. License Model</span>
+              <p className="text-[11px] text-slate-300">The CRM platform is licensed on a Licensed Seat basis. Each active or allocated seat represents one user license. User roles do not affect pricing.</p>
+            </div>
+            
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">2. Initial Subscription</span>
+              <p className="text-[11px] text-slate-300">Every new organization must subscribe to a minimum of 10 Licensed Seats and a minimum 3 Months Contract. GST extra as applicable.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">3. Additional Licenses</span>
+              <p className="text-[11px] text-slate-300">After onboarding, additional licenses may be purchased in increments of one (1) seat. Pricing is based on the subscribed plan.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">4. Billing Cycle</span>
+              <p className="text-[11px] text-slate-300">Billing follows the Calendar Month (1st Day to Last Day of the Month). No daily or prorated calculations are applicable.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">5. New User Activation</span>
+              <p className="text-[11px] text-slate-300">Any new licensed seat activated during a billing month will be billed for the entire billing month.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">6. User Deactivation</span>
+              <p className="text-[11px] text-slate-300">If an employee resigns or is deactivated, the seat remains billable until the end of the current billing cycle. Reductions take effect next cycle.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">7. Replace Employee Policy</span>
+              <p className="text-[11px] text-slate-300">Organizations may replace an inactive employee with a new employee using the existing seat. No additional charges are applied.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">8. License Reduction</span>
+              <p className="text-[11px] text-slate-300">Unused licensed seats may be reduced before the next billing cycle. Seat reductions will not affect invoices already generated.</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">9. Role Flexibility</span>
+              <p className="text-[11px] text-slate-300">Complete flexibility in assigning roles. Billing depends only on Licensed Seats and not on user roles (Admins/Managers/Telecallers).</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">10. Storage & Call Recordings</span>
+              <p className="text-[11px] text-slate-300">Storage allocation and call recording retention are based on the subscribed plan. Additional storage may be purchased separately.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">11. Plan Upgrade</span>
+              <p className="text-[11px] text-slate-300">Plan upgrades become effective immediately. Additional features are activated without data loss.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">12. Plan Downgrade</span>
+              <p className="text-[11px] text-slate-300">Plan downgrades become effective from the next billing cycle and are subject to plan compatibility.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">13. Payment Terms</span>
+              <p className="text-[11px] text-slate-300">Invoices are generated according to the subscribed licensed seats. Late payments may result in suspension of services.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">14. Taxes & Support SLA</span>
+              <p className="text-[11px] text-slate-300">GST is charged extra as per government regulations. Support SLA depends on plan: Starter (Business Hours), Growth (Priority), Enterprise (Dedicated).</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest">15. Data Security</span>
+              <p className="text-[11px] text-slate-300">Each organization operates in a completely isolated multi-tenant environment. Role Based Access Control (RBAC) and Audit Logs are active.</p>
+            </div>
+
+            <div className="p-3 bg-slate-905/30 rounded-xl space-y-1 border border-brand-500/10">
+              <span className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-widest font-mono">16. License Definition</span>
+              <p className="text-[11px] text-slate-300">Seats are the commercial billing entity. Users and roles are operational entities. Reassign seats using the Replace Employee feature.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
