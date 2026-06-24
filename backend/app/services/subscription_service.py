@@ -329,6 +329,11 @@ class SubscriptionService:
             org.max_users = plan.max_users
             
         await self.db.commit()
+
+        # Invalidate features cache
+        from app.dependencies.feature_guard import invalidate_tenant_features
+        await invalidate_tenant_features(organization_id)
+
         await self.db.refresh(sub)
         return sub
 

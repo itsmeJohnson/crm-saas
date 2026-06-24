@@ -1,6 +1,6 @@
 import os
 from typing import List, Union
-from pydantic import AnyHttpUrl, BeforeValidator, field_validator
+from pydantic import AnyHttpUrl, BeforeValidator, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Annotated
 
@@ -68,11 +68,39 @@ class Settings(BaseSettings):
 
     # SMTP / Emails
     SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
     SMTP_PORT: int = 587
     SMTP_HOST: str | None = None
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
     EMAILS_FROM_EMAIL: str = "info@telecrm-saas.com"
     EMAILS_FROM_NAME: str = "TeleCRM Billing"
+
+    # DigitalOcean Spaces Storage
+    SPACES_KEY: str | None = None
+    SPACES_SECRET: str | None = None
+    SPACES_ENDPOINT: str | None = None
+    SPACES_BUCKET: str | None = None
+
+    # Razorpay Settings
+    RAZORPAY_KEY_ID: str | None = None
+    RAZORPAY_KEY_SECRET: str | None = None
+    RAZORPAY_WEBHOOK_SECRET: str | None = None
+
+    # Profile Mode
+    ENVIRONMENT: str = "development"
+
+    @model_validator(mode="after")
+    def validate_production_config(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if self.JWT_SECRET_KEY == "supersecretkeychangeinproduction1234567890":
+                raise ValueError(
+                    "Default JWT_SECRET_KEY cannot be used in production environment."
+                )
+            if self.POSTGRES_PASSWORD == "postgres" or self.POSTGRES_USER == "postgres":
+                raise ValueError(
+                    "Default PostgreSQL credentials (postgres/postgres) cannot be used in production environment."
+                )
+        return self
 
 settings = Settings()

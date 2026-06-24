@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Load PG credentials or fallback to compose defaults
 DB_HOST="${POSTGRES_SERVER:-db}"
@@ -23,6 +23,10 @@ export PGPASSWORD="$DB_PASSWORD"
 pg_dump -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" | gzip > "$BACKUP_FILE"
 
 echo "Backup created successfully: $BACKUP_FILE"
+
+# Upload backup to DigitalOcean Spaces bucket and rotate
+echo "Uploading backup to DigitalOcean Spaces..."
+python "$(dirname "$0")/upload_backup.py" "$BACKUP_FILE"
 
 # Manage retention - remove local files older than 7 days
 echo "Cleaning up local backups older than 7 days..."

@@ -30,3 +30,6 @@ postgres_data/
 
 # Uploads
 backend/uploads/
+
+# Backups
+backend/backups/

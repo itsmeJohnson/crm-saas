@@ -39,3 +39,16 @@ def decode_token(token: str) -> dict:
         return decoded_token
     except jwt.InvalidTokenError:
         return {}
+
+
+import hashlib
+import secrets
+
+def generate_random_token() -> str:
+    """Generate a secure, random token."""
+    return secrets.token_urlsafe(32)
+
+def hash_token(token: str) -> str:
+    """Generate a SHA-256 hash of the token for secure DB storage."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+

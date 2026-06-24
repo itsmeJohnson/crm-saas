@@ -137,16 +137,35 @@ async def forgot_password(
             detail="No user registered with this email address"
         )
     
-    # Generate token (6 digit hex is easy to type for demo/reset)
-    token = secrets.token_hex(3).upper() # e.g. E5A3F1
-    user.reset_token = token
+    # Generate secure token and store its SHA-256 hash
+    from app.core.security import generate_random_token, hash_token
+    token = generate_random_token()
+    hashed_token = hash_token(token)
+    
+    user.reset_token = hashed_token
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
     
     await db.commit()
     
+    # Resolve frontend URL dynamically from config
+    from app.core.config import settings
+    frontend_url = "http://localhost:5173"
+    if settings.BACKEND_CORS_ORIGINS:
+        frontend_url = settings.BACKEND_CORS_ORIGINS[0]
+    
+    reset_url = f"{frontend_url}/login?token={token}"
+    
+    # Trigger email notification
+    from app.services.email_service import send_email
+    send_email(
+        to_email=user.email,
+        subject="Reset your TeleCRM Password",
+        template_name="password_reset.html",
+        context={"reset_url": reset_url}
+    )
+    
     return {
-        "detail": f"Reset code generated successfully: {token}",
-        "token": token
+        "detail": "If your email is registered, you will receive a password reset link shortly."
     }
 
 @router.post("/reset-password")
@@ -154,9 +173,12 @@ async def reset_password(
     payload: ResetPasswordRequest,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    from app.core.security import hash_token, get_password_hash
+    
+    hashed_token = hash_token(payload.token)
     now = datetime.now(timezone.utc)
     query = select(User).where(
-        User.reset_token == payload.token,
+        User.reset_token == hashed_token,
         User.reset_token_expires > now,
         User.is_deleted == False
     )
@@ -169,7 +191,6 @@ async def reset_password(
             detail="Invalid or expired password reset token"
         )
     
-    from app.core.security import get_password_hash
     user.hashed_password = get_password_hash(payload.password)
     user.reset_token = None
     user.reset_token_expires = None
@@ -177,3 +198,4 @@ async def reset_password(
     await db.commit()
     
     return {"detail": "Password has been reset successfully"}
+

@@ -19,7 +19,7 @@ class Lead(BaseModel):
     source: Mapped[str | None] = mapped_column(String(100), nullable=True)
     value: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     import_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("lead_imports.id"), nullable=True, index=True)
     stage_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pipeline_stages.id"), nullable=False, index=True)
     available_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)

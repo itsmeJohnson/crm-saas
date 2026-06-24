@@ -119,7 +119,21 @@ async def upload_import_file(
     """Upload bulk lead CSV/Excel and retrieve mapping suggestions and preview."""
     import_service = LeadImportService(db)
     content = await file.read()
-    return await import_service.get_preview_from_file(file.filename, content)
+    
+    from app.core.storage import validate_and_sanitize_file
+    from fastapi import HTTPException
+    
+    try:
+        sanitized_filename, ext = validate_and_sanitize_file(
+            content=content,
+            filename=file.filename or "leads.csv",
+            allowed_extensions={"csv", "xlsx", "xls"},
+            max_size=2 * 1024 * 1024
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    return await import_service.get_preview_from_file(sanitized_filename, content)
 
 @router.post("/import/google-sheets", response_model=ImportPreviewResponse)
 async def google_sheets_import_preview(

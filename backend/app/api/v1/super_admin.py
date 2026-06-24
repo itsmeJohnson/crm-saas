@@ -147,6 +147,10 @@ async def update_tenant_subscription(
     org.subscription_expires_at = expires_at
     
     await db.commit()
+
+    # Invalidate features cache
+    from app.dependencies.feature_guard import invalidate_tenant_features
+    await invalidate_tenant_features(org_id)
     
     # Get counts
     user_count_query = select(func.count(User.id)).where(User.organization_id == org_id, User.is_deleted == False)
@@ -334,6 +338,10 @@ async def toggle_tenant_subscription_status(
         sub.status = org.subscription_status
         
     await db.commit()
+
+    # Invalidate features cache
+    from app.dependencies.feature_guard import invalidate_tenant_features
+    await invalidate_tenant_features(org_id)
     
     # Send email notification if suspended or active
     stmt_admin = select(User).where(
@@ -444,6 +452,10 @@ async def delete_tenant(
     await db.execute(delete(Organization).filter(Organization.id == org_id))
 
     await db.commit()
+
+    # Invalidate features cache
+    from app.dependencies.feature_guard import invalidate_tenant_features
+    await invalidate_tenant_features(org_id)
 
     return {"detail": "Tenant organization and all related data deleted successfully"}
 
@@ -558,6 +570,10 @@ async def update_plan(
     await db.commit()
     await db.refresh(plan)
 
+    # Invalidate all features cache
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+
     if old_val:
         from app.services.audit_service import AuditService
         audit_service = AuditService(db)
@@ -588,6 +604,11 @@ async def delete_plan(
         raise HTTPException(status_code=404, detail="Plan not found")
     plan.is_deleted = True
     await db.commit()
+
+    # Invalidate all features cache
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+
     return {"detail": "Plan deleted successfully"}
 
 @router.post("/plans/reorder", status_code=status.HTTP_200_OK)
@@ -635,6 +656,11 @@ async def update_feature(
             setattr(feature, key, val)
     await db.commit()
     await db.refresh(feature)
+
+    # Invalidate all features cache
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+
     return feature
 
 
@@ -684,6 +710,11 @@ async def toggle_plan_feature(
 
     await db.commit()
     await db.refresh(mapping)
+
+    # Invalidate all features cache
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+
     return mapping
 
 @router.post("/plan-features/clone", status_code=status.HTTP_200_OK)
@@ -715,6 +746,11 @@ async def clone_plan_features(
         db.add(new_mapping)
 
     await db.commit()
+
+    # Invalidate all features cache
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+
     return {"detail": f"Cloned {len(source_mappings)} features successfully"}
 
 
@@ -838,14 +874,17 @@ async def upload_company_logo(
     user_agent = request.headers.get("user-agent")
     
     file_bytes = await file.read()
-    await service.upload_logo(
-        file_bytes=file_bytes,
-        original_filename=file.filename or "logo.png",
-        organization_id=actor.organization_id,
-        actor_user_id=actor.id,
-        ip_address=ip_address,
-        user_agent=user_agent
-    )
+    try:
+        await service.upload_logo(
+            file_bytes=file_bytes,
+            original_filename=file.filename or "logo.png",
+            organization_id=actor.organization_id,
+            actor_user_id=actor.id,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return await service.get_config()
 
 @router.post("/invoice-config/upload-qr", response_model=InvoiceConfigResponse)
@@ -861,14 +900,17 @@ async def upload_payment_qr(
     user_agent = request.headers.get("user-agent")
     
     file_bytes = await file.read()
-    await service.upload_qr_code(
-        file_bytes=file_bytes,
-        original_filename=file.filename or "qr.png",
-        organization_id=actor.organization_id,
-        actor_user_id=actor.id,
-        ip_address=ip_address,
-        user_agent=user_agent
-    )
+    try:
+        await service.upload_qr_code(
+            file_bytes=file_bytes,
+            original_filename=file.filename or "qr.png",
+            organization_id=actor.organization_id,
+            actor_user_id=actor.id,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return await service.get_config()
 
 @router.delete("/invoice-config/logo", response_model=InvoiceConfigResponse)

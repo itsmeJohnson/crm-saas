@@ -196,7 +196,25 @@ async def pay_portal_invoice(
     payload: PayInvoiceRequest,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Simulates invoice payment execution through chosen gateway details."""
+    """Simulates or executes invoice payment verification through chosen gateway details."""
+    if payload.gateway == "Razorpay":
+        if not payload.razorpay_order_id or not payload.razorpay_signature or not payload.transaction_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing Razorpay signature verification parameters"
+            )
+        from app.services.razorpay_service import RazorpayService
+        rzp_service = RazorpayService(db)
+        if not rzp_service.verify_payment_signature(
+            order_id=payload.razorpay_order_id,
+            payment_id=payload.transaction_id,
+            signature=payload.razorpay_signature
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Razorpay payment signature"
+            )
+
     service = PortalService(db)
     user_name = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email
     invoice = await service.pay_invoice(
@@ -208,6 +226,41 @@ async def pay_portal_invoice(
         actor_name=user_name
     )
     return invoice
+
+@router.post("/invoices/{invoice_id}/checkout")
+async def create_razorpay_checkout_order(
+    invoice_id: uuid.UUID,
+    current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Initiates checkout order session with Razorpay Payment Gateway."""
+    from app.services.razorpay_service import RazorpayService
+    
+    # Verify invoice exists and belongs to organization
+    stmt = select(Invoice).where(
+        Invoice.id == invoice_id,
+        Invoice.organization_id == current_user.organization_id,
+        Invoice.is_deleted == False
+    )
+    res = await db.execute(stmt)
+    invoice = res.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found."
+        )
+        
+    if invoice.payment_status == "paid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invoice is already paid."
+        )
+        
+    rzp_service = RazorpayService(db)
+    order_data = await rzp_service.create_checkout_order(invoice)
+    return order_data
+
 
 @router.get("/payments")
 async def list_portal_payments(

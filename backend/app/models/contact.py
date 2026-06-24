@@ -14,4 +14,4 @@ class Contact(BaseModel):
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     job_title: Mapped[str | None] = mapped_column(String(100), nullable=True)
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)

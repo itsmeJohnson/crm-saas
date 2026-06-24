@@ -442,6 +442,11 @@ class PortalService:
                     org.subscription_status = "active"
 
         await self.db.commit()
+
+        # Invalidate features cache
+        from app.dependencies.feature_guard import invalidate_tenant_features
+        await invalidate_tenant_features(organization_id)
+
         await self.db.refresh(invoice)
 
         # 4. Log audit log

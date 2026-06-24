@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -27,6 +27,7 @@ type ResetForm = z.infer<typeof resetSchema>;
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth);
   
   const [step, setStep] = useState<'login' | 'forgot' | 'reset'>('login');
@@ -61,6 +62,14 @@ export const Login: React.FC = () => {
     resolver: zodResolver(resetSchema),
   });
 
+  useEffect(() => {
+    const token = searchParams.get('token') || searchParams.get('reset_token');
+    if (token) {
+      setStep('reset');
+      resetFormReset({ token, password: '' });
+    }
+  }, [searchParams, resetFormReset]);
+
   const onLoginSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setError(null);
@@ -91,11 +100,11 @@ export const Login: React.FC = () => {
     try {
       const res = await api.post('/auth/forgot-password', data);
       setDemoToken(res.data.token);
-      setSuccess('Reset code generated successfully! Enter it below to change your password.');
+      setSuccess(res.data.detail || 'Password reset link sent successfully! Please check your email.');
       setTimeout(() => {
         setStep('reset');
         setSuccess(null);
-      }, 3000);
+      }, 4000);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to request password reset code.');
     } finally {

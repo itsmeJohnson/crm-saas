@@ -48,9 +48,12 @@ def send_email(to_email: str, subject: str, template_name: str, context: dict) -
 
     try:
         # Connect and send
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
-        if settings.SMTP_TLS:
-            server.starttls()
+        if settings.SMTP_SSL:
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+        else:
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            if settings.SMTP_TLS:
+                server.starttls()
         if settings.SMTP_USER and settings.SMTP_PASSWORD:
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.sendmail(settings.EMAILS_FROM_EMAIL, [to_email], msg.as_string())

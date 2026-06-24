@@ -1,3 +1,5 @@
+import json
+import logging
 import uuid
 from typing import Annotated
 from datetime import datetime, timezone
@@ -12,6 +14,18 @@ from app.models.tenant_subscription import TenantSubscription
 from app.models.plan import Plan
 from app.models.plan_feature import PlanFeature
 from app.models.feature import Feature
+from app.core.redis import redis_client
+
+logger = logging.getLogger("feature_guard")
+
+async def invalidate_tenant_features(org_id: str | uuid.UUID) -> None:
+    """Invalidates cached active features list for a specific organization."""
+    cache_key = f"tenant_features:{org_id}"
+    await redis_client.delete(cache_key)
+
+async def invalidate_all_tenant_features() -> None:
+    """Invalidates all cached feature sets across all organizations."""
+    await redis_client.delete_pattern("tenant_features:*")
 
 def require_feature(feature_code: str):
     async def dependency(
@@ -22,52 +36,56 @@ def require_feature(feature_code: str):
         if actor.role == "SuperAdmin":
             return
 
-        # Fetch tenant active subscription
-        stmt = select(TenantSubscription).where(
-            TenantSubscription.organization_id == actor.organization_id,
-            TenantSubscription.is_deleted == False
-        )
-        res = await db.execute(stmt)
-        sub = res.scalar_one_or_none()
-
-        if not sub:
+        org_id = actor.organization_id
+        if not org_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Feature Not Available"
             )
 
-        # Check subscription status and expiry
-        now = datetime.now(timezone.utc)
-        if sub.status not in ["active", "trial"] or (sub.end_date and sub.end_date < now):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Feature Not Available"
-            )
+        cache_key = f"tenant_features:{org_id}"
+        cached_val = await redis_client.get(cache_key)
+        
+        active_features = None
+        if cached_val is not None:
+            try:
+                active_features = json.loads(cached_val)
+            except Exception as e:
+                logger.warning(f"Error decoding features cache for tenant {org_id}: {e}")
 
-        # Fetch the plan to verify if active
-        plan_stmt = select(Plan).where(Plan.id == sub.plan_id, Plan.is_active == True)
-        plan_res = await db.execute(plan_stmt)
-        plan = plan_res.scalar_one_or_none()
-        if not plan:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Feature Not Available"
+        if active_features is None:
+            # Query from DB
+            active_features = []
+            stmt = select(TenantSubscription).where(
+                TenantSubscription.organization_id == org_id,
+                TenantSubscription.is_deleted == False
             )
+            res = await db.execute(stmt)
+            sub = res.scalar_one_or_none()
 
-        # Check if the feature mapping is enabled in the plan_features table
-        pf_stmt = (
-            select(PlanFeature)
-            .join(Feature, Feature.id == PlanFeature.feature_id)
-            .where(
-                PlanFeature.plan_id == plan.id,
-                Feature.code == feature_code,
-                PlanFeature.enabled == True,
-                Feature.active == True
-            )
-        )
-        pf_res = await db.execute(pf_stmt)
-        pf = pf_res.scalar_one_or_none()
-        if not pf:
+            if sub:
+                now = datetime.now(timezone.utc)
+                if sub.status in ["active", "trial"] and (not sub.end_date or sub.end_date >= now):
+                    plan_stmt = select(Plan).where(Plan.id == sub.plan_id, Plan.is_active == True)
+                    plan_res = await db.execute(plan_stmt)
+                    plan = plan_res.scalar_one_or_none()
+                    if plan:
+                        pf_stmt = (
+                            select(Feature.code)
+                            .join(PlanFeature, Feature.id == PlanFeature.feature_id)
+                            .where(
+                                PlanFeature.plan_id == plan.id,
+                                PlanFeature.enabled == True,
+                                Feature.active == True
+                            )
+                        )
+                        pf_res = await db.execute(pf_stmt)
+                        active_features = list(pf_res.scalars().all())
+
+            # Cache the result for 1 hour
+            await redis_client.set(cache_key, json.dumps(active_features), ex=3600)
+
+        if feature_code not in active_features:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Feature Not Available"

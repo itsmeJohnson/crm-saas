@@ -41,6 +41,8 @@ class PurchaseStorageRequest(BaseModel):
 class PayInvoiceRequest(BaseModel):
     gateway: str = Field("UPI", pattern="^(UPI|Stripe|Razorpay|Cashfree|PhonePe|Bank)$")
     transaction_id: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_signature: Optional[str] = None
 
 class SeatUsageMeter(BaseModel):
     current: int

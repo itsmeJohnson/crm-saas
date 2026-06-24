@@ -5,6 +5,12 @@ from datetime import datetime, timezone
 
 class JSONFormatter(logging.Formatter):
     def format(self, record):
+        from app.middleware.correlation import correlation_id_ctx
+        try:
+            corr_id = correlation_id_ctx.get()
+        except Exception:
+            corr_id = ""
+
         log_data = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
@@ -12,7 +18,8 @@ class JSONFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
-            "line": record.lineno
+            "line": record.lineno,
+            "correlation_id": corr_id
         }
         
         # Include exception info if present

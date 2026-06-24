@@ -73,17 +73,28 @@ class InvoiceConfigService:
         ip_address: str | None = None,
         user_agent: str | None = None
     ) -> str:
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        ext = os.path.splitext(original_filename)[1] or ".png"
-        filename = f"logo_{uuid.uuid4().hex}{ext}"
-        filepath = os.path.join(UPLOAD_DIR, filename)
+        from app.core.storage import validate_and_sanitize_file, get_storage_provider
         
-        with open(filepath, "wb") as f:
-            f.write(file_bytes)
-
+        # Validate file size, extension, and magic bytes signature
+        filename, ext = validate_and_sanitize_file(
+            content=file_bytes,
+            filename=original_filename,
+            allowed_extensions={"jpg", "jpeg", "png", "webp", "svg", "pdf"},
+            max_size=2 * 1024 * 1024
+        )
+        
+        provider = get_storage_provider()
+        
         config = await self.repo.get_default()
         old_logo = config.company_logo_url or ""
-        logo_url = f"/api/v1/uploads/branding/{filename}"
+        
+        # Clean up old file using provider
+        if old_logo:
+            await provider.delete_file(old_logo)
+
+        # Upload new file
+        logo_url = await provider.upload_file(file_bytes, filename)
+        
         config.company_logo_url = logo_url
         config.updated_at = datetime.now(timezone.utc)
         self.db.add(config)
@@ -115,17 +126,28 @@ class InvoiceConfigService:
         ip_address: str | None = None,
         user_agent: str | None = None
     ) -> str:
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        ext = os.path.splitext(original_filename)[1] or ".png"
-        filename = f"qr_{uuid.uuid4().hex}{ext}"
-        filepath = os.path.join(UPLOAD_DIR, filename)
+        from app.core.storage import validate_and_sanitize_file, get_storage_provider
         
-        with open(filepath, "wb") as f:
-            f.write(file_bytes)
+        # Validate file size, extension, and magic bytes signature
+        filename, ext = validate_and_sanitize_file(
+            content=file_bytes,
+            filename=original_filename,
+            allowed_extensions={"jpg", "jpeg", "png", "webp", "svg", "pdf"},
+            max_size=2 * 1024 * 1024
+        )
+        
+        provider = get_storage_provider()
 
         config = await self.repo.get_default()
         old_qr = config.qr_code_url or ""
-        qr_url = f"/api/v1/uploads/branding/{filename}"
+        
+        # Clean up old file using provider
+        if old_qr:
+            await provider.delete_file(old_qr)
+
+        # Upload new file
+        qr_url = await provider.upload_file(file_bytes, filename)
+        
         config.qr_code_url = qr_url
         config.updated_at = datetime.now(timezone.utc)
         self.db.add(config)
@@ -158,14 +180,9 @@ class InvoiceConfigService:
         config = await self.repo.get_default()
         old_logo = config.company_logo_url or ""
         if old_logo:
-            # Try to delete file on disk
-            try:
-                filename = old_logo.split("/")[-1]
-                filepath = os.path.join(UPLOAD_DIR, filename)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-            except Exception as e:
-                logger.error(f"Error deleting logo file: {e}")
+            from app.core.storage import get_storage_provider
+            provider = get_storage_provider()
+            await provider.delete_file(old_logo)
 
             config.company_logo_url = None
             config.updated_at = datetime.now(timezone.utc)
@@ -197,14 +214,9 @@ class InvoiceConfigService:
         config = await self.repo.get_default()
         old_qr = config.qr_code_url or ""
         if old_qr:
-            # Try to delete file on disk
-            try:
-                filename = old_qr.split("/")[-1]
-                filepath = os.path.join(UPLOAD_DIR, filename)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-            except Exception as e:
-                logger.error(f"Error deleting QR code file: {e}")
+            from app.core.storage import get_storage_provider
+            provider = get_storage_provider()
+            await provider.delete_file(old_qr)
 
             config.qr_code_url = None
             config.updated_at = datetime.now(timezone.utc)
@@ -225,3 +237,4 @@ class InvoiceConfigService:
                     "user_agent": user_agent
                 }
             )
+

@@ -226,10 +226,23 @@ async def test_plan_upgrade_flow(client: AsyncClient, setup_portal_data: dict, d
     inv_data = response.json()
     invoice_id = uuid.UUID(inv_data["id"])
 
+    # 1b. Initiate checkout session
+    checkout_response = await client.post(f"/api/v1/portal/invoices/{invoice_id}/checkout", headers=headers)
+    assert checkout_response.status_code == 200
+    checkout_data = checkout_response.json()
+    mock_order_id = checkout_data["id"]
+
     # 2. Pay Invoice
-    pay_payload = {"gateway": "Razorpay", "transaction_id": "TXN-RAZORPAY-1"}
-    pay_response = await client.post(f"/api/v1/portal/invoices/{invoice_id}/pay", json=pay_payload, headers=headers)
-    assert pay_response.status_code == 200
+    pay_payload = {
+        "gateway": "Razorpay",
+        "transaction_id": "TXN-RAZORPAY-1",
+        "razorpay_order_id": mock_order_id,
+        "razorpay_signature": "mock_sig_val"
+    }
+    from unittest.mock import patch
+    with patch("app.services.razorpay_service.RazorpayService.verify_payment_signature", return_value=True):
+        pay_response = await client.post(f"/api/v1/portal/invoices/{invoice_id}/pay", json=pay_payload, headers=headers)
+        assert pay_response.status_code == 200
 
     # Verify plan upgrade side effects
     await db.refresh(setup_portal_data["org"])
