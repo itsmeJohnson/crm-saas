@@ -1,15 +1,40 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { Shield, Sparkles, Building, Lock } from 'lucide-react';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { SummaryCards } from '../../components/dashboard/SummaryCards';
+import { LeadStatusChart } from '../../components/dashboard/LeadStatusChart';
+import { RecentActivitiesWidget } from '../../components/dashboard/RecentActivitiesWidget';
+import { AnalyticsDashboard } from '../../components/dashboard/AnalyticsDashboard';
+import { useAnalyticsStore } from '../../store/analyticsStore';
+import { DialerConsole } from '../../components/dialer/DialerConsole';
+import { Sparkles, Building, RefreshCw } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const { user, organization } = useAuthStore();
+  const {
+    summary,
+    recentActivities,
+    totalRecent,
+    page,
+    limit,
+    isLoadingSummary,
+    isLoadingActivities,
+    fetchSummary,
+    fetchRecentActivities,
+    setPage
+  } = useDashboardStore();
 
-  const futureModules = [
-    { name: 'Lead Management', desc: 'Capture, status pipelines, assignments', status: 'Module 4' },
-    { name: 'Customer Contacts', desc: 'Contact details, communication logs', status: 'Module 5' },
-    { name: 'Deal Opportunities', desc: 'Kanban boards, revenue forecasts', status: 'Module 6' },
-  ];
+  const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
+
+  const handleRefresh = async () => {
+    await Promise.all([fetchSummary(), fetchRecentActivities(), fetchDashboardMetrics()]);
+  };
+
+  useEffect(() => {
+    fetchSummary();
+    fetchRecentActivities();
+    fetchDashboardMetrics();
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -20,75 +45,70 @@ export const Home: React.FC = () => {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-300 text-xs font-semibold rounded-full border border-brand-500/20">
             <Sparkles className="w-3.5 h-3.5" />
-            Module 1 Live
+            Operations Overview
           </div>
           <h1 className="text-4xl font-extrabold text-white tracking-tight">
             Welcome back, <span className="gradient-text">{user?.first_name || 'Admin'}</span>
           </h1>
           <p className="text-slate-400 text-sm md:text-base max-w-xl">
-            You are authenticated into your tenant workspace. Module 1 handles secure session storage, token rotation, and multi-tenant scoping.
+            Real-time analytics and activity summary for your organization workspace.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 px-5 py-4 bg-slate-900/60 border border-slate-800 rounded-xl">
-          <Building className="w-10 h-10 text-brand-400" />
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Active Tenant</p>
-            <p className="text-md font-bold text-white">{organization?.name}</p>
-            <p className="text-xs text-slate-400">/{organization?.slug}</p>
-          </div>
-        </div>
-      </div>
+        <div className="flex items-center gap-6">
+          <button
+            onClick={handleRefresh}
+            title="Refresh dashboard data"
+            className="p-3 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer bg-slate-950/20"
+          >
+            <RefreshCw className={`w-4 h-4 ${(isLoadingSummary || isLoadingActivities) ? 'animate-spin' : ''}`} />
+          </button>
 
-      {/* Grid details */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-panel p-6 rounded-2xl space-y-3">
-          <div className="w-10 h-10 bg-brand-500/15 rounded-xl flex items-center justify-center">
-            <Shield className="w-5 h-5 text-brand-400" />
-          </div>
-          <h3 className="font-bold text-lg text-white">RBAC Protected</h3>
-          <p className="text-slate-400 text-sm">
-            Your role is assigned as <span className="text-brand-300 font-medium">{user?.role}</span>. Organization settings are restricted to admins.
-          </p>
-        </div>
-
-        <div className="glass-panel p-6 rounded-2xl space-y-3">
-          <div className="w-10 h-10 bg-indigo-500/15 rounded-xl flex items-center justify-center">
-            <Building className="w-5 h-5 text-indigo-400" />
-          </div>
-          <h3 className="font-bold text-lg text-white">Multi-Tenant Scoped</h3>
-          <p className="text-slate-400 text-sm">
-            All API queries are automatically bound to the header payload checking database identifiers dynamically.
-          </p>
-        </div>
-
-        <div className="glass-panel p-6 rounded-2xl space-y-3">
-          <div className="w-10 h-10 bg-purple-500/15 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-purple-400" />
-          </div>
-          <h3 className="font-bold text-lg text-white">Token Rotation</h3>
-          <p className="text-slate-400 text-sm">
-            Refresh tokens rotate on every API request expiration, securing active sessions without user logout disruption.
-          </p>
-        </div>
-      </div>
-
-      {/* Unlocked roadmap / future modules */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-white tracking-tight">System Modules</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {futureModules.map((mod) => (
-            <div key={mod.name} className="bg-slate-950 border border-slate-900 p-6 rounded-2xl flex flex-col justify-between opacity-60 relative overflow-hidden group">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase">{mod.status}</span>
-                  <Lock className="w-3.5 h-3.5 text-slate-600" />
-                </div>
-                <h4 className="font-bold text-slate-300">{mod.name}</h4>
-                <p className="text-slate-500 text-xs">{mod.desc}</p>
-              </div>
+          <div className="flex items-center gap-3 px-5 py-4 bg-slate-900/60 border border-slate-800 rounded-xl">
+            <Building className="w-10 h-10 text-brand-400" />
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Active Tenant</p>
+              <p className="text-md font-bold text-white">{organization?.name}</p>
+              <p className="text-xs text-slate-400">/{organization?.slug}</p>
             </div>
-          ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Relocated Telecaller Dialer Workspace at the absolute top */}
+      {dashboardData?.role === 'Telecaller' && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-white">Agent Dialer cockpit</h3>
+            <p className="text-xs text-slate-400 mt-1">Start your dialing session to contact leads assigned to your queue.</p>
+          </div>
+          <DialerConsole />
+        </div>
+      )}
+
+      {/* Analytics Performance Dashboard */}
+      <AnalyticsDashboard />
+
+      {/* KPI Cards Widget */}
+      <SummaryCards summary={summary} isLoading={isLoadingSummary} />
+
+      {/* Analytics Charts & Timelines Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column - Lead Status Chart */}
+        <div className="lg:col-span-1">
+          <LeadStatusChart summary={summary} isLoading={isLoadingSummary} />
+        </div>
+
+        {/* Right column - Recent Activities Widget */}
+        <div className="lg:col-span-2">
+          <RecentActivitiesWidget
+            activities={recentActivities}
+            total={totalRecent}
+            page={page}
+            limit={limit}
+            isLoading={isLoadingActivities}
+            onPageChange={setPage}
+          />
         </div>
       </div>
     </div>

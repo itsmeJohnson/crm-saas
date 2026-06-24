@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Sequence, Tuple
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.user_repository import UserRepository
 from app.services.permission_service import PermissionService
@@ -14,6 +15,14 @@ class UserService:
         self.db = db
         self.user_repo = UserRepository(db)
         self.audit_service = AuditService(db)
+
+    async def is_team_leader(self, user: User) -> bool:
+        """Check if the user is a Team Leader (Employee reporting to a Manager)."""
+        if user.role != "Employee" or not user.reporting_to_id:
+            return False
+        parent_res = await self.db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+        parent_role = parent_res.scalar()
+        return parent_role == "Manager"
 
     async def get_user_by_id(self, actor: User, user_id: uuid.UUID) -> User:
         """Fetch a specific user inside the same organization."""
@@ -28,6 +37,12 @@ class UserService:
                 status_code=status.HTTP_404_NOT_FOUND, 
                 detail="User not found"
             )
+        if actor.id != user_id:
+            is_tl = await self.is_team_leader(actor)
+            PermissionService.check_user_management_permission(
+                actor, user.role, user.reporting_to_id, is_tl
+            )
+        user.is_team_leader = await self.is_team_leader(user)
         return user
 
     async def create_user(self, actor: User, user_data: dict) -> User:
@@ -38,8 +53,43 @@ class UserService:
                 detail="Actor account is deactivated"
             )
         
-        # Enforce RBAC Role Hierarchy: Manager can only create Employee, Employee cannot create anyone
-        PermissionService.check_user_management_permission(actor, user_data.get("role", "Employee"))
+        role = user_data.get("role", "Employee")
+        reporting_to_id = user_data.get("reporting_to_id")
+        if reporting_to_id and isinstance(reporting_to_id, str):
+            reporting_to_id = uuid.UUID(reporting_to_id)
+            user_data["reporting_to_id"] = reporting_to_id
+
+        # Enforce RBAC Role Hierarchy
+        is_tl = await self.is_team_leader(actor)
+        
+        # If actor is a Team Leader, they can only create Employees reporting directly to them
+        if actor.role == "Employee":
+            if not is_tl:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Telecallers cannot create users"
+                )
+            if role != "Employee":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Team Leaders can only create Employees"
+                )
+            if reporting_to_id != actor.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Team Leaders can only create team members reporting to themselves"
+                )
+        
+        PermissionService.check_user_management_permission(
+            actor, role, reporting_to_id, is_tl
+        )
+
+        await self.validate_reporting_structure(
+            user_id=None,
+            role=role,
+            reporting_to_id=reporting_to_id,
+            organization_id=actor.organization_id
+        )
 
         # Check global email uniqueness
         existing = await self.user_repo.get_by_email_global(user_data["email"])
@@ -53,6 +103,7 @@ class UserService:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
         
         user = await self.user_repo.create_user(actor.organization_id, user_data)
+        user.is_team_leader = await self.is_team_leader(user)
         
         # Write Audit Log
         await self.audit_service.log_event(
@@ -91,10 +142,41 @@ class UserService:
                     detail="You cannot deactivate yourself"
                 )
         else:
-            # Manager cannot edit OrgAdmin or Manager, Employee cannot edit anyone
-            PermissionService.check_user_management_permission(actor, target_user.role)
+            is_tl = await self.is_team_leader(actor)
+            PermissionService.check_user_management_permission(
+                actor, target_user.role, target_user.reporting_to_id, is_tl
+            )
+            
+            # TL constraints
+            if actor.role == "Employee" and is_tl:
+                if "role" in update_data and update_data["role"] != target_user.role:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Team Leaders cannot change the role of team members"
+                    )
+                if "reporting_to_id" in update_data and update_data["reporting_to_id"] != target_user.reporting_to_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Team Leaders cannot reassign team members"
+                    )
+            
             if "role" in update_data:
-                PermissionService.check_user_management_permission(actor, update_data["role"])
+                PermissionService.check_user_management_permission(
+                    actor, update_data["role"], update_data.get("reporting_to_id"), is_tl
+                )
+
+        # Validate reporting hierarchy if role or reporting_to_id is being updated
+        if "role" in update_data or "reporting_to_id" in update_data:
+            role = update_data.get("role", target_user.role)
+            reporting_to_id = update_data.get("reporting_to_id", target_user.reporting_to_id)
+            if reporting_to_id and isinstance(reporting_to_id, str):
+                reporting_to_id = uuid.UUID(reporting_to_id)
+            await self.validate_reporting_structure(
+                user_id=user_id,
+                role=role,
+                reporting_to_id=reporting_to_id,
+                organization_id=actor.organization_id
+            )
 
         # Prevent demoting the final OrgAdmin
         if target_user.role == "OrgAdmin" and "role" in update_data and update_data["role"] != "OrgAdmin":
@@ -109,6 +191,8 @@ class UserService:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
 
         updated = await self.user_repo.update_user(actor.organization_id, user_id, update_data)
+        if updated:
+            updated.is_team_leader = await self.is_team_leader(updated)
         
         await self.audit_service.log_event(
             organization_id=actor.organization_id,
@@ -137,7 +221,10 @@ class UserService:
                 detail="You cannot deactivate yourself"
             )
 
-        PermissionService.check_user_management_permission(actor, target_user.role)
+        is_tl = await self.is_team_leader(actor)
+        PermissionService.check_user_management_permission(
+            actor, target_user.role, target_user.reporting_to_id, is_tl
+        )
 
         # Prevent deactivating the last OrgAdmin
         if target_user.role == "OrgAdmin" and not is_active:
@@ -149,6 +236,8 @@ class UserService:
                 )
 
         updated = await self.user_repo.toggle_active(actor.organization_id, user_id, is_active)
+        if updated:
+            updated.is_team_leader = await self.is_team_leader(updated)
 
         action_name = "USER_ACTIVATED" if is_active else "USER_DEACTIVATED"
         await self.audit_service.log_event(
@@ -177,7 +266,10 @@ class UserService:
                 detail="You cannot delete yourself"
             )
 
-        PermissionService.check_user_management_permission(actor, target_user.role)
+        is_tl = await self.is_team_leader(actor)
+        PermissionService.check_user_management_permission(
+            actor, target_user.role, target_user.reporting_to_id, is_tl
+        )
 
         # Prevent deleting the last OrgAdmin
         if target_user.role == "OrgAdmin":
@@ -189,6 +281,8 @@ class UserService:
                 )
 
         deleted = await self.user_repo.soft_delete_user(actor.organization_id, user_id)
+        if deleted:
+            deleted.is_team_leader = await self.is_team_leader(deleted)
 
         await self.audit_service.log_event(
             organization_id=actor.organization_id,
@@ -200,11 +294,149 @@ class UserService:
 
         return deleted
 
-    async def paginate_users(self, actor: User, skip: int = 0, limit: int = 100, search_query: str | None = None) -> Tuple[Sequence[User], int]:
+    async def paginate_users(
+        self, 
+        actor: User, 
+        skip: int = 0, 
+        limit: int = 100, 
+        search_query: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None
+    ) -> Tuple[Sequence[User], int]:
         """Fetch paginated, searchable list of users belonging to the tenant."""
         if not actor.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Actor account is deactivated"
             )
-        return await self.user_repo.paginate_users(actor.organization_id, skip, limit, search_query)
+        
+        reporting_to_id = None
+        if actor.role == "Employee":
+            is_tl = False
+            if actor.reporting_to_id:
+                # Check if the parent role is Manager (so actor is TL)
+                parent_res = await self.db.execute(select(User.role).filter(User.id == actor.reporting_to_id))
+                parent_role = parent_res.scalar()
+                if parent_role == "Manager":
+                    is_tl = True
+            
+            if not is_tl:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have enough privileges"
+                )
+            reporting_to_id = actor.id
+
+        records, total = await self.user_repo.paginate_users(
+            actor.organization_id, skip, limit, search_query, role, is_active, reporting_to_id
+        )
+        for u in records:
+            u.is_team_leader = await self.is_team_leader(u)
+        return records, total
+
+    async def get_downline_user_ids(self, actor: User) -> set[uuid.UUID]:
+        """Fetch all downline user IDs in actor's reporting chain recursively."""
+        return await self.get_downline_user_ids_by_id(actor.organization_id, actor.id)
+
+    async def get_downline_user_ids_by_id(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> set[uuid.UUID]:
+        """Fetch all downline user IDs in a user's reporting chain recursively."""
+        query = select(User.id, User.reporting_to_id).where(
+            User.organization_id == organization_id,
+            User.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        rows = result.all()
+        
+        parent_to_children = {}
+        for uid, pid in rows:
+            if pid is not None:
+                parent_to_children.setdefault(pid, []).append(uid)
+                
+        downlines = set()
+        queue = [user_id]
+        while queue:
+            curr = queue.pop(0)
+            children = parent_to_children.get(curr, [])
+            for child in children:
+                if child not in downlines:
+                    downlines.add(child)
+                    queue.append(child)
+        return downlines
+
+    async def validate_reporting_structure(
+        self,
+        user_id: uuid.UUID | None,
+        role: str,
+        reporting_to_id: uuid.UUID | None,
+        organization_id: uuid.UUID
+    ) -> None:
+        """
+        Validate the strict 4-tier reporting line:
+        - OrgAdmin cannot report to anyone.
+        - Manager must report to an OrgAdmin.
+        - Employee (TL) must report to a Manager.
+        - Employee (Telecaller) must report to a TL (Employee who reports to a Manager).
+        """
+        if role == "OrgAdmin":
+            if reporting_to_id is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="OrgAdmin cannot report to anyone"
+                )
+            return
+
+        if reporting_to_id is None:
+            return
+
+        if user_id and reporting_to_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user cannot report to themselves"
+            )
+
+        # Prevent circular reporting dependency
+        if user_id:
+            downlines = await self.get_downline_user_ids_by_id(organization_id, user_id)
+            if reporting_to_id in downlines:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Circular reporting dependency detected: target manager reports to this user"
+                )
+
+        # Fetch parent
+        parent = await self.user_repo.get_user_by_id(organization_id, reporting_to_id)
+        if not parent:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reporting user not found or belongs to another organization"
+            )
+
+        if role == "Manager":
+            if parent.role != "OrgAdmin":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Managers must report to a Super Admin (OrgAdmin)"
+                )
+
+        elif role == "Employee":
+            if parent.role == "Manager":
+                # Valid TL
+                pass
+            elif parent.role == "Employee":
+                # Parent is Employee, must be a TL (so parent must report to a Manager)
+                if not parent.reporting_to_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Telecallers must report to a Team Leader who reports to a Manager"
+                    )
+                grandparent = await self.user_repo.get_user_by_id(organization_id, parent.reporting_to_id)
+                if not grandparent or grandparent.role != "Manager":
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Telecallers must report to a Team Leader who reports to a Manager"
+                    )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Employees must report to either a Manager (TL) or a Team Leader (Agent)"
+                )

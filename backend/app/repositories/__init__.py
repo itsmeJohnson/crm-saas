@@ -4,6 +4,9 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.session import UserSessionRepository
 from app.repositories.invitation_repository import InvitationRepository
 from app.repositories.audit_repository import AuditRepository
+from app.repositories.lead_import_repository import LeadImportRepository
+from app.repositories.assignment_config_repository import AssignmentConfigRepository
+from app.repositories.commercial_settings import CommercialSettingsRepository
 
 __all__ = [
     "BaseRepository",
@@ -11,5 +14,8 @@ __all__ = [
     "UserRepository",
     "UserSessionRepository",
     "InvitationRepository",
-    "AuditRepository"
+    "AuditRepository",
+    "LeadImportRepository",
+    "AssignmentConfigRepository",
+    "CommercialSettingsRepository"
 ]

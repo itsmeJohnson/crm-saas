@@ -25,3 +25,11 @@ class RefreshTokenRequest(BaseModel):
 class AuthMeResponse(BaseModel):
     user: UserResponse
     organization: OrganizationResponse
+    features: list[str] = []
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., description="The password reset token")
+    password: str = Field(..., min_length=8, description="The new password")

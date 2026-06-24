@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { Building, ShieldAlert, Check, Loader2 } from 'lucide-react';
+import { PipelineSettings } from '../../components/admin/PipelineSettings';
 
 const orgSchema = z.object({
   name: z.string().min(2, 'Organization name must be at least 2 characters'),
@@ -19,6 +20,7 @@ export const Profile: React.FC = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
   const authStore = useAuthStore();
   const [success, setSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'pipeline'>('profile');
 
   const isAdmin = user?.role === 'OrgAdmin' || user?.role === 'SuperAdmin';
 
@@ -43,7 +45,7 @@ export const Profile: React.FC = () => {
     onSuccess: (updatedOrg) => {
       queryClient.setQueryData(['my-organization'], updatedOrg);
       if (authStore.user && authStore.accessToken && authStore.refreshToken) {
-        setAuth(authStore.user, updatedOrg, authStore.accessToken, authStore.refreshToken);
+        setAuth(authStore.user, updatedOrg, authStore.features, authStore.accessToken, authStore.refreshToken);
       }
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -63,70 +65,98 @@ export const Profile: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Organization Profile</h1>
-          <p className="text-slate-400 text-sm">View or modify your tenant details and company settings.</p>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Organization Settings</h1>
+          <p className="text-slate-400 text-sm">View or modify your tenant details, company settings, and pipelines.</p>
         </div>
       </div>
 
-      <div className="glass-panel p-8 rounded-2xl space-y-6">
-        <div className="flex items-center gap-4 p-4 bg-slate-900/40 border border-slate-800 rounded-xl">
-          <Building className="w-10 h-10 text-brand-400" />
-          <div>
-            <h3 className="font-bold text-white text-lg">{org?.name}</h3>
-            <p className="text-slate-400 text-sm">Unique identifier slug: <span className="text-brand-300 font-mono">/{org?.slug}</span></p>
-          </div>
-        </div>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-800 gap-4">
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'profile'
+              ? 'border-brand-500 text-brand-400 font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Company Profile
+        </button>
+        <button
+          onClick={() => setActiveTab('pipeline')}
+          className={`pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'pipeline'
+              ? 'border-brand-500 text-brand-400 font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Pipeline Settings
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Company Name</label>
-            <input
-              type="text"
-              disabled={!isAdmin}
-              {...register('name')}
-              className="w-full px-4 py-3 rounded-xl glass-input disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder="Acme Corporation"
-            />
-            {errors.name && <p className="mt-1.5 text-xs text-red-400">{errors.name.message}</p>}
-          </div>
-
-          {!isAdmin && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-200 text-sm rounded-xl flex items-center gap-3">
-              <ShieldAlert className="w-5 h-5 flex-shrink-0 text-amber-400" />
-              <p>You need organization admin rights to update this settings profile.</p>
+      {activeTab === 'profile' ? (
+        <div className="glass-panel p-8 rounded-2xl space-y-6">
+          <div className="flex items-center gap-4 p-4 bg-slate-900/40 border border-slate-800 rounded-xl">
+            <Building className="w-10 h-10 text-brand-400" />
+            <div>
+              <h3 className="font-bold text-white text-lg">{org?.name}</h3>
+              <p className="text-slate-400 text-sm">Unique identifier slug: <span className="text-brand-300 font-mono">/{org?.slug}</span></p>
             </div>
-          )}
+          </div>
 
-          {isAdmin && (
-            <div className="flex items-center gap-4">
-              <button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="py-3 px-6 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-all duration-150 flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20"
-              >
-                {updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving changes...
-                  </>
-                ) : (
-                  'Save Settings'
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Company Name</label>
+              <input
+                type="text"
+                disabled={!isAdmin}
+                {...register('name')}
+                className="w-full px-4 py-3 rounded-xl glass-input disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder="Acme Corporation"
+              />
+              {errors.name && <p className="mt-1.5 text-xs text-red-400">{errors.name.message}</p>}
+            </div>
+
+            {!isAdmin && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-200 text-sm rounded-xl flex items-center gap-3">
+                <ShieldAlert className="w-5 h-5 flex-shrink-0 text-amber-400" />
+                <p>You need organization admin rights to update this settings profile.</p>
+              </div>
+            )}
+
+            {isAdmin && (
+              <div className="flex items-center gap-4">
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="py-3 px-6 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-all duration-150 flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 cursor-pointer"
+                >
+                  {updateMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving changes...
+                    </>
+                  ) : (
+                    'Save Settings'
+                  )}
+                </button>
+
+                {success && (
+                  <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium animate-fade-in">
+                    <Check className="w-4 h-4" />
+                    Settings saved successfully
+                  </span>
                 )}
-              </button>
-
-              {success && (
-                <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium animate-fade-in">
-                  <Check className="w-4 h-4" />
-                  Settings saved successfully
-                </span>
-              )}
-            </div>
-          )}
-        </form>
-      </div>
+              </div>
+            )}
+          </form>
+        </div>
+      ) : (
+        <PipelineSettings />
+      )}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+import uuid
 from fastapi import HTTPException, status
 from app.models.user import User
 
@@ -17,7 +18,12 @@ class PermissionService:
         return False
 
     @staticmethod
-    def check_user_management_permission(actor: User, target_user_role: str) -> None:
+    def check_user_management_permission(
+        actor: User, 
+        target_user_role: str, 
+        target_reporting_to_id: uuid.UUID | None = None, 
+        is_tl: bool = False
+    ) -> None:
         """
         Verify if the actor is active and has permissions to manipulate a target user with a given role.
         Raises 403 Forbidden on failure.
@@ -27,6 +33,11 @@ class PermissionService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is deactivated"
             )
+        
+        # If the actor is a Team Leader (is_tl=True), they can manage an Employee reporting to them.
+        if actor.role == "Employee" and is_tl and target_user_role == "Employee" and target_reporting_to_id == actor.id:
+            return
+            
         if not PermissionService.verify_role_hierarchy(actor.role, target_user_role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

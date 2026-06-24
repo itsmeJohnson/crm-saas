@@ -6,7 +6,8 @@ class UserBase(BaseModel):
     email: EmailStr
     first_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, max_length=100)
-    role: str = "User"
+    role: str = "Employee"
+    reporting_to_id: uuid.UUID | None = None
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
@@ -18,6 +19,7 @@ class UserUpdate(BaseModel):
     last_name: str | None = Field(None, max_length=100)
     is_active: bool | None = None
     role: str | None = Field(None, pattern="^(OrgAdmin|Manager|Employee)$")
+    reporting_to_id: uuid.UUID | None = None
 
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
@@ -29,3 +31,4 @@ class UserResponse(UserBase):
     is_invited: bool
     created_at: datetime
     updated_at: datetime
+    is_team_leader: bool = False

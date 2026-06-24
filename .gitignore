@@ -27,3 +27,6 @@ build/
 
 # Docker
 postgres_data/
+
+# Uploads
+backend/uploads/

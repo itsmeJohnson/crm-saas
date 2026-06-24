@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; border: 1px solid #eaeaea; border-radius: 8px; padding: 30px; }
+        .header { border-bottom: 2px solid #ea580c; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h2 { color: #ea580c; margin: 0; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #2563eb; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .footer { font-size: 12px; color: #777; margin-top: 30px; border-top: 1px solid #eaeaea; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Your Free Trial is Ending Soon</h2>
+        </div>
+        {% if custom_body %}
+            {{ custom_body|safe }}
+        {% else %}
+            <p>Hello <strong>{{ org_name }}</strong>,</p>
+            <p>We hope you are enjoying your experience with TeleCRM! This is a quick heads-up that your free trial is ending in <strong>{{ days_left }} days</strong> on <strong>{{ trial_end_date }}</strong>.</p>
+            <p>To avoid any disruption in service for your calling agents, please upgrade to a paid subscription plan.</p>
+            <p><a href="{{ upgrade_url }}" class="button">Upgrade My Plan</a></p>
+            <p>If you need more time or have questions about our plans, feel free to contact our support team.</p>
+        {% endif %}
+        <div class="footer">
+            This is an automated billing notification from TeleCRM.
+        </div>
+    </div>
+</body>
+</html>
