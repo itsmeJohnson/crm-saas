@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import ForeignKey, String, Numeric, DateTime
+from sqlalchemy import ForeignKey, String, Numeric, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
 
@@ -28,6 +28,7 @@ class Invoice(BaseModel):
     gst_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
     pdf_file_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    action_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization")

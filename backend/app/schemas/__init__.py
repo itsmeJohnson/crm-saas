@@ -23,6 +23,15 @@ from app.schemas.subscription import (
 from app.schemas.commercial_settings import (
     CommercialSettingsBase, CommercialSettingsUpdate, CommercialSettingsResponse
 )
+from app.schemas.support_ticket import (
+    SupportTicketCreate, SupportTicketUpdate, SupportTicketCommentRequest,
+    SupportTicketCommentResponse, SupportTicketHistoryResponse, SupportTicketResponse
+)
+from app.schemas.portal import (
+    OrgProfileUpdate, OrgBillingUpdate, OrgNotificationSettingsUpdate,
+    PurchaseSeatsRequest, PurchaseStorageRequest, PayInvoiceRequest,
+    DashboardStatsResponse, SeatUsageMeter, StorageUsageMeter
+)
 
 __all__ = [
     "OrganizationBase", "OrganizationCreate", "OrganizationUpdate", "OrganizationResponse",
@@ -43,5 +52,10 @@ __all__ = [
     "UnifiedDashboardResponse",
     "PlanResponse", "TenantSubscriptionResponse", "UsageMeter",
     "SubscriptionDetailsResponse", "SubscriptionRenewResponse", "InvoiceResponse",
-    "CommercialSettingsBase", "CommercialSettingsUpdate", "CommercialSettingsResponse"
+    "CommercialSettingsBase", "CommercialSettingsUpdate", "CommercialSettingsResponse",
+    "SupportTicketCreate", "SupportTicketUpdate", "SupportTicketCommentRequest",
+    "SupportTicketCommentResponse", "SupportTicketHistoryResponse", "SupportTicketResponse",
+    "OrgProfileUpdate", "OrgBillingUpdate", "OrgNotificationSettingsUpdate",
+    "PurchaseSeatsRequest", "PurchaseStorageRequest", "PayInvoiceRequest",
+    "DashboardStatsResponse", "SeatUsageMeter", "StorageUsageMeter"
 ]

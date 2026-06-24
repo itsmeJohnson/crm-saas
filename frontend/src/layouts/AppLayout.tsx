@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
-import { LayoutDashboard, LogOut, Building, Users, FolderKanban, Workflow, Sun, Moon, Menu, X } from 'lucide-react';
+import { LayoutDashboard, LogOut, Building, Users, FolderKanban, Workflow, Sun, Moon, Menu, X, CreditCard } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 
 export const AppLayout: React.FC = () => {
@@ -24,6 +24,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Pipelines', path: '/pipelines', icon: Workflow, roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE' },
     { name: 'Users', path: '/users', icon: Users, roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
     { name: 'Organization', path: '/organization', icon: Building, roles: ['OrgAdmin'] },
+    { name: 'Subscription Portal', path: '/portal/dashboard', icon: CreditCard, roles: ['OrgAdmin'] },
   ];
 
   const features = useAuthStore((state) => state.features);

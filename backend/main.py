@@ -18,6 +18,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
 from app.api.v1.telephony import router as telephony_router
+from app.api.v1.portal import router as portal_router
 from app.models.base import Base
 from app.core.database import engine, async_session_maker
 import os
@@ -122,6 +123,7 @@ app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics", 
 app.include_router(super_admin_router, prefix=f"{settings.API_V1_STR}/super-admin", tags=["super-admin"])
 app.include_router(subscription_router, prefix=f"{settings.API_V1_STR}/tenant", tags=["subscription"])
 app.include_router(telephony_router, prefix=f"{settings.API_V1_STR}/telephony", tags=["telephony"])
+app.include_router(portal_router, prefix=f"{settings.API_V1_STR}/portal", tags=["portal"])
 
 @app.get("/health")
 def health_check():

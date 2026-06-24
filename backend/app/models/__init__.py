@@ -22,6 +22,7 @@ from app.models.payment import Payment
 from app.models.system_setting import SystemSetting
 from app.models.invoice_config import InvoiceConfig
 from app.models.commercial_settings import CommercialSettings
+from app.models.support_ticket import SupportTicket
 
 __all__ = [
     "Base", 
@@ -52,5 +53,6 @@ __all__ = [
     "Payment",
     "SystemSetting",
     "InvoiceConfig",
-    "CommercialSettings"
+    "CommercialSettings",
+    "SupportTicket"
 ]

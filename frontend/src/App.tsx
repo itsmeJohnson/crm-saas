@@ -15,6 +15,24 @@ import { ContactsPage } from './pages/ContactsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 
+// Self Service Portal imports
+import { OrgPortalLayout } from './layouts/OrgPortalLayout';
+import { PortalDashboard } from './pages/portal/PortalDashboard';
+import { PortalSubscription } from './pages/portal/PortalSubscription';
+import { PortalPlans } from './pages/portal/PortalPlans';
+import { PortalInvoices } from './pages/portal/PortalInvoices';
+import { PortalPayments } from './pages/portal/PortalPayments';
+import { PortalUsage } from './pages/portal/PortalUsage';
+import { PortalStorage } from './pages/portal/PortalStorage';
+import { PortalRecordings } from './pages/portal/PortalRecordings';
+import { PortalUsers } from './pages/portal/PortalUsers';
+import { PortalProfile } from './pages/portal/PortalProfile';
+import { PortalBilling } from './pages/portal/PortalBilling';
+import { PortalSupport } from './pages/portal/PortalSupport';
+import { PortalActivityLogs } from './pages/portal/PortalActivityLogs';
+import { PortalSettings } from './pages/portal/PortalSettings';
+
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -75,6 +93,26 @@ export const App: React.FC = () => {
               {/* SuperAdmin only */}
               <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
                 <Route path="/tenants" element={<TenantsPage />} />
+              </Route>
+            </Route>
+
+            {/* Organization Self-Service Portal Layout (restricted to OrgAdmin) */}
+            <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+              <Route element={<OrgPortalLayout />}>
+                <Route path="/portal/dashboard" element={<PortalDashboard />} />
+                <Route path="/portal/subscription" element={<PortalSubscription />} />
+                <Route path="/portal/plans" element={<PortalPlans />} />
+                <Route path="/portal/invoices" element={<PortalInvoices />} />
+                <Route path="/portal/payments" element={<PortalPayments />} />
+                <Route path="/portal/usage" element={<PortalUsage />} />
+                <Route path="/portal/storage" element={<PortalStorage />} />
+                <Route path="/portal/recordings" element={<PortalRecordings />} />
+                <Route path="/portal/users" element={<PortalUsers />} />
+                <Route path="/portal/profile" element={<PortalProfile />} />
+                <Route path="/portal/billing" element={<PortalBilling />} />
+                <Route path="/portal/support" element={<PortalSupport />} />
+                <Route path="/portal/activity" element={<PortalActivityLogs />} />
+                <Route path="/portal/settings" element={<PortalSettings />} />
               </Route>
             </Route>
           </Route>
