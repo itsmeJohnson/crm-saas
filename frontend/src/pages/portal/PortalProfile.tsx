@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi, OrgProfileDetails } from '../../services/portalApi';
 import {
-  User, Link2, Mail, Phone, Globe, Languages,
+  User, Link2, Mail, Phone, Globe,
   Loader2, CheckCircle2, AlertTriangle, Building
 } from 'lucide-react';
 

@@ -1,8 +1,8 @@
 import uuid
 import secrets
 from datetime import datetime, timezone
-from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
+from typing import Annotated, List, Literal
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Request
 from app.schemas.invoice_config import InvoiceConfigResponse, InvoiceConfigUpdate
 from app.services.invoice_config_service import InvoiceConfigService
 from app.schemas.commercial_settings import CommercialSettingsResponse, CommercialSettingsUpdate
@@ -238,15 +238,15 @@ async def create_tenant_invoice(
 @router.patch("/invoices/{invoice_id}", response_model=TenantInvoiceResponse)
 async def update_invoice_status(
     invoice_id: uuid.UUID,
-    status_val: str,
     actor: Annotated[User, Depends(require_super_admin)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status_val: Literal["paid", "pending", "overdue", "void", "waived"] = Query(..., description="New invoice status"),
 ):
-    """Change paid/pending/overdue status of an invoice."""
+    """Change the status of an invoice. Accepts only valid status values."""
     invoice = await db.get(Invoice, invoice_id)
     if not invoice or invoice.is_deleted:
         raise HTTPException(status_code=404, detail="Invoice not found")
-        
+
     invoice.status = status_val
     await db.commit()
     await db.refresh(invoice)
@@ -515,6 +515,7 @@ async def create_plan(
         allow_upgrade=payload.allow_upgrade,
         allow_downgrade=payload.allow_downgrade,
         allow_trial=payload.allow_trial,
+        allow_additional_seats=payload.allow_additional_seats,
         auto_renew=payload.auto_renew,
         plan_active=payload.plan_active,
         is_active=payload.plan_active
@@ -797,8 +798,8 @@ async def suspend_tenant(
     actor: Annotated[User, Depends(require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Suspend a tenant organization."""
-    return await toggle_tenant_subscription_status(org_id=org_id, actor=actor, db=db, status_val="suspended")
+    """Suspend or reactivate a tenant organization."""
+    return await toggle_tenant_subscription_status(org_id=org_id, actor=actor, db=db, status_val=None)
 
 @router.post("/tenants/{org_id}/reset-password")
 async def reset_tenant_owner_password(
@@ -982,3 +983,887 @@ async def update_commercial_settings(
     )
 
 
+
+# ==========================================
+# PHASE 1: SUPER ADMIN EXECUTIVE DASHBOARD
+# ==========================================
+
+from app.schemas.dashboard import SuperAdminDashboardResponse, OrgMetrics, RevenueMetrics, LicensingMetrics, InfraMetrics, ActivityMetrics
+
+@router.get("/dashboard", response_model=SuperAdminDashboardResponse)
+async def get_super_admin_dashboard(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Executive dashboard with business overview, revenue, licensing and infra metrics."""
+    from datetime import date, timedelta
+    now = datetime.now(timezone.utc)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    next_7_days = now + timedelta(days=7)
+
+    # ── Org Metrics ──
+    total_orgs = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False))).scalar() or 0
+    active_orgs = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "active"))).scalar() or 0
+    trial_orgs = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "trial"))).scalar() or 0
+    expired_orgs = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "expired"))).scalar() or 0
+    suspended_orgs = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "suspended"))).scalar() or 0
+    new_today = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.created_at >= today_start))).scalar() or 0
+
+    # ── Revenue Metrics ──
+    mrr_result = await db.execute(
+        select(func.coalesce(func.sum(Plan.monthly_price * TenantSubscription.users_purchased), 0.0))
+        .join(Plan, TenantSubscription.plan_id == Plan.id)
+        .where(TenantSubscription.status.in_(["active", "trial"]), TenantSubscription.is_deleted == False)
+    )
+    mrr = float(mrr_result.scalar() or 0.0)
+
+    total_collected = float((await db.execute(
+        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "paid", Invoice.is_deleted == False)
+    )).scalar() or 0.0)
+
+    pending = float((await db.execute(
+        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "unpaid", Invoice.is_deleted == False)
+    )).scalar() or 0.0)
+
+    failed_count = (await db.execute(
+        select(func.count(Invoice.id))
+        .where(Invoice.payment_status == "failed", Invoice.is_deleted == False)
+    )).scalar() or 0
+
+    overdue_count = (await db.execute(
+        select(func.count(Invoice.id))
+        .where(Invoice.payment_status == "unpaid", Invoice.due_date < now, Invoice.is_deleted == False)
+    )).scalar() or 0
+
+    # ── Licensing Metrics ──
+    total_licensed = (await db.execute(
+        select(func.coalesce(func.sum(TenantSubscription.users_purchased), 0))
+        .where(TenantSubscription.status.in_(["active", "trial"]), TenantSubscription.is_deleted == False)
+    )).scalar() or 0
+
+    active_seats = (await db.execute(
+        select(func.coalesce(func.sum(TenantSubscription.users_active), 0))
+        .where(TenantSubscription.is_deleted == False)
+    )).scalar() or 0
+
+    utilization = round((active_seats / total_licensed * 100) if total_licensed > 0 else 0.0, 1)
+
+    # ── Storage Metrics ──
+    total_storage = float((await db.execute(
+        select(func.coalesce(func.sum(TenantSubscription.storage_used), 0.0))
+        .where(TenantSubscription.is_deleted == False)
+    )).scalar() or 0.0)
+
+    call_storage = float((await db.execute(
+        select(func.coalesce(func.sum(TenantSubscription.call_recording_usage), 0.0))
+        .where(TenantSubscription.is_deleted == False)
+    )).scalar() or 0.0)
+
+    # ── DB & Redis health ──
+    db_status = "healthy"
+    try:
+        await db.execute(select(func.now()))
+    except Exception:
+        db_status = "unhealthy"
+
+    redis_status = "healthy"
+    try:
+        from app.core.redis import redis_client
+        await redis_client.ping()
+    except Exception:
+        redis_status = "unavailable"
+
+    # ── Activity Metrics ──
+    renewals_due = (await db.execute(
+        select(func.count(TenantSubscription.id))
+        .where(
+            TenantSubscription.end_date.between(now, next_7_days),
+            TenantSubscription.status == "active",
+            TenantSubscription.is_deleted == False
+        )
+    )).scalar() or 0
+
+    trials_expiring = (await db.execute(
+        select(func.count(TenantSubscription.id))
+        .where(
+            TenantSubscription.trial_end_date != None,
+            TenantSubscription.trial_end_date.between(now, next_7_days),
+            TenantSubscription.status == "trial",
+            TenantSubscription.is_deleted == False
+        )
+    )).scalar() or 0
+
+    new_invoices = (await db.execute(
+        select(func.count(Invoice.id))
+        .where(Invoice.created_at >= today_start, Invoice.is_deleted == False)
+    )).scalar() or 0
+
+    new_payments = (await db.execute(
+        select(func.count(Payment.id))
+        .where(Payment.created_at >= today_start)
+    )).scalar() or 0
+
+    return SuperAdminDashboardResponse(
+        orgs=OrgMetrics(total=total_orgs, active=active_orgs, trial=trial_orgs,
+                        expired=expired_orgs, suspended=suspended_orgs, new_today=new_today),
+        revenue=RevenueMetrics(mrr=mrr, arr=mrr * 12, total_collected=total_collected,
+                               pending=pending, failed_count=failed_count, overdue_count=overdue_count),
+        licensing=LicensingMetrics(total_licensed_seats=total_licensed, active_seats=active_seats,
+                                   available_seats=max(0, total_licensed - active_seats),
+                                   utilization_percent=utilization),
+        infra=InfraMetrics(total_storage_gb=round(total_storage, 2),
+                           call_recording_gb=round(call_storage / 1024, 2) if call_storage > 0 else 0.0,
+                           db_status=db_status, redis_status=redis_status),
+        activity=ActivityMetrics(new_orgs_today=new_today, renewals_due_7days=renewals_due,
+                                  trials_expiring_7days=trials_expiring, new_invoices_today=new_invoices,
+                                  payments_today=new_payments),
+        generated_at=now
+    )
+
+
+# ==========================================
+# PHASE 2: ENHANCED TENANT ACTIONS
+# ==========================================
+
+from app.core.security import create_access_token
+
+@router.post("/tenants/{org_id}/extend-trial", response_model=TenantResponse)
+async def extend_tenant_trial(
+    org_id: uuid.UUID,
+    days: int = 7,
+    actor: Annotated[User, Depends(require_super_admin)] = None,
+    db: Annotated[AsyncSession, Depends(get_db)] = None
+):
+    """Extend trial period for a tenant by N days."""
+    org = await db.get(Organization, org_id)
+    if not org or org.is_deleted:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    sub = (await db.execute(
+        select(TenantSubscription).where(TenantSubscription.organization_id == org_id, TenantSubscription.is_deleted == False)
+    )).scalar_one_or_none()
+
+    if sub:
+        from datetime import timedelta
+        current_end = sub.trial_end_date or sub.end_date
+        sub.trial_end_date = (current_end or datetime.now(timezone.utc)) + timedelta(days=days)
+        sub.end_date = sub.trial_end_date
+
+    from datetime import timedelta
+    org.subscription_expires_at = (org.subscription_expires_at or datetime.now(timezone.utc)) + timedelta(days=days)
+
+    await db.commit()
+    await db.refresh(org)
+
+    from app.services.audit_service import AuditService
+    audit = AuditService(db)
+    await audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
+        action="TRIAL_EXTENDED", resource_type="Organization", resource_id=str(org_id),
+        action_metadata={"days_extended": days, "tenant_name": org.name})
+
+    u_cnt = (await db.execute(select(func.count(User.id)).where(User.organization_id == org_id, User.is_deleted == False))).scalar() or 0
+    i_cnt = (await db.execute(select(func.count(Invoice.id)).where(Invoice.organization_id == org_id, Invoice.is_deleted == False))).scalar() or 0
+    return TenantResponse(id=org.id, name=org.name, slug=org.slug, is_active=org.is_active,
+                          subscription_plan=org.subscription_plan, subscription_expires_at=org.subscription_expires_at,
+                          subscription_status=org.subscription_status, max_users=org.max_users,
+                          user_count=u_cnt, invoice_count=i_cnt)
+
+
+@router.post("/tenants/{org_id}/activate")
+async def activate_tenant(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Activate a suspended tenant."""
+    org = await db.get(Organization, org_id)
+    if not org or org.is_deleted:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    org.is_active = True
+    org.subscription_status = "active"
+    await db.commit()
+
+    from app.services.audit_service import AuditService
+    audit = AuditService(db)
+    await audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
+        action="TENANT_ACTIVATED", resource_type="Organization", resource_id=str(org_id),
+        action_metadata={"tenant_name": org.name})
+
+    return {"detail": "Tenant activated successfully"}
+
+
+@router.post("/tenants/{org_id}/impersonate")
+async def impersonate_tenant_admin(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Generate a short-lived token to log in as the OrgAdmin of this tenant."""
+    org = await db.get(Organization, org_id)
+    if not org or org.is_deleted:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    admin = (await db.execute(
+        select(User).where(User.organization_id == org_id, User.role == "OrgAdmin", User.is_deleted == False)
+    )).scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=404, detail="No OrgAdmin found for this tenant")
+
+    from datetime import timedelta
+    impersonation_token = create_access_token(
+        subject=str(admin.id),
+        token_version=admin.token_version,
+        expires_delta=timedelta(minutes=15)
+    )
+
+    from app.services.audit_service import AuditService
+    audit = AuditService(db)
+    await audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
+        action="IMPERSONATION", resource_type="Organization", resource_id=str(org_id),
+        action_metadata={"tenant_name": org.name, "impersonated_user": str(admin.id), "target_email": admin.email})
+
+    return {
+        "access_token": impersonation_token,
+        "token_type": "bearer",
+        "expires_in": 900,
+        "impersonating": {"org_id": str(org_id), "org_name": org.name, "admin_email": admin.email}
+    }
+
+
+@router.get("/tenants/{org_id}/audit-logs")
+async def get_tenant_audit_logs(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(50, le=500),
+    offset: int = Query(0, ge=0)
+):
+    """Get audit logs for a specific tenant."""
+    from app.models.audit_log import AuditLog
+    stmt = select(AuditLog).where(
+        AuditLog.organization_id == org_id
+    ).order_by(AuditLog.created_at.desc()).limit(limit).offset(offset)
+    res = await db.execute(stmt)
+    logs = res.scalars().all()
+    total = (await db.execute(select(func.count(AuditLog.id)).where(AuditLog.organization_id == org_id))).scalar() or 0
+    return {"total": total, "data": [{"id": str(l.id), "action": l.action, "resource_type": l.resource_type,
+             "resource_id": l.resource_id, "metadata": l.action_metadata, "created_at": l.created_at.isoformat()} for l in logs]}
+
+
+# ==========================================
+# PHASE 13: GLOBAL AUDIT CENTER
+# ==========================================
+
+@router.get("/audit-logs")
+async def get_all_audit_logs(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    org_id: uuid.UUID | None = Query(None),
+    action: str | None = Query(None),
+    resource_type: str | None = Query(None),
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0, ge=0)
+):
+    """Global audit log search with filters."""
+    from app.models.audit_log import AuditLog
+    stmt = select(AuditLog)
+    if org_id:
+        stmt = stmt.where(AuditLog.organization_id == org_id)
+    if action:
+        stmt = stmt.where(AuditLog.action.ilike(f"%{action}%"))
+    if resource_type:
+        stmt = stmt.where(AuditLog.resource_type == resource_type)
+    if start_date:
+        stmt = stmt.where(AuditLog.created_at >= start_date)
+    if end_date:
+        stmt = stmt.where(AuditLog.created_at <= end_date)
+
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(total_stmt)).scalar() or 0
+
+    stmt = stmt.order_by(AuditLog.created_at.desc()).limit(limit).offset(offset)
+    res = await db.execute(stmt)
+    logs = res.scalars().all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [{"id": str(l.id), "organization_id": str(l.organization_id),
+                  "actor_user_id": str(l.actor_user_id) if l.actor_user_id else None,
+                  "action": l.action, "resource_type": l.resource_type, "resource_id": l.resource_id,
+                  "metadata": l.action_metadata, "created_at": l.created_at.isoformat()} for l in logs]
+    }
+
+
+# ==========================================
+# PHASE 4: FEATURE MANAGEMENT (Create/Delete)
+# ==========================================
+
+from pydantic import BaseModel as PydanticBaseModel
+
+class FeatureCreate(PydanticBaseModel):
+    code: str
+    display_name: str
+    description: str | None = None
+    category: str
+    icon: str | None = None
+    active: bool = True
+
+
+@router.post("/features", response_model=FeatureResponse, status_code=status.HTTP_201_CREATED)
+async def create_feature(
+    payload: FeatureCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Create a new feature in the feature registry."""
+    existing = (await db.execute(select(Feature).where(Feature.code == payload.code))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Feature with code '{payload.code}' already exists")
+
+    feature = Feature(
+        code=payload.code, display_name=payload.display_name,
+        description=payload.description, category=payload.category,
+        icon=payload.icon, active=payload.active
+    )
+    db.add(feature)
+    await db.commit()
+    await db.refresh(feature)
+
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+    return feature
+
+
+@router.delete("/features/{feature_id}")
+async def delete_feature(
+    feature_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Soft delete a feature from the registry."""
+    feature = await db.get(Feature, feature_id)
+    if not feature or feature.is_deleted:
+        raise HTTPException(status_code=404, detail="Feature not found")
+    feature.is_deleted = True
+    await db.commit()
+    from app.dependencies.feature_guard import invalidate_all_tenant_features
+    await invalidate_all_tenant_features()
+    return {"detail": "Feature deleted"}
+
+
+# ==========================================
+# PHASE 5: COUPON MANAGEMENT
+# ==========================================
+
+from app.schemas.coupon import CouponCreate, CouponUpdate, CouponResponse
+
+@router.get("/coupons", response_model=list[CouponResponse])
+async def list_coupons(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.coupon import Coupon
+    res = await db.execute(select(Coupon).where(Coupon.is_deleted == False).order_by(Coupon.created_at.desc()))
+    return res.scalars().all()
+
+
+@router.post("/coupons", response_model=CouponResponse, status_code=status.HTTP_201_CREATED)
+async def create_coupon(
+    payload: CouponCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.coupon import Coupon
+    existing = (await db.execute(select(Coupon).where(Coupon.code == payload.code.upper(), Coupon.is_deleted == False))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Coupon code already exists")
+
+    data = payload.model_dump()
+    data["code"] = payload.code.upper()
+    coupon = Coupon(**data, created_by=actor.id)
+    db.add(coupon)
+    await db.commit()
+    await db.refresh(coupon)
+    return coupon
+
+
+@router.patch("/coupons/{coupon_id}", response_model=CouponResponse)
+async def update_coupon(
+    coupon_id: uuid.UUID,
+    payload: CouponUpdate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.coupon import Coupon
+    coupon = await db.get(Coupon, coupon_id)
+    if not coupon or coupon.is_deleted:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(coupon, k, v)
+    await db.commit()
+    await db.refresh(coupon)
+    return coupon
+
+
+@router.delete("/coupons/{coupon_id}")
+async def delete_coupon(
+    coupon_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.coupon import Coupon
+    coupon = await db.get(Coupon, coupon_id)
+    if not coupon or coupon.is_deleted:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    coupon.is_deleted = True
+    await db.commit()
+    return {"detail": "Coupon deleted"}
+
+
+# ==========================================
+# PHASE 6: MULTI-CURRENCY ENGINE
+# ==========================================
+
+from app.schemas.currency import CurrencyCreate, CurrencyUpdate, CurrencyResponse
+
+@router.get("/currencies", response_model=list[CurrencyResponse])
+async def list_currencies(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.currency import Currency
+    res = await db.execute(select(Currency).where(Currency.is_active == True).order_by(Currency.code))
+    return res.scalars().all()
+
+
+@router.post("/currencies", response_model=CurrencyResponse, status_code=status.HTTP_201_CREATED)
+async def create_currency(
+    payload: CurrencyCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.currency import Currency
+    existing = await db.get(Currency, payload.code.upper())
+    if existing:
+        raise HTTPException(status_code=409, detail="Currency already exists")
+
+    if payload.is_base:
+        await db.execute(Currency.__table__.update().values(is_base=False))
+
+    data = payload.model_dump()
+    data["code"] = payload.code.upper()
+    currency = Currency(**data)
+    db.add(currency)
+    await db.commit()
+    await db.refresh(currency)
+    return currency
+
+
+@router.patch("/currencies/{code}", response_model=CurrencyResponse)
+async def update_currency(
+    code: str,
+    payload: CurrencyUpdate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.currency import Currency
+    currency = await db.get(Currency, code.upper())
+    if not currency:
+        raise HTTPException(status_code=404, detail="Currency not found")
+
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(currency, k, v)
+    currency.last_updated = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(currency)
+    return currency
+
+
+@router.delete("/currencies/{code}")
+async def delete_currency(
+    code: str,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.currency import Currency
+    currency = await db.get(Currency, code.upper())
+    if not currency:
+        raise HTTPException(status_code=404, detail="Currency not found")
+    if currency.is_base:
+        raise HTTPException(status_code=400, detail="Cannot delete the base currency")
+    currency.is_active = False
+    await db.commit()
+    return {"detail": "Currency deactivated"}
+
+
+# ==========================================
+# PHASE 7: TAX ENGINE
+# ==========================================
+
+from app.schemas.tax_config import TaxConfigCreate, TaxConfigUpdate, TaxConfigResponse
+
+@router.get("/tax-configs", response_model=list[TaxConfigResponse])
+async def list_tax_configs(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.tax_config import TaxConfig
+    res = await db.execute(select(TaxConfig).where(TaxConfig.is_deleted == False).order_by(TaxConfig.country_name))
+    return res.scalars().all()
+
+
+@router.post("/tax-configs", response_model=TaxConfigResponse, status_code=status.HTTP_201_CREATED)
+async def create_tax_config(
+    payload: TaxConfigCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.tax_config import TaxConfig
+    tax = TaxConfig(**payload.model_dump())
+    db.add(tax)
+    await db.commit()
+    await db.refresh(tax)
+    return tax
+
+
+@router.patch("/tax-configs/{config_id}", response_model=TaxConfigResponse)
+async def update_tax_config(
+    config_id: uuid.UUID,
+    payload: TaxConfigUpdate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.tax_config import TaxConfig
+    config = await db.get(TaxConfig, config_id)
+    if not config or config.is_deleted:
+        raise HTTPException(status_code=404, detail="Tax config not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(config, k, v)
+    await db.commit()
+    await db.refresh(config)
+    return config
+
+
+@router.delete("/tax-configs/{config_id}")
+async def delete_tax_config(
+    config_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.tax_config import TaxConfig
+    config = await db.get(TaxConfig, config_id)
+    if not config or config.is_deleted:
+        raise HTTPException(status_code=404, detail="Tax config not found")
+    config.is_deleted = True
+    await db.commit()
+    return {"detail": "Tax config deleted"}
+
+
+# ==========================================
+# PHASE 9: PAYMENT GATEWAY MANAGEMENT
+# ==========================================
+
+from app.schemas.payment_gateway import PaymentGatewayCreate, PaymentGatewayUpdate, PaymentGatewayResponse
+
+@router.get("/payment-gateways", response_model=list[PaymentGatewayResponse])
+async def list_payment_gateways(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.payment_gateway import PaymentGateway
+    res = await db.execute(select(PaymentGateway).where(PaymentGateway.is_deleted == False).order_by(PaymentGateway.sort_order))
+    gateways = res.scalars().all()
+    return [PaymentGatewayResponse.from_model(gw) for gw in gateways]
+
+
+@router.post("/payment-gateways", response_model=PaymentGatewayResponse, status_code=status.HTTP_201_CREATED)
+async def create_payment_gateway(
+    payload: PaymentGatewayCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.payment_gateway import PaymentGateway
+    existing = (await db.execute(select(PaymentGateway).where(PaymentGateway.name == payload.name))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Gateway already configured")
+    gw = PaymentGateway(**payload.model_dump())
+    db.add(gw)
+    await db.commit()
+    await db.refresh(gw)
+    return PaymentGatewayResponse.from_model(gw)
+
+
+@router.patch("/payment-gateways/{gw_id}", response_model=PaymentGatewayResponse)
+async def update_payment_gateway(
+    gw_id: uuid.UUID,
+    payload: PaymentGatewayUpdate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.payment_gateway import PaymentGateway
+    gw = await db.get(PaymentGateway, gw_id)
+    if not gw or gw.is_deleted:
+        raise HTTPException(status_code=404, detail="Gateway not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        if v is not None or k in ("api_key", "api_secret", "webhook_secret"):
+            setattr(gw, k, v)
+    await db.commit()
+    await db.refresh(gw)
+    return PaymentGatewayResponse.from_model(gw)
+
+
+@router.post("/payment-gateways/{gw_id}/toggle")
+async def toggle_payment_gateway(
+    gw_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.payment_gateway import PaymentGateway
+    gw = await db.get(PaymentGateway, gw_id)
+    if not gw or gw.is_deleted:
+        raise HTTPException(status_code=404, detail="Gateway not found")
+    gw.is_enabled = not gw.is_enabled
+    await db.commit()
+    return {"detail": f"Gateway {'enabled' if gw.is_enabled else 'disabled'}", "is_enabled": gw.is_enabled}
+
+
+# ==========================================
+# PHASE 12: NOTIFICATION TEMPLATES
+# ==========================================
+
+from app.schemas.notification_template import NotificationTemplateCreate, NotificationTemplateUpdate, NotificationTemplateResponse
+
+@router.get("/notification-templates", response_model=list[NotificationTemplateResponse])
+async def list_notification_templates(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.notification_template import NotificationTemplate
+    res = await db.execute(
+        select(NotificationTemplate)
+        .where(NotificationTemplate.is_deleted == False)
+        .order_by(NotificationTemplate.category, NotificationTemplate.template_key)
+    )
+    return res.scalars().all()
+
+
+@router.post("/notification-templates", response_model=NotificationTemplateResponse, status_code=status.HTTP_201_CREATED)
+async def create_notification_template(
+    payload: NotificationTemplateCreate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.notification_template import NotificationTemplate
+    existing = (await db.execute(
+        select(NotificationTemplate).where(
+            NotificationTemplate.template_key == payload.template_key,
+            NotificationTemplate.is_deleted == False
+        )
+    )).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Template key already exists")
+    tmpl = NotificationTemplate(**payload.model_dump())
+    db.add(tmpl)
+    await db.commit()
+    await db.refresh(tmpl)
+    return tmpl
+
+
+@router.patch("/notification-templates/{tmpl_id}", response_model=NotificationTemplateResponse)
+async def update_notification_template(
+    tmpl_id: uuid.UUID,
+    payload: NotificationTemplateUpdate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.notification_template import NotificationTemplate
+    tmpl = await db.get(NotificationTemplate, tmpl_id)
+    if not tmpl or tmpl.is_deleted:
+        raise HTTPException(status_code=404, detail="Template not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(tmpl, k, v)
+    await db.commit()
+    await db.refresh(tmpl)
+    return tmpl
+
+
+@router.delete("/notification-templates/{tmpl_id}")
+async def delete_notification_template(
+    tmpl_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    from app.models.notification_template import NotificationTemplate
+    tmpl = await db.get(NotificationTemplate, tmpl_id)
+    if not tmpl or tmpl.is_deleted:
+        raise HTTPException(status_code=404, detail="Template not found")
+    tmpl.is_deleted = True
+    await db.commit()
+    return {"detail": "Template deleted"}
+
+
+# ==========================================
+# PHASE 15: REPORTS
+# ==========================================
+
+@router.get("/reports/revenue")
+async def revenue_report(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
+    currency: str = Query("INR")
+):
+    """Revenue report with MRR/ARR breakdown."""
+    if not start_date:
+        start_date = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0)
+    if not end_date:
+        end_date = datetime.now(timezone.utc)
+
+    total_collected = float((await db.execute(
+        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "paid", Invoice.is_deleted == False,
+               Invoice.created_at.between(start_date, end_date))
+    )).scalar() or 0.0)
+
+    pending = float((await db.execute(
+        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "unpaid", Invoice.is_deleted == False)
+    )).scalar() or 0.0)
+
+    mrr = float((await db.execute(
+        select(func.coalesce(func.sum(Plan.monthly_price * TenantSubscription.users_purchased), 0.0))
+        .join(Plan, TenantSubscription.plan_id == Plan.id)
+        .where(TenantSubscription.status.in_(["active"]), TenantSubscription.is_deleted == False)
+    )).scalar() or 0.0)
+
+    plan_dist = (await db.execute(
+        select(Plan.display_name, Plan.name, func.count(TenantSubscription.id).label("count"))
+        .join(TenantSubscription, TenantSubscription.plan_id == Plan.id)
+        .where(TenantSubscription.is_deleted == False, TenantSubscription.status == "active")
+        .group_by(Plan.id, Plan.display_name, Plan.name)
+        .order_by(func.count(TenantSubscription.id).desc())
+    )).all()
+
+    return {
+        "period_start": start_date.date().isoformat(),
+        "period_end": end_date.date().isoformat(),
+        "currency": currency,
+        "mrr": round(mrr, 2),
+        "arr": round(mrr * 12, 2),
+        "total_collected": round(total_collected, 2),
+        "pending": round(pending, 2),
+        "top_plans": [{"name": p.display_name or p.name, "active_subscriptions": p.count} for p in plan_dist],
+    }
+
+
+@router.get("/reports/tenants")
+async def tenant_report(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Tenant distribution summary."""
+    total = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False))).scalar() or 0
+    active = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "active"))).scalar() or 0
+    trial = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "trial"))).scalar() or 0
+    expired = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "expired"))).scalar() or 0
+    suspended = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False, Organization.subscription_status == "suspended"))).scalar() or 0
+
+    plan_dist = (await db.execute(
+        select(Organization.subscription_plan, func.count(Organization.id).label("count"))
+        .where(Organization.is_deleted == False)
+        .group_by(Organization.subscription_plan)
+    )).all()
+
+    return {
+        "total": total, "active": active, "trial": trial,
+        "expired": expired, "suspended": suspended,
+        "by_plan": [{"plan": p.subscription_plan, "count": p.count} for p in plan_dist]
+    }
+
+
+@router.get("/reports/seat-utilization")
+async def seat_utilization_report(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Seat utilization across all tenants."""
+    total_licensed = (await db.execute(
+        select(func.coalesce(func.sum(TenantSubscription.users_purchased), 0))
+        .where(TenantSubscription.is_deleted == False)
+    )).scalar() or 0
+
+    total_active = (await db.execute(
+        select(func.coalesce(func.sum(TenantSubscription.users_active), 0))
+        .where(TenantSubscription.is_deleted == False)
+    )).scalar() or 0
+
+    by_org = (await db.execute(
+        select(Organization.name, TenantSubscription.users_purchased, TenantSubscription.users_active)
+        .join(TenantSubscription, TenantSubscription.organization_id == Organization.id)
+        .where(Organization.is_deleted == False, TenantSubscription.is_deleted == False)
+        .order_by(TenantSubscription.users_purchased.desc())
+        .limit(50)
+    )).all()
+
+    return {
+        "total_licensed": total_licensed,
+        "total_active": total_active,
+        "utilization_pct": round(total_active / total_licensed * 100, 1) if total_licensed > 0 else 0.0,
+        "by_organization": [
+            {
+                "name": r.name,
+                "licensed": r.users_purchased,
+                "active": r.users_active,
+                "utilization_pct": round(r.users_active / r.users_purchased * 100, 1) if r.users_purchased > 0 else 0.0
+            }
+            for r in by_org
+        ]
+    }
+
+
+@router.get("/reports/invoices")
+async def invoice_report(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None)
+):
+    """Invoice summary report."""
+    if not start_date:
+        from datetime import timedelta
+        start_date = datetime.now(timezone.utc) - timedelta(days=30)
+    if not end_date:
+        end_date = datetime.now(timezone.utc)
+
+    total_invoices = (await db.execute(
+        select(func.count(Invoice.id))
+        .where(Invoice.is_deleted == False, Invoice.created_at.between(start_date, end_date))
+    )).scalar() or 0
+
+    paid = (await db.execute(
+        select(func.count(Invoice.id), func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "paid", Invoice.is_deleted == False,
+               Invoice.created_at.between(start_date, end_date))
+    )).one()
+
+    unpaid = (await db.execute(
+        select(func.count(Invoice.id), func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "unpaid", Invoice.is_deleted == False,
+               Invoice.created_at.between(start_date, end_date))
+    )).one()
+
+    return {
+        "period_start": start_date.date().isoformat(),
+        "period_end": end_date.date().isoformat(),
+        "total_invoices": total_invoices,
+        "paid_count": paid[0], "paid_amount": float(paid[1]),
+        "unpaid_count": unpaid[0], "unpaid_amount": float(unpaid[1]),
+    }

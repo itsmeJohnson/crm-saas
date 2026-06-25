@@ -16,17 +16,20 @@ async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     token: Annotated[str, Depends(reusable_oauth2)]
 ) -> User:
+    # decode_token now raises HTTPException on expiry/invalid — no need to check empty dict
     payload = decode_token(token)
+
     token_subject = payload.get("sub")
     token_type = payload.get("type")
-    
+    token_version_claim = payload.get("tv")  # embedded at login for forced-logout support
+
     if not token_subject or token_type != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     user_repo = UserRepository(db)
     try:
         user_uuid = uuid.UUID(token_subject)
@@ -35,18 +38,27 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token content"
         )
-        
+
     user = await user_repo.get(user_uuid)
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user"
         )
+
+    # Validate token_version — ensures forced logout and password reset invalidate sessions
+    if token_version_claim is not None and token_version_claim != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session invalidated. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
 
 async def get_current_active_user(

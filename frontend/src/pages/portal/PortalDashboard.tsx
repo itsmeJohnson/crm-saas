@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { portalApi, DashboardStatsResponse } from '../../services/portalApi';
 import {
   Sparkles, CreditCard, Users, HardDrive, PhoneCall,
-  ArrowRight, Plus, Download, AlertTriangle, Loader2, CheckCircle2, ChevronRight
+  ArrowRight, Plus, AlertTriangle, Loader2, CheckCircle2, ChevronRight
 } from 'lucide-react';
 
 export const PortalDashboard: React.FC = () => {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

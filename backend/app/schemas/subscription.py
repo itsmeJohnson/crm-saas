@@ -30,6 +30,9 @@ class TenantSubscriptionResponse(BaseModel):
     end_date: datetime
     trial_end_date: datetime | None = None
     auto_renew: bool
+    users_purchased: int
+    users_purchased_next: int | None = None
+    users_active: int
     plan: PlanResponse
 
 class UsageMeter(BaseModel):
@@ -59,3 +62,6 @@ class InvoiceResponse(BaseModel):
     due_date: datetime
     issue_date: datetime
     plan_name: str | None = None
+
+class ReduceSeatsRequest(BaseModel):
+    new_seat_count: int = Field(..., ge=10, description="The new total seat count, must be at least 10.")

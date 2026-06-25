@@ -23,6 +23,12 @@ from app.models.system_setting import SystemSetting
 from app.models.invoice_config import InvoiceConfig
 from app.models.commercial_settings import CommercialSettings
 from app.models.support_ticket import SupportTicket
+from app.models.seat_history import SeatAssignmentHistory
+from app.models.currency import Currency
+from app.models.tax_config import TaxConfig
+from app.models.payment_gateway import PaymentGateway
+from app.models.notification_template import NotificationTemplate
+from app.models.coupon import Coupon
 
 __all__ = [
     "Base", 
@@ -54,5 +60,11 @@ __all__ = [
     "SystemSetting",
     "InvoiceConfig",
     "CommercialSettings",
-    "SupportTicket"
+    "SupportTicket",
+    "SeatAssignmentHistory",
+    "Currency",
+    "TaxConfig",
+    "PaymentGateway",
+    "NotificationTemplate",
+    "Coupon"
 ]

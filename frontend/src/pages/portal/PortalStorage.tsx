@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import {
   HardDrive, Plus, CreditCard, Loader2, CheckCircle2,
-  AlertTriangle, ArrowUpRight, BarChart
+  AlertTriangle, 
 } from 'lucide-react';
 
 export const PortalStorage: React.FC = () => {

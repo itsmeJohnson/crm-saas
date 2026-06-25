@@ -3,18 +3,56 @@ import { useForm } from 'react-hook-form';
 import { 
   Building, Users, FileText, Edit, Plus, X, ShieldAlert, 
   Loader2, Calendar, DollarSign, CheckCircle2, AlertCircle, Clock, Trash2,
-  Workflow, CheckSquare, Settings, Lock, Check, Key, ArrowUpDown, FolderKanban,
-  Upload, Mail, CreditCard, Image, Receipt, Percent
+  Workflow, CheckSquare, Settings, Lock, Unlock, Check, Key, ArrowUpDown, FolderKanban,
+  Upload, Mail, CreditCard, Image, Receipt, Percent, LayoutDashboard,
+  Globe, Tag, Bell, Shield, BarChart3, RefreshCw, ToggleLeft, ToggleRight,
+  Download, Eye, EyeOff
 } from 'lucide-react';
 import { 
   superAdminApi, TenantResponse, TenantUserResponse, TenantInvoiceResponse,
   SubscriptionUpdateRequest, InvoiceCreateRequest, CreateTenantRequest,
   PlanResponse, FeatureResponse, PlanFeatureResponse, PlanCreatePayload,
-  CommercialSettingsUpdate
+  CommercialSettingsUpdate, CurrencyResponse, TaxConfigResponse,
+  PaymentGatewayResponse, NotificationTemplateResponse, CouponResponse
 } from '../services/superAdminApi';
 
+type SectionKey = 'dashboard' | 'tenants' | 'plans' | 'features' | 'commercial' | 'currencies' | 'tax' | 'gateways' | 'coupons' | 'invoice' | 'notifications' | 'audit' | 'reports' | 'global';
+
+const CommercialSummaryPanel: React.FC<{ regPlan?: any }> = (_props) => (
+  <div className="border-t border-slate-800/80 pt-4">
+    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Commercial Summary</h4>
+    <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl overflow-hidden text-xs">
+      {[
+        { label: 'Price Per Licensed Seat', hint: 'As entered above' },
+        { label: 'Minimum Initial Purchase', hint: '10 Licensed Seats' },
+        { label: 'Minimum Contract', hint: '3 Months' },
+        { label: 'Starting Monthly Billing', hint: 'Price x Min Seats' },
+        { label: 'GST', hint: 'Extra (as configured)' },
+        { label: 'Additional Seat Price', hint: 'Per extra seat / month' },
+      ].map((row, i) => (
+        <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i !== 5 ? 'border-b border-slate-800/60' : ''}`}>
+          <span className="text-slate-400 font-medium">{row.label}</span>
+          <span className="text-slate-300 font-semibold">{row.hint}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const NavItem: React.FC<{ icon: React.ElementType; label: string; active: boolean; onClick: () => void }> = ({ icon: Icon, label, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer text-left relative ${
+      active ? 'bg-brand-500/10 text-brand-400 border-r-2 border-brand-500' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+    }`}
+  >
+    <Icon className="w-4 h-4 shrink-0" />
+    {label}
+  </button>
+);
+
 export const TenantsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'features' | 'invoice-settings' | 'commercial-settings' | 'system-settings'>('tenants');
+  const [activeSection, setActiveSection] = useState<SectionKey>('tenants');
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [plans, setPlans] = useState<PlanResponse[]>([]);
   const [features, setFeatures] = useState<FeatureResponse[]>([]);
@@ -22,657 +60,444 @@ export const TenantsPage: React.FC = () => {
   const [settingsData, setSettingsData] = useState<Record<string, any>>({});
   const [editedConfig, setEditedConfig] = useState<any>(null);
   const [invoiceConfigSubTab, setInvoiceConfigSubTab] = useState<'general' | 'branding' | 'tax' | 'invoice' | 'payment' | 'email' | 'footer'>('general');
-  
   const [editedCommSettings, setEditedCommSettings] = useState<CommercialSettingsUpdate | null>(null);
   const [commSettingsSubTab, setCommSettingsSubTab] = useState<'general' | 'pricing' | 'tax' | 'contracts' | 'setup' | 'discounts' | 'late-fees' | 'renewals' | 'reminders' | 'emails' | 'advanced'>('general');
   const [isUploading, setIsUploading] = useState(false);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // Modals / Drawer state
   const [selectedTenant, setSelectedTenant] = useState<TenantResponse | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanResponse | null>(null);
   const [activeModal, setActiveModal] = useState<'createTenant' | 'editSubscription' | 'users' | 'invoices' | 'deleteTenantConfirm' | 'resetPassword' | 'createPlan' | 'editPlan' | null>(null);
-  
-  // Specific inputs
   const [deleteConfirmSlug, setDeleteConfirmSlug] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [tenantUsers, setTenantUsers] = useState<TenantUserResponse[]>([]);
   const [invoices, setInvoices] = useState<TenantInvoiceResponse[]>([]);
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [currencies, setCurrencies] = useState<CurrencyResponse[]>([]);
+  const [taxConfigs, setTaxConfigs] = useState<TaxConfigResponse[]>([]);
+  const [gateways, setGateways] = useState<PaymentGatewayResponse[]>([]);
+  const [coupons, setCoupons] = useState<CouponResponse[]>([]);
+  const [notifTemplates, setNotifTemplates] = useState<NotificationTemplateResponse[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [revenueReport, setRevenueReport] = useState<any>(null);
+  const [seatReport, setSeatReport] = useState<any>(null);
+  const [currencyForm, setCurrencyForm] = useState<any>({});
+  const [activeCurrencyModal, setActiveCurrencyModal] = useState<'create' | 'edit' | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyResponse | null>(null);
+  const [taxForm, setTaxForm] = useState<any>({});
+  const [activeTaxModal, setActiveTaxModal] = useState<'create' | 'edit' | null>(null);
+  const [selectedTax, setSelectedTax] = useState<TaxConfigResponse | null>(null);
+  const [couponForm, setCouponForm] = useState<any>({});
+  const [activeCouponModal, setActiveCouponModal] = useState<'create' | 'edit' | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = useState<CouponResponse | null>(null);
+  const [notifForm, setNotifForm] = useState<any>({});
+  const [activeNotifModal, setActiveNotifModal] = useState<'edit' | null>(null);
+  const [selectedNotif, setSelectedNotif] = useState<NotificationTemplateResponse | null>(null);
+  const [gatewayForms, setGatewayForms] = useState<Record<string, any>>({});
+  const [expandedGateway, setExpandedGateway] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
 
-  // Loaders
   const fetchAllData = async () => {
-    setIsLoading(true);
-    setGlobalError(null);
+    setIsLoading(true); setGlobalError(null);
     try {
-      if (activeTab === 'tenants') {
-        const data = await superAdminApi.getTenants();
-        setTenants(data);
-      } else if (activeTab === 'plans') {
-        const data = await superAdminApi.getPlans();
-        setPlans(data);
-      } else if (activeTab === 'features') {
-        const pData = await superAdminApi.getPlans();
-        const fData = await superAdminApi.getFeatures();
-        const mData = await superAdminApi.getPlanFeatures();
-        setPlans(pData);
-        setFeatures(fData);
-        setMappings(mData);
-      } else if (activeTab === 'invoice-settings') {
-        const data = await superAdminApi.getInvoiceConfig();
-        setEditedConfig(data);
-      } else if (activeTab === 'commercial-settings') {
-        const data = await superAdminApi.getCommercialSettings();
-        setEditedCommSettings({ ...data, reason: '' });
-        const pData = await superAdminApi.getPlans();
-        setPlans(pData);
-      } else if (activeTab === 'system-settings') {
-        const data = await superAdminApi.getSystemSettings();
-        const configMap: Record<string, any> = {};
-        data.forEach(item => {
-          configMap[item.key] = item.value;
-        });
-        setSettingsData(configMap);
+      switch (activeSection) {
+        case 'dashboard': { const d = await superAdminApi.getDashboard(); setDashboard(d); break; }
+        case 'tenants': { const d = await superAdminApi.getTenants(); setTenants(d); break; }
+        case 'plans': { const d = await superAdminApi.getPlans(); setPlans(d); break; }
+        case 'features': {
+          const [p,f,m] = await Promise.all([superAdminApi.getPlans(),superAdminApi.getFeatures(),superAdminApi.getPlanFeatures()]);
+          setPlans(p); setFeatures(f); setMappings(m); break;
+        }
+        case 'invoice': { const d = await superAdminApi.getInvoiceConfig(); setEditedConfig(d); break; }
+        case 'commercial': {
+          const [d,p] = await Promise.all([superAdminApi.getCommercialSettings(),superAdminApi.getPlans()]);
+          setEditedCommSettings({ ...d, reason: '' }); setPlans(p); break;
+        }
+        case 'global': {
+          const d = await superAdminApi.getSystemSettings();
+          const m: Record<string,any> = {};
+          d.forEach((i: any) => { m[i.key] = i.value; });
+          setSettingsData(m); break;
+        }
+        case 'currencies': { const d = await superAdminApi.getCurrencies(); setCurrencies(d); break; }
+        case 'tax': { const d = await superAdminApi.getTaxConfigs(); setTaxConfigs(d); break; }
+        case 'gateways': { const d = await superAdminApi.getPaymentGateways(); setGateways(d); break; }
+        case 'coupons': { const d = await superAdminApi.getCoupons(); setCoupons(d); break; }
+        case 'notifications': { const d = await superAdminApi.getNotificationTemplates(); setNotifTemplates(d); break; }
+        case 'audit': {
+          const d = await superAdminApi.getAuditLogs({ limit: 50, ...(auditSearch ? { action: auditSearch } : {}) });
+          setAuditLogs(Array.isArray(d) ? d : (d as any).items || []); break;
+        }
+        case 'reports': {
+          const [rv,st] = await Promise.all([superAdminApi.getRevenueReport(),superAdminApi.getSeatUtilization()]);
+          setRevenueReport(rv); setSeatReport(st); break;
+        }
+        default: break;
       }
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || 'Failed to fetch settings from backend');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err: any) { setGlobalError(err.response?.data?.detail || 'Failed to fetch data'); }
+    finally { setIsLoading(false); }
   };
 
-  useEffect(() => {
-    fetchAllData();
-  }, [activeTab]);
+  useEffect(() => { fetchAllData(); }, [activeSection]);
 
-  const showSuccess = (msg: string) => {
-    setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(null), 4000);
-  };
+  const showSuccess = (msg: string) => { setSuccessMessage(msg); setTimeout(() => setSuccessMessage(null), 4000); };
 
-  // ==========================================
-  // TENANT ACTIONS
-  // ==========================================
   const openUsersModal = async (tenant: TenantResponse) => {
-    setSelectedTenant(tenant);
-    setTenantUsers([]);
-    setActiveModal('users');
-    setIsModalLoading(true);
-    setModalError(null);
-    try {
-      const data = await superAdminApi.getTenantUsers(tenant.id);
-      setTenantUsers(data);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to load users');
-    } finally {
-      setIsModalLoading(false);
-    }
+    setSelectedTenant(tenant); setTenantUsers([]); setActiveModal('users'); setIsModalLoading(true); setModalError(null);
+    try { setTenantUsers(await superAdminApi.getTenantUsers(tenant.id)); }
+    catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const openInvoicesModal = async (tenant: TenantResponse) => {
-    setSelectedTenant(tenant);
-    setInvoices([]);
-    setActiveModal('invoices');
-    setIsModalLoading(true);
-    setModalError(null);
-    try {
-      const data = await superAdminApi.getTenantInvoices(tenant.id);
-      setInvoices(data);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to load invoices');
-    } finally {
-      setIsModalLoading(false);
-    }
+    setSelectedTenant(tenant); setInvoices([]); setActiveModal('invoices'); setIsModalLoading(true); setModalError(null);
+    try { setInvoices(await superAdminApi.getTenantInvoices(tenant.id)); }
+    catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const handleSuspendTenant = async (tenant: TenantResponse) => {
     setIsLoading(true);
-    try {
-      await superAdminApi.suspendTenant(tenant.id);
-      showSuccess(`Subscription status for ${tenant.name} updated.`);
-      await fetchAllData();
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || 'Failed to toggle status');
-    } finally {
-      setIsLoading(false);
-    }
+    try { await superAdminApi.suspendTenant(tenant.id); showSuccess('Status updated.'); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
   };
-
   const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTenant || !newPassword) return;
-    setIsModalLoading(true);
-    setModalError(null);
-    try {
-      await superAdminApi.resetTenantOwnerPassword(selectedTenant.id, newPassword);
-      showSuccess(`Owner password reset successfully.`);
-      setNewPassword('');
-      setActiveModal(null);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to reset password');
-    } finally {
-      setIsModalLoading(false);
-    }
+    e.preventDefault(); if (!selectedTenant || !newPassword) return;
+    setIsModalLoading(true); setModalError(null);
+    try { await superAdminApi.resetTenantOwnerPassword(selectedTenant.id, newPassword); showSuccess('Password reset.'); setNewPassword(''); setActiveModal(null); }
+    catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
-  // Forms Hooks
   const { register: regTenant, handleSubmit: handleTenantSubmit, reset: resetTenant, formState: { errors: tenantErrors } } = useForm<CreateTenantRequest>();
   const { register: regSub, handleSubmit: handleSubSubmit, setValue: setSubValue, formState: { errors: subErrors } } = useForm<SubscriptionUpdateRequest>();
   const { register: regInv, handleSubmit: handleInvSubmit, reset: resetInv, formState: { errors: invErrors } } = useForm<InvoiceCreateRequest>();
   const { register: regPlan, handleSubmit: handlePlanSubmit, reset: resetPlan, setValue: setPlanValue, formState: { errors: planErrors } } = useForm<PlanCreatePayload>();
-
-  const openEditSubModal = (tenant: TenantResponse) => {
-    setSelectedTenant(tenant);
-    setModalError(null);
-    setActiveModal('editSubscription');
-  };
-
+  const openEditSubModal = (tenant: TenantResponse) => { setSelectedTenant(tenant); setModalError(null); setActiveModal('editSubscription'); };
   useEffect(() => {
     if (selectedTenant && activeModal === 'editSubscription') {
       setSubValue('subscription_plan', selectedTenant.subscription_plan);
       setSubValue('subscription_status', selectedTenant.subscription_status);
       setSubValue('max_users', selectedTenant.max_users);
-      setSubValue('subscription_expires_at', selectedTenant.subscription_expires_at ? selectedTenant.subscription_expires_at.substring(0, 10) : '');
+      setSubValue('subscription_expires_at', selectedTenant.subscription_expires_at?.substring(0, 10) || '');
     }
   }, [selectedTenant, activeModal, setSubValue]);
-
   const onCreateTenant = async (data: CreateTenantRequest) => {
-    setIsModalLoading(true);
-    setModalError(null);
+    setIsModalLoading(true); setModalError(null);
     try {
-      await superAdminApi.createTenant(data);
-      showSuccess(`Tenant ${data.company_name} created successfully.`);
-      await fetchAllData();
-      resetTenant();
-      setActiveModal(null);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to create tenant');
-    } finally {
-      setIsModalLoading(false);
-    }
+      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3) });
+      showSuccess('Tenant created.'); await fetchAllData(); resetTenant(); setActiveModal(null);
+    } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const onUpdateSubscription = async (data: SubscriptionUpdateRequest) => {
-    if (!selectedTenant) return;
-    setIsModalLoading(true);
-    setModalError(null);
+    if (!selectedTenant) return; setIsModalLoading(true); setModalError(null);
     try {
-      const payload: SubscriptionUpdateRequest = {
-        subscription_plan: data.subscription_plan,
-        subscription_status: data.subscription_status,
-        max_users: Number(data.max_users),
-        subscription_expires_at: data.subscription_expires_at ? new Date(data.subscription_expires_at).toISOString() : null
-      };
-      await superAdminApi.updateSubscription(selectedTenant.id, payload);
-      showSuccess(`Subscription bounds saved.`);
-      await fetchAllData();
-      setActiveModal(null);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to update subscription');
-    } finally {
-      setIsModalLoading(false);
-    }
+      await superAdminApi.updateSubscription(selectedTenant.id, { ...data, max_users: Number(data.max_users), subscription_expires_at: data.subscription_expires_at ? new Date(data.subscription_expires_at).toISOString() : null });
+      showSuccess('Subscription updated.'); await fetchAllData(); setActiveModal(null);
+    } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const onCreateInvoice = async (data: InvoiceCreateRequest) => {
-    if (!selectedTenant) return;
-    setIsModalLoading(true);
-    setModalError(null);
+    if (!selectedTenant) return; setIsModalLoading(true); setModalError(null);
     try {
-      const payload: InvoiceCreateRequest = {
-        amount: Number(data.amount),
-        due_date: new Date(data.due_date).toISOString(),
-        status: data.status || 'Pending'
-      };
-      await superAdminApi.createManualInvoice(selectedTenant.id, payload);
-      showSuccess('Manual invoice generated successfully.');
-      const updatedInvoices = await superAdminApi.getTenantInvoices(selectedTenant.id);
-      setInvoices(updatedInvoices);
-      resetInv();
-      await fetchAllData(); // update count
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to create manual invoice');
-    } finally {
-      setIsModalLoading(false);
-    }
+      await superAdminApi.createManualInvoice(selectedTenant.id, { amount: Number(data.amount), due_date: new Date(data.due_date).toISOString(), status: data.status || 'Pending' });
+      showSuccess('Invoice created.'); setInvoices(await superAdminApi.getTenantInvoices(selectedTenant.id)); resetInv();
+    } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const onToggleInvoiceStatus = async (invoiceId: string, currentStatus: string) => {
     if (!selectedTenant) return;
     const nextStatus = currentStatus === 'Paid' ? 'Pending' : currentStatus === 'Pending' ? 'Overdue' : 'Paid';
-    setIsModalLoading(true);
-    setModalError(null);
-    try {
-      await superAdminApi.updateInvoiceStatus(invoiceId, nextStatus);
-      const updatedInvoices = await superAdminApi.getTenantInvoices(selectedTenant.id);
-      setInvoices(updatedInvoices);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to update status');
-    } finally {
-      setIsModalLoading(false);
-    }
+    setIsModalLoading(true); setModalError(null);
+    try { await superAdminApi.updateInvoiceStatus(invoiceId, nextStatus); setInvoices(await superAdminApi.getTenantInvoices(selectedTenant.id)); }
+    catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const onConfirmDeleteTenant = async () => {
-    if (!selectedTenant) return;
-    setIsLoading(true);
-    try {
-      await superAdminApi.deleteTenant(selectedTenant.id);
-      showSuccess('Tenant instance and all associated databases purged.');
-      setActiveModal(null);
-      await fetchAllData();
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || 'Failed to purge tenant');
-    } finally {
-      setIsLoading(false);
-    }
+    if (!selectedTenant) return; setIsLoading(true);
+    try { await superAdminApi.deleteTenant(selectedTenant.id); showSuccess('Tenant purged.'); setActiveModal(null); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
   };
-
-  // ==========================================
-  // PLANS CRUD ACTIONS
-  // ==========================================
+  const cast = (data: PlanCreatePayload) => ({
+    ...data,
+    monthly_price: Number(data.monthly_price), quarterly_price: Number(data.quarterly_price), annual_price: Number(data.annual_price),
+    max_users: Number(data.max_users), storage_limit_gb: Number(data.storage_limit_gb),
+    recording_retention_days: Number(data.recording_retention_days), display_order: Number(data.display_order),
+    setup_charges: Number(data.setup_charges), minimum_users: Number(data.minimum_users),
+    maximum_users: Number(data.maximum_users), minimum_contract_months: Number(data.minimum_contract_months),
+    trial_days: Number(data.trial_days || 0), extra_user_price: Number(data.extra_user_price || 0),
+    discount_percentage: Number(data.discount_percentage || 0), gst_percentage: Number(data.gst_percentage || 0),
+    popular_plan: Boolean(data.popular_plan), recommended_plan: Boolean(data.recommended_plan),
+    allow_upgrade: Boolean(data.allow_upgrade), allow_downgrade: Boolean(data.allow_downgrade),
+    allow_trial: Boolean(data.allow_trial), allow_additional_seats: Boolean(data.allow_additional_seats),
+    auto_renew: Boolean(data.auto_renew), plan_active: Boolean(data.plan_active)
+  });
   const handleCreatePlan = async (data: PlanCreatePayload) => {
-    setIsModalLoading(true);
-    setModalError(null);
-    try {
-      await superAdminApi.createPlan({
-        ...data,
-        monthly_price: Number(data.monthly_price),
-        quarterly_price: Number(data.quarterly_price),
-        annual_price: Number(data.annual_price),
-        max_users: Number(data.max_users),
-        max_admins: Number(data.max_admins),
-        max_managers: Number(data.max_managers),
-        max_team_leads: Number(data.max_team_leads),
-        max_employees: Number(data.max_employees),
-        storage_limit_gb: Number(data.storage_limit_gb),
-        recording_retention_days: Number(data.recording_retention_days),
-        display_order: Number(data.display_order),
-        setup_charges: Number(data.setup_charges),
-        minimum_users: Number(data.minimum_users),
-        maximum_users: Number(data.maximum_users),
-        minimum_contract_months: Number(data.minimum_contract_months),
-        trial_days: Number(data.trial_days || 0),
-        extra_user_price: Number(data.extra_user_price || 0),
-        discount_percentage: Number(data.discount_percentage || 0),
-        gst_percentage: Number(data.gst_percentage || 0),
-        popular_plan: Boolean(data.popular_plan),
-        recommended_plan: Boolean(data.recommended_plan),
-        allow_upgrade: Boolean(data.allow_upgrade),
-        allow_downgrade: Boolean(data.allow_downgrade),
-        allow_trial: Boolean(data.allow_trial),
-        auto_renew: Boolean(data.auto_renew),
-        plan_active: Boolean(data.plan_active)
-      });
-      showSuccess(`Pricing plan template added.`);
-      await fetchAllData();
-      setActiveModal(null);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to create plan template');
-    } finally {
-      setIsModalLoading(false);
-    }
+    setIsModalLoading(true); setModalError(null);
+    try { await superAdminApi.createPlan(cast(data)); showSuccess('Plan created.'); await fetchAllData(); setActiveModal(null); }
+    catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const handleEditPlan = async (data: PlanCreatePayload) => {
-    if (!selectedPlan) return;
-    setIsModalLoading(true);
-    setModalError(null);
-    try {
-      await superAdminApi.updatePlan(selectedPlan.id, {
-        ...data,
-        monthly_price: Number(data.monthly_price),
-        quarterly_price: Number(data.quarterly_price),
-        annual_price: Number(data.annual_price),
-        max_users: Number(data.max_users),
-        max_admins: Number(data.max_admins),
-        max_managers: Number(data.max_managers),
-        max_team_leads: Number(data.max_team_leads),
-        max_employees: Number(data.max_employees),
-        storage_limit_gb: Number(data.storage_limit_gb),
-        recording_retention_days: Number(data.recording_retention_days),
-        display_order: Number(data.display_order),
-        setup_charges: Number(data.setup_charges),
-        minimum_users: Number(data.minimum_users),
-        maximum_users: Number(data.maximum_users),
-        minimum_contract_months: Number(data.minimum_contract_months),
-        trial_days: Number(data.trial_days || 0),
-        extra_user_price: Number(data.extra_user_price || 0),
-        discount_percentage: Number(data.discount_percentage || 0),
-        gst_percentage: Number(data.gst_percentage || 0),
-        popular_plan: Boolean(data.popular_plan),
-        recommended_plan: Boolean(data.recommended_plan),
-        allow_upgrade: Boolean(data.allow_upgrade),
-        allow_downgrade: Boolean(data.allow_downgrade),
-        allow_trial: Boolean(data.allow_trial),
-        auto_renew: Boolean(data.auto_renew),
-        plan_active: Boolean(data.plan_active)
-      });
-      showSuccess(`Pricing plan updated.`);
-      await fetchAllData();
-      setActiveModal(null);
-    } catch (err: any) {
-      setModalError(err.response?.data?.detail || 'Failed to update plan template');
-    } finally {
-      setIsModalLoading(false);
-    }
+    if (!selectedPlan) return; setIsModalLoading(true); setModalError(null);
+    try { await superAdminApi.updatePlan(selectedPlan.id, cast(data)); showSuccess('Plan updated.'); await fetchAllData(); setActiveModal(null); }
+    catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsModalLoading(false); }
   };
-
   const handleDeletePlan = async (planId: string) => {
-    if (!confirm('Are you sure you want to delete this pricing plan?')) return;
-    setIsLoading(true);
-    try {
-      await superAdminApi.deletePlan(planId);
-      showSuccess('Plan deleted successfully.');
-      await fetchAllData();
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || 'Failed to delete plan');
-    } finally {
-      setIsLoading(false);
-    }
+    if (!confirm('Delete this plan?')) return; setIsLoading(true);
+    try { await superAdminApi.deletePlan(planId); showSuccess('Plan deleted.'); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
   };
-
   const handleReorderPlans = async (planId: string, dir: 'up' | 'down') => {
-    const idx = plans.findIndex(p => p.id === planId);
-    if (idx === -1) return;
-    const newPlans = [...plans];
-    if (dir === 'up' && idx > 0) {
-      const temp = newPlans[idx];
-      newPlans[idx] = newPlans[idx - 1];
-      newPlans[idx - 1] = temp;
-    } else if (dir === 'down' && idx < newPlans.length - 1) {
-      const temp = newPlans[idx];
-      newPlans[idx] = newPlans[idx + 1];
-      newPlans[idx + 1] = temp;
-    } else {
-      return;
-    }
+    const idx = plans.findIndex(p => p.id === planId); if (idx === -1) return;
+    const np = [...plans];
+    if (dir === 'up' && idx > 0) { const t = np[idx]; np[idx] = np[idx-1]; np[idx-1] = t; }
+    else if (dir === 'down' && idx < np.length - 1) { const t = np[idx]; np[idx] = np[idx+1]; np[idx+1] = t; }
+    else return;
     setIsLoading(true);
-    try {
-      await superAdminApi.reorderPlans(newPlans.map(p => p.id));
-      await fetchAllData();
-    } catch (err: any) {
-      setGlobalError('Failed to save plans display sequence');
-    } finally {
-      setIsLoading(false);
-    }
+    try { await superAdminApi.reorderPlans(np.map(p => p.id)); await fetchAllData(); }
+    catch { setGlobalError('Failed'); }
+    finally { setIsLoading(false); }
   };
-
-  // ==========================================
-  // FEATURE MATRIX ACTIONS
-  // ==========================================
-  const isFeatureMapped = (planId: string, featureId: string) => {
-    return mappings.some(m => m.plan_id === planId && m.feature_id === featureId && m.enabled);
-  };
-
+  const isFeatureMapped = (planId: string, featureId: string) => mappings.some(m => m.plan_id === planId && m.feature_id === featureId && m.enabled);
   const handleToggleFeature = async (planId: string, featureId: string) => {
-    const currentEnabled = isFeatureMapped(planId, featureId);
+    const cur = isFeatureMapped(planId, featureId);
     try {
-      await superAdminApi.togglePlanFeature({
-        plan_id: planId,
-        feature_id: featureId,
-        enabled: !currentEnabled
-      });
-      // Optimistic update local state
-      const updatedMappings = [...mappings];
-      const idx = updatedMappings.findIndex(m => m.plan_id === planId && m.feature_id === featureId);
-      if (idx !== -1) {
-        updatedMappings[idx].enabled = !currentEnabled;
-      } else {
-        updatedMappings.push({
-          id: '',
-          plan_id: planId,
-          feature_id: featureId,
-          enabled: !currentEnabled
-        });
-      }
-      setMappings(updatedMappings);
-      showSuccess('Plan feature mapping updated successfully.');
-    } catch (err: any) {
-      setGlobalError('Failed to toggle feature mapping');
-    }
+      await superAdminApi.togglePlanFeature({ plan_id: planId, feature_id: featureId, enabled: !cur });
+      const um = [...mappings]; const idx = um.findIndex(m => m.plan_id === planId && m.feature_id === featureId);
+      if (idx !== -1) um[idx].enabled = !cur; else um.push({ id: '', plan_id: planId, feature_id: featureId, enabled: !cur });
+      setMappings(um); showSuccess('Updated.');
+    } catch { setGlobalError('Failed'); }
   };
-
-  // ==========================================
-  // INVOICE DYNAMIC CONFIGURATION ACTIONS
-  // ==========================================
   const handleSaveConfig = async () => {
-    if (!editedConfig) return;
-    setIsLoading(true);
-    setGlobalError(null);
-    try {
-      const updated = await superAdminApi.updateInvoiceConfig(editedConfig);
-      setEditedConfig(updated);
-      showSuccess("Invoice configuration updated successfully.");
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || "Failed to update configuration.");
-    } finally {
-      setIsLoading(false);
-    }
+    if (!editedConfig) return; setIsLoading(true);
+    try { setEditedConfig(await superAdminApi.updateInvoiceConfig(editedConfig)); showSuccess('Saved.'); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
   };
-
   const handleSaveCommSettings = async () => {
     if (!editedCommSettings) return;
-    if (!editedCommSettings.reason) {
-      setGlobalError("Reason for update is required for audit logs tracking.");
-      return;
-    }
+    if (!editedCommSettings.reason) { setGlobalError('Reason required.'); return; }
     setIsLoading(true);
-    setGlobalError(null);
-    try {
-      const updated = await superAdminApi.updateCommercialSettings(editedCommSettings);
-      setEditedCommSettings({ ...updated, reason: '' });
-      showSuccess("Commercial settings updated successfully.");
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || "Failed to update commercial settings.");
-    } finally {
-      setIsLoading(false);
-    }
+    try { const u = await superAdminApi.updateCommercialSettings(editedCommSettings); setEditedCommSettings({ ...u, reason: '' }); showSuccess('Saved.'); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
   };
-
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    setIsUploading(true);
-    setGlobalError(null);
-    try {
-      const updated = await superAdminApi.uploadCompanyLogo(file);
-      setEditedConfig(updated);
-      showSuccess("Company logo uploaded successfully.");
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || "Failed to upload logo.");
-    } finally {
-      setIsUploading(false);
-    }
+    if (!e.target.files?.length) return; setIsUploading(true);
+    try { setEditedConfig(await superAdminApi.uploadCompanyLogo(e.target.files[0])); showSuccess('Logo uploaded.'); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsUploading(false); }
   };
-
   const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    setIsUploading(true);
-    setGlobalError(null);
-    try {
-      const updated = await superAdminApi.uploadPaymentQr(file);
-      setEditedConfig(updated);
-      showSuccess("Payment QR code uploaded successfully.");
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || "Failed to upload QR code.");
-    } finally {
-      setIsUploading(false);
-    }
+    if (!e.target.files?.length) return; setIsUploading(true);
+    try { setEditedConfig(await superAdminApi.uploadPaymentQr(e.target.files[0])); showSuccess('QR uploaded.'); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsUploading(false); }
   };
-
   const handleDeleteLogo = async () => {
-    if (!confirm("Are you sure you want to delete the company logo?")) return;
-    setIsUploading(true);
-    setGlobalError(null);
-    try {
-      const updated = await superAdminApi.deleteCompanyLogo();
-      setEditedConfig(updated);
-      showSuccess("Company logo deleted.");
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || "Failed to delete logo.");
-    } finally {
-      setIsUploading(false);
-    }
+    if (!confirm('Delete logo?')) return; setIsUploading(true);
+    try { setEditedConfig(await superAdminApi.deleteCompanyLogo()); showSuccess('Deleted.'); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsUploading(false); }
   };
-
   const handleDeleteQr = async () => {
-    if (!confirm("Are you sure you want to delete the payment QR code?")) return;
-    setIsUploading(true);
-    setGlobalError(null);
-    try {
-      const updated = await superAdminApi.deletePaymentQr();
-      setEditedConfig(updated);
-      showSuccess("Payment QR code deleted.");
-    } catch (err: any) {
-      setGlobalError(err.response?.data?.detail || "Failed to delete QR code.");
-    } finally {
-      setIsUploading(false);
-    }
+    if (!confirm('Delete QR?')) return; setIsUploading(true);
+    try { setEditedConfig(await superAdminApi.deletePaymentQr()); showSuccess('Deleted.'); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsUploading(false); }
   };
-
   const handleSaveSystemSettings = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const smtp = {
-      host: formData.get('smtp_host'),
-      port: Number(formData.get('smtp_port')),
-      user: formData.get('smtp_user'),
-      from_name: formData.get('smtp_from_name')
-    };
-    const knowlarity = {
-      api_key: formData.get('k_key'),
-      agent_number: formData.get('k_agent')
-    };
+    e.preventDefault(); const fd = new FormData(e.currentTarget); setIsLoading(true);
+    try {
+      await superAdminApi.upsertSystemSetting({ key: 'smtp_settings', value: { host: fd.get('smtp_host'), port: Number(fd.get('smtp_port')), user: fd.get('smtp_user'), from_name: fd.get('smtp_from_name') } });
+      await superAdminApi.upsertSystemSetting({ key: 'telephony_settings', value: { api_key: fd.get('k_key'), agent_number: fd.get('k_agent') } });
+      showSuccess('Saved.');
+    } catch { setGlobalError('Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const getInvoiceStatusIcon = (status: string) => {
+    if (status === 'Paid') return <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />;
+    if (status === 'Pending') return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
+    return <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />;
+  };
+  const handleSaveCurrency = async () => {
     setIsLoading(true);
     try {
-      await superAdminApi.upsertSystemSetting({ key: 'smtp_settings', value: smtp });
-      await superAdminApi.upsertSystemSetting({ key: 'telephony_settings', value: knowlarity });
-      showSuccess('Core SMTP & Telephony settings updated.');
-    } catch (err: any) {
-      setGlobalError('Failed to save system settings');
-    } finally {
-      setIsLoading(false);
-    }
+      if (activeCurrencyModal === 'create') await superAdminApi.createCurrency(currencyForm);
+      else if (selectedCurrency) await superAdminApi.updateCurrency(selectedCurrency.code, currencyForm);
+      showSuccess('Saved.'); await fetchAllData(); setActiveCurrencyModal(null);
+    } catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleDeleteCurrency = async (code: string) => {
+    if (!confirm('Delete ' + code + '?')) return; setIsLoading(true);
+    try { await superAdminApi.deleteCurrency(code); showSuccess('Deleted.'); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleSaveTax = async () => {
+    setIsLoading(true);
+    try {
+      if (activeTaxModal === 'create') await superAdminApi.createTaxConfig(taxForm);
+      else if (selectedTax) await superAdminApi.updateTaxConfig(selectedTax.id, taxForm);
+      showSuccess('Saved.'); await fetchAllData(); setActiveTaxModal(null);
+    } catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleDeleteTax = async (id: string) => {
+    if (!confirm('Delete?')) return; setIsLoading(true);
+    try { await superAdminApi.deleteTaxConfig(id); showSuccess('Deleted.'); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleToggleGateway = async (id: string) => {
+    setIsLoading(true);
+    try { await superAdminApi.togglePaymentGateway(id); showSuccess('Toggled.'); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleSaveGateway = async (name: string) => {
+    setIsLoading(true);
+    try { await superAdminApi.updatePaymentGateway(name, gatewayForms[name] || {}); showSuccess('Saved.'); await fetchAllData(); setExpandedGateway(null); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleSaveCoupon = async () => {
+    setIsLoading(true);
+    try {
+      const p = { ...couponForm, discount_value: Number(couponForm.discount_value), max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : null, min_order_value: Number(couponForm.min_order_value || 0) };
+      if (activeCouponModal === 'create') await superAdminApi.createCoupon(p);
+      else if (selectedCoupon) await superAdminApi.updateCoupon(selectedCoupon.id, p);
+      showSuccess('Saved.'); await fetchAllData(); setActiveCouponModal(null);
+    } catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleDeleteCoupon = async (id: string) => {
+    if (!confirm('Delete?')) return; setIsLoading(true);
+    try { await superAdminApi.deleteCoupon(id); showSuccess('Deleted.'); await fetchAllData(); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
+  };
+  const handleSaveNotif = async () => {
+    if (!selectedNotif) return; setIsLoading(true);
+    try { await superAdminApi.updateNotificationTemplate(selectedNotif.id, notifForm); showSuccess('Saved.'); await fetchAllData(); setActiveNotifModal(null); }
+    catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
+    finally { setIsLoading(false); }
   };
 
-  const getInvoiceStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Paid':
-        return <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />;
-      case 'Pending':
-        return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
-      case 'Overdue':
-        return <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />;
-      default:
-        return null;
-    }
-  };
+  const navItems: { key: SectionKey; icon: React.ElementType; label: string }[] = [
+    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { key: 'tenants', icon: Building, label: 'Tenants' },
+    { key: 'plans', icon: FolderKanban, label: 'Plans' },
+    { key: 'features', icon: Workflow, label: 'Features' },
+    { key: 'commercial', icon: DollarSign, label: 'Commercial' },
+    { key: 'currencies', icon: Globe, label: 'Currencies' },
+    { key: 'tax', icon: Receipt, label: 'Tax Engine' },
+    { key: 'gateways', icon: CreditCard, label: 'Gateways' },
+    { key: 'coupons', icon: Tag, label: 'Coupons' },
+    { key: 'invoice', icon: FileText, label: 'Invoice Config' },
+    { key: 'notifications', icon: Bell, label: 'Notifications' },
+    { key: 'audit', icon: Shield, label: 'Audit Center' },
+    { key: 'reports', icon: BarChart3, label: 'Reports' },
+    { key: 'global', icon: Settings, label: 'Global Settings' },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Tab Navigation header */}
-      <div className="flex flex-col border-b border-slate-800 pb-2">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
-              Super Admin Command Center
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Configure dynamic plans, map permissions, toggle features, manage billing ledgers, and verify setups.
-            </p>
+    <div style={{ display: 'flex', margin: '-24px', minHeight: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+      <nav style={{ width: '188px', flexShrink: 0, borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div className="p-4 border-b border-slate-800">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Super Admin</p>
+          <h2 className="text-sm font-bold text-slate-200 mt-0.5">Control Center</h2>
+        </div>
+        <div className="py-2 flex-1">
+          {navItems.map(item => <NavItem key={item.key} icon={item.icon} label={item.label} active={activeSection === item.key} onClick={() => { setActiveSection(item.key); setGlobalError(null); }} />)}
+        </div>
+      </nav>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }} className="space-y-6">
+        {globalError && (
+          <div className="p-4 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-start gap-2.5 text-sm text-red-400">
+            <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" /><span>{globalError}</span>
+            <button onClick={() => setGlobalError(null)} className="ml-auto cursor-pointer"><X className="w-4 h-4" /></button>
           </div>
-        </div>
-
-        {/* Tab Links */}
-        <div className="flex items-center gap-1.5 mt-6 overflow-x-auto pb-1 scrollbar-thin">
-          <button 
-            onClick={() => setActiveTab('tenants')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-              activeTab === 'tenants' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-            }`}
-          >
-            <Building className="w-4 h-4" />
-            Tenants Registry
-          </button>
-          <button 
-            onClick={() => setActiveTab('plans')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-              activeTab === 'plans' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-            }`}
-          >
-            <FolderKanban className="w-4 h-4" />
-            Plan Templates
-          </button>
-          <button 
-            onClick={() => setActiveTab('features')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-              activeTab === 'features' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-            }`}
-          >
-            <Workflow className="w-4 h-4" />
-            Feature Matrix
-          </button>
-          <button 
-            onClick={() => setActiveTab('invoice-settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-              activeTab === 'invoice-settings' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            Invoice Config
-          </button>
-          <button 
-            onClick={() => setActiveTab('commercial-settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-              activeTab === 'commercial-settings' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            Commercial Settings
-          </button>
-          <button 
-            onClick={() => setActiveTab('system-settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-              activeTab === 'system-settings' ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            System Settings
-          </button>
-        </div>
-      </div>
-
-      {globalError && (
-        <div className="p-4 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-start gap-2.5 text-sm text-red-400">
-          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
-          <span>{globalError}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-4 bg-emerald-950/20 border border-emerald-900/30 rounded-2xl flex items-start gap-2.5 text-sm text-emerald-400">
-          <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="glass-panel p-20 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-400">
-          <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
-          <p className="text-sm font-medium">Fetching details from configuration ledger...</p>
-        </div>
-      ) : (
-        <>
-          {/* ==========================================
-              TAB 1: TENANTS REGISTRY
-             ========================================== */}
-          {activeTab === 'tenants' && (
+        )}
+        {successMessage && (
+          <div className="p-4 bg-emerald-950/20 border border-emerald-900/30 rounded-2xl flex items-start gap-2.5 text-sm text-emerald-400">
+            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" /><span>{successMessage}</span>
+          </div>
+        )}
+        {isLoading ? (
+          <div className="glass-panel p-20 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-400">
+            <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
+            <p className="text-sm font-medium">Loading...</p>
+          </div>
+        ) : (
+          <>
+            {activeSection === 'dashboard' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div><h2 className="text-2xl font-bold text-slate-100">Executive Dashboard</h2><p className="text-sm text-slate-400 mt-1">Real-time platform metrics</p></div>
+                  <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-pointer hover:text-slate-200"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+                </div>
+                {dashboard ? (
+                  <>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Total Organizations', value: dashboard.orgs?.total ?? 0, sub: (dashboard.orgs?.active ?? 0) + ' active', color: 'text-brand-400' },
+                        { label: 'MRR', value: 'Rs.' + Number(dashboard.revenue?.mrr ?? 0).toLocaleString('en-IN'), sub: 'ARR Rs.' + Number(dashboard.revenue?.arr ?? 0).toLocaleString('en-IN'), color: 'text-emerald-400' },
+                        { label: 'Licensed Seats', value: dashboard.licensing?.total_seats ?? 0, sub: (dashboard.licensing?.active_seats ?? 0) + ' active', color: 'text-sky-400' },
+                        { label: 'Trial Orgs', value: dashboard.orgs?.trial ?? 0, sub: (dashboard.activity?.expiring_soon ?? 0) + ' expiring', color: 'text-amber-400' },
+                      ].map((c, i) => (
+                        <div key={i} className="glass-panel p-5 border border-slate-800/80 rounded-2xl">
+                          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">{c.label}</p>
+                          <p className={'text-2xl font-bold mt-2 ' + c.color}>{c.value}</p>
+                          <p className="text-xs text-slate-500 mt-1">{c.sub}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-4">Activity</h3>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div><p className="text-2xl font-bold text-brand-400">{dashboard.activity?.new_signups_today ?? 0}</p><p className="text-xs text-slate-500 mt-1">Today</p></div>
+                          <div><p className="text-2xl font-bold text-emerald-400">{dashboard.activity?.active_last_7d ?? 0}</p><p className="text-xs text-slate-500 mt-1">Last 7d</p></div>
+                          <div><p className="text-2xl font-bold text-amber-400">{dashboard.activity?.expiring_soon ?? 0}</p><p className="text-xs text-slate-500 mt-1">Expiring</p></div>
+                        </div>
+                      </div>
+                      <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-4">Infrastructure</h3>
+                        <div className="space-y-3">
+                          {[
+                            { label: 'API', val: dashboard.infra?.api_status ?? 'unknown', ok: dashboard.infra?.api_status === 'healthy' },
+                            { label: 'Database', val: dashboard.infra?.db_status ?? 'unknown', ok: dashboard.infra?.db_status === 'healthy' },
+                            { label: 'Redis', val: dashboard.infra?.redis_status ?? 'unknown', ok: dashboard.infra?.redis_status === 'healthy' },
+                          ].map((x, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <span className="text-xs text-slate-400">{x.label}</span>
+                              <span className={'text-xs font-bold ' + (x.ok ? 'text-emerald-400' : 'text-rose-400')}>{x.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-500 text-center">
+                    <LayoutDashboard className="w-12 h-12 text-slate-600 mb-3" />
+                    <p className="font-semibold text-slate-400">No dashboard data</p>
+                    <p className="text-xs mt-1">Backend may be offline.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          {activeSection === 'tenants' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Tenants List</h3>
@@ -703,7 +528,7 @@ export const TenantsPage: React.FC = () => {
                         <tr className="border-b border-slate-800 bg-slate-900/20">
                           <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Company / Subdomain</th>
                           <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Tier / Max Seats</th>
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Tier / Licensed Seats</th>
                           <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Expires At</th>
                           <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">Resources</th>
                           <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Actions</th>
@@ -733,7 +558,7 @@ export const TenantsPage: React.FC = () => {
                                 <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-brand-500/10 text-brand-400 border border-brand-500/20 uppercase tracking-wider">
                                   {tenant.subscription_plan}
                                 </span>
-                                <p className="text-[10px] text-slate-400 mt-1">Users Limit: {tenant.max_users}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Licensed Seats: {tenant.max_users}</p>
                               </div>
                             </td>
                             <td className="px-6 py-4.5 text-xs text-slate-300">
@@ -765,6 +590,7 @@ export const TenantsPage: React.FC = () => {
                                 <button
                                   onClick={() => openEditSubModal(tenant)}
                                   className="px-2 py-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                  title="Edit Subscription Tier"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                   Tier
@@ -782,11 +608,17 @@ export const TenantsPage: React.FC = () => {
                                 <button
                                   onClick={() => handleSuspendTenant(tenant)}
                                   className={`p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg transition-all cursor-pointer ${
-                                    tenant.is_active ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'
+                                    tenant.subscription_status === 'suspended'
+                                      ? 'text-emerald-400 hover:text-emerald-300'
+                                      : 'text-amber-400 hover:text-amber-300'
                                   }`}
-                                  title={tenant.is_active ? 'Suspend Account' : 'Reactivate Account'}
+                                  title={tenant.subscription_status === 'suspended' ? 'Reactivate Account' : 'Suspend Account'}
                                 >
-                                  <Lock className="w-4 h-4" />
+                                  {tenant.subscription_status === 'suspended' ? (
+                                    <Lock className="w-4 h-4" />
+                                  ) : (
+                                    <Unlock className="w-4 h-4" />
+                                  )}
                                 </button>
                                 <button
                                   onClick={() => {
@@ -814,13 +646,38 @@ export const TenantsPage: React.FC = () => {
           {/* ==========================================
               TAB 2: PLANS CRUD
              ========================================== */}
-          {activeTab === 'plans' && (
+          {activeSection === 'plans' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Subscription Plans</h3>
                 <button
                   onClick={() => {
-                    resetPlan();
+                    resetPlan({
+                      minimum_users: 10,
+                      minimum_contract_months: 3,
+                      allow_additional_seats: true,
+                      currency: 'INR',
+                      monthly_price: 3999,
+                      quarterly_price: 11997,
+                      annual_price: 47988,
+                      max_users: 10,
+                      maximum_users: 1000,
+                      trial_days: 0,
+                      extra_user_price: 3999,
+                      discount_percentage: 0,
+                      gst_percentage: 18,
+                      display_order: 1,
+                      setup_charges: 0,
+                      storage_limit_gb: 100,
+                      recording_retention_days: 90,
+                      popular_plan: false,
+                      recommended_plan: false,
+                      allow_upgrade: true,
+                      allow_downgrade: true,
+                      allow_trial: true,
+                      auto_renew: true,
+                      plan_active: true
+                    });
                     setSelectedPlan(null);
                     setModalError(null);
                     setActiveModal('createPlan');
@@ -841,7 +698,23 @@ export const TenantsPage: React.FC = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {plans.map((plan) => (
-                    <div key={plan.id} className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4 relative flex flex-col justify-between hover:border-slate-800 transition-all">
+                    <div
+                      key={plan.id}
+                      className={`glass-panel p-6 border rounded-2xl space-y-4 relative flex flex-col justify-between transition-all ${
+                        plan.popular_plan
+                          ? 'border-brand-500/40 shadow-lg shadow-brand-500/10 hover:border-brand-500/60'
+                          : 'border-slate-800/80 hover:border-slate-700'
+                      }`}
+                    >
+                      {/* MOST POPULAR badge */}
+                      {plan.popular_plan && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-brand-500 to-indigo-500 text-white text-[10px] font-bold rounded-full shadow-md shadow-brand-500/30 uppercase tracking-widest whitespace-nowrap">
+                            ⭐ Most Popular
+                          </span>
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
                           <div>
@@ -849,13 +722,13 @@ export const TenantsPage: React.FC = () => {
                             <p className="text-xs text-slate-500 font-mono">slug: {plan.name}</p>
                           </div>
                           <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
-                            <button 
+                            <button
                               onClick={() => handleReorderPlans(plan.id, 'up')}
                               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                             >
                               <ArrowUpDown className="w-3 h-3 rotate-180" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleReorderPlans(plan.id, 'down')}
                               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                             >
@@ -864,31 +737,50 @@ export const TenantsPage: React.FC = () => {
                           </div>
                         </div>
                         <p className="text-xs text-slate-400 line-clamp-2">{plan.description || 'No description provided.'}</p>
-                        
-                        <div className="py-2 border-y border-slate-800/80 flex justify-between items-baseline gap-2">
-                          <span className="text-2xl font-black text-brand-400">
-                            {plan.currency} {plan.monthly_price}
-                          </span>
-                          <span className="text-xs text-slate-500">/ month</span>
+
+                        {/* Price block */}
+                        <div className="py-3 border-y border-slate-800/80">
+                          <p className="text-3xl font-black text-brand-400">
+                            {plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.monthly_price).toLocaleString('en-IN')}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
                         </div>
 
-                        <div className="space-y-1.5 pt-2">
+                        {/* Plan details */}
+                        <div className="space-y-1.5 pt-1">
                           <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Users className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Max Seats: <strong>{plan.max_users}</strong></span>
+                            <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>Starts From: <strong>{plan.minimum_users ?? plan.max_users} Licensed Seats</strong></span>
                           </p>
                           <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Building className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Storage limit: <strong>{plan.storage_limit_gb} GB</strong></span>
+                            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span>Minimum Contract: <strong>{plan.minimum_contract_months} Months</strong></span>
                           </p>
                           <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <FileText className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Retention: <strong>{plan.recording_retention_days} days</strong></span>
+                            <Building className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>Storage: <strong>{plan.storage_limit_gb} GB</strong></span>
                           </p>
                           <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Contract: <strong>{plan.minimum_contract_months} months</strong></span>
+                            <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>Call Recording Retention: <strong>{plan.recording_retention_days} Days</strong></span>
                           </p>
+                          <p className="text-xs text-slate-300 flex items-center gap-2">
+                            <DollarSign className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>Additional Seat Price: <strong>{plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.extra_user_price ?? 0).toLocaleString('en-IN')}</strong></span>
+                          </p>
+                          <p className="text-xs text-slate-300 flex items-center gap-2">
+                            <Check className={`w-3.5 h-3.5 shrink-0 ${plan.allow_additional_seats ? 'text-emerald-500' : 'text-slate-600'}`} />
+                            <span>Additional Seats: <strong>{plan.allow_additional_seats ? 'Allowed' : 'Not Allowed'}</strong></span>
+                          </p>
+                        </div>
+
+                        {/* Billing Policy */}
+                        <div className="mt-3 p-3 bg-slate-900/60 border border-slate-800/60 rounded-xl text-[10px] text-slate-400 space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Billing Policy</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Per Licensed Seat</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Purchase: {plan.minimum_users ?? plan.max_users} Seats</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Contract: {plan.minimum_contract_months} Months</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{plan.allow_additional_seats ? 'Additional Seats can be purchased anytime' : 'Additional Seats not available'}</p>
                         </div>
                       </div>
 
@@ -897,7 +789,6 @@ export const TenantsPage: React.FC = () => {
                           onClick={() => {
                             setSelectedPlan(plan);
                             setModalError(null);
-                            // Populate values
                             Object.keys(plan).forEach((key) => {
                               setPlanValue(key as any, plan[key as keyof PlanResponse]);
                             });
@@ -924,7 +815,7 @@ export const TenantsPage: React.FC = () => {
           {/* ==========================================
               TAB 3: FEATURE MATRIX
              ========================================== */}
-          {activeTab === 'features' && (
+          {activeSection === 'features' && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Plan Permissions Matrix</h3>
@@ -996,7 +887,7 @@ export const TenantsPage: React.FC = () => {
           {/* ==========================================
               TAB 4: INVOICE CONFIGURATION
              ========================================== */}
-          {activeTab === 'invoice-settings' && editedConfig && (
+          {activeSection === 'invoice' && editedConfig && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Left Column: Config Forms (col-span-2) */}
               <div className="xl:col-span-2 space-y-6">
@@ -1672,7 +1563,7 @@ export const TenantsPage: React.FC = () => {
           {/* ==========================================
               TAB 4B: COMMERCIAL SETTINGS
              ========================================== */}
-          {activeTab === 'commercial-settings' && editedCommSettings && (
+          {activeSection === 'commercial' && editedCommSettings && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Left Column: Config Forms (col-span-2) */}
               <div className="xl:col-span-2 space-y-6">
@@ -2344,7 +2235,7 @@ export const TenantsPage: React.FC = () => {
           {/* ==========================================
               TAB 5: SYSTEM CONFIGURATIONS
              ========================================== */}
-          {activeTab === 'system-settings' && (
+          {activeSection === 'global' && (
             <div className="max-w-2xl">
               <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
                 <div>
@@ -2437,13 +2328,273 @@ export const TenantsPage: React.FC = () => {
               </div>
             </div>
           )}
-        </>
-      )}
 
-      {/* ==========================================
-          MODALS & DRAWERS
-         ========================================== */}
+            {activeSection === 'currencies' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div><h2 className="text-xl font-bold text-slate-100">Multi-Currency Engine</h2><p className="text-sm text-slate-400 mt-1">Manage exchange rates with base-currency pivot</p></div>
+                  <button onClick={() => { setCurrencyForm({ code: '', name: '', symbol: '', exchange_rate: 1, is_active: true }); setActiveCurrencyModal('create'); }} className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"><Plus className="w-3.5 h-3.5" /> Add Currency</button>
+                </div>
+                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Code','Name','Symbol','Rate vs Base','Base','Active','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {currencies.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-500 text-sm">No currencies configured.</td></tr>
+                      : currencies.map(c => (
+                        <tr key={c.code} className="hover:bg-slate-900/10 transition-colors">
+                          <td className="px-5 py-3.5"><span className="font-mono font-bold text-slate-200">{c.code}</span></td>
+                          <td className="px-5 py-3.5 text-sm text-slate-300">{c.name}</td>
+                          <td className="px-5 py-3.5 text-sm text-slate-300">{c.symbol}</td>
+                          <td className="px-5 py-3.5 text-sm text-slate-300">{c.is_base ? '-' : Number(c.exchange_rate).toFixed(4)}</td>
+                          <td className="px-5 py-3.5">{c.is_base && <span className="px-2 py-0.5 bg-brand-500/10 text-brand-400 text-[10px] font-bold rounded border border-brand-500/20 uppercase">BASE</span>}</td>
+                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (c.is_active ? 'text-emerald-400' : 'text-slate-500')}>{c.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-5 py-3.5"><div className="flex items-center gap-2">
+                            <button onClick={() => { setSelectedCurrency(c); setCurrencyForm({ name: c.name, symbol: c.symbol, exchange_rate: c.exchange_rate, is_active: c.is_active }); setActiveCurrencyModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                            {!c.is_base && <button onClick={() => handleDeleteCurrency(c.code)} className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>}
+                          </div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
+            {activeSection === 'tax' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div><h2 className="text-xl font-bold text-slate-100">Tax Engine</h2><p className="text-sm text-slate-400 mt-1">Country-wise GST / VAT / Sales Tax</p></div>
+                  <button onClick={() => { setTaxForm({ country_code: '', country_name: '', tax_type: 'GST', tax_rate: 18, tax_label: 'GST', tax_inclusive: false, is_active: true, is_default: false }); setActiveTaxModal('create'); }} className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"><Plus className="w-3.5 h-3.5" /> Add Tax Config</button>
+                </div>
+                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Country','Code','Type','Rate %','Label','Inclusive','Default','Active','Actions'].map(h=><th key={h} className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {taxConfigs.length === 0 ? <tr><td colSpan={9} className="px-5 py-12 text-center text-slate-500 text-sm">No tax configurations.</td></tr>
+                      : taxConfigs.map(t => (
+                        <tr key={t.id} className="hover:bg-slate-900/10 transition-colors">
+                          <td className="px-4 py-3.5 text-sm text-slate-200 font-medium">{t.country_name}</td>
+                          <td className="px-4 py-3.5"><span className="font-mono text-xs text-slate-400">{t.country_code}</span></td>
+                          <td className="px-4 py-3.5"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded uppercase">{t.tax_type}</span></td>
+                          <td className="px-4 py-3.5 text-sm text-slate-300">{t.tax_rate}%</td>
+                          <td className="px-4 py-3.5 text-sm text-slate-300">{t.tax_label}</td>
+                          <td className="px-4 py-3.5 text-xs">{t.tax_inclusive ? <span className="text-emerald-400">Yes</span> : <span className="text-slate-500">No</span>}</td>
+                          <td className="px-4 py-3.5 text-xs">{t.is_default ? <span className="text-brand-400 font-bold">Yes</span> : '-'}</td>
+                          <td className="px-4 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-slate-500')}>{t.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-4 py-3.5"><div className="flex items-center gap-2">
+                            <button onClick={() => { setSelectedTax(t); setTaxForm({ country_code: t.country_code, country_name: t.country_name, tax_type: t.tax_type, tax_rate: t.tax_rate, tax_label: t.tax_label, tax_inclusive: t.tax_inclusive, is_active: t.is_active, is_default: t.is_default }); setActiveTaxModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDeleteTax(t.id)} className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'gateways' && (
+              <div className="space-y-4">
+                <div><h2 className="text-xl font-bold text-slate-100">Payment Gateways</h2><p className="text-sm text-slate-400 mt-1">API keys encrypted server-side - never returned in responses</p></div>
+                <div className="space-y-3">
+                  {gateways.length === 0 ? <div className="glass-panel p-12 rounded-2xl border border-slate-800/80 flex items-center justify-center text-slate-500">No gateways seeded.</div>
+                  : gateways.map(gw => (
+                    <div key={gw.name} className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden">
+                      <div className="flex items-center justify-between p-5">
+                        <div className="flex items-center gap-3">
+                          <div className={'w-8 h-8 rounded-lg flex items-center justify-center ' + (gw.is_enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500')}><CreditCard className="w-4 h-4" /></div>
+                          <div><p className="text-sm font-bold text-slate-200">{gw.display_name}</p>{gw.description && <p className="text-xs text-slate-500">{gw.description}</p>}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {gw.is_sandbox && <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded border border-amber-500/20 uppercase">Sandbox</span>}
+                          <span className={'text-xs font-semibold ' + (gw.api_key_set ? 'text-emerald-400' : 'text-slate-500')}>{gw.api_key_set ? 'Key set' : 'No key'}</span>
+                          <button onClick={() => handleToggleGateway(gw.name)} className={'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ' + (gw.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-800')}>
+                            {gw.is_enabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}{gw.is_enabled ? 'Enabled' : 'Disabled'}
+                          </button>
+                          <button onClick={() => setExpandedGateway(expandedGateway === gw.name ? null : gw.name)} className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-300 cursor-pointer">Configure</button>
+                        </div>
+                      </div>
+                      {expandedGateway === gw.name && (
+                        <div className="border-t border-slate-800 p-5 bg-slate-950/20 space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">API Key</label>
+                              <div className="relative">
+                                <input type={showApiKey[gw.name] ? 'text' : 'password'} placeholder={gw.api_key_set ? '(already set)' : 'Enter API key'}
+                                  value={gatewayForms[gw.name]?.api_key || ''} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), api_key: e.target.value } }))}
+                                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none pr-10" />
+                                <button type="button" onClick={() => setShowApiKey(prev => ({ ...prev, [gw.name]: !prev[gw.name] }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 cursor-pointer">
+                                  {showApiKey[gw.name] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Webhook Secret</label>
+                              <input type="password" placeholder={gw.webhook_secret_set ? '(already set)' : 'Enter secret'}
+                                value={gatewayForms[gw.name]?.webhook_secret || ''} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), webhook_secret: e.target.value } }))}
+                                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                              <input type="checkbox" checked={gatewayForms[gw.name]?.is_sandbox ?? gw.is_sandbox} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), is_sandbox: e.target.checked } }))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" />
+                              Sandbox Mode
+                            </label>
+                            <button onClick={() => handleSaveGateway(gw.name)} className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold cursor-pointer">Save</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'coupons' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div><h2 className="text-xl font-bold text-slate-100">Coupon Management</h2><p className="text-sm text-slate-400 mt-1">Discount codes for tenant billing</p></div>
+                  <button onClick={() => { setCouponForm({ code: '', description: '', discount_type: 'percentage', discount_value: 10, max_uses: '', valid_from: new Date().toISOString().split('T')[0], valid_until: '', min_order_value: 0, is_active: true }); setActiveCouponModal('create'); }} className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"><Plus className="w-3.5 h-3.5" /> Create Coupon</button>
+                </div>
+                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Code','Type','Discount','Uses','Valid Until','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {coupons.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-500 text-sm">No coupons yet.</td></tr>
+                      : coupons.map(c => (
+                        <tr key={c.id} className="hover:bg-slate-900/10 transition-colors">
+                          <td className="px-5 py-3.5"><p className="font-mono font-bold text-slate-200">{c.code}</p>{c.description && <p className="text-[10px] text-slate-500">{c.description}</p>}</td>
+                          <td className="px-5 py-3.5"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded uppercase">{c.discount_type}</span></td>
+                          <td className="px-5 py-3.5 text-sm font-semibold text-emerald-400">{c.discount_type === 'percentage' ? c.discount_value + '%' : 'Rs.' + c.discount_value}</td>
+                          <td className="px-5 py-3.5 text-xs text-slate-300">{c.uses_count}{c.max_uses ? ' / ' + c.max_uses : ' / inf'}</td>
+                          <td className="px-5 py-3.5 text-xs text-slate-300">{c.valid_until ? new Date(c.valid_until).toLocaleDateString() : 'No expiry'}</td>
+                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (c.is_active ? 'text-emerald-400' : 'text-slate-500')}>{c.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-5 py-3.5"><div className="flex items-center gap-2">
+                            <button onClick={() => { setSelectedCoupon(c); setCouponForm({ code: c.code, description: c.description || '', discount_type: c.discount_type, discount_value: c.discount_value, max_uses: c.max_uses ?? '', valid_from: c.valid_from?.split('T')[0] || '', valid_until: c.valid_until?.split('T')[0] || '', min_order_value: c.min_order_value, is_active: c.is_active }); setActiveCouponModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDeleteCoupon(c.id)} className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'notifications' && (
+              <div className="space-y-4">
+                <div><h2 className="text-xl font-bold text-slate-100">Notification Templates</h2><p className="text-sm text-slate-400 mt-1">Email, SMS, and WhatsApp templates</p></div>
+                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Template','Channel','Category','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {notifTemplates.length === 0 ? <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500 text-sm">No templates. Run backend seeds.</td></tr>
+                      : notifTemplates.map(t => (
+                        <tr key={t.id} className="hover:bg-slate-900/10 transition-colors">
+                          <td className="px-5 py-3.5"><p className="text-sm font-semibold text-slate-200">{t.template_name}</p><p className="text-[10px] text-slate-500 font-mono">{t.template_key}</p></td>
+                          <td className="px-5 py-3.5"><span className={'px-2 py-0.5 text-[10px] font-bold rounded uppercase border ' + (t.channel === 'email' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : t.channel === 'sms' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : t.channel === 'whatsapp' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700')}>{t.channel}</span></td>
+                          <td className="px-5 py-3.5 text-xs text-slate-400">{t.category}</td>
+                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-slate-500')}>{t.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-5 py-3.5"><button onClick={() => { setSelectedNotif(t); setNotifForm({ template_name: t.template_name, subject: t.subject || '', body: t.body, is_active: t.is_active, description: t.description || '' }); setActiveNotifModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'audit' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div><h2 className="text-xl font-bold text-slate-100">Audit Center</h2><p className="text-sm text-slate-400 mt-1">Immutable log of all sensitive operations</p></div>
+                  <div className="flex items-center gap-2">
+                    <input type="text" placeholder="Filter by action..." value={auditSearch} onChange={e => setAuditSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchAllData()} className="px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none w-48" />
+                    <button onClick={fetchAllData} className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /></button>
+                  </div>
+                </div>
+                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Timestamp','User','Action','Resource','IP','Details'].map(h=><th key={h} className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {auditLogs.length === 0 ? <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-500 text-sm">No audit logs found.</td></tr>
+                      : auditLogs.map((log: any, i: number) => (
+                        <tr key={log.id || i} className="hover:bg-slate-900/10 transition-colors">
+                          <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{log.created_at ? new Date(log.created_at).toLocaleString() : '-'}</td>
+                          <td className="px-4 py-3 text-xs text-slate-300">{log.user_email || log.actor_id || '-'}</td>
+                          <td className="px-4 py-3"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded uppercase">{log.action || '-'}</span></td>
+                          <td className="px-4 py-3 text-xs text-slate-400">{log.resource_type || '-'}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500 font-mono">{log.ip_address || '-'}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">{log.details ? JSON.stringify(log.details).substring(0,60) : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'reports' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div><h2 className="text-xl font-bold text-slate-100">Reports and Analytics</h2><p className="text-sm text-slate-400 mt-1">Revenue, seat utilization, tenant health</p></div>
+                  <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" />Revenue Report</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                    </div>
+                    {revenueReport ? (
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Total Revenue', value: 'Rs.' + Number(revenueReport.total_revenue ?? 0).toLocaleString('en-IN') },
+                          { label: 'MRR', value: 'Rs.' + Number(revenueReport.mrr ?? 0).toLocaleString('en-IN') },
+                          { label: 'ARR', value: 'Rs.' + Number(revenueReport.arr ?? 0).toLocaleString('en-IN') },
+                          { label: 'Currency', value: revenueReport.currency ?? 'INR' },
+                        ].map((row, i) => (
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
+                            <span className="text-xs text-slate-400">{row.label}</span><span className="text-sm font-semibold text-slate-200">{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-slate-500 py-4 text-center">No revenue data.</p>}
+                  </div>
+                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><Users className="w-4 h-4 text-sky-400" />Seat Utilization</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                    </div>
+                    {seatReport ? (
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Total Licensed', value: seatReport.total_licensed_seats ?? 0 },
+                          { label: 'Active Seats', value: seatReport.active_seats ?? 0 },
+                          { label: 'Utilization', value: (seatReport.utilization_percentage ?? 0) + '%' },
+                          { label: 'Total Orgs', value: seatReport.total_orgs ?? 0 },
+                        ].map((row, i) => (
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
+                            <span className="text-xs text-slate-400">{row.label}</span><span className="text-sm font-semibold text-slate-200">{row.value}</span>
+                          </div>
+                        ))}
+                        {seatReport.utilization_percentage !== undefined && (
+                          <div className="h-2 bg-slate-800 rounded-full overflow-hidden mt-2">
+                            <div className="h-full bg-gradient-to-r from-brand-500 to-indigo-500 rounded-full" style={{ width: Math.min(seatReport.utilization_percentage, 100) + '%' }} />
+                          </div>
+                        )}
+                      </div>
+                    ) : <p className="text-sm text-slate-500 py-4 text-center">No seat data.</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </>
+        )}
+      </div>
+
+      {/* ALL MODALS */}
       {/* RESET OWNER PASSWORD MODAL */}
       {activeModal === 'resetPassword' && selectedTenant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -2569,7 +2720,7 @@ export const TenantsPage: React.FC = () => {
 
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Monthly ($)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Price Per Licensed Seat</label>
                   <input
                     type="number"
                     step="0.01"
@@ -2606,47 +2757,25 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               <div className="border-t border-slate-800/80 pt-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Seat Limits & Allocation Counts</h4>
-                <div className="grid grid-cols-5 gap-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Enterprise Seat Licensing Config</h4>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Users</label>
+                    <label className="block text-[10px] text-slate-400 mb-1.5">Default Licensed Seat Count</label>
                     <input
                       type="number"
                       {...regPlan('max_users', { required: true, min: 1 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Admins</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_admins', { required: true, min: 1 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Mgrs</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_managers', { required: true, min: 0 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max TLs</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_team_leads', { required: true, min: 0 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Agents</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_employees', { required: true, min: 0 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
+                  <div className="flex items-center pt-6">
+                    <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        {...regPlan('allow_additional_seats')}
+                        className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                      />
+                      Allow Additional Seats
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2689,15 +2818,19 @@ export const TenantsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Min Users</label>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Minimum Initial Licensed Seats</label>
                   <input
                     type="number"
-                    {...regPlan('minimum_users', { required: true, min: 1 })}
+                    {...regPlan('minimum_users', {
+                      required: 'Minimum licensed seats is required',
+                      min: { value: 10, message: 'Minimum 10 licensed seats' }
+                    })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
+                  {planErrors.minimum_users && <p className="text-[10px] text-red-400 mt-1">{planErrors.minimum_users.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Max Users Bound</label>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Maximum Supported Licensed Seats</label>
                   <input
                     type="number"
                     {...regPlan('maximum_users', { required: true, min: 1 })}
@@ -2708,9 +2841,13 @@ export const TenantsPage: React.FC = () => {
                   <label className="block text-[10px] text-slate-400 mb-1.5">Min Contract (m)</label>
                   <input
                     type="number"
-                    {...regPlan('minimum_contract_months', { required: true, min: 1 })}
+                    {...regPlan('minimum_contract_months', { 
+                      required: 'Min contract is required', 
+                      min: { value: 3, message: 'Minimum 3 months' } 
+                    })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
+                  {planErrors.minimum_contract_months && <p className="text-[10px] text-red-400 mt-1">{planErrors.minimum_contract_months.message}</p>}
                 </div>
               </div>
 
@@ -2725,7 +2862,7 @@ export const TenantsPage: React.FC = () => {
                   {planErrors.trial_days && <p className="text-[10px] text-red-400 mt-1">{planErrors.trial_days.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Extra User Price</label>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Additional Seat Price</label>
                   <input
                     type="number"
                     step="0.01"
@@ -2865,6 +3002,9 @@ export const TenantsPage: React.FC = () => {
                 </label>
               </div>
 
+              {/* Commercial Summary (Part 7) */}
+              <CommercialSummaryPanel regPlan={regPlan} />
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
                 <button
                   type="button"
@@ -2938,6 +3078,35 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.slug && <p className="text-xs text-red-400 mt-1">{tenantErrors.slug.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4 mt-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seats</label>
+                  <input
+                    type="number"
+                    defaultValue={10}
+                    {...regTenant('licensed_seats', { 
+                      required: 'Seats count is required', 
+                      min: { value: 10, message: 'Minimum purchase is 10 Licensed Seats' } 
+                    })}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  />
+                  {tenantErrors.licensed_seats && <p className="text-xs text-red-400 mt-1">{tenantErrors.licensed_seats.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Contract Duration (Months)</label>
+                  <input
+                    type="number"
+                    defaultValue={3}
+                    {...regTenant('contract_months', { 
+                      required: 'Contract duration is required', 
+                      min: { value: 3, message: 'Minimum contract is 3 months' } 
+                    })}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  />
+                  {tenantErrors.contract_months && <p className="text-xs text-red-400 mt-1">{tenantErrors.contract_months.message}</p>}
                 </div>
               </div>
 
@@ -3077,10 +3246,10 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max User Seat Limits</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seat Limit</label>
                 <input
                   type="number"
-                  {...regSub('max_users', { required: 'User limit is required', min: { value: 1, message: 'Must allow at least 1 user' } })}
+                  {...regSub('max_users', { required: 'Licensed seat limit is required', min: { value: 1, message: 'Must allow at least 1 licensed seat' } })}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                 />
                 {subErrors.max_users && <p className="text-xs text-red-400 mt-1">{subErrors.max_users.message}</p>}
@@ -3417,6 +3586,130 @@ export const TenantsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeCurrencyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Globe className="w-5 h-5 text-brand-400" />{activeCurrencyModal === 'create' ? 'Add Currency' : 'Edit ' + (selectedCurrency?.code ?? '')}</h3>
+              <button onClick={() => setActiveCurrencyModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {activeCurrencyModal === 'create' && (
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Code</label>
+                <input value={currencyForm.code || ''} onChange={e => setCurrencyForm((p: any) => ({...p, code: e.target.value.toUpperCase()}))} placeholder="USD" maxLength={10} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Name</label><input value={currencyForm.name || ''} onChange={e => setCurrencyForm((p: any) => ({...p, name: e.target.value}))} placeholder="US Dollar" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Symbol</label><input value={currencyForm.symbol || ''} onChange={e => setCurrencyForm((p: any) => ({...p, symbol: e.target.value}))} placeholder="$" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              </div>
+              <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Exchange Rate (vs Base INR)</label>
+              <input type="number" step="0.0001" value={currencyForm.exchange_rate || ''} onChange={e => setCurrencyForm((p: any) => ({...p, exchange_rate: e.target.value}))} placeholder="0.0120" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={currencyForm.is_active ?? true} onChange={e => setCurrencyForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
+                <button onClick={() => setActiveCurrencyModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+                <button onClick={handleSaveCurrency} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTaxModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Receipt className="w-5 h-5 text-brand-400" />{activeTaxModal === 'create' ? 'Add Tax Config' : 'Edit Tax Config'}</h3>
+              <button onClick={() => setActiveTaxModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Country Code</label><input value={taxForm.country_code || ''} onChange={e => setTaxForm((p: any) => ({...p, country_code: e.target.value.toUpperCase()}))} placeholder="IN" maxLength={10} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Country Name</label><input value={taxForm.country_name || ''} onChange={e => setTaxForm((p: any) => ({...p, country_name: e.target.value}))} placeholder="India" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Type</label>
+                <select value={taxForm.tax_type || 'GST'} onChange={e => setTaxForm((p: any) => ({...p, tax_type: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none">
+                  {['GST','VAT','SALES_TAX','NONE'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Rate %</label><input type="number" step="0.01" value={taxForm.tax_rate || ''} onChange={e => setTaxForm((p: any) => ({...p, tax_rate: e.target.value}))} placeholder="18" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Label</label><input value={taxForm.tax_label || ''} onChange={e => setTaxForm((p: any) => ({...p, tax_label: e.target.value}))} placeholder="GST" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              </div>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={taxForm.tax_inclusive ?? false} onChange={e => setTaxForm((p: any) => ({...p, tax_inclusive: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Inclusive</label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={taxForm.is_default ?? false} onChange={e => setTaxForm((p: any) => ({...p, is_default: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Default</label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={taxForm.is_active ?? true} onChange={e => setTaxForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
+                <button onClick={() => setActiveTaxModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+                <button onClick={handleSaveTax} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeCouponModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Tag className="w-5 h-5 text-brand-400" />{activeCouponModal === 'create' ? 'Create Coupon' : 'Edit Coupon'}</h3>
+              <button onClick={() => setActiveCouponModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Code</label><input value={couponForm.code || ''} onChange={e => setCouponForm((p: any) => ({...p, code: e.target.value.toUpperCase()}))} placeholder="SAVE20" disabled={activeCouponModal === 'edit'} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none disabled:opacity-50" /></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Type</label>
+                <select value={couponForm.discount_type || 'percentage'} onChange={e => setCouponForm((p: any) => ({...p, discount_type: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none">
+                  <option value="percentage">Percentage %</option><option value="flat">Flat Amount</option>
+                </select></div>
+              </div>
+              <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</label><input value={couponForm.description || ''} onChange={e => setCouponForm((p: any) => ({...p, description: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Value</label><input type="number" step="0.01" value={couponForm.discount_value || ''} onChange={e => setCouponForm((p: any) => ({...p, discount_value: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max Uses</label><input type="number" value={couponForm.max_uses || ''} onChange={e => setCouponForm((p: any) => ({...p, max_uses: e.target.value}))} placeholder="blank = unlimited" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Valid From</label><input type="date" value={couponForm.valid_from || ''} onChange={e => setCouponForm((p: any) => ({...p, valid_from: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Valid Until</label><input type="date" value={couponForm.valid_until || ''} onChange={e => setCouponForm((p: any) => ({...p, valid_until: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={couponForm.is_active ?? true} onChange={e => setCouponForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
+                <button onClick={() => setActiveCouponModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+                <button onClick={handleSaveCoupon} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save Coupon</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeNotifModal === 'edit' && selectedNotif && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-xl glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+              <div><h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Bell className="w-5 h-5 text-brand-400" /> Edit Template</h3><p className="text-xs text-slate-400 mt-0.5 font-mono">{selectedNotif.template_key}</p></div>
+              <button onClick={() => setActiveNotifModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Template Name</label><input value={notifForm.template_name || ''} onChange={e => setNotifForm((p: any) => ({...p, template_name: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              {selectedNotif.channel === 'email' && (
+                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subject</label><input value={notifForm.subject || ''} onChange={e => setNotifForm((p: any) => ({...p, subject: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Body</label>
+                {selectedNotif.variables && selectedNotif.variables.length > 0 && <p className="text-[10px] text-slate-500 mb-1.5">Variables: {selectedNotif.variables.map((v: string) => '{{' + v + '}}').join(', ')}</p>}
+                <textarea rows={6} value={notifForm.body || ''} onChange={e => setNotifForm((p: any) => ({...p, body: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none font-mono" />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={notifForm.is_active ?? true} onChange={e => setNotifForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
+                <button onClick={() => setActiveNotifModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+                <button onClick={handleSaveNotif} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save Template</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

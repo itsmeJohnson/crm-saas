@@ -13,13 +13,19 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
+def create_access_token(subject: Union[str, Any], token_version: int = 1, expires_delta: timedelta = None) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode = {"exp": expire, "sub": str(subject), "type": "access", "jti": uuid.uuid4().hex}
+
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "type": "access",
+        "jti": uuid.uuid4().hex,
+        "tv": token_version,  # token_version for forced-logout support
+    }
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
@@ -28,17 +34,37 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: timedelta = No
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
+
     to_encode = {"exp": expire, "sub": str(subject), "type": "refresh", "jti": uuid.uuid4().hex}
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 def decode_token(token: str) -> dict:
+    """
+    Decode and validate a JWT.
+    Raises HTTPException with specific detail on expiry vs invalid token,
+    so the frontend can distinguish between the two and attempt a refresh.
+    """
+    from fastapi import HTTPException, status as http_status
     try:
-        decoded_token = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        decoded_token = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM]
+        )
         return decoded_token
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="token_expired",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="token expired"'},
+        )
     except jwt.InvalidTokenError:
-        return {}
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 import hashlib

@@ -24,7 +24,8 @@ class TenantSubscription(BaseModel):
     billing_cycle: Mapped[str] = mapped_column(String(20), default="monthly", nullable=False)  # "monthly", "quarterly", "annual"
     next_invoice_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     renewal_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    users_purchased: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    users_purchased: Mapped[int] = mapped_column(Integer, default=10, nullable=False)  # Default 10 seats as per commercial terms
+    users_purchased_next: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Scheduled seat count for next billing cycle
     users_active: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     storage_used: Mapped[float] = mapped_column(Numeric(10, 3), default=0.0, nullable=False)  # in GB
     call_recording_usage: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # count or minutes

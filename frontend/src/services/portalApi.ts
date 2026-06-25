@@ -148,6 +148,11 @@ export const portalApi = {
     return res.data;
   },
 
+  reduceSeats: async (payload: { new_seat_count: number }) => {
+    const res = await api.post<any>('/portal/subscription/reduce-seats', payload);
+    return res.data;
+  },
+
   getInvoices: async () => {
     const res = await api.get<PortalInvoiceResponse[]>('/portal/invoices');
     return res.data;

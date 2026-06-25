@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi, PortalInvoiceResponse } from '../../services/portalApi';
 import {
-  FileText, Download, CreditCard, Search, Calendar,
+  Download, CreditCard, Search,
   AlertTriangle, Loader2, CheckCircle2, SlidersHorizontal
 } from 'lucide-react';
 

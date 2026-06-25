@@ -1,10 +1,10 @@
 import uuid
 from typing import Annotated, List
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse, UserCreate, UserUpdate
+from app.schemas.user import UserResponse, UserCreate, UserUpdate, ReplaceEmployeeRequest, SeatUtilizationResponse, SeatHistoryResponse
 from app.schemas.invitation import InvitationResponse, InvitationCreate, InvitationAccept
 from app.services.user_service import UserService
 from app.services.invitation_service import InvitationService
@@ -13,7 +13,7 @@ from app.middleware.subscription_guard import check_user_creation_limit_dep, che
 
 router = APIRouter()
 
-# --- Users ---
+# ── Users ─────────────────────────────────────────────────────────────────────
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
@@ -41,7 +41,63 @@ async def list_users(
     records, _ = await user_service.paginate_users(actor, skip, limit, search, role, is_active)
     return list(records)
 
-# --- Invitations ---
+# ── Static paths MUST come before /{user_id} to avoid shadowing ──────────────
+
+@router.get("/seat-utilization", response_model=SeatUtilizationResponse)
+async def get_seat_utilization(
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Get the current seat licensing utilization metrics."""
+    user_service = UserService(db)
+    return await user_service.get_seat_utilization(actor.organization_id)
+
+@router.get("/seat-history", response_model=List[SeatHistoryResponse])
+async def get_seat_history(
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Get seat assignment and replacement history logs."""
+    user_service = UserService(db)
+    return await user_service.get_seat_history(actor.organization_id)
+
+@router.get("/inactive-employees", response_model=List[UserResponse])
+async def get_inactive_employees(
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Get a list of inactive employees who currently occupy a seat and can be replaced."""
+    user_service = UserService(db)
+    return await user_service.get_inactive_employees(actor.organization_id)
+
+@router.post("/replace-employee", response_model=UserResponse)
+async def replace_employee(
+    request: Request,
+    payload: ReplaceEmployeeRequest,
+    actor: Annotated[User, Depends(require_user_management_permission())],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    response: Response = None
+):
+    """Replace an inactive employee with a new employee, transferring their seat."""
+    user_service = UserService(db)
+
+    ip_address = request.client.host if request.client else None
+    browser_info = request.headers.get("user-agent")
+
+    new_user, notification = await user_service.replace_employee(
+        actor=actor,
+        old_user_id=payload.old_user_id,
+        new_user_data=payload.model_dump(),
+        ip_address=ip_address,
+        browser_info=browser_info
+    )
+
+    if response:
+        response.headers["X-Notification"] = notification
+
+    return new_user
+
+# ── Invitations ───────────────────────────────────────────────────────────────
 
 @router.post("/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 async def invite_user(
@@ -78,7 +134,7 @@ async def accept_invitation(
         last_name=accept_in.last_name
     )
 
-# --- User Detail Operations ---
+# ── User Detail Operations (/{user_id} MUST be last) ─────────────────────────
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
@@ -116,8 +172,9 @@ async def toggle_user_status(
     user_id: uuid.UUID,
     actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    is_active: bool = Query(...)
+    is_active: bool = Query(...),
+    inactive_reason: str | None = Query(None)
 ):
     """Activate or deactivate user account status."""
     user_service = UserService(db)
-    return await user_service.toggle_active(actor, user_id, is_active)
+    return await user_service.toggle_active(actor, user_id, is_active, inactive_reason)

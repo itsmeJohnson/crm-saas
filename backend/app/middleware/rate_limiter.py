@@ -49,7 +49,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         
         is_allowed = True
         
-        # Try Redis first if available
+        # Try Redis first if available — fail-closed on outage (prevents per-instance bypass)
         if self.redis_client:
             try:
                 key = f"rate_limit:{client_ip}:{int(current_time) // 60}"
@@ -60,9 +60,13 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 if request_count > self.limit_per_minute:
                     is_allowed = False
             except Exception as e:
-                logger.error(f"Redis rate limiting error: {e}. Falling back to in-memory.")
-                is_allowed = self._check_memory_limit(client_ip, current_time)
+                logger.error(f"Redis rate limiting unavailable: {e}. Returning 503 to prevent bypass.")
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "Service temporarily unavailable. Please retry shortly."}
+                )
         else:
+            # No Redis configured — in-memory fallback (dev/single-instance only)
             is_allowed = self._check_memory_limit(client_ip, current_time)
 
         if not is_allowed:

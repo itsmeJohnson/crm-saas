@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import {
-  BarChart3, Users, PhoneCall, FileUp, Loader2, AlertTriangle, Sparkles
+  BarChart3, Users, PhoneCall, FileUp, Loader2, AlertTriangle, 
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer

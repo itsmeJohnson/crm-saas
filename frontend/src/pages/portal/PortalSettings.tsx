@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import { useThemeStore } from '../../store/themeStore';
 import {
-  Settings, Bell, Mail, Shield, CheckCircle2,
+  Settings, Bell, CheckCircle2,
   AlertTriangle, Loader2, Sun, Moon, RefreshCw
 } from 'lucide-react';
 

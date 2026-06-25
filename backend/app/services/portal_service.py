@@ -398,12 +398,17 @@ class PortalService:
         elif action_type == "upgrade_plan":
             plan_id = uuid.UUID(metadata.get("plan_id"))
             billing_cycle = metadata.get("billing_cycle", "monthly")
+            licensed_seats = metadata.get("licensed_seats")
             plan_stmt = select(Plan).where(Plan.id == plan_id)
             plan_res = await self.db.execute(plan_stmt)
             plan = plan_res.scalar_one_or_none()
             if plan and sub:
                 sub.plan_id = plan.id
                 sub.billing_cycle = billing_cycle
+                if licensed_seats:
+                    sub.users_purchased = int(licensed_seats)
+                else:
+                    sub.users_purchased = max(sub.users_purchased, plan.minimum_users)
                 days_to_add = 30
                 if billing_cycle == "quarterly":
                     days_to_add = 90
@@ -417,7 +422,7 @@ class PortalService:
                 
                 if org:
                     org.subscription_plan = plan.name
-                    org.max_users = plan.max_users
+                    org.max_users = sub.users_purchased
                     org.subscription_expires_at = sub.end_date
                     org.subscription_status = "active"
 
@@ -484,13 +489,25 @@ class PortalService:
             if not plan:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found.")
 
-        # Determine base amount based on cycle
+        # Fetch active sub if any
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+
+        licensed_seats = max(sub.users_purchased, plan.minimum_users) if sub else max(plan.minimum_users, 10)
+
+        # Determine price per seat based on cycle
         if billing_cycle == "annual":
-            base_amount = float(plan.annual_price) if plan.annual_price > 0 else float(plan.monthly_price) * 12
+            price_per_seat = float(plan.annual_price) if plan.annual_price > 0 else float(plan.monthly_price) * 12
         elif billing_cycle == "quarterly":
-            base_amount = float(plan.quarterly_price) if plan.quarterly_price > 0 else float(plan.monthly_price) * 3
+            price_per_seat = float(plan.quarterly_price) if plan.quarterly_price > 0 else float(plan.monthly_price) * 3
         else:
-            base_amount = float(plan.monthly_price) if plan.monthly_price > 0 else float(plan.price_inr)
+            price_per_seat = float(plan.monthly_price) if plan.monthly_price > 0 else float(plan.price_inr)
+
+        base_amount = price_per_seat * licensed_seats
 
         gst_rate = float(comm_settings.default_gst)
         if comm_settings.gst_inclusive:
@@ -515,14 +532,6 @@ class PortalService:
         now = datetime.now(timezone.utc)
         invoice_num = f"{prefix}-UPGR-{uuid.uuid4().hex[:6].upper()}-{int(now.timestamp())}"
 
-        # Fetch active sub if any
-        sub_stmt = select(TenantSubscription).where(
-            TenantSubscription.organization_id == organization_id,
-            TenantSubscription.is_deleted == False
-        )
-        sub_res = await self.db.execute(sub_stmt)
-        sub = sub_res.scalar_one_or_none()
-
         invoice = Invoice(
             organization_id=organization_id,
             invoice_number=invoice_num,
@@ -546,7 +555,8 @@ class PortalService:
             "action_type": "upgrade_plan",
             "plan_id": str(plan_id),
             "billing_cycle": billing_cycle,
-            "gateway": gateway
+            "gateway": gateway,
+            "licensed_seats": licensed_seats
         }
         self.db.add(invoice)
         await self.db.commit()
@@ -561,3 +571,62 @@ class PortalService:
             action_metadata={"plan_name": plan.name, "billing_cycle": billing_cycle, "amount": total_amount}
         )
         return invoice
+
+    async def reduce_licensed_seats(
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, new_seat_count: int
+    ) -> TenantSubscription:
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found.")
+
+        # Validation checks
+        if new_seat_count >= sub.users_purchased:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New seat count must be less than current purchased seats."
+            )
+        if new_seat_count < 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot reduce below the minimum initial purchase of 10 Licensed Seats."
+            )
+
+        # Count active users currently assigned seats
+        from app.models.user import User
+        from sqlalchemy import func
+        stmt = select(func.count(User.id)).where(
+            User.organization_id == organization_id,
+            User.is_active == True,
+            User.seat_number.isnot(None),
+            User.is_deleted == False
+        )
+        res = await self.db.execute(stmt)
+        active_count = res.scalar() or 0
+
+        if new_seat_count < active_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot reduce seats below the number of currently active users ({active_count}). Please deactivate some users first."
+            )
+
+        # Schedule the reduction
+        sub.users_purchased_next = new_seat_count
+        await self.db.commit()
+        await self.db.refresh(sub)
+
+        # Log audit event
+        await self.audit_service.log_event(
+            organization_id=organization_id,
+            actor_user_id=actor_user_id,
+            action="SCHEDULE_SEAT_REDUCTION",
+            resource_type="SUBSCRIPTION",
+            resource_id=str(sub.id),
+            action_metadata={"from_seats": sub.users_purchased, "to_seats": new_seat_count}
+        )
+
+        return sub
