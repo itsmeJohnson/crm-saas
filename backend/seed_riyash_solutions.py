@@ -30,6 +30,8 @@ from app.models.payment import Payment
 from app.models.system_setting import SystemSetting
 from app.models.invoice_config import InvoiceConfig
 from app.models.commercial_settings import CommercialSettings
+from app.models.assignment_config import AssignmentConfig
+from app.models.lead_import import LeadImport
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("seed_riyash")
@@ -103,7 +105,7 @@ PLAN_SPEC = {
         "price_quarterly": 14997.0,
         "price_annual": 59988.0,
         "max_users": 15,
-        "minimum_users": 15,
+        "minimum_users": 10,
         "maximum_users": 1000,
         "minimum_contract_months": 3,
         "extra_user_price": 4999.0,
@@ -126,7 +128,7 @@ PLAN_SPEC = {
         "price_quarterly": 22500.0,
         "price_annual": 90000.0,
         "max_users": 20,
-        "minimum_users": 20,
+        "minimum_users": 10,
         "maximum_users": 1000,
         "minimum_contract_months": 3,
         "extra_user_price": 7500.0,
@@ -231,7 +233,7 @@ async def seed_plans(session: AsyncSession, feature_map: dict) -> dict:
         
         # Clean up existing features mapping if plan exists
         if plan:
-            await session.execute(delete(PlanFeature).where(PlanFeature.plan_id == plan.id))
+            plan.plan_features.clear()
             await session.flush()
         else:
             plan = Plan(name=plan_name)
@@ -245,11 +247,15 @@ async def seed_plans(session: AsyncSession, feature_map: dict) -> dict:
         plan.price_inr = spec["price_monthly"]
         plan.currency = "INR"
         plan.max_users = spec["max_users"]
+        plan.minimum_users = spec["minimum_users"]
+        plan.maximum_users = spec["maximum_users"]
+        plan.minimum_contract_months = spec["minimum_contract_months"]
+        plan.extra_user_price = spec["extra_user_price"]
+        plan.allow_additional_seats = spec["allow_additional_seats"]
         plan.storage_limit_gb = spec["storage_limit_gb"]
         plan.recording_retention_days = spec["recording_retention_days"]
         plan.priority_support = spec["priority_support"]
         plan.api_access = spec["api_access"]
-        plan.minimum_contract_months = 3
         plan.is_active = True
         plan.plan_active = True
         plan.is_trial = False
@@ -299,6 +305,8 @@ async def clean_existing_tenant(session: AsyncSession, org_slug: str):
         await session.execute(delete(Invoice).where(Invoice.organization_id == org.id))
         await session.execute(delete(TenantSubscription).where(TenantSubscription.organization_id == org.id))
         await session.execute(delete(User).where(User.organization_id == org.id))
+        await session.execute(delete(AssignmentConfig).where(AssignmentConfig.organization_id == org.id))
+        await session.execute(delete(LeadImport).where(LeadImport.organization_id == org.id))
         await session.execute(delete(Organization).where(Organization.id == org.id))
         await session.commit()
         logger.info("Purged old Riyash Solutions tenant data.")

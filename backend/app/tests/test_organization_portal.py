@@ -75,6 +75,7 @@ async def setup_portal_data(db: AsyncSession):
         price_inr=4999.00,
         monthly_price=4999.00,
         max_users=20,
+        minimum_users=20,
         max_admins=2,
         max_managers=4,
         max_team_leads=8,
