@@ -235,7 +235,10 @@ class AuthService:
         return user
 
     async def create_user_session(self, user_id: Any, ip_address: str | None = None, user_agent: str | None = None) -> Token:
-        access_token = create_access_token(subject=user_id)
+        # Fetch current token_version to embed in access token for forced-logout support
+        user = await self.user_repo.get(user_id)
+        token_version = user.token_version if user else 1
+        access_token = create_access_token(subject=user_id, token_version=token_version)
         refresh_token = create_refresh_token(subject=user_id)
         
         expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)

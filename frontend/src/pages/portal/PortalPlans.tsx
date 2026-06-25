@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import {
-  Sparkles, CheckCircle2, AlertTriangle, Loader2, CreditCard, Check, HelpCircle
+  CheckCircle2, AlertTriangle, Loader2, CreditCard, Check, 
 } from 'lucide-react';
 
 export const PortalPlans: React.FC = () => {

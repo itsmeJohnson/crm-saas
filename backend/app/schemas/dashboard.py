@@ -1,34 +1,52 @@
-import uuid
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from datetime import datetime
 
-class AssignedLeadBreakdown(BaseModel):
-    user_id: str
-    user_name: str
-    lead_count: int
 
-class DashboardSummaryResponse(BaseModel):
-    total_leads: int
-    contacts_count: int
-    companies_count: int
-    user_count: int
-    activities_count: int
-    leads_by_status: Dict[str, int]
-    assigned_leads_breakdown: List[AssignedLeadBreakdown]
-
-class RecentActivityItem(BaseModel):
-    id: str
-    activity_type: str
-    subject: str
-    description: Optional[str] = None
-    due_date: Optional[str] = None
-    status: str
-    assigned_user_id: Optional[str] = None
-    assigned_user_name: str
-    created_at: str
-
-class RecentActivitiesResponse(BaseModel):
-    items: List[RecentActivityItem]
+class OrgMetrics(BaseModel):
     total: int
-    page: int
-    limit: int
+    active: int
+    trial: int
+    expired: int
+    suspended: int
+    new_today: int
+
+
+class RevenueMetrics(BaseModel):
+    mrr: float
+    arr: float
+    total_collected: float
+    pending: float
+    failed_count: int
+    overdue_count: int
+    currency: str = "INR"
+
+
+class LicensingMetrics(BaseModel):
+    total_licensed_seats: int
+    active_seats: int
+    available_seats: int
+    utilization_percent: float
+
+
+class InfraMetrics(BaseModel):
+    total_storage_gb: float
+    call_recording_gb: float
+    db_status: str
+    redis_status: str
+
+
+class ActivityMetrics(BaseModel):
+    new_orgs_today: int
+    renewals_due_7days: int
+    trials_expiring_7days: int
+    new_invoices_today: int
+    payments_today: int
+
+
+class SuperAdminDashboardResponse(BaseModel):
+    orgs: OrgMetrics
+    revenue: RevenueMetrics
+    licensing: LicensingMetrics
+    infra: InfraMetrics
+    activity: ActivityMetrics
+    generated_at: datetime

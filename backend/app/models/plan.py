@@ -55,6 +55,20 @@ class Plan(BaseModel):
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     plan_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+
+    # Phase 3 - Extended Plan Configuration
+    quarterly_discount: Mapped[float] = mapped_column(Numeric(5, 2), default=5.0, nullable=False)
+    annual_discount: Mapped[float] = mapped_column(Numeric(5, 2), default=15.0, nullable=False)
+    allow_seat_reduction: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    replace_employee_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    included_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ai_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    extra_storage_price: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    sla_hours: Mapped[int] = mapped_column(Integer, default=48, nullable=False)
+    dedicated_manager: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    base_currency: Mapped[str] = mapped_column(String(10), default="INR", nullable=False)
+    price_per_seat: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+
     # Relationships
     plan_features: Mapped[list["PlanFeature"]] = relationship(
         "PlanFeature", 

@@ -1,5 +1,6 @@
-from datetime import datetime
-from sqlalchemy import String, Boolean, Integer
+import uuid
+from datetime import datetime, timezone
+from sqlalchemy import String, Boolean, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
 
@@ -46,6 +47,16 @@ class Organization(BaseModel):
     # Extra Portal Fields
     auto_renewal: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     theme: Mapped[str] = mapped_column(String(50), default="dark", nullable=False)
+
+
+    # Phase 3 - Extended organization fields
+    country: Mapped[str] = mapped_column(String(100), default="India", nullable=False)
+    country_code: Mapped[str] = mapped_column(String(10), default="IN", nullable=False)
+    plan_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("plans.id"), nullable=True, index=True)
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    suspension_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    trial_extended_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Relationships
     users: Mapped[list["User"]] = relationship(

@@ -13,17 +13,25 @@ from app.models.user import User
 from app.repositories.organization import OrganizationRepository
 from app.schemas.user import UserResponse
 from app.schemas.organization import OrganizationResponse
-from app.middleware.permissions import check_is_team_leader
+from app.middleware.permissions import check_is_team_leader, require_role
 from datetime import datetime, timedelta, timezone
 import secrets
 
 router = APIRouter()
 
-@router.post("/register", response_model=AuthMeResponse)
+# SuperAdmin-only dependency
+_require_super_admin = require_role(["SuperAdmin"])
+
+@router.post("/register", response_model=AuthMeResponse, status_code=201)
 async def register(
     request: RegisterTenantRequest,
+    actor: Annotated[User, Depends(_require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    """
+    Create a new tenant organisation and its OrgAdmin user.
+    Restricted to SuperAdmin — use the Admin Dashboard (/tenants) to onboard clients.
+    """
     auth_service = AuthService(db)
     user, org = await auth_service.register_tenant(request)
     return AuthMeResponse(
@@ -37,17 +45,41 @@ async def login(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    from app.services.audit_service import AuditService
     auth_service = AuthService(db)
-    user = await auth_service.authenticate_user(request_data)
-    
+    audit = AuditService(db)
+
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
-    
-    return await auth_service.create_user_session(
+
+    try:
+        user = await auth_service.authenticate_user(request_data)
+    except HTTPException:
+        # Log failed login attempt (no user_id available)
+        await audit.log_event(
+            actor_id=None,
+            organization_id=None,
+            event_type="AUTH_LOGIN_FAILED",
+            description=f"Failed login attempt for email: {request_data.email}",
+            ip_address=ip_address,
+            browser_info=user_agent,
+        )
+        raise
+
+    tokens = await auth_service.create_user_session(
         user_id=user.id,
         ip_address=ip_address,
         user_agent=user_agent
     )
+    await audit.log_event(
+        actor_id=user.id,
+        organization_id=user.organization_id,
+        event_type="AUTH_LOGIN",
+        description=f"User logged in from {ip_address}",
+        ip_address=ip_address,
+        browser_info=user_agent,
+    )
+    return tokens
 
 @router.post("/refresh", response_model=Token)
 async def refresh(
@@ -58,7 +90,7 @@ async def refresh(
     auth_service = AuthService(db)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
-    
+
     return await auth_service.refresh_session(
         refresh_token=request_data.refresh_token,
         ip_address=ip_address,
@@ -68,10 +100,18 @@ async def refresh(
 @router.post("/logout")
 async def logout(
     request_data: RefreshTokenRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    from app.services.audit_service import AuditService
     auth_service = AuthService(db)
     await auth_service.logout_session(request_data.refresh_token)
+    await AuditService(db).log_event(
+        actor_id=current_user.id,
+        organization_id=current_user.organization_id,
+        event_type="AUTH_LOGOUT",
+        description="User logged out",
+    )
     return {"detail": "Logged out successfully"}
 
 @router.get("/me", response_model=AuthMeResponse)
@@ -126,16 +166,17 @@ async def forgot_password(
     payload: ForgotPasswordRequest,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    # Always return the same response to prevent email enumeration
+    GENERIC_RESPONSE = {"detail": "If your email is registered, you will receive a password reset link shortly."}
+
     # Find user by email
     query = select(User).where(User.email == payload.email, User.is_deleted == False)
     res = await db.execute(query)
     user = res.scalar_one_or_none()
-    
+
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No user registered with this email address"
-        )
+        # Return 200 with generic message — never reveal whether email exists
+        return GENERIC_RESPONSE
     
     # Generate secure token and store its SHA-256 hash
     from app.core.security import generate_random_token, hash_token
@@ -163,10 +204,7 @@ async def forgot_password(
         template_name="password_reset.html",
         context={"reset_url": reset_url}
     )
-    
-    return {
-        "detail": "If your email is registered, you will receive a password reset link shortly."
-    }
+    return GENERIC_RESPONSE
 
 @router.post("/reset-password")
 async def reset_password(
@@ -174,7 +212,8 @@ async def reset_password(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     from app.core.security import hash_token, get_password_hash
-    
+    from app.services.audit_service import AuditService
+
     hashed_token = hash_token(payload.token)
     now = datetime.now(timezone.utc)
     query = select(User).where(
@@ -184,18 +223,25 @@ async def reset_password(
     )
     res = await db.execute(query)
     user = res.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired password reset token"
         )
-    
+
     user.hashed_password = get_password_hash(payload.password)
     user.reset_token = None
     user.reset_token_expires = None
-    
+    # Increment token_version to invalidate all existing sessions immediately
+    user.token_version = (user.token_version or 1) + 1
+
     await db.commit()
-    
+    await AuditService(db).log_event(
+        actor_id=user.id,
+        organization_id=user.organization_id,
+        event_type="AUTH_PASSWORD_RESET",
+        description="Password reset completed — all existing sessions invalidated",
+    )
     return {"detail": "Password has been reset successfully"}
 

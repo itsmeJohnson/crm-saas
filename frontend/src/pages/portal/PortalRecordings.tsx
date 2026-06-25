@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import {
-  PhoneCall, Play, Pause, Trash2, Download, Search,
-  AlertTriangle, Loader2, CheckCircle2, Volume2, ArrowUpDown
+  Play, Pause, Trash2, Search,
+  AlertTriangle, Loader2, CheckCircle2, 
 } from 'lucide-react';
 
 export const PortalRecordings: React.FC = () => {
@@ -56,7 +56,7 @@ export const PortalRecordings: React.FC = () => {
         audioInstance.pause();
       }
       const newAudio = new Audio(url);
-      newAudio.play().catch((err) => {
+      newAudio.play().catch((_err) => {
         setError("Audio recording file URL failed to play.");
       });
       newAudio.onended = () => {

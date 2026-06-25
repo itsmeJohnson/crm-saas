@@ -1,5 +1,50 @@
 import { api } from './api';
 
+// ── Phase 1: Dashboard ────────────────────────────────────────────────────────
+export interface DashboardOrgMetrics { total: number; active: number; trial: number; expired: number; suspended: number; new_today: number; }
+export interface DashboardRevenueMetrics { mrr: number; arr: number; total_collected: number; pending: number; failed_count: number; overdue_count: number; currency: string; }
+export interface DashboardLicensingMetrics { total_licensed_seats: number; active_seats: number; available_seats: number; utilization_percent: number; }
+export interface DashboardInfraMetrics { total_storage_gb: number; call_recording_gb: number; db_status: string; redis_status: string; }
+export interface DashboardActivityMetrics { new_orgs_today: number; renewals_due_7days: number; trials_expiring_7days: number; new_invoices_today: number; payments_today: number; }
+export interface SuperAdminDashboard { orgs: DashboardOrgMetrics; revenue: DashboardRevenueMetrics; licensing: DashboardLicensingMetrics; infra: DashboardInfraMetrics; activity: DashboardActivityMetrics; generated_at: string; }
+
+// ── Phase 6: Currency ─────────────────────────────────────────────────────────
+export interface CurrencyResponse { code: string; name: string; symbol: string; exchange_rate: number; is_base: boolean; is_active: boolean; source: string; last_updated: string | null; }
+export interface CurrencyCreate { code: string; name: string; symbol: string; exchange_rate: number; is_base?: boolean; }
+export interface CurrencyUpdate { name?: string; symbol?: string; exchange_rate?: number; is_active?: boolean; is_base?: boolean; }
+
+// ── Phase 7: Tax Engine ───────────────────────────────────────────────────────
+export interface TaxConfigResponse { id: string; country_code: string; country_name: string; tax_type: string; tax_rate: number; tax_label: string; tax_inclusive: boolean; is_active: boolean; is_default: boolean; state_code: string | null; created_at: string; }
+export interface TaxConfigCreate { country_code: string; country_name: string; tax_type: string; tax_rate: number; tax_label: string; tax_inclusive?: boolean; is_active?: boolean; is_default?: boolean; }
+export interface TaxConfigUpdate { tax_rate?: number; tax_label?: string; tax_type?: string; tax_inclusive?: boolean; is_active?: boolean; is_default?: boolean; }
+
+// ── Phase 9: Payment Gateways ─────────────────────────────────────────────────
+export interface PaymentGatewayResponse { id: string; name: string; display_name: string; is_enabled: boolean; is_sandbox: boolean; api_key_set: boolean; webhook_secret_set: boolean; sort_order: number; description: string | null; extra_config: Record<string, any> | null; }
+export interface PaymentGatewayUpdate { display_name?: string; is_enabled?: boolean; is_sandbox?: boolean; api_key?: string; api_secret?: string; webhook_secret?: string; description?: string; }
+
+// ── Phase 12: Notification Templates ─────────────────────────────────────────
+export interface NotificationTemplateResponse { id: string; template_key: string; template_name: string; channel: string; subject: string | null; body: string; variables: string[] | null; is_active: boolean; category: string; description: string | null; created_at: string; updated_at: string; }
+export interface NotificationTemplateCreate { template_key: string; template_name: string; channel: string; subject?: string; body: string; variables?: string[]; category?: string; description?: string; }
+export interface NotificationTemplateUpdate { template_name?: string; subject?: string; body?: string; variables?: string[]; is_active?: boolean; description?: string; }
+
+// ── Phase 5: Coupons ──────────────────────────────────────────────────────────
+export interface CouponResponse { id: string; code: string; description: string | null; discount_type: string; discount_value: number; max_uses: number | null; uses_count: number; valid_from: string; valid_until: string | null; min_order_value: number; applicable_plans: string[] | null; is_active: boolean; notes: string | null; created_at: string; }
+export interface CouponCreate { code: string; description?: string; discount_type: string; discount_value: number; max_uses?: number; valid_from: string; valid_until?: string; min_order_value?: number; applicable_plans?: string[]; is_active?: boolean; notes?: string; }
+export interface CouponUpdate { description?: string; discount_value?: number; max_uses?: number; valid_until?: string; is_active?: boolean; notes?: string; }
+
+// ── Phase 4: Feature Create ───────────────────────────────────────────────────
+export interface FeatureCreate { code: string; display_name: string; description?: string; category: string; icon?: string; active?: boolean; }
+
+// ── Phase 15: Reports ─────────────────────────────────────────────────────────
+export interface RevenueReport { period_start: string; period_end: string; currency: string; mrr: number; arr: number; total_collected: number; pending: number; top_plans: Array<{ name: string; active_subscriptions: number }>; }
+export interface TenantReport { total: number; active: number; trial: number; expired: number; suspended: number; by_plan: Array<{ plan: string; count: number }>; }
+export interface SeatUtilizationReport { total_licensed: number; total_active: number; utilization_pct: number; by_organization: Array<{ name: string; licensed: number; active: number; utilization_pct: number }>; }
+export interface InvoiceReport { period_start: string; period_end: string; total_invoices: number; paid_count: number; paid_amount: number; unpaid_count: number; unpaid_amount: number; }
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+export interface AuditLogEntry { id: string; organization_id?: string; actor_user_id?: string; action: string; resource_type: string; resource_id?: string; metadata?: Record<string, any>; created_at: string; }
+export interface AuditLogPage { total: number; limit: number; offset: number; data: AuditLogEntry[]; }
+
 export interface TenantResponse {
   id: string;
   name: string;
@@ -130,6 +175,85 @@ export const superAdminApi = {
   updateFeature: async (featureId: string, payload: Partial<FeatureResponse>) => {
     const response = await api.patch<FeatureResponse>(`/super-admin/features/${featureId}`, payload);
     return response.data;
+  },
+  createFeature: async (payload: FeatureCreate) => {
+    const response = await api.post<FeatureResponse>('/super-admin/features', payload);
+    return response.data;
+  },
+  deleteFeature: async (featureId: string) => {
+    const response = await api.delete<{ detail: string }>(`/super-admin/features/${featureId}`);
+    return response.data;
+  },
+
+  // Phase 1: Dashboard
+  getDashboard: async () => {
+    const response = await api.get<SuperAdminDashboard>('/super-admin/dashboard');
+    return response.data;
+  },
+
+  // Phase 2: Enhanced Tenant Actions
+  extendTrial: async (orgId: string, days: number) => {
+    const response = await api.post(`/super-admin/tenants/${orgId}/extend-trial`, null, { params: { days } });
+    return response.data;
+  },
+  activateTenant: async (orgId: string) => {
+    const response = await api.post(`/super-admin/tenants/${orgId}/activate`);
+    return response.data;
+  },
+  impersonateTenant: async (orgId: string) => {
+    const response = await api.post<{ access_token: string; impersonating: { org_name: string; admin_email: string } }>(`/super-admin/tenants/${orgId}/impersonate`);
+    return response.data;
+  },
+  getTenantAuditLogs: async (orgId: string, limit = 50, offset = 0) => {
+    const response = await api.get(`/super-admin/tenants/${orgId}/audit-logs`, { params: { limit, offset } });
+    return response.data;
+  },
+
+  // Phase 5: Coupons
+  getCoupons: async () => { const r = await api.get<CouponResponse[]>('/super-admin/coupons'); return r.data; },
+  createCoupon: async (p: CouponCreate) => { const r = await api.post<CouponResponse>('/super-admin/coupons', p); return r.data; },
+  updateCoupon: async (id: string, p: CouponUpdate) => { const r = await api.patch<CouponResponse>(`/super-admin/coupons/${id}`, p); return r.data; },
+  deleteCoupon: async (id: string) => { const r = await api.delete(`/super-admin/coupons/${id}`); return r.data; },
+
+  // Phase 6: Currency
+  getCurrencies: async () => { const r = await api.get<CurrencyResponse[]>('/super-admin/currencies'); return r.data; },
+  createCurrency: async (p: CurrencyCreate) => { const r = await api.post<CurrencyResponse>('/super-admin/currencies', p); return r.data; },
+  updateCurrency: async (code: string, p: CurrencyUpdate) => { const r = await api.patch<CurrencyResponse>(`/super-admin/currencies/${code}`, p); return r.data; },
+  deleteCurrency: async (code: string) => { const r = await api.delete(`/super-admin/currencies/${code}`); return r.data; },
+
+  // Phase 7: Tax Configs
+  getTaxConfigs: async () => { const r = await api.get<TaxConfigResponse[]>('/super-admin/tax-configs'); return r.data; },
+  createTaxConfig: async (p: TaxConfigCreate) => { const r = await api.post<TaxConfigResponse>('/super-admin/tax-configs', p); return r.data; },
+  updateTaxConfig: async (id: string, p: TaxConfigUpdate) => { const r = await api.patch<TaxConfigResponse>(`/super-admin/tax-configs/${id}`, p); return r.data; },
+  deleteTaxConfig: async (id: string) => { const r = await api.delete(`/super-admin/tax-configs/${id}`); return r.data; },
+
+  // Phase 9: Payment Gateways
+  getPaymentGateways: async () => { const r = await api.get<PaymentGatewayResponse[]>('/super-admin/payment-gateways'); return r.data; },
+  updatePaymentGateway: async (id: string, p: PaymentGatewayUpdate) => { const r = await api.patch<PaymentGatewayResponse>(`/super-admin/payment-gateways/${id}`, p); return r.data; },
+  togglePaymentGateway: async (id: string) => { const r = await api.post<{ is_enabled: boolean }>(`/super-admin/payment-gateways/${id}/toggle`); return r.data; },
+
+  // Phase 12: Notification Templates
+  getNotificationTemplates: async () => { const r = await api.get<NotificationTemplateResponse[]>('/super-admin/notification-templates'); return r.data; },
+  createNotificationTemplate: async (p: NotificationTemplateCreate) => { const r = await api.post<NotificationTemplateResponse>('/super-admin/notification-templates', p); return r.data; },
+  updateNotificationTemplate: async (id: string, p: NotificationTemplateUpdate) => { const r = await api.patch<NotificationTemplateResponse>(`/super-admin/notification-templates/${id}`, p); return r.data; },
+  deleteNotificationTemplate: async (id: string) => { const r = await api.delete(`/super-admin/notification-templates/${id}`); return r.data; },
+
+  // Phase 13: Audit Center
+  getAuditLogs: async (params: { org_id?: string; action?: string; resource_type?: string; start_date?: string; end_date?: string; limit?: number; offset?: number }) => {
+    const r = await api.get<AuditLogPage>('/super-admin/audit-logs', { params });
+    return r.data;
+  },
+
+  // Phase 15: Reports
+  getRevenueReport: async (start_date?: string, end_date?: string, currency = 'INR') => {
+    const r = await api.get<RevenueReport>('/super-admin/reports/revenue', { params: { start_date, end_date, currency } });
+    return r.data;
+  },
+  getTenantReport: async () => { const r = await api.get<TenantReport>('/super-admin/reports/tenants'); return r.data; },
+  getSeatUtilization: async () => { const r = await api.get<SeatUtilizationReport>('/super-admin/reports/seat-utilization'); return r.data; },
+  getInvoiceReport: async (start_date?: string, end_date?: string) => {
+    const r = await api.get<InvoiceReport>('/super-admin/reports/invoices', { params: { start_date, end_date } });
+    return r.data;
   },
 
   // Plan Feature Mappings

@@ -79,7 +79,7 @@ class InvoiceConfigService:
         filename, ext = validate_and_sanitize_file(
             content=file_bytes,
             filename=original_filename,
-            allowed_extensions={"jpg", "jpeg", "png", "webp", "svg", "pdf"},
+            allowed_extensions={"jpg", "jpeg", "png", "webp"},  # SVG blocked: stored XSS risk
             max_size=2 * 1024 * 1024
         )
         
@@ -132,7 +132,7 @@ class InvoiceConfigService:
         filename, ext = validate_and_sanitize_file(
             content=file_bytes,
             filename=original_filename,
-            allowed_extensions={"jpg", "jpeg", "png", "webp", "svg", "pdf"},
+            allowed_extensions={"jpg", "jpeg", "png", "webp"},  # SVG blocked: stored XSS risk
             max_size=2 * 1024 * 1024
         )
         

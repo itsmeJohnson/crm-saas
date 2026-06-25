@@ -2,255 +2,317 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ────────────────────────────────────────────────────────────
+   Slate CSS-var bridge (used by tailwind.config.js)
+   Dark mode = default (no class). Light mode = .light class.
+──────────────────────────────────────────────────────────── */
 :root {
-  --slate-50: 248 250 252;
+  --slate-50:  248 250 252;
   --slate-100: 241 245 249;
   --slate-200: 226 232 240;
   --slate-300: 203 213 225;
   --slate-400: 148 163 184;
   --slate-500: 100 116 139;
-  --slate-600: 71 85 105;
-  --slate-700: 51 65 85;
-  --slate-800: 30 41 59;
-  --slate-900: 15 23 42;
-  --slate-950: 2 6 23;
+  --slate-600:  71  85 105;
+  --slate-700:  51  65  85;
+  --slate-800:  30  41  59;
+  --slate-900:  15  23  42;
+  --slate-950:   2   6  23;
+
+  /* Semantic design tokens — dark mode defaults */
+  --bg-app:         #0d1117;
+  --bg-surface:     #131920;
+  --bg-card:        #1a2234;
+  --bg-card-hover:  #1f2a3e;
+  --bg-subtle:      #1e2a3b;
+  --bg-input:       #1a2234;
+  --border-color:   rgba(255, 255, 255, 0.07);
+  --border-strong:  rgba(255, 255, 255, 0.12);
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md:      0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg:      0 20px 60px rgba(0, 0, 0, 0.6);
+  --shadow-modal:   0 24px 80px rgba(0, 0, 0, 0.7);
 }
 
+/* ── Light Mode ─────────────────────────────────────────── */
 .light {
+  /* Invert Tailwind slate vars */
   --slate-950: 248 250 252;
   --slate-900: 255 255 255;
   --slate-800: 241 245 249;
   --slate-700: 226 232 240;
   --slate-600: 148 163 184;
   --slate-500: 100 116 139;
-  --slate-400: 71 85 105;
-  --slate-300: 51 65 85;
-  --slate-200: 30 41 59;
-  --slate-100: 15 23 42;
-  --slate-50: 2 6 23;
+  --slate-400:  71  85 105;
+  --slate-300:  51  65  85;
+  --slate-200:  30  41  59;
+  --slate-100:  15  23  42;
+  --slate-50:    2   6  23;
 
-  background-color: #f8fafc !important;
-  color: #334155 !important;
+  /* Semantic tokens — light */
+  --bg-app:         #f2f4f8;
+  --bg-surface:     #ffffff;
+  --bg-card:        #ffffff;
+  --bg-card-hover:  #f8fafc;
+  --bg-subtle:      #f1f5f9;
+  --bg-input:       #ffffff;
+  --border-color:   #e2e8f0;
+  --border-strong:  #cbd5e1;
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md:      0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:      0 20px 60px rgba(0, 0, 0, 0.1);
+  --shadow-modal:   0 24px 80px rgba(0, 0, 0, 0.14);
+
+  background-color: var(--bg-app);
+  color: var(--text-primary);
 }
 
-.light body {
-  background-color: #f8fafc !important;
-  color: #334155 !important;
-}
-
-.light aside {
-  background-color: #ffffff !important;
-  border-right: 1px solid #e2e8f0 !important;
-}
-
-.light aside .text-slate-400 {
-  color: #64748b !important;
-}
-
-.light aside .hover\:bg-slate-900\/80:hover {
-  background-color: #f1f5f9 !important;
-}
-
-.light aside .hover\:text-slate-100:hover {
-  color: #0f172a !important;
-}
-
-.light aside .text-slate-200 {
-  color: #1e293b !important;
-}
-
-.light main {
-  background-color: #f8fafc !important;
-}
-
-.light .glass-panel,
-.light .bg-slate-900,
-.light .bg-slate-900\/60,
-.light .bg-slate-900\/50,
-.light .bg-slate-900\/40,
-.light [class*="bg-slate-900"] {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
-}
-
-.light .border-slate-800,
-.light .border-slate-800\/60,
-.light .border-slate-800\/80,
-.light [class*="border-slate-800"],
-.light [class*="border-slate-700"] {
-  border-color: #e2e8f0 !important;
-}
-
-.light h1, .light h2, .light h3, .light h4, .light h5, .light h6,
-.light .text-white,
-.light .text-slate-100,
-.light .text-slate-200 {
-  color: #0f172a !important;
-}
-
-.light button .text-white,
-.light button.text-white,
-.light a.text-white,
-.light .bg-brand-500 .text-white,
-.light .bg-brand-600 .text-white,
-.light .bg-brand-500,
-.light .bg-indigo-600,
-.light .bg-emerald-600,
-.light .bg-rose-600,
-.light .bg-blue-600 {
-  color: #ffffff !important;
-}
-
-.light .text-slate-300,
-.light .text-slate-400,
-.light .text-slate-500 {
-  color: #475569 !important;
-}
-
-.light .glass-input {
-  background-color: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #0f172a !important;
-}
-
-.light .glass-input::placeholder {
-  color: #94a3b8 !important;
-}
-
-.light th {
-  background-color: #f8fafc !important;
-  color: #475569 !important;
-  font-weight: 600 !important;
-}
-
-.light tr:hover {
-  background-color: #f8fafc !important;
-}
-
+/* ── Base Typography ─────────────────────────────────────── */
 @layer base {
   body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
   }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', sans-serif;
-  }
-  .light h1, .light h2, .light h3, .light h4, .light h5, .light h6 {
-    font-family: 'Work Sans', 'Inter', sans-serif;
+    font-family: 'Outfit', 'Inter', sans-serif;
+    font-weight: 600;
   }
 }
 
-/* Glassmorphism Utilities */
+/* ──────────────────────────────────────────────────────────
+   Professional Component Classes
+   .glass-panel and .glass-input kept for backwards compat.
+   Now resolve to clean card styles — no backdrop blur.
+──────────────────────────────────────────────────────────── */
+
+/* Card / Panel — replaces heavy glassmorphism */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  /* backdrop-filter removed intentionally — replaced by solid bg for professionalism */
 }
 
+.light .glass-panel {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Input fields */
 .glass-input {
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  transition: all 0.2s ease-in-out;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  width: 100%;
 }
 
 .glass-input:focus {
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
-  outline: none;
+  border-color: #5275ff;
+  box-shadow: 0 0 0 3px rgba(82, 117, 255, 0.15);
 }
 
-.light .glass-input:focus {
-  border-color: rgba(82, 117, 255, 0.6);
-  box-shadow: 0 0 0 2px rgba(82, 117, 255, 0.2);
+.glass-input::placeholder {
+  color: var(--text-muted);
 }
 
+.light .glass-input {
+  background-color: #ffffff;
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.light .glass-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Gradient text */
 .gradient-text {
   background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .light .gradient-text {
-  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #5275ff 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Custom Scrollbars */
+/* ──────────────────────────────────────────────────────────
+   Sidebar & Navigation
+──────────────────────────────────────────────────────────── */
+.crm-sidebar {
+  background-color: var(--bg-surface);
+  border-right: 1px solid var(--border-color);
+}
+
+.crm-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background-color 0.12s ease, color 0.12s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.crm-nav-item:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.crm-nav-item--active {
+  background-color: rgba(82, 117, 255, 0.12);
+  color: #818cf8;
+  font-weight: 600;
+}
+
+.light .crm-nav-item--active {
+  background-color: #eff2ff;
+  color: #4f46e5;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Modal overlay
+──────────────────────────────────────────────────────────── */
+.crm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 40;
+}
+
+.crm-modal {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-modal);
+}
+
+.light .crm-modal {
+  background-color: #ffffff;
+  border-color: var(--border-color);
+}
+
+/* ──────────────────────────────────────────────────────────
+   Scrollbars — thin and clean
+──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
+
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.2);
+  background: transparent;
 }
-.light ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-}
+
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(148, 163, 184, 0.2);
   border-radius: 99px;
 }
-.light ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-.light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(148, 163, 184, 0.4);
 }
 
-/* Light Theme Dialer Console Contrast Fixes */
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* ──────────────────────────────────────────────────────────
+   Light mode: fix Tailwind utility color classes
+   The CSS-var slate bridge handles most of these, but some
+   components use explicit slate values that need context-
+   aware overrides here.
+──────────────────────────────────────────────────────────── */
+
+.light aside {
+  background-color: #ffffff;
+  border-right: 1px solid #e2e8f0;
+}
+
+.light header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.light th {
+  background-color: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.light tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Preserve white text on solid accent buttons */
+.light .bg-brand-500,
+.light .bg-brand-600,
+.light .bg-indigo-600,
+.light .bg-emerald-600,
+.light .bg-rose-600,
+.light .bg-red-600,
+.light .bg-blue-600,
+.light .bg-violet-600 {
+  color: #ffffff;
+}
+
+/* Dropdown menus */
+.light .absolute.bg-slate-800,
+.light .absolute.bg-slate-900 {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.light .absolute.bg-slate-800 button,
+.light .absolute.bg-slate-900 button {
+  color: #334155;
+}
+
+.light .absolute.bg-slate-800 button:hover,
+.light .absolute.bg-slate-900 button:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Dialer console & chip backgrounds */
 .light .bg-slate-800\/40,
 .light [class*="bg-slate-800/40"] {
-  background-color: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
-}
-
-.light .bg-slate-800,
-.light [class*="bg-slate-800"] {
-  background-color: #f1f5f9 !important;
-  color: #334155 !important;
-  border-color: #cbd5e1 !important;
-}
-
-.light .bg-slate-850,
-.light .bg-slate-900,
-.light .bg-slate-950,
-.light .bg-slate-950\/80,
-.light [class*="bg-slate-950/80"] {
-  background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
-}
-
-.light .text-slate-300 {
-  color: #334155 !important;
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
 }
 
 .light .hover\:bg-slate-700:hover,
-.light [class*="hover:bg-slate-700"]:hover,
-.light .hover\:bg-slate-800:hover,
-.light [class*="hover:bg-slate-800"]:hover {
-  background-color: #e2e8f0 !important;
-  color: #0f172a !important;
+.light .hover\:bg-slate-800:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
 }
-
-.light .absolute.bg-slate-800 {
-  background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-.light .absolute.bg-slate-800 button {
-  color: #334155 !important;
-}
-
-.light .absolute.bg-slate-800 button:hover {
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
-}
-

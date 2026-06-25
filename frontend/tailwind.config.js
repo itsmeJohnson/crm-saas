@@ -9,7 +9,7 @@ export default {
     extend: {
       colors: {
         slate: {
-          50: 'rgb(var(--slate-50) / <alpha-value>)',
+          50:  'rgb(var(--slate-50)  / <alpha-value>)',
           100: 'rgb(var(--slate-100) / <alpha-value>)',
           200: 'rgb(var(--slate-200) / <alpha-value>)',
           300: 'rgb(var(--slate-300) / <alpha-value>)',
@@ -22,7 +22,7 @@ export default {
           950: 'rgb(var(--slate-950) / <alpha-value>)',
         },
         brand: {
-          50: '#f5f7ff',
+          50:  '#f5f7ff',
           100: '#ebf0ff',
           200: '#d6e0ff',
           300: '#b3c7ff',
@@ -32,8 +32,21 @@ export default {
           700: '#253ccf',
           800: '#2232a8',
           900: '#212f85',
-        }
-      }
+          950: '#161e6a',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        display: ['Outfit', 'Inter', 'sans-serif'],
+      },
+      borderRadius: {
+        '4xl': '2rem',
+      },
+      boxShadow: {
+        'card':    '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+        'card-md': '0 4px 12px rgba(0,0,0,0.15)',
+        'card-lg': '0 20px 60px rgba(0,0,0,0.25)',
+      },
     },
   },
   plugins: [],

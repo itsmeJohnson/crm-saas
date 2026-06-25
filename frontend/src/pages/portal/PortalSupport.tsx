@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi, SupportTicketResponse } from '../../services/portalApi';
 import {
-  LifeBuoy, Send, MessageSquare, Plus, PlusCircle, Clock,
-  CheckCircle, AlertCircle, Loader2, AlertTriangle, ChevronRight, X
+  LifeBuoy, Send, PlusCircle,
+  CheckCircle, Loader2, AlertTriangle, X
 } from 'lucide-react';
 
 export const PortalSupport: React.FC = () => {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import {
-  Shield, Check, Calendar, Settings, AlertTriangle,
-  RotateCcw, Sparkles, Loader2, CheckCircle2, ShieldAlert, Users, X
+  Shield, Check, AlertTriangle,
+  RotateCcw, Loader2, CheckCircle2, ShieldAlert, Users, X
 } from 'lucide-react';
 
 export const PortalSubscription: React.FC = () => {
