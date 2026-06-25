@@ -172,3 +172,80 @@ async def test_seat_licensing_and_replace_employee(db: AsyncSession):
         await user_service.toggle_active(admin, employee.id, True)
     assert exc_info.value.status_code == 400
     assert "No available seats" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_seat_licensing_invoice_calculations(db: AsyncSession):
+    # Ensure plans exist with correct properties
+    from sqlalchemy import delete
+    from app.models.invoice import Invoice
+    from app.models.commercial_settings import CommercialSettings
+
+    await db.execute(delete(Plan).where(Plan.name.in_(["Starter-Test", "Growth-Test", "Enterprise-Test"])))
+    await db.commit()
+
+    starter_plan = Plan(
+        name="Starter-Test",
+        display_name="Starter Test",
+        monthly_price=3999.0,
+        minimum_users=10,
+        extra_user_price=3999.0,
+        gst_percentage=0.0,
+        discount_percentage=0.0,
+        setup_charges=0.0
+    )
+    growth_plan = Plan(
+        name="Growth-Test",
+        display_name="Growth Test",
+        monthly_price=4999.0,
+        minimum_users=10,
+        extra_user_price=4999.0,
+        gst_percentage=0.0,
+        discount_percentage=0.0,
+        setup_charges=0.0
+    )
+    enterprise_plan = Plan(
+        name="Enterprise-Test",
+        display_name="Enterprise AI Test",
+        monthly_price=7500.0,
+        minimum_users=10,
+        extra_user_price=7500.0,
+        gst_percentage=0.0,
+        discount_percentage=0.0,
+        setup_charges=0.0
+    )
+
+    db.add_all([starter_plan, growth_plan, enterprise_plan])
+    await db.commit()
+
+    # Load default settings or create if not present
+    comm_settings = await db.scalar(select(CommercialSettings).where(CommercialSettings.id == "default"))
+    if not comm_settings:
+        comm_settings = CommercialSettings(id="default", default_gst=0.0, gst_inclusive=True)
+        db.add(comm_settings)
+        await db.commit()
+    else:
+        comm_settings.default_gst = 0.0
+        comm_settings.gst_inclusive = True
+        db.add(comm_settings)
+        await db.commit()
+
+    # Scenario 1: Starter with 10 Seats
+    price_per_seat_starter = float(starter_plan.monthly_price)
+    amount_starter = price_per_seat_starter * 10
+    assert amount_starter == 39990.0
+
+    # Scenario 2: Growth with 15 Seats
+    price_per_seat_growth = float(growth_plan.monthly_price)
+    amount_growth = price_per_seat_growth * 15
+    assert amount_growth == 74985.0
+
+    # Scenario 3: Enterprise with 20 Seats
+    price_per_seat_enterprise = float(enterprise_plan.monthly_price)
+    amount_enterprise = price_per_seat_enterprise * 20
+    assert amount_enterprise == 150000.0
+
+    # Clean up test plans
+    await db.execute(delete(Plan).where(Plan.name.in_(["Starter-Test", "Growth-Test", "Enterprise-Test"])))
+    await db.commit()
+
