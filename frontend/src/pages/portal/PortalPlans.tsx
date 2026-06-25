@@ -6,6 +6,7 @@ import {
 
 export const PortalPlans: React.FC = () => {
   const [plans, setPlans] = useState<any[]>([]);
+  const [subscription, setSubscription] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -23,9 +24,12 @@ export const PortalPlans: React.FC = () => {
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const data = await portalApi.getPlans();
-      // Filter out deleted/inactive if not done in backend, though it's ordered
-      setPlans(data);
+      const [plansData, subData] = await Promise.all([
+        portalApi.getPlans(),
+        portalApi.getSubscription()
+      ]);
+      setPlans(plansData);
+      setSubscription(subData?.subscription || null);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to retrieve subscription plans.");
     } finally {
@@ -62,6 +66,7 @@ export const PortalPlans: React.FC = () => {
       setSuccess(`Successfully upgraded to the "${selectedPlan.display_name || selectedPlan.name}" plan! Your limits have been instantly updated.`);
       setSelectedPlan(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      fetchPlans();
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to process plan upgrade.");
     } finally {
@@ -153,13 +158,21 @@ export const PortalPlans: React.FC = () => {
                 </div>
 
                 {/* Price Display */}
-                <div className="py-2">
+                <div className="py-2 space-y-1">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-slate-100">₹{parseFloat(price).toFixed(2)}</span>
-                    <span className="text-[10px] text-slate-500 font-medium">/{billingCycle}</span>
+                    <span className="text-2xl font-bold text-slate-100">₹{parseFloat(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[10px] text-slate-500 font-medium">/ seat / {billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'}</span>
                   </div>
+                  <p className="text-[10px] text-brand-400 font-semibold">
+                    Starts from: ₹{(parseFloat(price) * plan.minimum_users).toLocaleString('en-IN')}/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'} (Min {plan.minimum_users} seats)
+                  </p>
+                  {subscription && (
+                    <p className="text-[10px] text-indigo-400 font-semibold">
+                      Your cost ({Math.max(subscription.users_purchased, plan.minimum_users)} seats): ₹{(parseFloat(price) * Math.max(subscription.users_purchased, plan.minimum_users)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'}
+                    </p>
+                  )}
                   {plan.setup_charges > 0 && (
-                    <p className="text-[9px] text-slate-500 mt-1">One-time installation charges: ₹{parseFloat(plan.setup_charges).toFixed(2)}</p>
+                    <p className="text-[9px] text-slate-500 mt-1">One-time setup charges: ₹{parseFloat(plan.setup_charges).toFixed(2)}</p>
                   )}
                 </div>
 
@@ -170,7 +183,11 @@ export const PortalPlans: React.FC = () => {
                 <div className="space-y-3 pt-2 text-xs">
                   <div className="flex items-center gap-2 text-slate-300">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Up to <strong>{plan.max_users} Users</strong></span>
+                    <span>Minimum <strong>{plan.minimum_users} Licensed Seats</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{plan.allow_additional_seats ? `Add seats dynamically at ₹${parseFloat(plan.extra_user_price || plan.monthly_price).toFixed(0)}/seat/mo` : 'Fixed seats count (no add-on seats)'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-300">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -178,15 +195,11 @@ export const PortalPlans: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-slate-300">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span><strong>{plan.recording_retention_days} Days</strong> call logs storage</span>
+                    <span><strong>{plan.recording_retention_days} Days</strong> Call Recording retention</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-300">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>{plan.priority_support ? '24/7 Priority Support' : 'Standard email support'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>{plan.api_access ? 'Advanced API Access' : 'No external API access'}</span>
                   </div>
                 </div>
               </div>
@@ -214,94 +227,114 @@ export const PortalPlans: React.FC = () => {
       </div>
 
       {/* Checkout Modal */}
-      {selectedPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-left">
-          <div className="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-6 bg-slate-950">
-            <div>
-              <h3 className="text-lg font-bold text-slate-100">Upgrade Plan Checkout</h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Verify upgrade specifications. Billing updates automatically after processed transaction.
-              </p>
-            </div>
+      {selectedPlan && (() => {
+        const currentSeatCount = subscription ? Math.max(subscription.users_purchased, selectedPlan.minimum_users) : selectedPlan.minimum_users;
+        const rawPricePerSeat = parseFloat(getCyclePrice(selectedPlan));
+        const tierPrice = rawPricePerSeat * currentSeatCount;
+        const setupCharges = parseFloat(selectedPlan.setup_charges || 0.0);
+        const gstAmount = tierPrice * 0.18;
+        const totalPrice = tierPrice + gstAmount + setupCharges;
 
-            <div className="space-y-4">
-              <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl space-y-1">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">New Tier Plan</span>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-slate-200">{selectedPlan.display_name || selectedPlan.name}</span>
-                  <span className="text-xs font-semibold text-slate-400 capitalize">{billingCycle} Cycle</span>
-                </div>
-              </div>
-
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-left">
+            <div className="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-6 bg-slate-950">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Payment Gateway</label>
-                <select
-                  value={selectedGateway}
-                  onChange={(e) => setSelectedGateway(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                >
-                  <option value="UPI">UPI / Instant QR</option>
-                  <option value="Stripe">Stripe Checkout</option>
-                  <option value="Razorpay">Razorpay Gateway</option>
-                  <option value="PhonePe">PhonePe Transfer</option>
-                  <option value="Bank">Direct Bank Transfer</option>
-                </select>
+                <h3 className="text-lg font-bold text-slate-100">Upgrade Plan Checkout</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Verify upgrade specifications. Billing updates automatically after processed transaction.
+                </p>
               </div>
 
-              {/* Total calculations */}
-              <div className="p-4 bg-slate-900/50 rounded-xl space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Tier Price:</span>
-                  <span className="font-mono text-slate-300">₹{parseFloat(getCyclePrice(selectedPlan)).toFixed(2)}</span>
-                </div>
-                {selectedPlan.setup_charges > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Setup Charges:</span>
-                    <span className="font-mono text-slate-300">₹{parseFloat(selectedPlan.setup_charges).toFixed(2)}</span>
+              <div className="space-y-4">
+                <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">New Tier Plan</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-slate-200">{selectedPlan.display_name || selectedPlan.name}</span>
+                    <span className="text-xs font-semibold text-slate-400 capitalize">{billingCycle} Cycle</span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500">GST (18% inclusive/applicable):</span>
-                  <span className="font-mono text-slate-300">
-                    ₹{(parseFloat(getCyclePrice(selectedPlan)) * 0.18).toFixed(2)}
-                  </span>
                 </div>
-                <div className="flex justify-between border-t border-slate-800/80 pt-2 font-bold text-sm">
-                  <span className="text-slate-400">Total Price:</span>
-                  <span className="text-slate-100">
-                    ₹{(parseFloat(getCyclePrice(selectedPlan)) * 1.18 + parseFloat(selectedPlan.setup_charges || 0.0)).toFixed(2)}
-                  </span>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Payment Gateway</label>
+                  <select
+                    value={selectedGateway}
+                    onChange={(e) => setSelectedGateway(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  >
+                    <option value="UPI">UPI / Instant QR</option>
+                    <option value="Stripe">Stripe Checkout</option>
+                    <option value="Razorpay">Razorpay Gateway</option>
+                    <option value="PhonePe">PhonePe Transfer</option>
+                    <option value="Bank">Direct Bank Transfer</option>
+                  </select>
+                </div>
+
+                {/* Total calculations */}
+                <div className="p-4 bg-slate-900/50 rounded-xl space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Price per seat:</span>
+                    <span className="font-mono text-slate-300">₹{rawPricePerSeat.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Seats to Purchase:</span>
+                    <span className="font-semibold text-slate-300">
+                      {currentSeatCount} Seats
+                      {subscription && subscription.users_purchased < selectedPlan.minimum_users && (
+                        <span className="text-[9px] text-brand-400 block font-normal">
+                          (Adjusted to plan minimum of {selectedPlan.minimum_users})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-800/80 pt-1">
+                    <span className="text-slate-500">Subtotal Price:</span>
+                    <span className="font-mono text-slate-300">₹{tierPrice.toFixed(2)}</span>
+                  </div>
+                  {setupCharges > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Setup Charges:</span>
+                      <span className="font-mono text-slate-300">₹{setupCharges.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">GST (18% inclusive/applicable):</span>
+                    <span className="font-mono text-slate-300">₹{gstAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-800/80 pt-2 font-bold text-sm">
+                    <span className="text-slate-400">Total Price:</span>
+                    <span className="text-slate-100">₹{totalPrice.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedPlan(null)}
-                className="px-4 py-2 border border-slate-900 hover:border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={processing}
-                className="flex items-center justify-center gap-1.5 px-6 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-xl text-xs font-bold"
-              >
-                {processing ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <>
-                    <CreditCard className="w-3.5 h-3.5" />
-                    Pay & Process
-                  </>
-                )}
-              </button>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan(null)}
+                  className="px-4 py-2 border border-slate-900 hover:border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCheckout}
+                  disabled={processing}
+                  className="flex items-center justify-center gap-1.5 px-6 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-xl text-xs font-bold"
+                >
+                  {processing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <CreditCard className="w-3.5 h-3.5" />
+                      Pay & Process
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

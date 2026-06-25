@@ -70,32 +70,32 @@ class SubscriptionService:
 
         # Build usage meters
         if sub and sub.plan:
-            plan = sub.plan
+            limit = sub.users_purchased
             usage_meters = {
                 "total_users": {
                     "current": usage["total_users"],
-                    "limit": plan.max_users,
-                    "percent": round((usage["total_users"] / plan.max_users) * 100, 2) if plan.max_users > 0 else 0
+                    "limit": limit,
+                    "percent": round((usage["total_users"] / limit) * 100, 2) if limit > 0 else 0
                 },
                 "admins": {
                     "current": usage["admins"],
-                    "limit": plan.max_admins,
-                    "percent": round((usage["admins"] / plan.max_admins) * 100, 2) if plan.max_admins > 0 else 0
+                    "limit": limit,
+                    "percent": round((usage["admins"] / limit) * 100, 2) if limit > 0 else 0
                 },
                 "managers": {
                     "current": usage["managers"],
-                    "limit": plan.max_managers,
-                    "percent": round((usage["managers"] / plan.max_managers) * 100, 2) if plan.max_managers > 0 else 0
+                    "limit": limit,
+                    "percent": round((usage["managers"] / limit) * 100, 2) if limit > 0 else 0
                 },
                 "team_leads": {
                     "current": usage["team_leads"],
-                    "limit": plan.max_team_leads,
-                    "percent": round((usage["team_leads"] / plan.max_team_leads) * 100, 2) if plan.max_team_leads > 0 else 0
+                    "limit": limit,
+                    "percent": round((usage["team_leads"] / limit) * 100, 2) if limit > 0 else 0
                 },
                 "employees": {
                     "current": usage["employees"],
-                    "limit": plan.max_employees,
-                    "percent": round((usage["employees"] / plan.max_employees) * 100, 2) if plan.max_employees > 0 else 0
+                    "limit": limit,
+                    "percent": round((usage["employees"] / limit) * 100, 2) if limit > 0 else 0
                 }
             }
         else:
@@ -163,52 +163,16 @@ class SubscriptionService:
 
         # Get current usage
         usage = await self.get_tenant_usage(organization_id)
-        plan = sub.plan
 
-        # Verify overall total limit
-        if usage["total_users"] >= plan.max_users:
+        # Verify overall total limit based on users_purchased (Licensed Seats)
+        limit = sub.users_purchased
+        if usage["total_users"] >= limit:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User limit reached. Your plan allows a maximum of {plan.max_users} total users."
+                detail=f"No available seats. Your subscription has a limit of {limit} Licensed Seats. Please purchase additional seats or replace an existing inactive employee."
             )
 
-        # Verify role-specific limit
-        if role == "OrgAdmin":
-            if usage["admins"] >= plan.max_admins:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Admin limit reached. Your plan allows a maximum of {plan.max_admins} OrgAdmins."
-                )
-        elif role == "Manager":
-            if usage["managers"] >= plan.max_managers:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Manager limit reached. Your plan allows a maximum of {plan.max_managers} Managers."
-                )
-        elif role == "Employee":
-            # Determine if it's a Team Leader or Telecaller
-            is_tl = False
-            if reporting_to_id:
-                # Query parent role
-                parent_stmt = select(User.role).where(User.id == reporting_to_id)
-                parent_res = await self.db.execute(parent_stmt)
-                parent_role = parent_res.scalar()
-                if parent_role == "Manager":
-                    is_tl = True
-
-            if is_tl:
-                if usage["team_leads"] >= plan.max_team_leads:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Team Leader limit reached. Your plan allows a maximum of {plan.max_team_leads} Team Leaders."
-                    )
-            else:
-                if usage["employees"] >= plan.max_employees:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Telecaller limit reached. Your plan allows a maximum of {plan.max_employees} Telecallers."
-                    )
-        else:
+        if role not in ["OrgAdmin", "Manager", "Employee"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid user role: {role}"
@@ -265,7 +229,13 @@ class SubscriptionService:
         currency = invoice_config.currency or comm_settings.default_currency or "INR"
         invoice_num = f"{prefix}-{uuid.uuid4().hex[:8].upper()}-{int(now.timestamp())}"
         
-        amount = float(plan.price_inr)
+        # Apply seat reduction if scheduled for the next cycle
+        if sub.users_purchased_next is not None:
+            sub.users_purchased = sub.users_purchased_next
+            sub.users_purchased_next = None
+
+        price_per_seat = float(plan.monthly_price if plan.monthly_price > 0 else plan.price_inr)
+        amount = price_per_seat * sub.users_purchased
         
         # Determine Setup Charge fallback
         setup_charges = float(plan.setup_charges) if plan.setup_charges is not None else float(comm_settings.default_setup_charge)
@@ -327,7 +297,7 @@ class SubscriptionService:
             org.subscription_plan = plan.name
             org.subscription_expires_at = new_end_date
             org.subscription_status = "active"
-            org.max_users = plan.max_users
+            org.max_users = sub.users_purchased
             
         await self.db.commit()
 

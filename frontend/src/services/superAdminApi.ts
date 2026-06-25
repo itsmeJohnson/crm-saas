@@ -51,6 +51,8 @@ export interface CreateTenantRequest {
   admin_password: string;
   first_name?: string | null;
   last_name?: string | null;
+  licensed_seats?: number;
+  contract_months?: number;
 }
 
 export const superAdminApi = {
@@ -288,6 +290,7 @@ export interface PlanCreatePayload {
   allow_upgrade: boolean;
   allow_downgrade: boolean;
   allow_trial: boolean;
+  allow_additional_seats: boolean;
   auto_renew: boolean;
   plan_active: boolean;
 }

@@ -79,10 +79,15 @@ FEATURES = [
 
 PLAN_SPEC = {
     "Starter": {
-        "price_monthly": 1500.0,
-        "price_quarterly": 4000.0,
-        "price_annual": 15000.0,
-        "max_users": 5,
+        "price_monthly": 3999.0,
+        "price_quarterly": 11997.0,
+        "price_annual": 47988.0,
+        "max_users": 10,
+        "minimum_users": 10,
+        "maximum_users": 1000,
+        "minimum_contract_months": 3,
+        "extra_user_price": 3999.0,
+        "allow_additional_seats": True,
         "storage_limit_gb": 10,
         "recording_retention_days": 30,
         "priority_support": False,
@@ -94,10 +99,15 @@ PLAN_SPEC = {
         ]
     },
     "Growth": {
-        "price_monthly": 3500.0,
-        "price_quarterly": 9500.0,
-        "price_annual": 35000.0,
-        "max_users": 20,
+        "price_monthly": 4999.0,
+        "price_quarterly": 14997.0,
+        "price_annual": 59988.0,
+        "max_users": 15,
+        "minimum_users": 15,
+        "maximum_users": 1000,
+        "minimum_contract_months": 3,
+        "extra_user_price": 4999.0,
+        "allow_additional_seats": True,
         "storage_limit_gb": 200,
         "recording_retention_days": 180,
         "priority_support": True,
@@ -111,11 +121,16 @@ PLAN_SPEC = {
             "SALES_PIPELINE", "ROLE_BASED_ACCESS", "PRIORITY_SUPPORT", "TEAM_MONITORING"
         ]
     },
-    "Enterprise": {
+    "Enterprise AI": {
         "price_monthly": 7500.0,
-        "price_quarterly": 20000.0,
-        "price_annual": 75000.0,
-        "max_users": 100,
+        "price_quarterly": 22500.0,
+        "price_annual": 90000.0,
+        "max_users": 20,
+        "minimum_users": 20,
+        "maximum_users": 1000,
+        "minimum_contract_months": 3,
+        "extra_user_price": 7500.0,
+        "allow_additional_seats": True,
         "storage_limit_gb": 1000,
         "recording_retention_days": 365,
         "priority_support": True,

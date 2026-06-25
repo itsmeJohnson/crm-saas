@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { 
   Building, Users, FileText, Edit, Plus, X, ShieldAlert, 
   Loader2, Calendar, DollarSign, CheckCircle2, AlertCircle, Clock, Trash2,
-  Workflow, CheckSquare, Settings, Lock, Check, Key, ArrowUpDown, FolderKanban,
+  Workflow, CheckSquare, Settings, Lock, Unlock, Check, Key, ArrowUpDown, FolderKanban,
   Upload, Mail, CreditCard, Image, Receipt, Percent
 } from 'lucide-react';
 import { 
@@ -184,7 +184,11 @@ export const TenantsPage: React.FC = () => {
     setIsModalLoading(true);
     setModalError(null);
     try {
-      await superAdminApi.createTenant(data);
+      await superAdminApi.createTenant({
+        ...data,
+        licensed_seats: Number(data.licensed_seats || 10),
+        contract_months: Number(data.contract_months || 3)
+      });
       showSuccess(`Tenant ${data.company_name} created successfully.`);
       await fetchAllData();
       resetTenant();
@@ -285,10 +289,10 @@ export const TenantsPage: React.FC = () => {
         quarterly_price: Number(data.quarterly_price),
         annual_price: Number(data.annual_price),
         max_users: Number(data.max_users),
-        max_admins: Number(data.max_admins),
-        max_managers: Number(data.max_managers),
-        max_team_leads: Number(data.max_team_leads),
-        max_employees: Number(data.max_employees),
+        max_admins: Number(data.max_admins || 100),
+        max_managers: Number(data.max_managers || 100),
+        max_team_leads: Number(data.max_team_leads || 100),
+        max_employees: Number(data.max_employees || 100),
         storage_limit_gb: Number(data.storage_limit_gb),
         recording_retention_days: Number(data.recording_retention_days),
         display_order: Number(data.display_order),
@@ -305,6 +309,7 @@ export const TenantsPage: React.FC = () => {
         allow_upgrade: Boolean(data.allow_upgrade),
         allow_downgrade: Boolean(data.allow_downgrade),
         allow_trial: Boolean(data.allow_trial),
+        allow_additional_seats: Boolean(data.allow_additional_seats),
         auto_renew: Boolean(data.auto_renew),
         plan_active: Boolean(data.plan_active)
       });
@@ -329,10 +334,10 @@ export const TenantsPage: React.FC = () => {
         quarterly_price: Number(data.quarterly_price),
         annual_price: Number(data.annual_price),
         max_users: Number(data.max_users),
-        max_admins: Number(data.max_admins),
-        max_managers: Number(data.max_managers),
-        max_team_leads: Number(data.max_team_leads),
-        max_employees: Number(data.max_employees),
+        max_admins: Number(data.max_admins || 100),
+        max_managers: Number(data.max_managers || 100),
+        max_team_leads: Number(data.max_team_leads || 100),
+        max_employees: Number(data.max_employees || 100),
         storage_limit_gb: Number(data.storage_limit_gb),
         recording_retention_days: Number(data.recording_retention_days),
         display_order: Number(data.display_order),
@@ -349,6 +354,7 @@ export const TenantsPage: React.FC = () => {
         allow_upgrade: Boolean(data.allow_upgrade),
         allow_downgrade: Boolean(data.allow_downgrade),
         allow_trial: Boolean(data.allow_trial),
+        allow_additional_seats: Boolean(data.allow_additional_seats),
         auto_renew: Boolean(data.auto_renew),
         plan_active: Boolean(data.plan_active)
       });
@@ -765,6 +771,7 @@ export const TenantsPage: React.FC = () => {
                                 <button
                                   onClick={() => openEditSubModal(tenant)}
                                   className="px-2 py-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                  title="Edit Subscription Tier"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                   Tier
@@ -782,11 +789,17 @@ export const TenantsPage: React.FC = () => {
                                 <button
                                   onClick={() => handleSuspendTenant(tenant)}
                                   className={`p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg transition-all cursor-pointer ${
-                                    tenant.is_active ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'
+                                    tenant.subscription_status === 'suspended'
+                                      ? 'text-emerald-400 hover:text-emerald-300'
+                                      : 'text-amber-400 hover:text-amber-300'
                                   }`}
-                                  title={tenant.is_active ? 'Suspend Account' : 'Reactivate Account'}
+                                  title={tenant.subscription_status === 'suspended' ? 'Reactivate Account' : 'Suspend Account'}
                                 >
-                                  <Lock className="w-4 h-4" />
+                                  {tenant.subscription_status === 'suspended' ? (
+                                    <Lock className="w-4 h-4" />
+                                  ) : (
+                                    <Unlock className="w-4 h-4" />
+                                  )}
                                 </button>
                                 <button
                                   onClick={() => {
@@ -820,7 +833,32 @@ export const TenantsPage: React.FC = () => {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Subscription Plans</h3>
                 <button
                   onClick={() => {
-                    resetPlan();
+                    resetPlan({
+                      minimum_users: 10,
+                      minimum_contract_months: 3,
+                      allow_additional_seats: true,
+                      currency: 'INR',
+                      monthly_price: 3999,
+                      quarterly_price: 11997,
+                      annual_price: 47988,
+                      max_users: 10,
+                      maximum_users: 1000,
+                      trial_days: 0,
+                      extra_user_price: 3999,
+                      discount_percentage: 0,
+                      gst_percentage: 18,
+                      display_order: 1,
+                      setup_charges: 0,
+                      storage_limit_gb: 100,
+                      recording_retention_days: 90,
+                      popular_plan: false,
+                      recommended_plan: false,
+                      allow_upgrade: true,
+                      allow_downgrade: true,
+                      allow_trial: true,
+                      auto_renew: true,
+                      plan_active: true
+                    });
                     setSelectedPlan(null);
                     setModalError(null);
                     setActiveModal('createPlan');
@@ -2606,47 +2644,25 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               <div className="border-t border-slate-800/80 pt-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Seat Limits & Allocation Counts</h4>
-                <div className="grid grid-cols-5 gap-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Enterprise Seat Licensing Config</h4>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Users</label>
+                    <label className="block text-[10px] text-slate-400 mb-1.5">Suggested Seats (max_users)</label>
                     <input
                       type="number"
                       {...regPlan('max_users', { required: true, min: 1 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Admins</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_admins', { required: true, min: 1 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Mgrs</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_managers', { required: true, min: 0 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max TLs</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_team_leads', { required: true, min: 0 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Max Agents</label>
-                    <input
-                      type="number"
-                      {...regPlan('max_employees', { required: true, min: 0 })}
-                      className="w-full px-2 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 text-center focus:outline-none"
-                    />
+                  <div className="flex items-center pt-6">
+                    <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        {...regPlan('allow_additional_seats')}
+                        className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                      />
+                      Allow Additional Seats
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2692,9 +2708,13 @@ export const TenantsPage: React.FC = () => {
                   <label className="block text-[10px] text-slate-400 mb-1.5">Min Users</label>
                   <input
                     type="number"
-                    {...regPlan('minimum_users', { required: true, min: 1 })}
+                    {...regPlan('minimum_users', { 
+                      required: 'Min users is required', 
+                      min: { value: 10, message: 'Minimum 10 users' } 
+                    })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
+                  {planErrors.minimum_users && <p className="text-[10px] text-red-400 mt-1">{planErrors.minimum_users.message}</p>}
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1.5">Max Users Bound</label>
@@ -2708,9 +2728,13 @@ export const TenantsPage: React.FC = () => {
                   <label className="block text-[10px] text-slate-400 mb-1.5">Min Contract (m)</label>
                   <input
                     type="number"
-                    {...regPlan('minimum_contract_months', { required: true, min: 1 })}
+                    {...regPlan('minimum_contract_months', { 
+                      required: 'Min contract is required', 
+                      min: { value: 3, message: 'Minimum 3 months' } 
+                    })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
+                  {planErrors.minimum_contract_months && <p className="text-[10px] text-red-400 mt-1">{planErrors.minimum_contract_months.message}</p>}
                 </div>
               </div>
 
@@ -2938,6 +2962,35 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.slug && <p className="text-xs text-red-400 mt-1">{tenantErrors.slug.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4 mt-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seats</label>
+                  <input
+                    type="number"
+                    defaultValue={10}
+                    {...regTenant('licensed_seats', { 
+                      required: 'Seats count is required', 
+                      min: { value: 10, message: 'Minimum purchase is 10 Licensed Seats' } 
+                    })}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  />
+                  {tenantErrors.licensed_seats && <p className="text-xs text-red-400 mt-1">{tenantErrors.licensed_seats.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Contract Duration (Months)</label>
+                  <input
+                    type="number"
+                    defaultValue={3}
+                    {...regTenant('contract_months', { 
+                      required: 'Contract duration is required', 
+                      min: { value: 3, message: 'Minimum contract is 3 months' } 
+                    })}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  />
+                  {tenantErrors.contract_months && <p className="text-xs text-red-400 mt-1">{tenantErrors.contract_months.message}</p>}
                 </div>
               </div>
 

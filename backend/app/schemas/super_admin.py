@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
+
 
 class SubscriptionUpdateRequest(BaseModel):
     subscription_plan: str
@@ -50,19 +51,20 @@ class PlanCreate(BaseModel):
     annual_price: float = 0.0
     currency: str = "INR"
     max_users: int = 50
-    max_admins: int = 1
-    max_managers: int = 2
-    max_team_leads: int = 5
-    max_employees: int = 42
+    # Obsolete role limits (DEPRECATED, defaulted for backward compatibility)
+    max_admins: int = 100
+    max_managers: int = 100
+    max_team_leads: int = 100
+    max_employees: int = 100
     storage_limit_gb: int = 10
     recording_retention_days: int = 30
     priority_support: bool = False
     api_access: bool = False
     display_order: int = 0
     setup_charges: float = 0.0
-    minimum_users: int = 1
+    minimum_users: int = Field(10, ge=10, description="Minimum Initial Licensed Seats (default 10)")
     maximum_users: int = 1000
-    minimum_contract_months: int = 1
+    minimum_contract_months: int = Field(3, ge=3, description="Minimum Initial Contract (default 3 months)")
     trial_days: int = 0
     extra_user_price: float = 0.0
     discount_percentage: float = 0.0
@@ -74,6 +76,7 @@ class PlanCreate(BaseModel):
     allow_upgrade: bool = True
     allow_downgrade: bool = True
     allow_trial: bool = True
+    allow_additional_seats: bool = True
     auto_renew: bool = True
     plan_active: bool = True
 
@@ -140,6 +143,7 @@ class PlanResponse(BaseModel):
     allow_upgrade: bool
     allow_downgrade: bool
     allow_trial: bool
+    allow_additional_seats: bool
     auto_renew: bool
     plan_active: bool
     created_at: datetime

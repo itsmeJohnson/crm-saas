@@ -515,6 +515,7 @@ async def create_plan(
         allow_upgrade=payload.allow_upgrade,
         allow_downgrade=payload.allow_downgrade,
         allow_trial=payload.allow_trial,
+        allow_additional_seats=payload.allow_additional_seats,
         auto_renew=payload.auto_renew,
         plan_active=payload.plan_active,
         is_active=payload.plan_active
@@ -797,8 +798,8 @@ async def suspend_tenant(
     actor: Annotated[User, Depends(require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Suspend a tenant organization."""
-    return await toggle_tenant_subscription_status(org_id=org_id, actor=actor, db=db, status_val="suspended")
+    """Suspend or reactivate a tenant organization."""
+    return await toggle_tenant_subscription_status(org_id=org_id, actor=actor, db=db, status_val=None)
 
 @router.post("/tenants/{org_id}/reset-password")
 async def reset_tenant_owner_password(

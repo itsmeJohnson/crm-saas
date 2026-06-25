@@ -18,7 +18,7 @@ from app.schemas.portal import (
     OrgProfileUpdate, OrgBillingUpdate, OrgNotificationSettingsUpdate, UpgradeSubscriptionRequest
 )
 from app.schemas.super_admin import PlanResponse
-from app.schemas.subscription import SubscriptionDetailsResponse, InvoiceResponse
+from app.schemas.subscription import SubscriptionDetailsResponse, InvoiceResponse, ReduceSeatsRequest, TenantSubscriptionResponse
 from app.schemas.support_ticket import (
     SupportTicketCreate, SupportTicketUpdate, SupportTicketCommentRequest, SupportTicketResponse
 )
@@ -90,6 +90,20 @@ async def add_user_seats(
         gateway=payload.gateway
     )
     return invoice
+
+@router.post("/subscription/reduce-seats", response_model=TenantSubscriptionResponse)
+async def reduce_user_seats(
+    current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],
+    payload: ReduceSeatsRequest,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Schedules a reduction in licensed seats to apply starting from the next billing cycle."""
+    service = PortalService(db)
+    return await service.reduce_licensed_seats(
+        organization_id=current_user.organization_id,
+        actor_user_id=current_user.id,
+        new_seat_count=payload.new_seat_count
+    )
 
 @router.post("/subscription/add-storage", response_model=InvoiceResponse)
 async def add_storage_limit(
