@@ -24,20 +24,12 @@ export const PortalPlans: React.FC = () => {
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      // Fetch plans and subscription independently — a subscription error must not block plan display
-      const [plansResult, subResult] = await Promise.allSettled([
+      const [plansData, subData] = await Promise.all([
         portalApi.getPlans(),
         portalApi.getSubscription()
       ]);
-      if (plansResult.status === 'fulfilled') {
-        setPlans(plansResult.value || []);
-      } else {
-        setError(plansResult.reason?.response?.data?.detail || "Failed to retrieve subscription plans.");
-      }
-      if (subResult.status === 'fulfilled') {
-        setSubscription(subResult.value?.subscription || null);
-      }
-      // Subscription fetch failure is non-fatal — plans still display
+      setPlans(plansData);
+      setSubscription(subData?.subscription || null);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to retrieve subscription plans.");
     } finally {

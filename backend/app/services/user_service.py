@@ -703,16 +703,9 @@ class UserService:
         }
 
     async def get_seat_history(self, organization_id: uuid.UUID) -> list[SeatAssignmentHistory]:
-        from sqlalchemy.orm import selectinload as _selectinload
-        stmt = (
-            select(SeatAssignmentHistory)
-            .options(
-                _selectinload(SeatAssignmentHistory.user),
-                _selectinload(SeatAssignmentHistory.performed_by),
-            )
-            .where(SeatAssignmentHistory.organization_id == organization_id)
-            .order_by(SeatAssignmentHistory.created_at.desc())
-        )
+        stmt = select(SeatAssignmentHistory).where(
+            SeatAssignmentHistory.organization_id == organization_id
+        ).order_by(SeatAssignmentHistory.created_at.desc())
         res = await self.db.execute(stmt)
         return list(res.scalars().all())
 

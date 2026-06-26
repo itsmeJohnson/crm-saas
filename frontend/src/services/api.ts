@@ -3,7 +3,6 @@ import { useAuthStore } from '../store/authStore';
 
 export const api = axios.create({
   baseURL: '/api/v1',
-  timeout: 15000, // 15 s — prevents infinite loading when backend is slow/stuck
   headers: {
     'Content-Type': 'application/json',
   },

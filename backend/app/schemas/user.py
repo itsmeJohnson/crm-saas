@@ -21,7 +21,6 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     role: str | None = Field(None, pattern="^(OrgAdmin|Manager|Employee)$")
     reporting_to_id: uuid.UUID | None = None
-    password: str | None = Field(None, min_length=8)
 
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)

@@ -7,8 +7,8 @@ import { EditUserModal } from '../components/users/EditUserModal';
 import { CreateMemberModal } from '../components/users/CreateMemberModal';
 import { useUserStore } from '../store/userStore';
 import { useAuthStore } from '../store/authStore';
-import { UserPlus, Mail, Calendar, ShieldAlert, Users, ShieldCheck } from 'lucide-react';
-import { UserResponse, userApi } from '../services/userApi';
+import { UserPlus, Mail, Calendar, ShieldAlert } from 'lucide-react';
+import { UserResponse } from '../services/userApi';
 
 export const UsersPage: React.FC = () => {
   const { fetchUsers, fetchInvitations, invitations } = useUserStore();
@@ -18,13 +18,11 @@ export const UsersPage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
-  const [seatUtil, setSeatUtil] = useState<{ licensed_seats: number; active_users: number; available_new_seats: number } | null>(null);
 
   useEffect(() => {
     fetchUsers();
     if (currentUser && (currentUser.role === 'OrgAdmin' || currentUser.role === 'Manager')) {
       fetchInvitations();
-      userApi.getSeatUtilization().then(setSeatUtil).catch(() => {});
     }
   }, [fetchUsers, fetchInvitations, currentUser]);
 
@@ -74,33 +72,6 @@ export const UsersPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Seat Utilization Banner */}
-      {seatUtil && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="glass-panel border border-slate-800/80 rounded-xl px-5 py-4 flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-brand-400 shrink-0" />
-            <div>
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Licensed Seats</p>
-              <p className="text-xl font-bold text-slate-100">{seatUtil.licensed_seats}</p>
-            </div>
-          </div>
-          <div className="glass-panel border border-slate-800/80 rounded-xl px-5 py-4 flex items-center gap-3">
-            <Users className="w-5 h-5 text-emerald-400 shrink-0" />
-            <div>
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Occupied Seats</p>
-              <p className="text-xl font-bold text-slate-100">{seatUtil.active_users}</p>
-            </div>
-          </div>
-          <div className="glass-panel border border-slate-800/80 rounded-xl px-5 py-4 flex items-center gap-3">
-            <UserPlus className="w-5 h-5 text-indigo-400 shrink-0" />
-            <div>
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Available Seats</p>
-              <p className="text-xl font-bold text-slate-100">{seatUtil.available_new_seats}</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">

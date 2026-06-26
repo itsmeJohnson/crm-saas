@@ -551,13 +551,8 @@ async def update_plan(
     
     old_val = {}
     new_val = {}
-
-    # Never allow these system fields to be overwritten via PATCH
-    PROTECTED = {'id', 'created_at', 'updated_at', 'deleted_at', 'is_deleted', 'price_inr'}
-
+    
     for key, val in payload.items():
-        if key in PROTECTED:
-            continue
         if hasattr(plan, key):
             current_value = getattr(plan, key)
             if current_value != val:
@@ -999,23 +994,20 @@ from app.schemas.dashboard import SuperAdminDashboardResponse, OrgMetrics, Reven
 async def get_super_admin_dashboard(
     actor: Annotated[User, Depends(require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    period: str = "month"  # "day" | "week" | "month"
+    period: str = "month"
 ):
-    """Executive dashboard with business overview, revenue, licensing and infra metrics.
-
-    period: Filter collection/onboarding metrics by 'day', 'week', or 'month'.
-    """
+    """Executive dashboard with business overview, revenue, licensing and infra metrics."""
     from datetime import date, timedelta
     now = datetime.now(timezone.utc)
     today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
     next_7_days = now + timedelta(days=7)
 
-    # Compute period start for filtered metrics
+    # Period start for toggle (day / week / month)
     if period == "day":
         period_start = today_start
     elif period == "week":
-        period_start = today_start - timedelta(days=today_start.weekday())  # Monday of this week
-    else:  # month
+        period_start = today_start - timedelta(days=today_start.weekday())
+    else:
         period_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
 
     # ── Org Metrics ──
@@ -1039,33 +1031,19 @@ async def get_super_admin_dashboard(
         .where(Invoice.payment_status == "paid", Invoice.is_deleted == False)
     )).scalar() or 0.0)
 
-    # Period-filtered collection (for day/week/month toggle)
-    period_collected = float((await db.execute(
-        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
-        .where(Invoice.payment_status == "paid", Invoice.is_deleted == False,
-               Invoice.created_at >= period_start)
-    )).scalar() or 0.0)
-
     pending = float((await db.execute(
         select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
         .where(Invoice.payment_status == "unpaid", Invoice.is_deleted == False)
     )).scalar() or 0.0)
-
-    # Period-filtered onboarded count
-    period_onboarded = (await db.execute(
-        select(func.count(Organization.id))
-        .where(Organization.is_deleted == False, Organization.created_at >= period_start)
-    )).scalar() or 0
 
     failed_count = (await db.execute(
         select(func.count(Invoice.id))
         .where(Invoice.payment_status == "failed", Invoice.is_deleted == False)
     )).scalar() or 0
 
-    now_naive = datetime(now.year, now.month, now.day, now.hour, now.minute, now.second)
     overdue_count = (await db.execute(
         select(func.count(Invoice.id))
-        .where(Invoice.payment_status == "unpaid", Invoice.due_date < now_naive, Invoice.is_deleted == False)
+        .where(Invoice.payment_status == "unpaid", Invoice.due_date < now, Invoice.is_deleted == False)
     )).scalar() or 0
 
     # ── Licensing Metrics ──
@@ -1134,6 +1112,18 @@ async def get_super_admin_dashboard(
     new_payments = (await db.execute(
         select(func.count(Payment.id))
         .where(Payment.created_at >= today_start)
+    )).scalar() or 0
+
+    # Period-scoped metrics
+    period_collected = float((await db.execute(
+        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "paid", Invoice.is_deleted == False,
+               Invoice.updated_at >= period_start)
+    )).scalar() or 0.0)
+
+    period_onboarded = (await db.execute(
+        select(func.count(Organization.id))
+        .where(Organization.is_deleted == False, Organization.created_at >= period_start)
     )).scalar() or 0
 
     return SuperAdminDashboardResponse(

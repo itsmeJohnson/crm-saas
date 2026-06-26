@@ -5,30 +5,11 @@ import { useThemeStore } from '../store/themeStore';
 import {
   LayoutDashboard, CreditCard, Sparkles, FileText, Receipt,
   BarChart3, HardDrive, PhoneCall, Users, User, Building2,
-  LifeBuoy, Activity, Settings, ArrowLeft, Sun, Moon, Menu, X,
+  LifeBuoy, Activity, Settings, ArrowLeft, Sun, Moon, Menu, X
 } from 'lucide-react';
 
-// Portal nav items mapped to feature codes (null = always visible)
-// underDev = true means the page shows "Under Development" UI
-const ALL_PORTAL_NAV = [
-  { name: 'Dashboard',      path: '/portal/dashboard',    icon: LayoutDashboard, featureCode: null,          underDev: false },
-  { name: 'Subscription',   path: '/portal/subscription', icon: CreditCard,      featureCode: null,          underDev: false },
-  { name: 'Plans',          path: '/portal/plans',        icon: Sparkles,        featureCode: null,          underDev: false },
-  { name: 'Invoices',       path: '/portal/invoices',     icon: FileText,        featureCode: null,          underDev: false },
-  { name: 'Payments',       path: '/portal/payments',     icon: Receipt,         featureCode: null,          underDev: false },
-  { name: 'Users',          path: '/portal/users',        icon: Users,           featureCode: 'ROLE_BASED_ACCESS', underDev: false },
-  { name: 'Usage',          path: '/portal/usage',        icon: BarChart3,       featureCode: null,          underDev: false },
-  { name: 'Call Recordings',path: '/portal/recordings',   icon: PhoneCall,       featureCode: 'CALL_RECORDING',    underDev: false },
-  { name: 'Storage',        path: '/portal/storage',      icon: HardDrive,       featureCode: null,          underDev: true  },
-  { name: 'Activity Logs',  path: '/portal/activity',     icon: Activity,        featureCode: 'ADVANCED_ANALYTICS', underDev: true },
-  { name: 'Profile',        path: '/portal/profile',      icon: User,            featureCode: null,          underDev: false },
-  { name: 'Billing',        path: '/portal/billing',      icon: Building2,       featureCode: null,          underDev: false },
-  { name: 'Support',        path: '/portal/support',      icon: LifeBuoy,        featureCode: null,          underDev: false },
-  { name: 'Settings',       path: '/portal/settings',     icon: Settings,        featureCode: null,          underDev: false },
-];
-
 export const OrgPortalLayout: React.FC = () => {
-  const { user, organization, logout, features } = useAuthStore();
+  const { user, organization, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,29 +20,40 @@ export const OrgPortalLayout: React.FC = () => {
     navigate('/login');
   };
 
-  // Filter nav: hide items whose feature is NOT in user's plan
-  const portalNavItems = ALL_PORTAL_NAV.filter(item => {
-    if (!item.featureCode) return true; // always-visible items
-    return features.includes(item.featureCode);
-  });
+  const portalNavItems = [
+    { name: 'Dashboard', path: '/portal/dashboard', icon: LayoutDashboard },
+    { name: 'Subscription', path: '/portal/subscription', icon: CreditCard },
+    { name: 'Plans', path: '/portal/plans', icon: Sparkles },
+    { name: 'Invoices', path: '/portal/invoices', icon: FileText },
+    { name: 'Payments', path: '/portal/payments', icon: Receipt },
+    { name: 'Usage', path: '/portal/usage', icon: BarChart3 },
+    { name: 'Storage', path: '/portal/storage', icon: HardDrive },
+    { name: 'Call Recordings', path: '/portal/recordings', icon: PhoneCall },
+    { name: 'Users', path: '/portal/users', icon: Users },
+    { name: 'Profile', path: '/portal/profile', icon: User },
+    { name: 'Billing', path: '/portal/billing', icon: Building2 },
+    { name: 'Support', path: '/portal/support', icon: LifeBuoy },
+    { name: 'Activity Logs', path: '/portal/activity', icon: Activity },
+    { name: 'Settings', path: '/portal/settings', icon: Settings },
+  ];
 
   const sidebarContent = (
-    <div className="flex flex-col justify-between h-full bg-[var(--bg-surface)]">
+    <div className="flex flex-col justify-between h-full bg-slate-950">
       <div className="overflow-y-auto flex-1 scrollbar-thin">
-        {/* Logo + close */}
-        <div className="p-6 flex items-center justify-between border-b border-[var(--border-color)]">
+        {/* Logo and close button */}
+        <div className="p-6 flex items-center justify-between border-b border-slate-900">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-tr from-brand-500 to-indigo-500 rounded-lg flex items-center justify-center font-bold text-white shadow">
               S
             </div>
             <div>
-              <span className="font-bold text-sm tracking-tight text-[var(--text-primary)] block">Self Service Portal</span>
-              <span className="text-[10px] text-[var(--text-muted)] tracking-widest font-semibold uppercase">Organization Admin</span>
+              <span className="font-bold text-sm tracking-tight text-slate-100 block">Self Service Portal</span>
+              <span className="text-[10px] text-slate-500 tracking-widest font-semibold uppercase">Organization Admin</span>
             </div>
           </div>
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="md:hidden p-1.5 border border-[var(--border-color)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+            className="md:hidden p-1.5 border border-slate-900 hover:border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -71,28 +63,15 @@ export const OrgPortalLayout: React.FC = () => {
         <div className="px-4 pt-4">
           <Link
             to="/"
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] hover:border-[var(--border-strong)] text-xs font-semibold text-brand-400 hover:text-brand-300 rounded-xl transition-all"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-slate-900/60 border border-slate-900 hover:border-slate-800 text-xs font-semibold text-brand-400 hover:text-brand-300 rounded-xl transition-all"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to CRM Workspace
           </Link>
         </div>
 
-        {/* Plan badge */}
-        {organization?.subscription_plan && (
-          <div className="px-4 pt-3">
-            <div className="flex items-center gap-2 px-3 py-2 bg-brand-500/10 border border-brand-500/20 rounded-xl">
-              <Sparkles className="w-3.5 h-3.5 text-brand-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Active Plan</p>
-                <p className="text-xs font-bold text-brand-400 capitalize">{organization.subscription_plan}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Navigation Links */}
-        <nav className="px-4 py-4 space-y-0.5">
+        <nav className="px-4 py-6 space-y-1">
           {portalNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -104,37 +83,34 @@ export const OrgPortalLayout: React.FC = () => {
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
                   isActive
                     ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/10'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]'
+                    : 'text-slate-400 hover:bg-slate-900/50 hover:text-slate-200'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1">{item.name}</span>
-                {item.underDev && !isActive && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    BETA
-                  </span>
-                )}
+                <Icon className="w-4.5 h-4.5" />
+                {item.name}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-app)]/60 space-y-4">
+      {/* Footer Profile Details */}
+      <div className="p-4 border-t border-slate-900 bg-slate-950/60 space-y-4">
         <div className="flex items-center justify-between px-2">
           <div className="overflow-hidden max-w-[150px]">
-            <p className="text-xs font-bold text-[var(--text-primary)] truncate">
+            <p className="text-xs font-bold text-slate-200 truncate">
               {user?.first_name} {user?.last_name}
             </p>
-            <p className="text-[10px] text-[var(--text-muted)] truncate">{user?.email}</p>
+            <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
             <span className="inline-block mt-1 px-1.5 py-0.5 text-[9px] font-bold bg-brand-500/10 text-brand-400 rounded border border-brand-500/20">
               {organization?.name}
             </span>
           </div>
+
+          {/* Theme Switcher */}
           <button
             onClick={toggleTheme}
-            className="p-2 border border-[var(--border-color)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+            className="p-2 border border-slate-900 hover:border-slate-800 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer bg-slate-950"
           >
             {theme === 'dark' ? (
               <Sun className="w-3.5 h-3.5 text-amber-400" />
@@ -145,7 +121,7 @@ export const OrgPortalLayout: React.FC = () => {
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 border border-slate-900 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all cursor-pointer"
         >
           Sign Out
         </button>
@@ -154,9 +130,9 @@ export const OrgPortalLayout: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-[var(--bg-app)] text-[var(--text-primary)] overflow-hidden flex-col md:flex-row font-sans">
+    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden flex-col md:flex-row font-sans">
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex md:w-60 border-r border-[var(--border-color)] flex-col justify-between z-25">
+      <aside className="hidden md:flex md:w-60 border-r border-slate-900 flex-col justify-between z-25">
         {sidebarContent}
       </aside>
 
@@ -164,10 +140,10 @@ export const OrgPortalLayout: React.FC = () => {
       {isMobileOpen && (
         <div className="fixed inset-0 z-30 md:hidden flex">
           <div
-            className="absolute inset-0 bg-[var(--bg-app)]/60 backdrop-blur-xs transition-opacity duration-200"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity duration-200"
             onClick={() => setIsMobileOpen(false)}
           ></div>
-          <aside className="relative w-60 bg-[var(--bg-surface)] border-r border-[var(--border-color)] shadow-2xl flex flex-col justify-between h-full z-10 animate-slide-in">
+          <aside className="relative w-60 bg-slate-950 border-r border-slate-900 shadow-2xl flex flex-col justify-between h-full z-10 animate-slide-in">
             {sidebarContent}
           </aside>
         </div>
@@ -175,24 +151,24 @@ export const OrgPortalLayout: React.FC = () => {
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Top Bar */}
-        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-[var(--bg-surface)] border-b border-[var(--border-color)] z-20">
+        {/* Mobile Top Bar Header */}
+        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-slate-950 border-b border-slate-900 z-20">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-tr from-brand-500 to-indigo-500 rounded-lg flex items-center justify-center font-bold text-white shadow">
               S
             </div>
-            <span className="font-semibold text-sm tracking-tight text-[var(--text-primary)]">Self Service Portal</span>
+            <span className="font-semibold text-sm tracking-tight text-slate-100">Self Service Portal</span>
           </div>
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="p-2 border border-[var(--border-color)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+            className="p-2 border border-slate-900 hover:border-slate-800 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
         </header>
 
         {/* Content Outlet */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+        <main className="flex-1 flex flex-col overflow-hidden relative bg-slate-950/30">
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-brand-500/5 rounded-full blur-[120px] pointer-events-none"></div>
           <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
             <Outlet />

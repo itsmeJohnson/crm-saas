@@ -98,8 +98,8 @@ export interface CreateTenantRequest {
   last_name?: string | null;
   licensed_seats?: number;
   contract_months?: number;
-  plan_name?: string;        // starter | growth | enterprise
-  billing_cycle?: string;    // monthly | quarterly | annual
+  plan_name?: string;
+  billing_cycle?: string;
 }
 
 export const superAdminApi = {
@@ -189,7 +189,9 @@ export const superAdminApi = {
 
   // Phase 1: Dashboard
   getDashboard: async (period?: 'day' | 'week' | 'month') => {
-    const response = await api.get<SuperAdminDashboard>('/super-admin/dashboard', { params: { period: period || 'month' } });
+    const response = await api.get<SuperAdminDashboard>('/super-admin/dashboard', {
+      params: { period: period || 'month' }
+    });
     return response.data;
   },
 

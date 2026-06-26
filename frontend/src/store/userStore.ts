@@ -73,19 +73,12 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { skip, limit } = get().pagination;
-      const { search, role, status } = get().filters;
-      const querySearch = search.trim() || undefined;
-      const queryRole = role !== 'All' && role !== 'TeamLeader' ? role : undefined;
-      // TeamLeader is Employee — handled client-side after fetch
-      const queryIsActive =
-        status === 'Active' ? true : status === 'Inactive' ? false : undefined;
+      const querySearch = get().filters.search.trim() || undefined;
 
       const data = await userApi.getUsers({
         skip,
         limit,
         search: querySearch,
-        role: queryRole,
-        is_active: queryIsActive,
       });
       set({ users: data, isLoading: false });
     } catch (err: any) {
