@@ -78,3 +78,35 @@ def hash_token(token: str) -> str:
     """Generate a SHA-256 hash of the token for secure DB storage."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
+def create_mfa_challenge_token(user_id: Any) -> str:
+    """
+    Create a short-lived (5 min) MFA challenge token.
+    Type='mfa_challenge' — rejected by all normal auth guards.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    to_encode = {
+        "exp": expire,
+        "sub": str(user_id),
+        "type": "mfa_challenge",
+        "jti": uuid.uuid4().hex,
+    }
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+def decode_mfa_challenge_token(token: str) -> str:
+    """
+    Decode an MFA challenge token. Returns user_id (sub).
+    Raises HTTPException if expired or wrong type.
+    """
+    from fastapi import HTTPException, status as http_status
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="MFA session expired. Please log in again.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA token.")
+
+    if payload.get("type") != "mfa_challenge":
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid token type for MFA verification.")
+
+    return payload["sub"]
+

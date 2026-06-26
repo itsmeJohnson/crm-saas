@@ -1752,6 +1752,33 @@ async def revenue_report(
         .order_by(func.count(TenantSubscription.id).desc())
     )).all()
 
+    # Monthly breakdown: group paid invoices by month in the date range
+    from sqlalchemy import extract, cast, Integer
+    monthly_rows = (await db.execute(
+        select(
+            extract('year', Invoice.created_at).label('year'),
+            extract('month', Invoice.created_at).label('month'),
+            func.coalesce(func.sum(Invoice.total_amount), 0.0).label('collections'),
+            func.count(Invoice.id).label('invoice_count')
+        )
+        .where(
+            Invoice.payment_status == "paid",
+            Invoice.is_deleted == False,
+            Invoice.created_at.between(start_date, end_date)
+        )
+        .group_by('year', 'month')
+        .order_by('year', 'month')
+    )).all()
+
+    monthly_breakdown = [
+        {
+            "month": f"{int(r.year)}-{int(r.month):02d}",
+            "collections": round(float(r.collections), 2),
+            "invoice_count": r.invoice_count,
+        }
+        for r in monthly_rows
+    ]
+
     return {
         "period_start": start_date.date().isoformat(),
         "period_end": end_date.date().isoformat(),
@@ -1760,6 +1787,7 @@ async def revenue_report(
         "arr": round(mrr * 12, 2),
         "total_collected": round(total_collected, 2),
         "pending": round(pending, 2),
+        "monthly_breakdown": monthly_breakdown,
         "top_plans": [{"name": p.display_name or p.name, "active_subscriptions": p.count} for p in plan_dist],
     }
 
@@ -1866,4 +1894,47 @@ async def invoice_report(
         "total_invoices": total_invoices,
         "paid_count": paid[0], "paid_amount": float(paid[1]),
         "unpaid_count": unpaid[0], "unpaid_amount": float(unpaid[1]),
+    }
+
+
+@router.get("/reports/churn")
+async def churn_report(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Churn rate: subscriptions that expired or were cancelled in the last 30 days
+    vs total active subscriptions at the start of that period.
+    """
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+
+    churned = (await db.execute(
+        select(func.count(TenantSubscription.id))
+        .where(
+            TenantSubscription.is_deleted == False,
+            TenantSubscription.status.in_(["expired", "suspended"]),
+            TenantSubscription.end_date.between(thirty_days_ago, now)
+        )
+    )).scalar() or 0
+
+    active_start = (await db.execute(
+        select(func.count(TenantSubscription.id))
+        .where(
+            TenantSubscription.is_deleted == False,
+            TenantSubscription.status == "active",
+            TenantSubscription.start_date <= thirty_days_ago
+        )
+    )).scalar() or 0
+
+    churn_rate = round((churned / active_start * 100), 2) if active_start > 0 else 0.0
+
+    return {
+        "period": "last_30_days",
+        "churned_subscriptions": churned,
+        "active_at_period_start": active_start,
+        "churn_rate_pct": churn_rate,
+        "healthy": churn_rate < 5.0,
+        "benchmark": "< 5% monthly churn is healthy for B2B SaaS"
     }

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
-import { AlertCircle, Loader2, KeyRound, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { AlertCircle, Loader2, KeyRound, Mail, ArrowLeft, CheckCircle, ShieldCheck } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -21,20 +21,31 @@ const resetSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters long'),
 });
 
+const mfaSchema = z.object({
+  totp_code: z.string().length(6, 'Enter the 6-digit code from your authenticator app').optional().or(z.literal('')),
+  backup_code: z.string().length(8, 'Backup codes are 8 characters').optional().or(z.literal('')),
+}).refine(d => (d.totp_code && d.totp_code.length === 6) || (d.backup_code && d.backup_code.length === 8), {
+  message: 'Enter either a 6-digit authenticator code or an 8-character backup code',
+  path: ['totp_code'],
+});
+
 type LoginForm = z.infer<typeof loginSchema>;
 type ForgotForm = z.infer<typeof forgotSchema>;
 type ResetForm = z.infer<typeof resetSchema>;
+type MFAForm = z.infer<typeof mfaSchema>;
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth);
-  
-  const [step, setStep] = useState<'login' | 'forgot' | 'reset'>('login');
+
+  const [step, setStep] = useState<'login' | 'forgot' | 'reset' | 'mfa'>('login');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [demoToken, setDemoToken] = useState<string | null>(null);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   // Forms
   const {
@@ -62,6 +73,16 @@ export const Login: React.FC = () => {
     resolver: zodResolver(resetSchema),
   });
 
+  const {
+    register: mfaRegister,
+    handleSubmit: handleMFASubmit,
+    formState: { errors: mfaErrors },
+    reset: mfaFormReset,
+    setValue: mfaSetValue,
+  } = useForm<MFAForm>({
+    resolver: zodResolver(mfaSchema),
+  });
+
   useEffect(() => {
     const token = searchParams.get('token') || searchParams.get('reset_token');
     if (token) {
@@ -75,12 +96,19 @@ export const Login: React.FC = () => {
     setError(null);
     try {
       const loginRes = await api.post('/auth/login', data);
-      const { access_token, refresh_token } = loginRes.data;
+      const { access_token, refresh_token, mfa_required } = loginRes.data;
+
+      // MFA challenge: backend returns mfa_required=true + a short-lived challenge token
+      if (mfa_required) {
+        setMfaToken(access_token);
+        mfaFormReset();
+        setUseBackupCode(false);
+        setStep('mfa');
+        return;
+      }
 
       const meRes = await api.get('/auth/me', {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
+        headers: { Authorization: `Bearer ${access_token}` },
       });
 
       const { user, organization, features } = meRes.data;
@@ -88,6 +116,31 @@ export const Login: React.FC = () => {
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'An error occurred during login. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onMFASubmit = async (data: MFAForm) => {
+    if (!mfaToken) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const verifyRes = await api.post('/auth/mfa/verify', {
+        mfa_token: mfaToken,
+        totp_code: useBackupCode ? undefined : (data.totp_code || undefined),
+        backup_code: useBackupCode ? (data.backup_code || undefined) : undefined,
+      });
+      const { access_token, refresh_token } = verifyRes.data;
+
+      const meRes = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const { user, organization, features } = meRes.data;
+      setAuth(user, organization, features || [], access_token, refresh_token);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Invalid code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -198,6 +251,86 @@ export const Login: React.FC = () => {
               className="text-brand-400 hover:text-brand-300 text-sm font-semibold transition-all cursor-pointer"
             >
               Forgot Password?
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* STEP MFA: MFA CHALLENGE */}
+      {step === 'mfa' && (
+        <form onSubmit={handleMFASubmit(onMFASubmit)} className="space-y-5">
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => { setError(null); setMfaToken(null); setStep('login'); }}
+              className="p-1 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4.5 h-4.5" />
+            </button>
+            <span className="text-sm font-semibold text-slate-300">Back to Login</span>
+          </div>
+
+          <div className="flex flex-col items-center text-center gap-2 py-2">
+            <div className="w-12 h-12 rounded-2xl bg-brand-500/15 border border-brand-500/25 flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6 text-brand-400" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-100">Two-Factor Authentication</h3>
+            <p className="text-xs text-slate-400">
+              {useBackupCode
+                ? 'Enter one of your 8-character backup codes.'
+                : 'Enter the 6-digit code from your Google Authenticator app.'}
+            </p>
+          </div>
+
+          {!useBackupCode ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Authenticator Code</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                {...mfaRegister('totp_code')}
+                className="w-full px-4 py-3 rounded-xl glass-input font-mono tracking-[0.5em] text-center text-xl"
+                placeholder="000000"
+                autoFocus
+              />
+              {mfaErrors.totp_code && <p className="mt-1.5 text-xs text-red-400">{mfaErrors.totp_code.message}</p>}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Backup Code</label>
+              <input
+                type="text"
+                maxLength={8}
+                {...mfaRegister('backup_code')}
+                className="w-full px-4 py-3 rounded-xl glass-input font-mono tracking-[0.3em] text-center text-xl uppercase"
+                placeholder="AB12CD34"
+                autoFocus
+              />
+              {mfaErrors.backup_code && <p className="mt-1.5 text-xs text-red-400">{mfaErrors.backup_code.message}</p>}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-all duration-150 flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 cursor-pointer"
+          >
+            {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Verifying...</> : 'Verify & Sign In'}
+          </button>
+
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setUseBackupCode(!useBackupCode);
+                setError(null);
+                mfaSetValue('totp_code', '');
+                mfaSetValue('backup_code', '');
+              }}
+              className="text-brand-400 hover:text-brand-300 text-sm font-semibold transition-all cursor-pointer"
+            >
+              {useBackupCode ? 'Use Authenticator App Instead' : 'Use a Backup Code Instead'}
             </button>
           </div>
         </form>

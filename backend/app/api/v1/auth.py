@@ -4,10 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.schemas.auth import (
-    RegisterTenantRequest, LoginRequest, Token, RefreshTokenRequest, 
-    AuthMeResponse, ForgotPasswordRequest, ResetPasswordRequest
+    RegisterTenantRequest, LoginRequest, Token, RefreshTokenRequest,
+    AuthMeResponse, ForgotPasswordRequest, ResetPasswordRequest,
+    MFAVerifyRequest, MFASetupResponse, MFAEnableResponse, MFAStatusResponse
 )
 from app.services.auth_service import AuthService
+from app.services.mfa_service import MFAService
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
 from app.repositories.organization import OrganizationRepository
@@ -16,6 +18,7 @@ from app.schemas.organization import OrganizationResponse
 from app.middleware.permissions import check_is_team_leader, require_role
 from datetime import datetime, timedelta, timezone
 import secrets
+import json
 
 router = APIRouter()
 
@@ -65,6 +68,24 @@ async def login(
             browser_info=user_agent,
         )
         raise
+
+    # MFA check: if enabled, return a short-lived challenge token instead of full session
+    if user.mfa_enabled:
+        from app.core.security import create_mfa_challenge_token
+        mfa_token = create_mfa_challenge_token(user.id)
+        await audit.log_event(
+            actor_id=user.id,
+            organization_id=user.organization_id,
+            event_type="AUTH_MFA_CHALLENGE",
+            description=f"MFA challenge issued for login from {ip_address}",
+            ip_address=ip_address,
+            browser_info=user_agent,
+        )
+        return Token(
+            access_token=mfa_token,
+            refresh_token="",
+            mfa_required=True
+        )
 
     tokens = await auth_service.create_user_session(
         user_id=user.id,
@@ -205,6 +226,170 @@ async def forgot_password(
         context={"reset_url": reset_url}
     )
     return GENERIC_RESPONSE
+
+# ---------------------------------------------------------------------------
+# MFA Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/mfa/status", response_model=MFAStatusResponse)
+async def mfa_status(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get MFA status for the current user."""
+    backup_remaining = 0
+    if current_user.mfa_backup_codes:
+        try:
+            backup_remaining = len(json.loads(current_user.mfa_backup_codes))
+        except Exception:
+            backup_remaining = 0
+    return MFAStatusResponse(
+        mfa_enabled=current_user.mfa_enabled,
+        backup_codes_remaining=backup_remaining
+    )
+
+
+@router.post("/mfa/setup", response_model=MFASetupResponse)
+async def mfa_setup(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Generate a new TOTP secret and QR code URI.
+    User must scan with Google Authenticator and then call /mfa/enable to activate.
+    """
+    if current_user.mfa_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="MFA is already enabled. Disable it first before setting up again."
+        )
+    mfa_service = MFAService(db)
+    result = await mfa_service.generate_setup(current_user.id)
+    return MFASetupResponse(**result)
+
+
+@router.post("/mfa/enable", response_model=MFAEnableResponse)
+async def mfa_enable(
+    payload: MFAVerifyRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Confirm MFA setup by verifying a TOTP code.
+    Returns one-time backup codes — save them immediately.
+    """
+    if not payload.totp_code:
+        raise HTTPException(status_code=400, detail="totp_code is required to enable MFA")
+    mfa_service = MFAService(db)
+    result = await mfa_service.enable_mfa(current_user.id, payload.totp_code)
+    from app.services.audit_service import AuditService
+    await AuditService(db).log_event(
+        actor_id=current_user.id,
+        organization_id=current_user.organization_id,
+        event_type="AUTH_MFA_ENABLED",
+        description="User enabled MFA",
+    )
+    return MFAEnableResponse(**result)
+
+
+@router.post("/mfa/verify", response_model=Token)
+async def mfa_verify(
+    payload: MFAVerifyRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Complete the login MFA challenge.
+    Send the mfa_token from the login response + either totp_code or backup_code.
+    Returns full access + refresh tokens on success.
+    """
+    if not payload.mfa_token:
+        raise HTTPException(status_code=400, detail="mfa_token is required")
+    if not payload.totp_code and not payload.backup_code:
+        raise HTTPException(status_code=400, detail="Either totp_code or backup_code is required")
+
+    from app.core.security import decode_mfa_challenge_token
+    user_id = decode_mfa_challenge_token(payload.mfa_token)
+
+    mfa_service = MFAService(db)
+
+    verified = False
+    if payload.totp_code:
+        verified = await mfa_service.verify_totp(user_id, payload.totp_code)
+    if not verified and payload.backup_code:
+        verified = await mfa_service.verify_backup_code(user_id, payload.backup_code)
+
+    if not verified:
+        from app.services.audit_service import AuditService
+        await AuditService(db).log_event(
+            actor_id=user_id,
+            organization_id=None,
+            event_type="AUTH_MFA_FAILED",
+            description="Failed MFA verification attempt",
+            ip_address=request.client.host if request.client else None,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid TOTP code or backup code."
+        )
+
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    auth_service = AuthService(db)
+    tokens = await auth_service.create_user_session(
+        user_id=user_id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    from app.services.audit_service import AuditService
+    from app.repositories.user import UserRepository
+    user = await UserRepository(db).get(user_id)
+    await AuditService(db).log_event(
+        actor_id=user_id,
+        organization_id=user.organization_id if user else None,
+        event_type="AUTH_LOGIN",
+        description=f"User completed MFA and logged in from {ip_address}",
+        ip_address=ip_address,
+        browser_info=user_agent,
+    )
+    return tokens
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(
+    payload: MFAVerifyRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Disable MFA. Requires valid TOTP code or backup code."""
+    mfa_service = MFAService(db)
+    result = await mfa_service.disable_mfa(
+        current_user.id,
+        totp_code=payload.totp_code,
+        backup_code=payload.backup_code
+    )
+    from app.services.audit_service import AuditService
+    await AuditService(db).log_event(
+        actor_id=current_user.id,
+        organization_id=current_user.organization_id,
+        event_type="AUTH_MFA_DISABLED",
+        description="User disabled MFA",
+    )
+    return result
+
+
+@router.post("/mfa/backup-codes/regenerate")
+async def mfa_regenerate_backup_codes(
+    payload: MFAVerifyRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Regenerate backup codes (requires valid TOTP). Old codes become invalid."""
+    if not payload.totp_code:
+        raise HTTPException(status_code=400, detail="totp_code is required")
+    mfa_service = MFAService(db)
+    return await mfa_service.regenerate_backup_codes(current_user.id, payload.totp_code)
+
 
 @router.post("/reset-password")
 async def reset_password(

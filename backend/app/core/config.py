@@ -67,14 +67,23 @@ class Settings(BaseSettings):
         return f"redis://{host}:{port}/0"
 
     # SMTP / Emails
-    SMTP_TLS: bool = True
-    SMTP_SSL: bool = False
+    # Hostinger config: SMTP_HOST=smtp.hostinger.com, SMTP_PORT=465, SMTP_USE_TLS=true
+    # For port 465 (SMTP_SSL=True), use smtplib.SMTP_SSL
+    # For port 587 (SMTP_TLS=True), use STARTTLS
+    SMTP_TLS: bool = True       # STARTTLS on port 587
+    SMTP_SSL: bool = False      # Direct SSL on port 465 (Hostinger)
+    SMTP_USE_TLS: bool = False  # Alias: if True, sets SMTP_SSL=True and SMTP_PORT=465
     SMTP_PORT: int = 587
     SMTP_HOST: str | None = None
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
-    EMAILS_FROM_EMAIL: str = "info@telecrm-saas.com"
-    EMAILS_FROM_NAME: str = "TeleCRM Billing"
+    SMTP_FROM_EMAIL: str | None = None   # Overrides EMAILS_FROM_EMAIL if set
+    SMTP_FROM_NAME: str | None = None    # Overrides EMAILS_FROM_NAME if set
+    EMAILS_FROM_EMAIL: str = "contact@support.johnsonsoftwares.com"
+    EMAILS_FROM_NAME: str = "Johnson Softwares CRM"
+
+    # MFA
+    MFA_ISSUER: str = "Johnson Softwares CRM"
 
     # DigitalOcean Spaces Storage
     SPACES_KEY: str | None = None
