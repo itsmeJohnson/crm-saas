@@ -209,10 +209,11 @@ async def create_tenant_invoice(
     rand_suffix = secrets.token_hex(4).upper()
     invoice_number = f"INV-{datetime.now().year}-{rand_suffix}"
     
+    # due_date column is a naive TIMESTAMP; normalize to UTC then drop tzinfo
     due_date = payload.due_date
-    if due_date.tzinfo is None:
-        due_date = due_date.replace(tzinfo=timezone.utc)
-        
+    if due_date.tzinfo is not None:
+        due_date = due_date.astimezone(timezone.utc).replace(tzinfo=None)
+
     invoice = Invoice(
         organization_id=org_id,
         invoice_number=invoice_number,
