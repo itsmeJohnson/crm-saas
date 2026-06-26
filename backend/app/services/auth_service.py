@@ -74,45 +74,27 @@ class AuthService:
         from app.models.invoice_config import InvoiceConfig
         from app.models.commercial_settings import CommercialSettings
         from app.models.seat_history import SeatAssignmentHistory
-        from app.models.payment import Payment
 
-        # Fetch Starter plan
-        plan_stmt = select(Plan).where(Plan.name == "Starter")
+        # Resolve plan by name (case-insensitive); fallback to starter
+        requested_plan_name = (getattr(request, "plan_name", None) or "starter").lower()
+        plan_stmt = select(Plan).where(Plan.name == requested_plan_name, Plan.plan_active == True)
         plan_res = await self.db.execute(plan_stmt)
         plan = plan_res.scalar_one_or_none()
         if not plan:
-            # Fallback to any plan if Starter is not seeded
-            plan_stmt = select(Plan)
+            # Fallback: try any active plan ordered by display_order
+            plan_stmt = select(Plan).where(Plan.plan_active == True).order_by(Plan.display_order)
             plan_res = await self.db.execute(plan_stmt)
-            plan = plan_res.scalar_one_or_none()
-            if not plan:
-                # Dynamically create and seed Starter plan on the fly (primarily for testing compatibility)
-                plan = Plan(
-                    name="Starter",
-                    display_name="Starter Plan",
-                    price_inr=3999.0,
-                    monthly_price=3999.0,
-                    max_users=10,
-                    minimum_users=10,
-                    maximum_users=1000,
-                    minimum_contract_months=3,
-                    extra_user_price=3999.0,
-                    allow_additional_seats=True,
-                    storage_limit_gb=10,
-                    recording_retention_days=30,
-                    priority_support=False,
-                    api_access=False,
-                    is_active=True,
-                    plan_active=True,
-                    is_trial=False,
-                    features={}
-                )
-                self.db.add(plan)
-                await self.db.flush()
+            plan = plan_res.scalars().first()
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Plan '{requested_plan_name}' not found. Please seed plans first."
+            )
 
+        billing_cycle = (getattr(request, "billing_cycle", None) or "monthly").lower()
         now_utc = datetime.now(timezone.utc)
         sub_end = now_utc + timedelta(days=request.contract_months * 30)
-        
+
         # 1. Create TenantSubscription
         sub = TenantSubscription(
             organization_id=org.id,
@@ -121,7 +103,7 @@ class AuthService:
             start_date=now_utc,
             end_date=sub_end,
             auto_renew=True,
-            billing_cycle="monthly",
+            billing_cycle=billing_cycle,
             users_purchased=request.licensed_seats,
             users_active=1
         )
@@ -149,7 +131,7 @@ class AuthService:
         )
         self.db.add(history)
 
-        # 4. Generate initial paid Invoice
+        # 4. Generate initial UNPAID Invoice (tenant sees it; SuperAdmin marks paid after payment)
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
         comm_res = await self.db.execute(comm_stmt)
         comm_settings = comm_res.scalar_one_or_none()
@@ -167,54 +149,52 @@ class AuthService:
             await self.db.flush()
 
         prefix = invoice_config.invoice_prefix or "INV"
-        currency = invoice_config.currency or comm_settings.default_currency or "INR"
-        invoice_num = f"{prefix}-REG-{uuid.uuid4().hex[:8].upper()}-{int(now_utc.timestamp())}"
+        currency = invoice_config.currency or (getattr(comm_settings, "default_currency", None) or "INR")
+        invoice_num = f"{prefix}-{uuid.uuid4().hex[:8].upper()}"
 
-        price_per_seat = float(plan.monthly_price if plan.monthly_price > 0 else plan.price_inr)
-        base_amount = price_per_seat * request.licensed_seats
-        
-        gst_rate = float(comm_settings.default_gst)
-        if comm_settings.gst_inclusive:
+        # Calculate base amount based on billing cycle
+        seats = request.licensed_seats
+        if billing_cycle == "quarterly":
+            price_per_seat = float(getattr(plan, "quarterly_price", None) or plan.monthly_price * 3)
+        elif billing_cycle == "annual":
+            price_per_seat = float(getattr(plan, "annual_price", None) or plan.monthly_price * 12)
+        else:  # monthly
+            price_per_seat = float(plan.monthly_price or 0.0)
+
+        setup_charges = float(getattr(plan, "setup_charges", 0.0) or 0.0)
+        subscription_amount = price_per_seat * seats
+        base_amount = subscription_amount + setup_charges
+
+        gst_rate = float(getattr(comm_settings, "default_gst", 18.0) or 18.0)
+        gst_inclusive = getattr(comm_settings, "gst_inclusive", False) or False
+        grace_days = int(getattr(comm_settings, "grace_period_days", 7) or 7)
+
+        if gst_inclusive:
             gst_amount = base_amount * (gst_rate / (100.0 + gst_rate))
-            taxable_amount = base_amount - gst_amount
             total_amount = base_amount
         else:
-            taxable_amount = base_amount
-            gst_amount = taxable_amount * (gst_rate / 100.0)
-            total_amount = taxable_amount + gst_amount
+            gst_amount = base_amount * (gst_rate / 100.0)
+            total_amount = base_amount + gst_amount
 
         invoice = Invoice(
             organization_id=org.id,
             invoice_number=invoice_num,
             amount=total_amount,
-            status="Paid",
-            due_date=now_utc + timedelta(days=comm_settings.grace_period_days),
+            status="Unpaid",
+            due_date=now_utc + timedelta(days=grace_days),
             plan_name=plan.name,
             amount_inr=total_amount if currency == "INR" else 0.0,
             currency=currency,
             issue_date=now_utc,
-            payment_status="paid",
+            payment_status="unpaid",
             subscription_id=sub.id,
-            setup_charges=0.0,
+            setup_charges=setup_charges,
             extra_users_amount=0.0,
             discount_amount=0.0,
             gst_amount=gst_amount,
             total_amount=total_amount
         )
         self.db.add(invoice)
-        await self.db.flush()
-
-        # 5. Create Payment record
-        payment = Payment(
-            invoice_id=invoice.id,
-            payment_reference=f"REF-REG-{uuid.uuid4().hex[:8].upper()}",
-            gateway="UPI",
-            status="Paid",
-            transaction_id=f"TXN-REG-{uuid.uuid4().hex[:12].upper()}",
-            paid_date=now_utc,
-            remarks="Initial registration payment"
-        )
-        self.db.add(payment)
         await self.db.flush()
 
         return user, org

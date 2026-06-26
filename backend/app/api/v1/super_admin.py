@@ -998,13 +998,25 @@ from app.schemas.dashboard import SuperAdminDashboardResponse, OrgMetrics, Reven
 @router.get("/dashboard", response_model=SuperAdminDashboardResponse)
 async def get_super_admin_dashboard(
     actor: Annotated[User, Depends(require_super_admin)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period: str = "month"  # "day" | "week" | "month"
 ):
-    """Executive dashboard with business overview, revenue, licensing and infra metrics."""
+    """Executive dashboard with business overview, revenue, licensing and infra metrics.
+
+    period: Filter collection/onboarding metrics by 'day', 'week', or 'month'.
+    """
     from datetime import date, timedelta
     now = datetime.now(timezone.utc)
     today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
     next_7_days = now + timedelta(days=7)
+
+    # Compute period start for filtered metrics
+    if period == "day":
+        period_start = today_start
+    elif period == "week":
+        period_start = today_start - timedelta(days=today_start.weekday())  # Monday of this week
+    else:  # month
+        period_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
 
     # ── Org Metrics ──
     total_orgs = (await db.execute(select(func.count(Organization.id)).where(Organization.is_deleted == False))).scalar() or 0
@@ -1027,10 +1039,23 @@ async def get_super_admin_dashboard(
         .where(Invoice.payment_status == "paid", Invoice.is_deleted == False)
     )).scalar() or 0.0)
 
+    # Period-filtered collection (for day/week/month toggle)
+    period_collected = float((await db.execute(
+        select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
+        .where(Invoice.payment_status == "paid", Invoice.is_deleted == False,
+               Invoice.created_at >= period_start)
+    )).scalar() or 0.0)
+
     pending = float((await db.execute(
         select(func.coalesce(func.sum(Invoice.total_amount), 0.0))
         .where(Invoice.payment_status == "unpaid", Invoice.is_deleted == False)
     )).scalar() or 0.0)
+
+    # Period-filtered onboarded count
+    period_onboarded = (await db.execute(
+        select(func.count(Organization.id))
+        .where(Organization.is_deleted == False, Organization.created_at >= period_start)
+    )).scalar() or 0
 
     failed_count = (await db.execute(
         select(func.count(Invoice.id))
@@ -1115,7 +1140,9 @@ async def get_super_admin_dashboard(
         orgs=OrgMetrics(total=total_orgs, active=active_orgs, trial=trial_orgs,
                         expired=expired_orgs, suspended=suspended_orgs, new_today=new_today),
         revenue=RevenueMetrics(mrr=mrr, arr=mrr * 12, total_collected=total_collected,
-                               pending=pending, failed_count=failed_count, overdue_count=overdue_count),
+                               pending=pending, failed_count=failed_count, overdue_count=overdue_count,
+                               period_collected=period_collected, period_onboarded=period_onboarded,
+                               period=period),
         licensing=LicensingMetrics(total_licensed_seats=total_licensed, active_seats=active_seats,
                                    available_seats=max(0, total_licensed - active_seats),
                                    utilization_percent=utilization),

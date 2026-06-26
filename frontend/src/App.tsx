@@ -43,6 +43,7 @@ const queryClient = new QueryClient({
 });
 
 import { FeatureGuardRoute } from './components/common/FeatureGuardRoute';
+import { UnderDevelopment } from './components/common/UnderDevelopment';
 
 export const App: React.FC = () => {
   return (
@@ -83,6 +84,17 @@ export const App: React.FC = () => {
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} allowTeamLeader={true} />}>
                   <Route path="/users" element={<UsersPage />} />
                 </Route>
+              </Route>
+
+              {/* Under Development — feature in plan but UI not built yet */}
+              <Route element={<FeatureGuardRoute featureCode="CLICK_TO_CALL" />}>
+                <Route path="/call-center" element={<UnderDevelopment featureName="Call Center" description="Click-to-Call, inbound & outbound calling, and call recording dashboard are actively being built." />} />
+              </Route>
+              <Route element={<FeatureGuardRoute featureCode="KPI_DASHBOARD" />}>
+                <Route path="/analytics" element={<UnderDevelopment featureName="KPI & Analytics" description="Team performance dashboards, conversion funnels, and KPI tracking are in development." />} />
+              </Route>
+              <Route element={<FeatureGuardRoute featureCode="TARGET_MANAGEMENT" />}>
+                <Route path="/targets" element={<UnderDevelopment featureName="Target Management" description="Sales targets, quota tracking, and achievement reports are coming soon." />} />
               </Route>
 
               {/* OrgAdmin only (general profile always allowed) */}

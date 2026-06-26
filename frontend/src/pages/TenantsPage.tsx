@@ -19,9 +19,9 @@ import {
 type SectionKey = 'dashboard' | 'tenants' | 'plans' | 'features' | 'commercial' | 'currencies' | 'tax' | 'gateways' | 'coupons' | 'invoice' | 'notifications' | 'audit' | 'reports' | 'global';
 
 const CommercialSummaryPanel: React.FC<{ regPlan?: any }> = (_props) => (
-  <div className="border-t border-slate-800/80 pt-4">
+  <div className="border-t border-[var(--border-strong)]/80 pt-4">
     <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Commercial Summary</h4>
-    <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl overflow-hidden text-xs">
+    <div className="bg-[var(--bg-subtle)]/60 border border-[var(--border-strong)]/60 rounded-xl overflow-hidden text-xs">
       {[
         { label: 'Price Per Licensed Seat', hint: 'As entered above' },
         { label: 'Minimum Initial Purchase', hint: '10 Licensed Seats' },
@@ -30,9 +30,9 @@ const CommercialSummaryPanel: React.FC<{ regPlan?: any }> = (_props) => (
         { label: 'GST', hint: 'Extra (as configured)' },
         { label: 'Additional Seat Price', hint: 'Per extra seat / month' },
       ].map((row, i) => (
-        <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i !== 5 ? 'border-b border-slate-800/60' : ''}`}>
-          <span className="text-slate-400 font-medium">{row.label}</span>
-          <span className="text-slate-300 font-semibold">{row.hint}</span>
+        <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i !== 5 ? 'border-b border-[var(--border-strong)]/60' : ''}`}>
+          <span className="text-[var(--text-secondary)] font-medium">{row.label}</span>
+          <span className="text-[var(--text-secondary)] font-semibold">{row.hint}</span>
         </div>
       ))}
     </div>
@@ -43,7 +43,7 @@ const NavItem: React.FC<{ icon: React.ElementType; label: string; active: boolea
   <button
     onClick={onClick}
     className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer text-left relative ${
-      active ? 'bg-brand-500/10 text-brand-400 border-r-2 border-brand-500' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+      active ? 'bg-brand-500/10 text-brand-400 border-r-2 border-brand-500' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card)]/50 hover:text-[var(--text-primary)]'
     }`}
   >
     <Icon className="w-4 h-4 shrink-0" />
@@ -76,6 +76,7 @@ export const TenantsPage: React.FC = () => {
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<any>(null);
+  const [dashboardPeriod, setDashboardPeriod] = useState<'day' | 'week' | 'month'>('month');
   const [currencies, setCurrencies] = useState<CurrencyResponse[]>([]);
   const [taxConfigs, setTaxConfigs] = useState<TaxConfigResponse[]>([]);
   const [gateways, setGateways] = useState<PaymentGatewayResponse[]>([]);
@@ -105,7 +106,7 @@ export const TenantsPage: React.FC = () => {
     setIsLoading(true); setGlobalError(null);
     try {
       switch (activeSection) {
-        case 'dashboard': { const d = await superAdminApi.getDashboard(); setDashboard(d); break; }
+        case 'dashboard': { const d = await superAdminApi.getDashboard(dashboardPeriod); setDashboard(d); break; }
         case 'tenants': { const d = await superAdminApi.getTenants(); setTenants(d); break; }
         case 'plans': { const d = await superAdminApi.getPlans(); setPlans(d); break; }
         case 'features': {
@@ -142,7 +143,7 @@ export const TenantsPage: React.FC = () => {
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { fetchAllData(); }, [activeSection]);
+  useEffect(() => { fetchAllData(); }, [activeSection, dashboardPeriod]);
 
   const showSuccess = (msg: string) => { setSuccessMessage(msg); setTimeout(() => setSuccessMessage(null), 4000); };
 
@@ -187,7 +188,7 @@ export const TenantsPage: React.FC = () => {
   const onCreateTenant = async (data: CreateTenantRequest) => {
     setIsModalLoading(true); setModalError(null);
     try {
-      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3) });
+      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3), plan_name: data.plan_name || 'starter', billing_cycle: data.billing_cycle || 'monthly' });
       showSuccess('Tenant created.'); await fetchAllData(); resetTenant(); setActiveModal(null);
     } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
     finally { setIsModalLoading(false); }
@@ -412,9 +413,9 @@ export const TenantsPage: React.FC = () => {
   return (
     <div style={{ display: 'flex', margin: '-24px', minHeight: 'calc(100vh - 64px)', overflow: 'hidden' }}>
       <nav style={{ width: '188px', flexShrink: 0, borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <div className="p-4 border-b border-slate-800">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Super Admin</p>
-          <h2 className="text-sm font-bold text-slate-200 mt-0.5">Control Center</h2>
+        <div className="p-4 border-b border-[var(--border-color)]">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Super Admin</p>
+          <h2 className="text-sm font-bold text-[var(--text-primary)] mt-0.5">Control Center</h2>
         </div>
         <div className="py-2 flex-1">
           {navItems.map(item => <NavItem key={item.key} icon={item.icon} label={item.label} active={activeSection === item.key} onClick={() => { setActiveSection(item.key); setGlobalError(null); }} />)}
@@ -434,7 +435,7 @@ export const TenantsPage: React.FC = () => {
           </div>
         )}
         {isLoading ? (
-          <div className="glass-panel p-20 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-400">
+          <div className="glass-panel p-20 rounded-2xl border border-[var(--border-strong)]/80 flex flex-col items-center justify-center text-[var(--text-secondary)]">
             <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
             <p className="text-sm font-medium">Loading...</p>
           </div>
@@ -442,56 +443,154 @@ export const TenantsPage: React.FC = () => {
           <>
             {activeSection === 'dashboard' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div><h2 className="text-2xl font-bold text-slate-100">Executive Dashboard</h2><p className="text-sm text-slate-400 mt-1">Real-time platform metrics</p></div>
-                  <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-pointer hover:text-slate-200"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
-                </div>
-                {dashboard ? (
-                  <>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      {[
-                        { label: 'Total Organizations', value: dashboard.orgs?.total ?? 0, sub: (dashboard.orgs?.active ?? 0) + ' active', color: 'text-brand-400' },
-                        { label: 'MRR', value: 'Rs.' + Number(dashboard.revenue?.mrr ?? 0).toLocaleString('en-IN'), sub: 'ARR Rs.' + Number(dashboard.revenue?.arr ?? 0).toLocaleString('en-IN'), color: 'text-emerald-400' },
-                        { label: 'Licensed Seats', value: dashboard.licensing?.total_seats ?? 0, sub: (dashboard.licensing?.active_seats ?? 0) + ' active', color: 'text-sky-400' },
-                        { label: 'Trial Orgs', value: dashboard.orgs?.trial ?? 0, sub: (dashboard.activity?.expiring_soon ?? 0) + ' expiring', color: 'text-amber-400' },
-                      ].map((c, i) => (
-                        <div key={i} className="glass-panel p-5 border border-slate-800/80 rounded-2xl">
-                          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">{c.label}</p>
-                          <p className={'text-2xl font-bold mt-2 ' + c.color}>{c.value}</p>
-                          <p className="text-xs text-slate-500 mt-1">{c.sub}</p>
-                        </div>
+                {/* Header + Controls */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-bold text-[var(--text-primary)]">Executive Dashboard</h2>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">Real-time platform metrics</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Period Toggle */}
+                    <div className="flex items-center gap-1 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl p-1">
+                      {(['day', 'week', 'month'] as const).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setDashboardPeriod(p)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer capitalize ${
+                            dashboardPeriod === p
+                              ? 'bg-brand-500 text-white shadow'
+                              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          {p === 'day' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+                        </button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl">
-                        <h3 className="text-sm font-bold text-slate-300 mb-4">Activity</h3>
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div><p className="text-2xl font-bold text-brand-400">{dashboard.activity?.new_signups_today ?? 0}</p><p className="text-xs text-slate-500 mt-1">Today</p></div>
-                          <div><p className="text-2xl font-bold text-emerald-400">{dashboard.activity?.active_last_7d ?? 0}</p><p className="text-xs text-slate-500 mt-1">Last 7d</p></div>
-                          <div><p className="text-2xl font-bold text-amber-400">{dashboard.activity?.expiring_soon ?? 0}</p><p className="text-xs text-slate-500 mt-1">Expiring</p></div>
-                        </div>
+                    <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)]">
+                      <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {dashboard ? (
+                  <>
+                    {/* Top KPIs: period-sensitive */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="glass-panel p-5 border border-[var(--border-color)] rounded-2xl">
+                        <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
+                          {dashboardPeriod === 'day' ? "Today's" : dashboardPeriod === 'week' ? "This Week's" : "This Month's"} Collection
+                        </p>
+                        <p className="text-2xl font-bold mt-2 text-emerald-400">
+                          ₹{Number(dashboard.revenue?.period_collected ?? 0).toLocaleString('en-IN')}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          Total ever: ₹{Number(dashboard.revenue?.total_collected ?? 0).toLocaleString('en-IN')}
+                        </p>
                       </div>
-                      <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl">
-                        <h3 className="text-sm font-bold text-slate-300 mb-4">Infrastructure</h3>
+                      <div className="glass-panel p-5 border border-[var(--border-color)] rounded-2xl">
+                        <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Pending Collection</p>
+                        <p className="text-2xl font-bold mt-2 text-amber-400">
+                          ₹{Number(dashboard.revenue?.pending ?? 0).toLocaleString('en-IN')}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          {dashboard.revenue?.overdue_count ?? 0} overdue invoices
+                        </p>
+                      </div>
+                      <div className="glass-panel p-5 border border-[var(--border-color)] rounded-2xl">
+                        <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
+                          {dashboardPeriod === 'day' ? "Today's" : dashboardPeriod === 'week' ? "This Week's" : "This Month's"} Onboarded
+                        </p>
+                        <p className="text-2xl font-bold mt-2 text-brand-400">
+                          {dashboard.revenue?.period_onboarded ?? 0}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          {dashboard.orgs?.active ?? 0} active of {dashboard.orgs?.total ?? 0} total
+                        </p>
+                      </div>
+                      <div className="glass-panel p-5 border border-[var(--border-color)] rounded-2xl">
+                        <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">MRR / ARR</p>
+                        <p className="text-2xl font-bold mt-2 text-sky-400">
+                          ₹{Number(dashboard.revenue?.mrr ?? 0).toLocaleString('en-IN')}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          ARR ₹{Number(dashboard.revenue?.arr ?? 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Second row: Org breakdown + Licensing + Infra */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Org breakdown */}
+                      <div className="glass-panel p-6 border border-[var(--border-color)] rounded-2xl">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Organization Status</h3>
                         <div className="space-y-3">
                           {[
-                            { label: 'API', val: dashboard.infra?.api_status ?? 'unknown', ok: dashboard.infra?.api_status === 'healthy' },
+                            { label: 'Active', val: dashboard.orgs?.active ?? 0, color: 'text-emerald-400' },
+                            { label: 'Trial', val: dashboard.orgs?.trial ?? 0, color: 'text-sky-400' },
+                            { label: 'Expired', val: dashboard.orgs?.expired ?? 0, color: 'text-rose-400' },
+                            { label: 'Suspended', val: dashboard.orgs?.suspended ?? 0, color: 'text-amber-400' },
+                          ].map((x, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <span className="text-xs text-[var(--text-muted)]">{x.label}</span>
+                              <span className={`text-sm font-bold ${x.color}`}>{x.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Licensing */}
+                      <div className="glass-panel p-6 border border-[var(--border-color)] rounded-2xl">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Seat Licensing</h3>
+                        <div className="space-y-3">
+                          {[
+                            { label: 'Licensed', val: dashboard.licensing?.total_licensed_seats ?? 0, color: 'text-brand-400' },
+                            { label: 'Active', val: dashboard.licensing?.active_seats ?? 0, color: 'text-emerald-400' },
+                            { label: 'Available', val: dashboard.licensing?.available_seats ?? 0, color: 'text-sky-400' },
+                            { label: 'Utilization', val: (dashboard.licensing?.utilization_percent ?? 0) + '%', color: 'text-amber-400' },
+                          ].map((x, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <span className="text-xs text-[var(--text-muted)]">{x.label}</span>
+                              <span className={`text-sm font-bold ${x.color}`}>{x.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Infra + Activity */}
+                      <div className="glass-panel p-6 border border-[var(--border-color)] rounded-2xl">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Infrastructure & Activity</h3>
+                        <div className="space-y-3">
+                          {[
                             { label: 'Database', val: dashboard.infra?.db_status ?? 'unknown', ok: dashboard.infra?.db_status === 'healthy' },
                             { label: 'Redis', val: dashboard.infra?.redis_status ?? 'unknown', ok: dashboard.infra?.redis_status === 'healthy' },
                           ].map((x, i) => (
                             <div key={i} className="flex items-center justify-between">
-                              <span className="text-xs text-slate-400">{x.label}</span>
-                              <span className={'text-xs font-bold ' + (x.ok ? 'text-emerald-400' : 'text-rose-400')}>{x.val}</span>
+                              <span className="text-xs text-[var(--text-muted)]">{x.label}</span>
+                              <span className={`text-xs font-bold ${x.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{x.val}</span>
                             </div>
                           ))}
+                          <div className="border-t border-[var(--border-color)] pt-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[var(--text-muted)]">New Today</span>
+                              <span className="text-xs font-bold text-brand-400">{dashboard.activity?.new_orgs_today ?? 0} orgs</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[var(--text-muted)]">Renewals in 7d</span>
+                              <span className="text-xs font-bold text-amber-400">{dashboard.activity?.renewals_due_7days ?? 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[var(--text-muted)]">Invoices Today</span>
+                              <span className="text-xs font-bold text-sky-400">{dashboard.activity?.new_invoices_today ?? 0}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-500 text-center">
-                    <LayoutDashboard className="w-12 h-12 text-slate-600 mb-3" />
-                    <p className="font-semibold text-slate-400">No dashboard data</p>
+                  <div className="glass-panel p-16 rounded-2xl border border-[var(--border-color)] flex flex-col items-center justify-center text-[var(--text-muted)] text-center">
+                    <LayoutDashboard className="w-12 h-12 opacity-30 mb-3" />
+                    <p className="font-semibold text-[var(--text-secondary)]">No dashboard data</p>
                     <p className="text-xs mt-1">Backend may be offline.</p>
                   </div>
                 )}
@@ -500,7 +599,7 @@ export const TenantsPage: React.FC = () => {
           {activeSection === 'tenants' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Tenants List</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">Tenants List</h3>
                 <button
                   onClick={() => {
                     resetTenant();
@@ -515,32 +614,32 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               {tenants.length === 0 ? (
-                <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-500 text-center">
-                  <Building className="w-12 h-12 text-slate-600 mb-3" />
-                  <p className="text-base font-semibold text-slate-400">No Tenants Found</p>
-                  <p className="text-xs text-slate-500 mt-1">Spin up a new tenant to initiate database instances.</p>
+                <div className="glass-panel p-16 rounded-2xl border border-[var(--border-strong)]/80 flex flex-col items-center justify-center text-[var(--text-muted)] text-center">
+                  <Building className="w-12 h-12 text-[var(--text-muted)] mb-3" />
+                  <p className="text-base font-semibold text-[var(--text-secondary)]">No Tenants Found</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Spin up a new tenant to initiate database instances.</p>
                 </div>
               ) : (
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-800 bg-slate-900/20">
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Company / Subdomain</th>
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Tier / Licensed Seats</th>
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Expires At</th>
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">Resources</th>
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+                        <tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Company / Subdomain</th>
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Status</th>
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Tier / Licensed Seats</th>
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Expires At</th>
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center">Resources</th>
+                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800 bg-slate-950/10">
+                      <tbody className="divide-y divide-[var(--border-color)] bg-[var(--bg-app)]/10">
                         {tenants.map((tenant) => (
-                          <tr key={tenant.id} className="hover:bg-slate-900/10 transition-colors">
+                          <tr key={tenant.id} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
                             <td className="px-6 py-4.5">
                               <div>
-                                <p className="text-sm font-semibold text-slate-200">{tenant.name}</p>
-                                <p className="text-xs text-slate-500">/{tenant.slug}</p>
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">{tenant.name}</p>
+                                <p className="text-xs text-[var(--text-muted)]">/{tenant.slug}</p>
                               </div>
                             </td>
                             <td className="px-6 py-4.5">
@@ -558,10 +657,10 @@ export const TenantsPage: React.FC = () => {
                                 <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-brand-500/10 text-brand-400 border border-brand-500/20 uppercase tracking-wider">
                                   {tenant.subscription_plan}
                                 </span>
-                                <p className="text-[10px] text-slate-400 mt-1">Licensed Seats: {tenant.max_users}</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">Licensed Seats: {tenant.max_users}</p>
                               </div>
                             </td>
-                            <td className="px-6 py-4.5 text-xs text-slate-300">
+                            <td className="px-6 py-4.5 text-xs text-[var(--text-secondary)]">
                               {tenant.subscription_expires_at 
                                 ? new Date(tenant.subscription_expires_at).toLocaleDateString()
                                 : 'Lifetime'
@@ -571,16 +670,16 @@ export const TenantsPage: React.FC = () => {
                               <div className="flex justify-center items-center gap-4">
                                 <button 
                                   onClick={() => openUsersModal(tenant)}
-                                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-brand-400 transition-colors cursor-pointer"
+                                  className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-brand-400 transition-colors cursor-pointer"
                                 >
-                                  <Users className="w-4 h-4 text-slate-500" />
+                                  <Users className="w-4 h-4 text-[var(--text-muted)]" />
                                   <span>{tenant.user_count}</span>
                                 </button>
                                 <button 
                                   onClick={() => openInvoicesModal(tenant)}
-                                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-400 transition-colors cursor-pointer"
+                                  className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-indigo-400 transition-colors cursor-pointer"
                                 >
-                                  <FileText className="w-4 h-4 text-slate-500" />
+                                  <FileText className="w-4 h-4 text-[var(--text-muted)]" />
                                   <span>{tenant.invoice_count}</span>
                                 </button>
                               </div>
@@ -589,7 +688,7 @@ export const TenantsPage: React.FC = () => {
                               <div className="flex items-center justify-end gap-2.5">
                                 <button
                                   onClick={() => openEditSubModal(tenant)}
-                                  className="px-2 py-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                  className="px-2 py-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
                                   title="Edit Subscription Tier"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
@@ -600,14 +699,14 @@ export const TenantsPage: React.FC = () => {
                                     setSelectedTenant(tenant);
                                     setActiveModal('resetPassword');
                                   }}
-                                  className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 transition-all cursor-pointer"
+                                  className="p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] transition-all cursor-pointer"
                                   title="Reset Owner Password"
                                 >
                                   <Key className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleSuspendTenant(tenant)}
-                                  className={`p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg transition-all cursor-pointer ${
+                                  className={`p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg transition-all cursor-pointer ${
                                     tenant.subscription_status === 'suspended'
                                       ? 'text-emerald-400 hover:text-emerald-300'
                                       : 'text-amber-400 hover:text-amber-300'
@@ -626,7 +725,7 @@ export const TenantsPage: React.FC = () => {
                                     setDeleteConfirmSlug('');
                                     setActiveModal('deleteTenantConfirm');
                                   }}
-                                  className="p-1.5 border border-slate-800 hover:bg-red-500/10 hover:border-red-500/20 text-red-400 rounded-lg transition-all cursor-pointer"
+                                  className="p-1.5 border border-[var(--border-color)] hover:bg-red-500/10 hover:border-red-500/20 text-red-400 rounded-lg transition-all cursor-pointer"
                                   title="Delete Tenant Database"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -649,7 +748,7 @@ export const TenantsPage: React.FC = () => {
           {activeSection === 'plans' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Subscription Plans</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">Subscription Plans</h3>
                 <button
                   onClick={() => {
                     resetPlan({
@@ -690,10 +789,10 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               {plans.length === 0 ? (
-                <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-500 text-center">
-                  <FolderKanban className="w-12 h-12 text-slate-600 mb-3" />
-                  <p className="text-base font-semibold text-slate-400">No Custom Plans Registered</p>
-                  <p className="text-xs text-slate-500 mt-1">Add your first commercial pricing plan to begin assigning tenant limits.</p>
+                <div className="glass-panel p-16 rounded-2xl border border-[var(--border-strong)]/80 flex flex-col items-center justify-center text-[var(--text-muted)] text-center">
+                  <FolderKanban className="w-12 h-12 text-[var(--text-muted)] mb-3" />
+                  <p className="text-base font-semibold text-[var(--text-secondary)]">No Custom Plans Registered</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Add your first commercial pricing plan to begin assigning tenant limits.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -703,7 +802,7 @@ export const TenantsPage: React.FC = () => {
                       className={`glass-panel p-6 border rounded-2xl space-y-4 relative flex flex-col justify-between transition-all ${
                         plan.popular_plan
                           ? 'border-brand-500/40 shadow-lg shadow-brand-500/10 hover:border-brand-500/60'
-                          : 'border-slate-800/80 hover:border-slate-700'
+                          : 'border-[var(--border-strong)]/80 hover:border-[var(--border-strong)]'
                       }`}
                     >
                       {/* MOST POPULAR badge */}
@@ -718,73 +817,73 @@ export const TenantsPage: React.FC = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h4 className="text-lg font-bold text-slate-100">{plan.display_name}</h4>
-                            <p className="text-xs text-slate-500 font-mono">slug: {plan.name}</p>
+                            <h4 className="text-lg font-bold text-[var(--text-primary)]">{plan.display_name}</h4>
+                            <p className="text-xs text-[var(--text-muted)] font-mono">slug: {plan.name}</p>
                           </div>
-                          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                          <div className="flex items-center gap-1 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg p-0.5">
                             <button
                               onClick={() => handleReorderPlans(plan.id, 'up')}
-                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                              className="p-1 hover:bg-[var(--bg-card)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                             >
                               <ArrowUpDown className="w-3 h-3 rotate-180" />
                             </button>
                             <button
                               onClick={() => handleReorderPlans(plan.id, 'down')}
-                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                              className="p-1 hover:bg-[var(--bg-card)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                             >
                               <ArrowUpDown className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-400 line-clamp-2">{plan.description || 'No description provided.'}</p>
+                        <p className="text-xs text-[var(--text-secondary)] line-clamp-2">{plan.description || 'No description provided.'}</p>
 
                         {/* Price block */}
-                        <div className="py-3 border-y border-slate-800/80">
+                        <div className="py-3 border-y border-[var(--border-strong)]/80">
                           <p className="text-3xl font-black text-brand-400">
                             {plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.monthly_price).toLocaleString('en-IN')}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
                         </div>
 
                         {/* Plan details */}
                         <div className="space-y-1.5 pt-1">
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                            <Users className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                             <span>Starts From: <strong>{plan.minimum_users ?? plan.max_users} Licensed Seats</strong></span>
                           </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
                             <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                             <span>Minimum Contract: <strong>{plan.minimum_contract_months} Months</strong></span>
                           </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Building className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                            <Building className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                             <span>Storage: <strong>{plan.storage_limit_gb} GB</strong></span>
                           </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                            <FileText className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                             <span>Call Recording Retention: <strong>{plan.recording_retention_days} Days</strong></span>
                           </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <DollarSign className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                            <DollarSign className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                             <span>Additional Seat Price: <strong>{plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.extra_user_price ?? 0).toLocaleString('en-IN')}</strong></span>
                           </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Check className={`w-3.5 h-3.5 shrink-0 ${plan.allow_additional_seats ? 'text-emerald-500' : 'text-slate-600'}`} />
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                            <Check className={`w-3.5 h-3.5 shrink-0 ${plan.allow_additional_seats ? 'text-emerald-500' : 'text-[var(--text-muted)]'}`} />
                             <span>Additional Seats: <strong>{plan.allow_additional_seats ? 'Allowed' : 'Not Allowed'}</strong></span>
                           </p>
                         </div>
 
                         {/* Billing Policy */}
-                        <div className="mt-3 p-3 bg-slate-900/60 border border-slate-800/60 rounded-xl text-[10px] text-slate-400 space-y-1">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Billing Policy</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Per Licensed Seat</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Purchase: {plan.minimum_users ?? plan.max_users} Seats</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Contract: {plan.minimum_contract_months} Months</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{plan.allow_additional_seats ? 'Additional Seats can be purchased anytime' : 'Additional Seats not available'}</p>
+                        <div className="mt-3 p-3 bg-[var(--bg-subtle)]/60 border border-[var(--border-strong)]/60 rounded-xl text-[10px] text-[var(--text-secondary)] space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Billing Policy</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-[var(--text-muted)] shrink-0" />Per Licensed Seat</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-[var(--text-muted)] shrink-0" />Minimum Initial Purchase: {plan.minimum_users ?? plan.max_users} Seats</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-[var(--text-muted)] shrink-0" />Minimum Initial Contract: {plan.minimum_contract_months} Months</p>
+                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-[var(--text-muted)] shrink-0" />{plan.allow_additional_seats ? 'Additional Seats can be purchased anytime' : 'Additional Seats not available'}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 pt-4 border-t border-slate-800/50">
+                      <div className="flex items-center gap-3 pt-4 border-t border-[var(--border-color)]/50">
                         <button
                           onClick={() => {
                             setSelectedPlan(plan);
@@ -794,13 +893,13 @@ export const TenantsPage: React.FC = () => {
                             });
                             setActiveModal('editPlan');
                           }}
-                          className="flex-1 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
+                          className="flex-1 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] hover:border-[var(--border-strong)] text-[var(--text-secondary)] rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
                         >
                           Configure
                         </button>
                         <button
                           onClick={() => handleDeletePlan(plan.id)}
-                          className="p-2 border border-slate-800 hover:border-red-500/30 hover:bg-red-500/10 text-red-400 rounded-xl transition-all cursor-pointer"
+                          className="p-2 border border-[var(--border-color)] hover:border-red-500/30 hover:bg-red-500/10 text-red-400 rounded-xl transition-all cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -818,24 +917,24 @@ export const TenantsPage: React.FC = () => {
           {activeSection === 'features' && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Plan Permissions Matrix</h3>
-                <p className="text-xs text-slate-500 mt-1">Cross-check plans mapping checkbox cells to dynamically authorize API scopes.</p>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">Plan Permissions Matrix</h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Cross-check plans mapping checkbox cells to dynamically authorize API scopes.</p>
               </div>
 
               {plans.length === 0 || features.length === 0 ? (
-                <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-500 text-center">
-                  <Workflow className="w-12 h-12 text-slate-600 mb-3" />
-                  <p className="text-base font-semibold text-slate-400">Setup Required</p>
-                  <p className="text-xs text-slate-500 mt-1">You must create at least one Plan Template and seed features to build matrix mappings.</p>
+                <div className="glass-panel p-16 rounded-2xl border border-[var(--border-strong)]/80 flex flex-col items-center justify-center text-[var(--text-muted)] text-center">
+                  <Workflow className="w-12 h-12 text-[var(--text-muted)] mb-3" />
+                  <p className="text-base font-semibold text-[var(--text-secondary)]">Setup Required</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">You must create at least one Plan Template and seed features to build matrix mappings.</p>
                 </div>
               ) : (
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-800 bg-slate-900/20">
-                          <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Feature Description</th>
-                          <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Category</th>
+                        <tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">
+                          <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Feature Description</th>
+                          <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Category</th>
                           {plans.map((p) => (
                             <th key={p.id} className="px-6 py-4.5 text-xs font-bold uppercase tracking-wider text-brand-400 text-center">
                               {p.display_name}
@@ -843,17 +942,17 @@ export const TenantsPage: React.FC = () => {
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800 bg-slate-950/10">
+                      <tbody className="divide-y divide-[var(--border-color)] bg-[var(--bg-app)]/10">
                         {features.map((feature) => (
-                          <tr key={feature.id} className="hover:bg-slate-900/10 transition-colors">
+                          <tr key={feature.id} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
                             <td className="px-6 py-4">
                               <div>
-                                <p className="text-sm font-semibold text-slate-200">{feature.display_name}</p>
-                                <p className="text-[10px] text-slate-500 font-mono">code: {feature.code}</p>
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">{feature.display_name}</p>
+                                <p className="text-[10px] text-[var(--text-muted)] font-mono">code: {feature.code}</p>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="inline-block px-1.5 py-0.5 text-[9px] font-semibold bg-slate-800 text-slate-400 rounded uppercase tracking-wider">
+                              <span className="inline-block px-1.5 py-0.5 text-[9px] font-semibold bg-[var(--bg-card)] text-[var(--text-secondary)] rounded uppercase tracking-wider">
                                 {feature.category}
                               </span>
                             </td>
@@ -866,7 +965,7 @@ export const TenantsPage: React.FC = () => {
                                     className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer mx-auto ${
                                       enabled 
                                         ? 'bg-brand-500/20 border-brand-500/40 text-brand-400 shadow-md shadow-brand-500/5' 
-                                        : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 text-transparent'
+                                        : 'border-[var(--border-color)] hover:border-[var(--border-strong)] bg-[var(--bg-subtle)]/40 text-transparent'
                                     }`}
                                   >
                                     <CheckSquare className="w-4 h-4" />
@@ -891,19 +990,19 @@ export const TenantsPage: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Left Column: Config Forms (col-span-2) */}
               <div className="xl:col-span-2 space-y-6">
-                <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
+                <div className="glass-panel p-6 border border-[var(--border-strong)]/80 rounded-2xl space-y-6">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                       <FileText className="w-5 h-5 text-indigo-400" />
                       Dynamic Invoice Ledger settings
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-[var(--text-muted)] mt-1">
                       Configure dynamic values, bank specifications, pan details, prefix parameters, and transaction details.
                     </p>
                   </div>
 
                   {/* Sub-tab Navigation */}
-                  <div className="flex border-b border-slate-800 pb-2 overflow-x-auto gap-1.5 scrollbar-thin">
+                  <div className="flex border-b border-[var(--border-color)] pb-2 overflow-x-auto gap-1.5 scrollbar-thin">
                     {[
                       { id: 'general', label: 'General', icon: Building },
                       { id: 'branding', label: 'Branding', icon: Image },
@@ -920,7 +1019,7 @@ export const TenantsPage: React.FC = () => {
                         className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
                           invoiceConfigSubTab === subTab.id
                             ? 'bg-brand-500/10 text-brand-400 border-brand-500/30'
-                            : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 border-transparent'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]/60 hover:text-[var(--text-primary)] border-transparent'
                         }`}
                       >
                         <subTab.icon className="w-3.5 h-3.5" />
@@ -935,62 +1034,62 @@ export const TenantsPage: React.FC = () => {
                     {invoiceConfigSubTab === 'general' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Company Name (Billing Issuer)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Company Name (Billing Issuer)</label>
                           <input
                             type="text"
                             value={editedConfig.company_name || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, company_name: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="Enter company billing name"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tagline</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Tagline</label>
                           <input
                             type="text"
                             value={editedConfig.tagline || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, tagline: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. Beyond boundaries"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Website</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Website</label>
                           <input
                             type="text"
                             value={editedConfig.website || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, website: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. www.johnsonsoftwares.com"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Support Contact Email</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Support Contact Email</label>
                           <input
                             type="email"
                             value={editedConfig.support_email || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, support_email: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. billing@johnsonsoftwares.com"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Phone Number</label>
                           <input
                             type="text"
                             value={editedConfig.phone_number || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, phone_number: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. +91 22 5097 2233"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Billing Address</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Billing Address</label>
                           <textarea
                             rows={3}
                             value={editedConfig.address || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, address: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="Enter physical billing address"
                           />
                         </div>
@@ -1001,17 +1100,17 @@ export const TenantsPage: React.FC = () => {
                     {invoiceConfigSubTab === 'branding' && (
                       <div className="space-y-6 text-left">
                         <div className="space-y-2">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Company Logo branding</h4>
-                          <p className="text-xs text-slate-500">Served dynamically at the top header of client invoice cards.</p>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Company Logo branding</h4>
+                          <p className="text-xs text-[var(--text-muted)]">Served dynamically at the top header of client invoice cards.</p>
                           {editedConfig.company_logo_url ? (
-                            <div className="flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                            <div className="flex items-center gap-4 p-4 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl">
                               <img
                                 src={editedConfig.company_logo_url}
                                 alt="Company Logo"
-                                className="max-h-16 max-w-[200px] object-contain rounded bg-slate-950 p-2"
+                                className="max-h-16 max-w-[200px] object-contain rounded bg-[var(--bg-app)] p-2"
                               />
                               <div>
-                                <p className="text-xs font-semibold text-slate-300">Logo active</p>
+                                <p className="text-xs font-semibold text-[var(--text-secondary)]">Logo active</p>
                                 <button
                                   type="button"
                                   onClick={handleDeleteLogo}
@@ -1023,11 +1122,11 @@ export const TenantsPage: React.FC = () => {
                               </div>
                             </div>
                           ) : (
-                            <div className="relative border-2 border-dashed border-slate-800 hover:border-brand-500/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-slate-950/20 text-center">
+                            <div className="relative border-2 border-dashed border-[var(--border-color)] hover:border-brand-500/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-[var(--bg-app)]/20 text-center">
                               {isUploading ? (
                                 <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-2" />
                               ) : (
-                                <Upload className="w-8 h-8 text-slate-500 mb-2" />
+                                <Upload className="w-8 h-8 text-[var(--text-muted)] mb-2" />
                               )}
                               <label className="text-xs font-semibold text-brand-400 cursor-pointer">
                                 <span>Upload logo file</span>
@@ -1038,7 +1137,7 @@ export const TenantsPage: React.FC = () => {
                                   className="hidden"
                                 />
                               </label>
-                              <span className="text-[10px] text-slate-500 mt-1">PNG, JPG, SVG up to 2MB</span>
+                              <span className="text-[10px] text-[var(--text-muted)] mt-1">PNG, JPG, SVG up to 2MB</span>
                             </div>
                           )}
                         </div>
@@ -1049,32 +1148,32 @@ export const TenantsPage: React.FC = () => {
                     {invoiceConfigSubTab === 'tax' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">GSTIN / Tax ID Number</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">GSTIN / Tax ID Number</label>
                           <input
                             type="text"
                             value={editedConfig.gst_number || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, gst_number: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. 27AAAAA1111A1Z1"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">PAN Number</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">PAN Number</label>
                           <input
                             type="text"
                             value={editedConfig.pan || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, pan: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. ABCDE1234F"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Business Registration Number</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Business Registration Number</label>
                           <input
                             type="text"
                             value={editedConfig.business_registration_number || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, business_registration_number: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. CIN / U12345MH2026PTC123456"
                           />
                         </div>
@@ -1085,42 +1184,42 @@ export const TenantsPage: React.FC = () => {
                     {invoiceConfigSubTab === 'invoice' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice Number Prefix</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Invoice Number Prefix</label>
                           <input
                             type="text"
                             value={editedConfig.invoice_prefix || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, invoice_prefix: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. TELE-INV"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Starting Invoice Number</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Starting Invoice Number</label>
                           <input
                             type="number"
                             min="1"
                             value={editedConfig.starting_invoice_number || 1000}
                             onChange={(e) => setEditedConfig({ ...editedConfig, starting_invoice_number: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Code</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Currency Code</label>
                           <input
                             type="text"
                             value={editedConfig.currency || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, currency: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. INR, USD"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Symbol</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Currency Symbol</label>
                           <input
                             type="text"
                             value={editedConfig.currency_symbol || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, currency_symbol: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. ₹, $"
                           />
                         </div>
@@ -1132,79 +1231,79 @@ export const TenantsPage: React.FC = () => {
                       <div className="space-y-4 text-left">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Bank Name</label>
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Bank Name</label>
                             <input
                               type="text"
                               value={editedConfig.bank_name || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, bank_name: e.target.value })}
-                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                               placeholder="e.g. HDFC Bank"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Account Holder</label>
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Account Holder</label>
                             <input
                               type="text"
                               value={editedConfig.account_holder || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, account_holder: e.target.value })}
-                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                               placeholder="e.g. Johnson Softwares Limited"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Account Number</label>
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Account Number</label>
                             <input
                               type="text"
                               value={editedConfig.account_number || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, account_number: e.target.value })}
-                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                               placeholder="e.g. 50100123456789"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">IFSC Code</label>
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">IFSC Code</label>
                             <input
                               type="text"
                               value={editedConfig.ifsc || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, ifsc: e.target.value })}
-                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                               placeholder="e.g. HDFC0000101"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Branch Name</label>
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Branch Name</label>
                             <input
                               type="text"
                               value={editedConfig.branch || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, branch: e.target.value })}
-                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                               placeholder="e.g. BKC Branch, Mumbai"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">UPI ID</label>
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">UPI ID</label>
                             <input
                               type="text"
                               value={editedConfig.upi_id || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, upi_id: e.target.value })}
-                              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                              className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                               placeholder="e.g. johnsonsoftwares@hdfc"
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment QR Code image</h4>
-                          <p className="text-xs text-slate-500">Rendered on the footer of client invoices for direct scan & pay.</p>
+                        <div className="space-y-2 pt-2 border-t border-[var(--border-strong)]/80">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Payment QR Code image</h4>
+                          <p className="text-xs text-[var(--text-muted)]">Rendered on the footer of client invoices for direct scan & pay.</p>
                           {editedConfig.qr_code_url ? (
-                            <div className="flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                            <div className="flex items-center gap-4 p-4 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl">
                               <img
                                 src={editedConfig.qr_code_url}
                                 alt="Payment QR"
                                 className="w-24 h-24 object-contain rounded bg-white p-1"
                               />
                               <div>
-                                <p className="text-xs font-semibold text-slate-300">QR Code active</p>
+                                <p className="text-xs font-semibold text-[var(--text-secondary)]">QR Code active</p>
                                 <button
                                   type="button"
                                   onClick={handleDeleteQr}
@@ -1216,11 +1315,11 @@ export const TenantsPage: React.FC = () => {
                               </div>
                             </div>
                           ) : (
-                            <div className="relative border-2 border-dashed border-slate-800 hover:border-brand-500/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-slate-950/20 text-center">
+                            <div className="relative border-2 border-dashed border-[var(--border-color)] hover:border-brand-500/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-[var(--bg-app)]/20 text-center">
                               {isUploading ? (
                                 <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-2" />
                               ) : (
-                                <Upload className="w-8 h-8 text-slate-500 mb-2" />
+                                <Upload className="w-8 h-8 text-[var(--text-muted)] mb-2" />
                               )}
                               <label className="text-xs font-semibold text-brand-400 cursor-pointer">
                                 <span>Upload QR code file</span>
@@ -1231,7 +1330,7 @@ export const TenantsPage: React.FC = () => {
                                   className="hidden"
                                 />
                               </label>
-                              <span className="text-[10px] text-slate-500 mt-1">PNG, JPG up to 2MB</span>
+                              <span className="text-[10px] text-[var(--text-muted)] mt-1">PNG, JPG up to 2MB</span>
                             </div>
                           )}
                         </div>
@@ -1242,116 +1341,116 @@ export const TenantsPage: React.FC = () => {
                     {invoiceConfigSubTab === 'email' && (
                       <div className="space-y-6 text-left">
                         {/* Issued email */}
-                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                        <div className="space-y-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-strong)]/80 rounded-xl">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Invoice Issued Notification</h4>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Subject</label>
                             <input
                               type="text"
                               value={editedConfig.invoice_subject || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, invoice_subject: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Body (Rich text markdown supported)</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Body (Rich text markdown supported)</label>
                             <textarea
                               rows={3}
                               value={editedConfig.invoice_body || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, invoice_body: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                         </div>
 
                         {/* Reminder email */}
-                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                        <div className="space-y-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-strong)]/80 rounded-xl">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Payment Overdue Reminder</h4>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Subject</label>
                             <input
                               type="text"
                               value={editedConfig.reminder_subject || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, reminder_subject: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Body</label>
                             <textarea
                               rows={3}
                               value={editedConfig.reminder_body || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, reminder_body: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                         </div>
 
                         {/* Payment Success email */}
-                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                        <div className="space-y-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-strong)]/80 rounded-xl">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Payment Success Confirmation</h4>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Subject</label>
                             <input
                               type="text"
                               value={editedConfig.payment_success_subject || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, payment_success_subject: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Body</label>
                             <textarea
                               rows={3}
                               value={editedConfig.payment_success_body || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, payment_success_body: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                         </div>
 
                         {/* Payment Failed email */}
-                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                        <div className="space-y-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-strong)]/80 rounded-xl">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Payment Transaction Failed</h4>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Subject</label>
                             <input
                               type="text"
                               value={editedConfig.payment_failed_subject || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, payment_failed_subject: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Body</label>
                             <textarea
                               rows={3}
                               value={editedConfig.payment_failed_body || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, payment_failed_body: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                         </div>
 
                         {/* Renewal Reminder email */}
-                        <div className="space-y-3 p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl">
+                        <div className="space-y-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-strong)]/80 rounded-xl">
                           <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Renewal Reminder Notification</h4>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Subject</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Subject</label>
                             <input
                               type="text"
                               value={editedConfig.renewal_reminder_subject || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, renewal_reminder_subject: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">Email Body</label>
+                            <label className="block text-[10px] text-[var(--text-secondary)] mb-1">Email Body</label>
                             <textarea
                               rows={3}
                               value={editedConfig.renewal_reminder_body || ''}
                               onChange={(e) => setEditedConfig({ ...editedConfig, renewal_reminder_body: e.target.value })}
-                              className="w-full px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-200 focus:outline-none"
+                              className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
                             />
                           </div>
                         </div>
@@ -1362,22 +1461,22 @@ export const TenantsPage: React.FC = () => {
                     {invoiceConfigSubTab === 'footer' && (
                       <div className="grid grid-cols-1 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Standard Payment Terms & Conditions</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Standard Payment Terms & Conditions</label>
                           <textarea
                             rows={4}
                             value={editedConfig.payment_terms || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, payment_terms: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. Invoice payment is due within 7 days of issue. Standard SLA rates apply."
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice Footer text note</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Invoice Footer text note</label>
                           <textarea
                             rows={3}
                             value={editedConfig.footer_text || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, footer_text: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. Thank you for your business! Reach billing@johnsonsoftwares.com for support."
                           />
                         </div>
@@ -1386,7 +1485,7 @@ export const TenantsPage: React.FC = () => {
                   </div>
 
                   {/* Save Configuration Trigger */}
-                  <div className="flex justify-end pt-4 border-t border-slate-800/80">
+                  <div className="flex justify-end pt-4 border-t border-[var(--border-strong)]/80">
                     <button
                       type="button"
                       onClick={handleSaveConfig}
@@ -1410,11 +1509,11 @@ export const TenantsPage: React.FC = () => {
               <div className="xl:col-span-1">
                 <div className="sticky top-6 space-y-4">
                   <div className="flex justify-between items-baseline px-1">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Live Invoice Mockup</h4>
-                    <span className="text-[10px] text-slate-500 italic">Auto updates as you type</span>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Live Invoice Mockup</h4>
+                    <span className="text-[10px] text-[var(--text-muted)] italic">Auto updates as you type</span>
                   </div>
 
-                  <div className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl p-6 bg-slate-950/60 text-slate-300 space-y-6 text-left relative">
+                  <div className="glass-panel border border-[var(--border-strong)]/80 rounded-2xl overflow-hidden shadow-2xl p-6 bg-[var(--bg-app)]/60 text-[var(--text-secondary)] space-y-6 text-left relative">
                     {/* Header: Company branding */}
                     <div className="flex justify-between items-start gap-4">
                       <div className="space-y-1 max-w-[60%]">
@@ -1429,11 +1528,11 @@ export const TenantsPage: React.FC = () => {
                             {editedConfig.company_name?.substring(0, 2).toUpperCase() || 'JS'}
                           </div>
                         )}
-                        <h4 className="text-sm font-bold text-slate-100 mt-2">{editedConfig.company_name || 'Acme Corporation Ltd.'}</h4>
-                        {editedConfig.tagline && <p className="text-[10px] text-slate-500 font-medium italic">{editedConfig.tagline}</p>}
+                        <h4 className="text-sm font-bold text-[var(--text-primary)] mt-2">{editedConfig.company_name || 'Acme Corporation Ltd.'}</h4>
+                        {editedConfig.tagline && <p className="text-[10px] text-[var(--text-muted)] font-medium italic">{editedConfig.tagline}</p>}
                       </div>
 
-                      <div className="text-right text-[10px] text-slate-500 space-y-0.5">
+                      <div className="text-right text-[10px] text-[var(--text-muted)] space-y-0.5">
                         <p>{editedConfig.website || 'www.acmepower.com'}</p>
                         <p>{editedConfig.support_email || 'billing@acmepower.com'}</p>
                         <p>{editedConfig.phone_number || '+91 22 5555 1234'}</p>
@@ -1441,10 +1540,10 @@ export const TenantsPage: React.FC = () => {
                     </div>
 
                     {/* Address issuer */}
-                    <div className="border-t border-slate-800/80 pt-3 text-[10px] text-slate-400 space-y-1">
-                      <p className="font-semibold text-slate-300">ISSUER ADDRESS & REGISTER DETAILS:</p>
-                      <p className="whitespace-pre-line text-slate-500 font-medium leading-relaxed">{editedConfig.address || '101, Antigravity Heights, Google DeepMind St, BKC, Mumbai - 400051.'}</p>
-                      <div className="grid grid-cols-2 gap-2 mt-1 pt-1.5 border-t border-slate-900/60 font-mono">
+                    <div className="border-t border-[var(--border-strong)]/80 pt-3 text-[10px] text-[var(--text-secondary)] space-y-1">
+                      <p className="font-semibold text-[var(--text-secondary)]">ISSUER ADDRESS & REGISTER DETAILS:</p>
+                      <p className="whitespace-pre-line text-[var(--text-muted)] font-medium leading-relaxed">{editedConfig.address || '101, Antigravity Heights, Google DeepMind St, BKC, Mumbai - 400051.'}</p>
+                      <div className="grid grid-cols-2 gap-2 mt-1 pt-1.5 border-t border-[var(--border-color)]/60 font-mono">
                         {editedConfig.gst_number && <p><strong>GSTIN:</strong> {editedConfig.gst_number}</p>}
                         {editedConfig.pan && <p><strong>PAN:</strong> {editedConfig.pan}</p>}
                         {editedConfig.business_registration_number && (
@@ -1454,24 +1553,24 @@ export const TenantsPage: React.FC = () => {
                     </div>
 
                     {/* Invoice ID/Dates */}
-                    <div className="border-t border-slate-800/80 pt-3 grid grid-cols-2 gap-4 text-[10px]">
+                    <div className="border-t border-[var(--border-strong)]/80 pt-3 grid grid-cols-2 gap-4 text-[10px]">
                       <div>
-                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Invoice Number</p>
-                        <p className="text-slate-200 font-mono text-xs font-bold mt-0.5">
+                        <p className="text-[var(--text-muted)] uppercase tracking-wider font-semibold">Invoice Number</p>
+                        <p className="text-[var(--text-primary)] font-mono text-xs font-bold mt-0.5">
                           {editedConfig.invoice_prefix || 'INV'}-{editedConfig.starting_invoice_number || '1001'}
                         </p>
                       </div>
                       <div className="text-right font-mono">
-                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Issue Date</p>
-                        <p className="text-slate-300 mt-0.5">{new Date().toLocaleDateString()}</p>
+                        <p className="text-[var(--text-muted)] uppercase tracking-wider font-semibold">Issue Date</p>
+                        <p className="text-[var(--text-secondary)] mt-0.5">{new Date().toLocaleDateString()}</p>
                       </div>
                       <div>
-                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Bill To</p>
-                        <p className="text-slate-200 font-bold mt-0.5">Demo Corporation Ltd.</p>
-                        <p className="text-slate-500 font-mono">billing@democorp.com</p>
+                        <p className="text-[var(--text-muted)] uppercase tracking-wider font-semibold">Bill To</p>
+                        <p className="text-[var(--text-primary)] font-bold mt-0.5">Demo Corporation Ltd.</p>
+                        <p className="text-[var(--text-muted)] font-mono">billing@democorp.com</p>
                       </div>
                       <div className="text-right font-mono">
-                        <p className="text-slate-500 uppercase tracking-wider font-semibold">Payment Due</p>
+                        <p className="text-[var(--text-muted)] uppercase tracking-wider font-semibold">Payment Due</p>
                         <p className="text-rose-400 font-semibold mt-0.5">
                           {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}
                         </p>
@@ -1479,23 +1578,23 @@ export const TenantsPage: React.FC = () => {
                     </div>
 
                     {/* Table charges */}
-                    <div className="border-t border-slate-800/80 pt-3 space-y-2">
-                      <div className="flex justify-between items-center text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                    <div className="border-t border-[var(--border-strong)]/80 pt-3 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)] uppercase font-bold tracking-wider">
                         <span>Line Item description</span>
                         <span>Total amount</span>
                       </div>
-                      <div className="flex justify-between items-start text-xs border-b border-slate-900/60 pb-2">
+                      <div className="flex justify-between items-start text-xs border-b border-[var(--border-color)]/60 pb-2">
                         <div>
-                          <p className="text-slate-200 font-semibold">Enterprise Pro CRM Subscription</p>
-                          <p className="text-[10px] text-slate-500">Includes active system dialers & API credential matrix (Monthly)</p>
+                          <p className="text-[var(--text-primary)] font-semibold">Enterprise Pro CRM Subscription</p>
+                          <p className="text-[10px] text-[var(--text-muted)]">Includes active system dialers & API credential matrix (Monthly)</p>
                         </div>
-                        <span className="text-slate-200 font-mono font-bold">
+                        <span className="text-[var(--text-primary)] font-mono font-bold">
                           {editedConfig.currency_symbol || '$'} 1500.00
                         </span>
                       </div>
 
                       {/* Math Summary */}
-                      <div className="space-y-1 text-[10px] text-slate-400 pt-1.5">
+                      <div className="space-y-1 text-[10px] text-[var(--text-secondary)] pt-1.5">
                         <div className="flex justify-between">
                           <span>Subtotal</span>
                           <span className="font-mono">{editedConfig.currency_symbol || '$'} 1500.00</span>
@@ -1508,7 +1607,7 @@ export const TenantsPage: React.FC = () => {
                           <span>CGST / SGST Tax (18.0%)</span>
                           <span className="font-mono">{editedConfig.currency_symbol || '$'} 270.00</span>
                         </div>
-                        <div className="flex justify-between text-xs text-slate-100 font-bold pt-2 border-t border-slate-800/60">
+                        <div className="flex justify-between text-xs text-[var(--text-primary)] font-bold pt-2 border-t border-[var(--border-strong)]/60">
                           <span>Total Payable ({editedConfig.currency || 'USD'})</span>
                           <span className="font-mono text-brand-400">
                             {editedConfig.currency_symbol || '$'} 1620.00
@@ -1519,17 +1618,17 @@ export const TenantsPage: React.FC = () => {
 
                     {/* Payment specifications details */}
                     {(editedConfig.bank_name || editedConfig.upi_id) && (
-                      <div className="border-t border-slate-800/80 pt-3 text-[10px] space-y-2">
-                        <p className="font-semibold text-slate-300 uppercase tracking-wider">Payment Instructions:</p>
+                      <div className="border-t border-[var(--border-strong)]/80 pt-3 text-[10px] space-y-2">
+                        <p className="font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Payment Instructions:</p>
                         <div className="grid grid-cols-3 gap-2">
                           {editedConfig.bank_name && (
-                            <div className="col-span-2 space-y-0.5 text-slate-500 font-mono">
-                              <p><strong className="text-slate-400 font-sans">Bank:</strong> {editedConfig.bank_name}</p>
-                              {editedConfig.account_holder && <p><strong className="text-slate-400 font-sans">Holder:</strong> {editedConfig.account_holder}</p>}
-                              {editedConfig.account_number && <p><strong className="text-slate-400 font-sans">A/C No:</strong> {editedConfig.account_number}</p>}
-                              {editedConfig.ifsc && <p><strong className="text-slate-400 font-sans">IFSC:</strong> {editedConfig.ifsc}</p>}
-                              {editedConfig.branch && <p><strong className="text-slate-400 font-sans">Branch:</strong> {editedConfig.branch}</p>}
-                              {editedConfig.upi_id && <p className="mt-1 pt-1 border-t border-slate-900/60"><strong className="text-slate-400 font-sans">UPI:</strong> {editedConfig.upi_id}</p>}
+                            <div className="col-span-2 space-y-0.5 text-[var(--text-muted)] font-mono">
+                              <p><strong className="text-[var(--text-secondary)] font-sans">Bank:</strong> {editedConfig.bank_name}</p>
+                              {editedConfig.account_holder && <p><strong className="text-[var(--text-secondary)] font-sans">Holder:</strong> {editedConfig.account_holder}</p>}
+                              {editedConfig.account_number && <p><strong className="text-[var(--text-secondary)] font-sans">A/C No:</strong> {editedConfig.account_number}</p>}
+                              {editedConfig.ifsc && <p><strong className="text-[var(--text-secondary)] font-sans">IFSC:</strong> {editedConfig.ifsc}</p>}
+                              {editedConfig.branch && <p><strong className="text-[var(--text-secondary)] font-sans">Branch:</strong> {editedConfig.branch}</p>}
+                              {editedConfig.upi_id && <p className="mt-1 pt-1 border-t border-[var(--border-color)]/60"><strong className="text-[var(--text-secondary)] font-sans">UPI:</strong> {editedConfig.upi_id}</p>}
                             </div>
                           )}
                           <div className="col-span-1 flex flex-col items-end justify-center">
@@ -1537,10 +1636,10 @@ export const TenantsPage: React.FC = () => {
                               <img
                                 src={editedConfig.qr_code_url}
                                 alt="Payment Scan QR"
-                                className="w-16 h-16 object-contain rounded bg-white p-0.5 border border-slate-800"
+                                className="w-16 h-16 object-contain rounded bg-white p-0.5 border border-[var(--border-color)]"
                               />
                             ) : editedConfig.upi_id ? (
-                              <div className="w-16 h-16 rounded border border-dashed border-slate-800 flex items-center justify-center text-center p-1 text-[8px] text-slate-600 bg-slate-900/10 leading-tight">
+                              <div className="w-16 h-16 rounded border border-dashed border-[var(--border-color)] flex items-center justify-center text-center p-1 text-[8px] text-[var(--text-muted)] bg-[var(--bg-subtle)]/10 leading-tight">
                                 Scan QR Code
                               </div>
                             ) : null}
@@ -1550,9 +1649,9 @@ export const TenantsPage: React.FC = () => {
                     )}
 
                     {/* Footer text note */}
-                    <div className="border-t border-slate-800/80 pt-3 text-[9px] text-slate-500 leading-normal space-y-1">
+                    <div className="border-t border-[var(--border-strong)]/80 pt-3 text-[9px] text-[var(--text-muted)] leading-normal space-y-1">
                       {editedConfig.payment_terms && <p><strong>Terms:</strong> {editedConfig.payment_terms}</p>}
-                      <p className="text-center font-medium italic text-slate-400/80 mt-1">{editedConfig.footer_text || 'Thank you for choosing Johnson Softwares!'}</p>
+                      <p className="text-center font-medium italic text-[var(--text-secondary)]/80 mt-1">{editedConfig.footer_text || 'Thank you for choosing Johnson Softwares!'}</p>
                     </div>
                   </div>
                 </div>
@@ -1567,19 +1666,19 @@ export const TenantsPage: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Left Column: Config Forms (col-span-2) */}
               <div className="xl:col-span-2 space-y-6">
-                <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
+                <div className="glass-panel p-6 border border-[var(--border-strong)]/80 rounded-2xl space-y-6">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                       <DollarSign className="w-5 h-5 text-indigo-400" />
                       Dynamic Commercial Configuration Engine
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-[var(--text-muted)] mt-1">
                       Configure dynamic prices, grace periods, auto-renewals, discounts, tax structures, setup charges, reminders, and customized templates globally.
                     </p>
                   </div>
 
                   {/* Sub-tab Navigation */}
-                  <div className="flex border-b border-slate-800 pb-2 overflow-x-auto gap-1.5 scrollbar-thin">
+                  <div className="flex border-b border-[var(--border-color)] pb-2 overflow-x-auto gap-1.5 scrollbar-thin">
                     {[
                       { id: 'general', label: 'General', icon: Building },
                       { id: 'pricing', label: 'Pricing & Seats', icon: Users },
@@ -1600,7 +1699,7 @@ export const TenantsPage: React.FC = () => {
                         className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
                           commSettingsSubTab === subTab.id
                             ? 'bg-brand-500/10 text-brand-400 border-brand-500/30'
-                            : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 border-transparent'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]/60 hover:text-[var(--text-primary)] border-transparent'
                         }`}
                       >
                         <subTab.icon className="w-3.5 h-3.5" />
@@ -1615,32 +1714,32 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'general' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Currency</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Currency</label>
                           <input
                             type="text"
                             value={editedCommSettings.default_currency || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_currency: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. INR"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Symbol</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Currency Symbol</label>
                           <input
                             type="text"
                             value={editedCommSettings.currency_symbol || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, currency_symbol: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. ₹"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default System Timezone</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default System Timezone</label>
                           <input
                             type="text"
                             value={editedCommSettings.default_timezone || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_timezone: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. Asia/Kolkata"
                           />
                         </div>
@@ -1651,34 +1750,34 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'pricing' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Minimum User Seats Limit</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Minimum User Seats Limit</label>
                           <input
                             type="number"
                             min="1"
                             value={editedCommSettings.minimum_users || 10}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, minimum_users: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Maximum User Seats Limit</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Maximum User Seats Limit</label>
                           <input
                             type="number"
                             value={editedCommSettings.maximum_users || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, maximum_users: e.target.value ? Number(e.target.value) : null })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="Leave empty for unlimited seats"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Extra Seat Price (per seat/month)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Extra Seat Price (per seat/month)</label>
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={editedCommSettings.default_extra_user_price || 0}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_extra_user_price: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -1688,35 +1787,35 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'tax' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tax Rate (GST %)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Tax Rate (GST %)</label>
                           <input
                             type="number"
                             min="0"
                             step="0.1"
                             value={editedCommSettings.default_gst || 18.0}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_gst: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tax label</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Tax label</label>
                           <input
                             type="text"
                             value={editedCommSettings.tax_label || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, tax_label: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. GST"
                           />
                         </div>
-                        <div className="md:col-span-2 flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl mt-2">
+                        <div className="md:col-span-2 flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl mt-2">
                           <input
                             type="checkbox"
                             id="gst_inclusive"
                             checked={editedCommSettings.gst_inclusive || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, gst_inclusive: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="gst_inclusive" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="gst_inclusive" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             GST Inclusive Pricing (Prices in plan templates already include GST tax)
                           </label>
                         </div>
@@ -1727,34 +1826,34 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'contracts' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Minimum Contract Period (Months)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Minimum Contract Period (Months)</label>
                           <input
                             type="number"
                             min="1"
                             value={editedCommSettings.default_min_contract || 3}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_min_contract: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Termination Notice Period (Days)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Termination Notice Period (Days)</label>
                           <input
                             type="number"
                             min="0"
                             value={editedCommSettings.notice_period_days || 15}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, notice_period_days: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
-                        <div className="md:col-span-2 flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl mt-2">
+                        <div className="md:col-span-2 flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl mt-2">
                           <input
                             type="checkbox"
                             id="auto_renewal"
                             checked={editedCommSettings.auto_renewal || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, auto_renewal: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="auto_renewal" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="auto_renewal" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Enable Auto-Renewal by default for new subscriptions
                           </label>
                         </div>
@@ -1765,37 +1864,37 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'setup' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Setup Charges</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Setup Charges</label>
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={editedCommSettings.default_setup_charge || 0}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_setup_charge: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <input
                             type="checkbox"
                             id="allow_setup_discount"
                             checked={editedCommSettings.allow_setup_discount || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_setup_discount: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="allow_setup_discount" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="allow_setup_discount" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Allow Setup Fee Discounts
                           </label>
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <input
                             type="checkbox"
                             id="free_setup_on_annual"
                             checked={editedCommSettings.free_setup_on_annual || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, free_setup_on_annual: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="free_setup_on_annual" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="free_setup_on_annual" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Waive Setup Fee on Annual billing
                           </label>
                         </div>
@@ -1806,7 +1905,7 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'discounts' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Discount Percentage</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Discount Percentage</label>
                           <input
                             type="number"
                             min="0"
@@ -1814,11 +1913,11 @@ export const TenantsPage: React.FC = () => {
                             step="0.01"
                             value={editedCommSettings.default_discount_percentage || 0}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_discount_percentage: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Maximum Permitted Discount %</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Maximum Permitted Discount %</label>
                           <input
                             type="number"
                             min="0"
@@ -1826,30 +1925,30 @@ export const TenantsPage: React.FC = () => {
                             step="0.01"
                             value={editedCommSettings.maximum_discount_percentage || 25}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, maximum_discount_percentage: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <input
                             type="checkbox"
                             id="allow_custom_discount"
                             checked={editedCommSettings.allow_custom_discount || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_custom_discount: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="allow_custom_discount" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="allow_custom_discount" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Allow manual/custom discounts overrides
                           </label>
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <input
                             type="checkbox"
                             id="allow_promo_code"
                             checked={editedCommSettings.allow_promo_code || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_promo_code: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="allow_promo_code" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="allow_promo_code" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Enable promo codes support
                           </label>
                         </div>
@@ -1860,35 +1959,35 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'late-fees' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Late Payment Charge Amount/Value</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Late Payment Charge Amount/Value</label>
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={editedCommSettings.late_payment_charge || 0}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, late_payment_charge: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Late Payment Charge type</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Late Payment Charge type</label>
                           <select
                             value={editedCommSettings.late_payment_type || 'flat'}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, late_payment_type: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="flat">Flat Charge</option>
                             <option value="percentage">Percentage per month (%)</option>
                           </select>
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Payment Grace Period (Days)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Payment Grace Period (Days)</label>
                           <input
                             type="number"
                             min="0"
                             value={editedCommSettings.grace_period_days || 7}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, grace_period_days: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="Days allowed before late fee/restriction starts"
                           />
                         </div>
@@ -1899,31 +1998,31 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'renewals' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Auto-Suspend Threshold (Days after renewal due)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Auto-Suspend Threshold (Days after renewal due)</label>
                           <input
                             type="number"
                             min="0"
                             value={editedCommSettings.auto_suspend_days || 30}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, auto_suspend_days: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Trial period duration (Days)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Trial period duration (Days)</label>
                           <input
                             type="number"
                             min="0"
                             value={editedCommSettings.default_trial_days || 14}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_trial_days: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Plan Template ID for new signups</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Plan Template ID for new signups</label>
                           <select
                             value={editedCommSettings.default_plan_id || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_plan_id: e.target.value || null })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="">No Default Plan (Manual upgrade required)</option>
                             {plans.map(plan => (
@@ -1931,27 +2030,27 @@ export const TenantsPage: React.FC = () => {
                             ))}
                           </select>
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl mt-6">
+                        <div className="flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl mt-6">
                           <input
                             type="checkbox"
                             id="auto_reactivate"
                             checked={editedCommSettings.auto_reactivate || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, auto_reactivate: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="auto_reactivate" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="auto_reactivate" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Auto-reactivate suspension on payment receipt
                           </label>
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-slate-900/30 border border-slate-800 rounded-xl md:col-span-2">
+                        <div className="flex items-center gap-3 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl md:col-span-2">
                           <input
                             type="checkbox"
                             id="allow_trial"
                             checked={editedCommSettings.allow_trial || false}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, allow_trial: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-950 focus:ring-brand-500/20"
+                            className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-app)] focus:ring-brand-500/20"
                           />
-                          <label htmlFor="allow_trial" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+                          <label htmlFor="allow_trial" className="text-xs font-semibold text-[var(--text-secondary)] select-none cursor-pointer">
                             Allow Trial Periods for new registration instances
                           </label>
                         </div>
@@ -1962,43 +2061,43 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'reminders' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Invoice reminders (days before due, comma-separated)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Invoice reminders (days before due, comma-separated)</label>
                           <input
                             type="text"
                             value={editedCommSettings.invoice_reminder_days || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, invoice_reminder_days: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. 7,3,1"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subscription warnings (days before renew, comma-separated)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Subscription warnings (days before renew, comma-separated)</label>
                           <input
                             type="text"
                             value={editedCommSettings.subscription_reminder_days || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, subscription_reminder_days: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. 15,7,3,0"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Payment Reminders (days after due, comma-separated)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Payment Reminders (days after due, comma-separated)</label>
                           <input
                             type="text"
                             value={editedCommSettings.payment_reminder_days || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, payment_reminder_days: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                             placeholder="e.g. 0,3,7,15"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Trial warnings offset (Days before expiry)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Trial warnings offset (Days before expiry)</label>
                           <input
                             type="number"
                             min="0"
                             value={editedCommSettings.trial_reminder_days || 3}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, trial_reminder_days: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -2007,63 +2106,63 @@ export const TenantsPage: React.FC = () => {
                     {/* Email Templates Section */}
                     {commSettingsSubTab === 'emails' && (
                       <div className="space-y-6 text-left">
-                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="space-y-2 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Welcome Email Override Template</label>
                           <textarea
                             rows={3}
                             value={editedCommSettings.welcome_template || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, welcome_template: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none font-mono"
                             placeholder="Use variables like {customer_name}"
                           />
                         </div>
-                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="space-y-2 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Trial Expiration Notice Template</label>
                           <textarea
                             rows={3}
                             value={editedCommSettings.trial_expiry_template || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, trial_expiry_template: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none font-mono"
                             placeholder="Use variables like {customer_name}, {days_left}"
                           />
                         </div>
-                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="space-y-2 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Subscription Renewal Reminder Template</label>
                           <textarea
                             rows={3}
                             value={editedCommSettings.renewal_reminder_template || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, renewal_reminder_template: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none font-mono"
                             placeholder="Use variables like {customer_name}, {renewal_date}"
                           />
                         </div>
-                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="space-y-2 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Invoice Reminder Template</label>
                           <textarea
                             rows={3}
                             value={editedCommSettings.invoice_reminder_template || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, invoice_reminder_template: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none font-mono"
                             placeholder="Use variables like {customer_name}, {invoice_number}"
                           />
                         </div>
-                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="space-y-2 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Payment Success Template</label>
                           <textarea
                             rows={3}
                             value={editedCommSettings.payment_success_template || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, payment_success_template: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none font-mono"
                             placeholder="Use variables like {customer_name}, {invoice_number}"
                           />
                         </div>
-                        <div className="space-y-2 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                        <div className="space-y-2 p-4 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl">
                           <label className="block text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">Payment Failed Template</label>
                           <textarea
                             rows={3}
                             value={editedCommSettings.payment_failed_template || ''}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, payment_failed_template: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none font-mono"
                             placeholder="Use variables like {customer_name}, {invoice_number}"
                           />
                         </div>
@@ -2074,23 +2173,23 @@ export const TenantsPage: React.FC = () => {
                     {commSettingsSubTab === 'advanced' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Recording Retention Period (Days)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Recording Retention Period (Days)</label>
                           <input
                             type="number"
                             min="1"
                             value={editedCommSettings.default_recording_retention_days || 90}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_recording_retention_days: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Default Storage Boundary (GB)</label>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Default Storage Boundary (GB)</label>
                           <input
                             type="number"
                             min="1"
                             value={editedCommSettings.default_storage_gb || 50}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, default_storage_gb: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                            className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -2098,9 +2197,9 @@ export const TenantsPage: React.FC = () => {
                   </div>
 
                   {/* Save Settings Trigger & Audit Reason */}
-                  <div className="pt-4 border-t border-slate-800/80 space-y-4">
+                  <div className="pt-4 border-t border-[var(--border-strong)]/80 space-y-4">
                     <div className="text-left">
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                         Reason for Update (Required for Audit Trail Logs)
                       </label>
                       <input
@@ -2108,7 +2207,7 @@ export const TenantsPage: React.FC = () => {
                         required
                         value={editedCommSettings.reason || ''}
                         onChange={(e) => setEditedCommSettings({ ...editedCommSettings, reason: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                        className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         placeholder="e.g. Revised default currency rules / updated late fee metrics"
                       />
                     </div>
@@ -2137,92 +2236,92 @@ export const TenantsPage: React.FC = () => {
               <div className="xl:col-span-1">
                 <div className="sticky top-6 space-y-4">
                   <div className="flex justify-between items-baseline px-1">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Live Active Summary</h4>
-                    <span className="text-[10px] text-slate-500 italic">Reactive summary card</span>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Live Active Summary</h4>
+                    <span className="text-[10px] text-[var(--text-muted)] italic">Reactive summary card</span>
                   </div>
 
-                  <div className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl p-6 bg-slate-950/60 text-slate-300 space-y-6 text-left relative">
+                  <div className="glass-panel border border-[var(--border-strong)]/80 rounded-2xl overflow-hidden shadow-2xl p-6 bg-[var(--bg-app)]/60 text-[var(--text-secondary)] space-y-6 text-left relative">
                     <div>
-                      <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+                      <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">
                         Commercial Engine Status
                       </h4>
-                      <p className="text-[10px] text-slate-500 mt-1">Reflects active global default fallbacks</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-1">Reflects active global default fallbacks</p>
                     </div>
 
-                    <div className="space-y-4 pt-2 border-t border-slate-800/60 text-xs leading-relaxed">
+                    <div className="space-y-4 pt-2 border-t border-[var(--border-strong)]/60 text-xs leading-relaxed">
                       <div className="space-y-1.5">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Default Localization</p>
-                        <p className="text-slate-300 font-mono">
-                          Currency: <strong className="text-slate-100">{editedCommSettings.default_currency || 'INR'} ({editedCommSettings.currency_symbol || '₹'})</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Currency: <strong className="text-[var(--text-primary)]">{editedCommSettings.default_currency || 'INR'} ({editedCommSettings.currency_symbol || '₹'})</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Timezone: <strong className="text-slate-100">{editedCommSettings.default_timezone || 'Asia/Kolkata'}</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Timezone: <strong className="text-[var(--text-primary)]">{editedCommSettings.default_timezone || 'Asia/Kolkata'}</strong>
                         </p>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                      <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Seats Pricing & Constraints</p>
-                        <p className="text-slate-300 font-mono">
-                          Seat limits: <strong className="text-slate-100">{editedCommSettings.minimum_users || 10} - {editedCommSettings.maximum_users || 'Unlimited'}</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Seat limits: <strong className="text-[var(--text-primary)]">{editedCommSettings.minimum_users || 10} - {editedCommSettings.maximum_users || 'Unlimited'}</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Extra Seat charge: <strong className="text-slate-100">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_extra_user_price || 0.00}/month</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Extra Seat charge: <strong className="text-[var(--text-primary)]">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_extra_user_price || 0.00}/month</strong>
                         </p>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                      <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Trial Periods Policy</p>
-                        <p className="text-slate-300 font-mono">
-                          Trials: <strong className="text-slate-100">{editedCommSettings.allow_trial ? 'Allowed (' + (editedCommSettings.default_trial_days || 14) + ' days)' : 'Disabled'}</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Trials: <strong className="text-[var(--text-primary)]">{editedCommSettings.allow_trial ? 'Allowed (' + (editedCommSettings.default_trial_days || 14) + ' days)' : 'Disabled'}</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Reminder offset: <strong className="text-slate-100">{editedCommSettings.trial_reminder_days || 3} days before expiry</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Reminder offset: <strong className="text-[var(--text-primary)]">{editedCommSettings.trial_reminder_days || 3} days before expiry</strong>
                         </p>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                      <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Tax & GST Details</p>
-                        <p className="text-slate-300 font-mono">
-                          GST rate: <strong className="text-slate-100">{editedCommSettings.default_gst || 18.0}% ({editedCommSettings.tax_label || 'GST'})</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          GST rate: <strong className="text-[var(--text-primary)]">{editedCommSettings.default_gst || 18.0}% ({editedCommSettings.tax_label || 'GST'})</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Price model: <strong className="text-slate-100">{editedCommSettings.gst_inclusive ? 'Tax Inclusive' : 'Tax Exclusive'}</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Price model: <strong className="text-[var(--text-primary)]">{editedCommSettings.gst_inclusive ? 'Tax Inclusive' : 'Tax Exclusive'}</strong>
                         </p>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                      <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Setup Fees Policy</p>
-                        <p className="text-slate-300 font-mono">
-                          Setup charges: <strong className="text-slate-100">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_setup_charge || 0.00}</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Setup charges: <strong className="text-[var(--text-primary)]">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_setup_charge || 0.00}</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Waived on Annual: <strong className="text-slate-100">{editedCommSettings.free_setup_on_annual ? 'Yes' : 'No'}</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Waived on Annual: <strong className="text-[var(--text-primary)]">{editedCommSettings.free_setup_on_annual ? 'Yes' : 'No'}</strong>
                         </p>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                      <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Grace & Suspension bounds</p>
-                        <p className="text-slate-300 font-mono">
-                          Late fee: <strong className="text-slate-100">{editedCommSettings.late_payment_charge || 0.00} ({editedCommSettings.late_payment_type || 'flat'})</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Late fee: <strong className="text-[var(--text-primary)]">{editedCommSettings.late_payment_charge || 0.00} ({editedCommSettings.late_payment_type || 'flat'})</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Payment grace: <strong className="text-slate-100">{editedCommSettings.grace_period_days || 7} days</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Payment grace: <strong className="text-[var(--text-primary)]">{editedCommSettings.grace_period_days || 7} days</strong>
                         </p>
-                        <p className="text-slate-300 font-mono">
-                          Suspends after: <strong className="text-slate-100">{editedCommSettings.auto_suspend_days || 30} days overdue</strong>
+                        <p className="text-[var(--text-secondary)] font-mono">
+                          Suspends after: <strong className="text-[var(--text-primary)]">{editedCommSettings.auto_suspend_days || 30} days overdue</strong>
                         </p>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
+                      <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Automation schedules</p>
-                        <p className="text-slate-500 font-mono leading-tight">
-                          Invoice notifications: <strong className="text-slate-300">{editedCommSettings.invoice_reminder_days || '7,3,1'} days before due</strong>
+                        <p className="text-[var(--text-muted)] font-mono leading-tight">
+                          Invoice notifications: <strong className="text-[var(--text-secondary)]">{editedCommSettings.invoice_reminder_days || '7,3,1'} days before due</strong>
                         </p>
-                        <p className="text-slate-500 font-mono leading-tight">
-                          Renewal warnings: <strong className="text-slate-300">{editedCommSettings.subscription_reminder_days || '15,7,3,0'} days before renewal</strong>
+                        <p className="text-[var(--text-muted)] font-mono leading-tight">
+                          Renewal warnings: <strong className="text-[var(--text-secondary)]">{editedCommSettings.subscription_reminder_days || '15,7,3,0'} days before renewal</strong>
                         </p>
-                        <p className="text-slate-500 font-mono leading-tight">
-                          Overdue payment reminders: <strong className="text-slate-300">{editedCommSettings.payment_reminder_days || '0,3,7,15'} days after due</strong>
+                        <p className="text-[var(--text-muted)] font-mono leading-tight">
+                          Overdue payment reminders: <strong className="text-[var(--text-secondary)]">{editedCommSettings.payment_reminder_days || '0,3,7,15'} days after due</strong>
                         </p>
                       </div>
                     </div>
@@ -2237,57 +2336,57 @@ export const TenantsPage: React.FC = () => {
              ========================================== */}
           {activeSection === 'global' && (
             <div className="max-w-2xl">
-              <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-6">
+              <div className="glass-panel p-6 border border-[var(--border-strong)]/80 rounded-2xl space-y-6">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                     <Settings className="w-5 h-5 text-indigo-400" />
                     SMTP & Telephony Settings
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1">Register default system mailer connections and external calling gateway keys securely.</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Register default system mailer connections and external calling gateway keys securely.</p>
                 </div>
 
                 <form onSubmit={handleSaveSystemSettings} className="space-y-6">
                   {/* SMTP CONFIG */}
                   <div className="space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 border-b border-slate-800/80 pb-2">SMTP Mailer Settings</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 border-b border-[var(--border-strong)]/80 pb-2">SMTP Mailer Settings</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">SMTP Host</label>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">SMTP Host</label>
                         <input
                           type="text"
                           name="smtp_host"
                           defaultValue={settingsData['smtp_settings']?.host || 'smtp.mailgun.org'}
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">SMTP Port</label>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">SMTP Port</label>
                         <input
                           type="number"
                           name="smtp_port"
                           defaultValue={settingsData['smtp_settings']?.port || 587}
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sender Username</label>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Sender Username</label>
                         <input
                           type="text"
                           name="smtp_user"
                           defaultValue={settingsData['smtp_settings']?.user || 'postmaster@mg.johnsonsoftwares.com'}
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sender Display Name</label>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Sender Display Name</label>
                         <input
                           type="text"
                           name="smtp_from_name"
                           defaultValue={settingsData['smtp_settings']?.from_name || 'TeleCRM Invoices'}
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
                     </div>
@@ -2295,24 +2394,24 @@ export const TenantsPage: React.FC = () => {
 
                   {/* TELEPHONY CONFIG */}
                   <div className="space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 border-b border-slate-800/80 pb-2">Telephony Gateway (Knowlarity)</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 border-b border-[var(--border-strong)]/80 pb-2">Telephony Gateway (Knowlarity)</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Knowlarity API Key</label>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Knowlarity API Key</label>
                         <input
                           type="password"
                           name="k_key"
                           defaultValue={settingsData['telephony_settings']?.api_key || '••••••••••••••••'}
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Primary Agent ID Number</label>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Primary Agent ID Number</label>
                         <input
                           type="text"
                           name="k_agent"
                           defaultValue={settingsData['telephony_settings']?.agent_number || '+912250972233'}
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
                     </div>
@@ -2332,25 +2431,25 @@ export const TenantsPage: React.FC = () => {
             {activeSection === 'currencies' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="text-xl font-bold text-slate-100">Multi-Currency Engine</h2><p className="text-sm text-slate-400 mt-1">Manage exchange rates with base-currency pivot</p></div>
+                  <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Multi-Currency Engine</h2><p className="text-sm text-[var(--text-secondary)] mt-1">Manage exchange rates with base-currency pivot</p></div>
                   <button onClick={() => { setCurrencyForm({ code: '', name: '', symbol: '', exchange_rate: 1, is_active: true }); setActiveCurrencyModal('create'); }} className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"><Plus className="w-3.5 h-3.5" /> Add Currency</button>
                 </div>
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <table className="w-full text-left border-collapse">
-                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Code','Name','Symbol','Rate vs Base','Base','Active','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {currencies.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-500 text-sm">No currencies configured.</td></tr>
+                    <thead><tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">{['Code','Name','Symbol','Rate vs Base','Base','Active','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {currencies.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-[var(--text-muted)] text-sm">No currencies configured.</td></tr>
                       : currencies.map(c => (
-                        <tr key={c.code} className="hover:bg-slate-900/10 transition-colors">
-                          <td className="px-5 py-3.5"><span className="font-mono font-bold text-slate-200">{c.code}</span></td>
-                          <td className="px-5 py-3.5 text-sm text-slate-300">{c.name}</td>
-                          <td className="px-5 py-3.5 text-sm text-slate-300">{c.symbol}</td>
-                          <td className="px-5 py-3.5 text-sm text-slate-300">{c.is_base ? '-' : Number(c.exchange_rate).toFixed(4)}</td>
+                        <tr key={c.code} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
+                          <td className="px-5 py-3.5"><span className="font-mono font-bold text-[var(--text-primary)]">{c.code}</span></td>
+                          <td className="px-5 py-3.5 text-sm text-[var(--text-secondary)]">{c.name}</td>
+                          <td className="px-5 py-3.5 text-sm text-[var(--text-secondary)]">{c.symbol}</td>
+                          <td className="px-5 py-3.5 text-sm text-[var(--text-secondary)]">{c.is_base ? '-' : Number(c.exchange_rate).toFixed(4)}</td>
                           <td className="px-5 py-3.5">{c.is_base && <span className="px-2 py-0.5 bg-brand-500/10 text-brand-400 text-[10px] font-bold rounded border border-brand-500/20 uppercase">BASE</span>}</td>
-                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (c.is_active ? 'text-emerald-400' : 'text-slate-500')}>{c.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (c.is_active ? 'text-emerald-400' : 'text-[var(--text-muted)]')}>{c.is_active ? 'Active' : 'Off'}</span></td>
                           <td className="px-5 py-3.5"><div className="flex items-center gap-2">
-                            <button onClick={() => { setSelectedCurrency(c); setCurrencyForm({ name: c.name, symbol: c.symbol, exchange_rate: c.exchange_rate, is_active: c.is_active }); setActiveCurrencyModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
-                            {!c.is_base && <button onClick={() => handleDeleteCurrency(c.code)} className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>}
+                            <button onClick={() => { setSelectedCurrency(c); setCurrencyForm({ name: c.name, symbol: c.symbol, exchange_rate: c.exchange_rate, is_active: c.is_active }); setActiveCurrencyModal('edit'); }} className="p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                            {!c.is_base && <button onClick={() => handleDeleteCurrency(c.code)} className="p-1.5 border border-[var(--border-color)] hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>}
                           </div></td>
                         </tr>
                       ))}
@@ -2363,27 +2462,27 @@ export const TenantsPage: React.FC = () => {
             {activeSection === 'tax' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="text-xl font-bold text-slate-100">Tax Engine</h2><p className="text-sm text-slate-400 mt-1">Country-wise GST / VAT / Sales Tax</p></div>
+                  <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Tax Engine</h2><p className="text-sm text-[var(--text-secondary)] mt-1">Country-wise GST / VAT / Sales Tax</p></div>
                   <button onClick={() => { setTaxForm({ country_code: '', country_name: '', tax_type: 'GST', tax_rate: 18, tax_label: 'GST', tax_inclusive: false, is_active: true, is_default: false }); setActiveTaxModal('create'); }} className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"><Plus className="w-3.5 h-3.5" /> Add Tax Config</button>
                 </div>
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <table className="w-full text-left border-collapse">
-                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Country','Code','Type','Rate %','Label','Inclusive','Default','Active','Actions'].map(h=><th key={h} className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {taxConfigs.length === 0 ? <tr><td colSpan={9} className="px-5 py-12 text-center text-slate-500 text-sm">No tax configurations.</td></tr>
+                    <thead><tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">{['Country','Code','Type','Rate %','Label','Inclusive','Default','Active','Actions'].map(h=><th key={h} className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {taxConfigs.length === 0 ? <tr><td colSpan={9} className="px-5 py-12 text-center text-[var(--text-muted)] text-sm">No tax configurations.</td></tr>
                       : taxConfigs.map(t => (
-                        <tr key={t.id} className="hover:bg-slate-900/10 transition-colors">
-                          <td className="px-4 py-3.5 text-sm text-slate-200 font-medium">{t.country_name}</td>
-                          <td className="px-4 py-3.5"><span className="font-mono text-xs text-slate-400">{t.country_code}</span></td>
-                          <td className="px-4 py-3.5"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded uppercase">{t.tax_type}</span></td>
-                          <td className="px-4 py-3.5 text-sm text-slate-300">{t.tax_rate}%</td>
-                          <td className="px-4 py-3.5 text-sm text-slate-300">{t.tax_label}</td>
-                          <td className="px-4 py-3.5 text-xs">{t.tax_inclusive ? <span className="text-emerald-400">Yes</span> : <span className="text-slate-500">No</span>}</td>
+                        <tr key={t.id} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
+                          <td className="px-4 py-3.5 text-sm text-[var(--text-primary)] font-medium">{t.country_name}</td>
+                          <td className="px-4 py-3.5"><span className="font-mono text-xs text-[var(--text-secondary)]">{t.country_code}</span></td>
+                          <td className="px-4 py-3.5"><span className="px-2 py-0.5 bg-[var(--bg-card)] text-[var(--text-secondary)] text-[10px] font-bold rounded uppercase">{t.tax_type}</span></td>
+                          <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{t.tax_rate}%</td>
+                          <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{t.tax_label}</td>
+                          <td className="px-4 py-3.5 text-xs">{t.tax_inclusive ? <span className="text-emerald-400">Yes</span> : <span className="text-[var(--text-muted)]">No</span>}</td>
                           <td className="px-4 py-3.5 text-xs">{t.is_default ? <span className="text-brand-400 font-bold">Yes</span> : '-'}</td>
-                          <td className="px-4 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-slate-500')}>{t.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-4 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-[var(--text-muted)]')}>{t.is_active ? 'Active' : 'Off'}</span></td>
                           <td className="px-4 py-3.5"><div className="flex items-center gap-2">
-                            <button onClick={() => { setSelectedTax(t); setTaxForm({ country_code: t.country_code, country_name: t.country_name, tax_type: t.tax_type, tax_rate: t.tax_rate, tax_label: t.tax_label, tax_inclusive: t.tax_inclusive, is_active: t.is_active, is_default: t.is_default }); setActiveTaxModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => handleDeleteTax(t.id)} className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { setSelectedTax(t); setTaxForm({ country_code: t.country_code, country_name: t.country_name, tax_type: t.tax_type, tax_rate: t.tax_rate, tax_label: t.tax_label, tax_inclusive: t.tax_inclusive, is_active: t.is_active, is_default: t.is_default }); setActiveTaxModal('edit'); }} className="p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDeleteTax(t.id)} className="p-1.5 border border-[var(--border-color)] hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div></td>
                         </tr>
                       ))}
@@ -2395,49 +2494,49 @@ export const TenantsPage: React.FC = () => {
 
             {activeSection === 'gateways' && (
               <div className="space-y-4">
-                <div><h2 className="text-xl font-bold text-slate-100">Payment Gateways</h2><p className="text-sm text-slate-400 mt-1">API keys encrypted server-side - never returned in responses</p></div>
+                <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Payment Gateways</h2><p className="text-sm text-[var(--text-secondary)] mt-1">API keys encrypted server-side - never returned in responses</p></div>
                 <div className="space-y-3">
-                  {gateways.length === 0 ? <div className="glass-panel p-12 rounded-2xl border border-slate-800/80 flex items-center justify-center text-slate-500">No gateways seeded.</div>
+                  {gateways.length === 0 ? <div className="glass-panel p-12 rounded-2xl border border-[var(--border-strong)]/80 flex items-center justify-center text-[var(--text-muted)]">No gateways seeded.</div>
                   : gateways.map(gw => (
-                    <div key={gw.name} className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden">
+                    <div key={gw.name} className="glass-panel border border-[var(--border-strong)]/80 rounded-2xl overflow-hidden">
                       <div className="flex items-center justify-between p-5">
                         <div className="flex items-center gap-3">
-                          <div className={'w-8 h-8 rounded-lg flex items-center justify-center ' + (gw.is_enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500')}><CreditCard className="w-4 h-4" /></div>
-                          <div><p className="text-sm font-bold text-slate-200">{gw.display_name}</p>{gw.description && <p className="text-xs text-slate-500">{gw.description}</p>}</div>
+                          <div className={'w-8 h-8 rounded-lg flex items-center justify-center ' + (gw.is_enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-[var(--bg-card)] text-[var(--text-muted)]')}><CreditCard className="w-4 h-4" /></div>
+                          <div><p className="text-sm font-bold text-[var(--text-primary)]">{gw.display_name}</p>{gw.description && <p className="text-xs text-[var(--text-muted)]">{gw.description}</p>}</div>
                         </div>
                         <div className="flex items-center gap-3">
                           {gw.is_sandbox && <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded border border-amber-500/20 uppercase">Sandbox</span>}
-                          <span className={'text-xs font-semibold ' + (gw.api_key_set ? 'text-emerald-400' : 'text-slate-500')}>{gw.api_key_set ? 'Key set' : 'No key'}</span>
-                          <button onClick={() => handleToggleGateway(gw.name)} className={'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ' + (gw.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-800')}>
+                          <span className={'text-xs font-semibold ' + (gw.api_key_set ? 'text-emerald-400' : 'text-[var(--text-muted)]')}>{gw.api_key_set ? 'Key set' : 'No key'}</span>
+                          <button onClick={() => handleToggleGateway(gw.name)} className={'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ' + (gw.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] border-[var(--border-color)]')}>
                             {gw.is_enabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}{gw.is_enabled ? 'Enabled' : 'Disabled'}
                           </button>
-                          <button onClick={() => setExpandedGateway(expandedGateway === gw.name ? null : gw.name)} className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-300 cursor-pointer">Configure</button>
+                          <button onClick={() => setExpandedGateway(expandedGateway === gw.name ? null : gw.name)} className="px-3 py-1.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-secondary)] cursor-pointer">Configure</button>
                         </div>
                       </div>
                       {expandedGateway === gw.name && (
-                        <div className="border-t border-slate-800 p-5 bg-slate-950/20 space-y-4">
+                        <div className="border-t border-[var(--border-color)] p-5 bg-[var(--bg-app)]/20 space-y-4">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">API Key</label>
+                              <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">API Key</label>
                               <div className="relative">
                                 <input type={showApiKey[gw.name] ? 'text' : 'password'} placeholder={gw.api_key_set ? '(already set)' : 'Enter API key'}
                                   value={gatewayForms[gw.name]?.api_key || ''} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), api_key: e.target.value } }))}
-                                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none pr-10" />
-                                <button type="button" onClick={() => setShowApiKey(prev => ({ ...prev, [gw.name]: !prev[gw.name] }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 cursor-pointer">
+                                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none pr-10" />
+                                <button type="button" onClick={() => setShowApiKey(prev => ({ ...prev, [gw.name]: !prev[gw.name] }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] cursor-pointer">
                                   {showApiKey[gw.name] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                               </div>
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Webhook Secret</label>
+                              <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Webhook Secret</label>
                               <input type="password" placeholder={gw.webhook_secret_set ? '(already set)' : 'Enter secret'}
                                 value={gatewayForms[gw.name]?.webhook_secret || ''} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), webhook_secret: e.target.value } }))}
-                                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" />
+                                className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" />
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                              <input type="checkbox" checked={gatewayForms[gw.name]?.is_sandbox ?? gw.is_sandbox} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), is_sandbox: e.target.checked } }))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" />
+                            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+                              <input type="checkbox" checked={gatewayForms[gw.name]?.is_sandbox ?? gw.is_sandbox} onChange={e => setGatewayForms(prev => ({ ...prev, [gw.name]: { ...(prev[gw.name] || {}), is_sandbox: e.target.checked } }))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" />
                               Sandbox Mode
                             </label>
                             <button onClick={() => handleSaveGateway(gw.name)} className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold cursor-pointer">Save</button>
@@ -2453,25 +2552,25 @@ export const TenantsPage: React.FC = () => {
             {activeSection === 'coupons' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="text-xl font-bold text-slate-100">Coupon Management</h2><p className="text-sm text-slate-400 mt-1">Discount codes for tenant billing</p></div>
+                  <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Coupon Management</h2><p className="text-sm text-[var(--text-secondary)] mt-1">Discount codes for tenant billing</p></div>
                   <button onClick={() => { setCouponForm({ code: '', description: '', discount_type: 'percentage', discount_value: 10, max_uses: '', valid_from: new Date().toISOString().split('T')[0], valid_until: '', min_order_value: 0, is_active: true }); setActiveCouponModal('create'); }} className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"><Plus className="w-3.5 h-3.5" /> Create Coupon</button>
                 </div>
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <table className="w-full text-left border-collapse">
-                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Code','Type','Discount','Uses','Valid Until','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {coupons.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-500 text-sm">No coupons yet.</td></tr>
+                    <thead><tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">{['Code','Type','Discount','Uses','Valid Until','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {coupons.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-[var(--text-muted)] text-sm">No coupons yet.</td></tr>
                       : coupons.map(c => (
-                        <tr key={c.id} className="hover:bg-slate-900/10 transition-colors">
-                          <td className="px-5 py-3.5"><p className="font-mono font-bold text-slate-200">{c.code}</p>{c.description && <p className="text-[10px] text-slate-500">{c.description}</p>}</td>
-                          <td className="px-5 py-3.5"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded uppercase">{c.discount_type}</span></td>
+                        <tr key={c.id} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
+                          <td className="px-5 py-3.5"><p className="font-mono font-bold text-[var(--text-primary)]">{c.code}</p>{c.description && <p className="text-[10px] text-[var(--text-muted)]">{c.description}</p>}</td>
+                          <td className="px-5 py-3.5"><span className="px-2 py-0.5 bg-[var(--bg-card)] text-[var(--text-secondary)] text-[10px] font-bold rounded uppercase">{c.discount_type}</span></td>
                           <td className="px-5 py-3.5 text-sm font-semibold text-emerald-400">{c.discount_type === 'percentage' ? c.discount_value + '%' : 'Rs.' + c.discount_value}</td>
-                          <td className="px-5 py-3.5 text-xs text-slate-300">{c.uses_count}{c.max_uses ? ' / ' + c.max_uses : ' / inf'}</td>
-                          <td className="px-5 py-3.5 text-xs text-slate-300">{c.valid_until ? new Date(c.valid_until).toLocaleDateString() : 'No expiry'}</td>
-                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (c.is_active ? 'text-emerald-400' : 'text-slate-500')}>{c.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-5 py-3.5 text-xs text-[var(--text-secondary)]">{c.uses_count}{c.max_uses ? ' / ' + c.max_uses : ' / inf'}</td>
+                          <td className="px-5 py-3.5 text-xs text-[var(--text-secondary)]">{c.valid_until ? new Date(c.valid_until).toLocaleDateString() : 'No expiry'}</td>
+                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (c.is_active ? 'text-emerald-400' : 'text-[var(--text-muted)]')}>{c.is_active ? 'Active' : 'Off'}</span></td>
                           <td className="px-5 py-3.5"><div className="flex items-center gap-2">
-                            <button onClick={() => { setSelectedCoupon(c); setCouponForm({ code: c.code, description: c.description || '', discount_type: c.discount_type, discount_value: c.discount_value, max_uses: c.max_uses ?? '', valid_from: c.valid_from?.split('T')[0] || '', valid_until: c.valid_until?.split('T')[0] || '', min_order_value: c.min_order_value, is_active: c.is_active }); setActiveCouponModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => handleDeleteCoupon(c.id)} className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { setSelectedCoupon(c); setCouponForm({ code: c.code, description: c.description || '', discount_type: c.discount_type, discount_value: c.discount_value, max_uses: c.max_uses ?? '', valid_from: c.valid_from?.split('T')[0] || '', valid_until: c.valid_until?.split('T')[0] || '', min_order_value: c.min_order_value, is_active: c.is_active }); setActiveCouponModal('edit'); }} className="p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDeleteCoupon(c.id)} className="p-1.5 border border-[var(--border-color)] hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div></td>
                         </tr>
                       ))}
@@ -2483,19 +2582,19 @@ export const TenantsPage: React.FC = () => {
 
             {activeSection === 'notifications' && (
               <div className="space-y-4">
-                <div><h2 className="text-xl font-bold text-slate-100">Notification Templates</h2><p className="text-sm text-slate-400 mt-1">Email, SMS, and WhatsApp templates</p></div>
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Notification Templates</h2><p className="text-sm text-[var(--text-secondary)] mt-1">Email, SMS, and WhatsApp templates</p></div>
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <table className="w-full text-left border-collapse">
-                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Template','Channel','Category','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {notifTemplates.length === 0 ? <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500 text-sm">No templates. Run backend seeds.</td></tr>
+                    <thead><tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">{['Template','Channel','Category','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {notifTemplates.length === 0 ? <tr><td colSpan={5} className="px-5 py-12 text-center text-[var(--text-muted)] text-sm">No templates. Run backend seeds.</td></tr>
                       : notifTemplates.map(t => (
-                        <tr key={t.id} className="hover:bg-slate-900/10 transition-colors">
-                          <td className="px-5 py-3.5"><p className="text-sm font-semibold text-slate-200">{t.template_name}</p><p className="text-[10px] text-slate-500 font-mono">{t.template_key}</p></td>
-                          <td className="px-5 py-3.5"><span className={'px-2 py-0.5 text-[10px] font-bold rounded uppercase border ' + (t.channel === 'email' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : t.channel === 'sms' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : t.channel === 'whatsapp' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700')}>{t.channel}</span></td>
-                          <td className="px-5 py-3.5 text-xs text-slate-400">{t.category}</td>
-                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-slate-500')}>{t.is_active ? 'Active' : 'Off'}</span></td>
-                          <td className="px-5 py-3.5"><button onClick={() => { setSelectedNotif(t); setNotifForm({ template_name: t.template_name, subject: t.subject || '', body: t.body, is_active: t.is_active, description: t.description || '' }); setActiveNotifModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button></td>
+                        <tr key={t.id} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
+                          <td className="px-5 py-3.5"><p className="text-sm font-semibold text-[var(--text-primary)]">{t.template_name}</p><p className="text-[10px] text-[var(--text-muted)] font-mono">{t.template_key}</p></td>
+                          <td className="px-5 py-3.5"><span className={'px-2 py-0.5 text-[10px] font-bold rounded uppercase border ' + (t.channel === 'email' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : t.channel === 'sms' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : t.channel === 'whatsapp' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-strong)]')}>{t.channel}</span></td>
+                          <td className="px-5 py-3.5 text-xs text-[var(--text-secondary)]">{t.category}</td>
+                          <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-[var(--text-muted)]')}>{t.is_active ? 'Active' : 'Off'}</span></td>
+                          <td className="px-5 py-3.5"><button onClick={() => { setSelectedNotif(t); setNotifForm({ template_name: t.template_name, subject: t.subject || '', body: t.body, is_active: t.is_active, description: t.description || '' }); setActiveNotifModal('edit'); }} className="p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><Edit className="w-3.5 h-3.5" /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -2507,25 +2606,25 @@ export const TenantsPage: React.FC = () => {
             {activeSection === 'audit' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="text-xl font-bold text-slate-100">Audit Center</h2><p className="text-sm text-slate-400 mt-1">Immutable log of all sensitive operations</p></div>
+                  <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Audit Center</h2><p className="text-sm text-[var(--text-secondary)] mt-1">Immutable log of all sensitive operations</p></div>
                   <div className="flex items-center gap-2">
-                    <input type="text" placeholder="Filter by action..." value={auditSearch} onChange={e => setAuditSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchAllData()} className="px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none w-48" />
-                    <button onClick={fetchAllData} className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /></button>
+                    <input type="text" placeholder="Filter by action..." value={auditSearch} onChange={e => setAuditSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchAllData()} className="px-3.5 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none w-48" />
+                    <button onClick={fetchAllData} className="p-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
-                <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
+                <div className="glass-panel rounded-2xl border border-[var(--border-strong)]/80 overflow-hidden">
                   <table className="w-full text-left border-collapse">
-                    <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Timestamp','User','Action','Resource','IP','Details'].map(h=><th key={h} className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {auditLogs.length === 0 ? <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-500 text-sm">No audit logs found.</td></tr>
+                    <thead><tr className="border-b border-[var(--border-color)] bg-[var(--bg-subtle)]/20">{['Timestamp','User','Action','Resource','IP','Details'].map(h=><th key={h} className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {auditLogs.length === 0 ? <tr><td colSpan={6} className="px-5 py-12 text-center text-[var(--text-muted)] text-sm">No audit logs found.</td></tr>
                       : auditLogs.map((log: any, i: number) => (
-                        <tr key={log.id || i} className="hover:bg-slate-900/10 transition-colors">
-                          <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{log.created_at ? new Date(log.created_at).toLocaleString() : '-'}</td>
-                          <td className="px-4 py-3 text-xs text-slate-300">{log.user_email || log.actor_id || '-'}</td>
-                          <td className="px-4 py-3"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded uppercase">{log.action || '-'}</span></td>
-                          <td className="px-4 py-3 text-xs text-slate-400">{log.resource_type || '-'}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500 font-mono">{log.ip_address || '-'}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">{log.details ? JSON.stringify(log.details).substring(0,60) : '-'}</td>
+                        <tr key={log.id || i} className="hover:bg-[var(--bg-subtle)]/10 transition-colors">
+                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)] whitespace-nowrap">{log.created_at ? new Date(log.created_at).toLocaleString() : '-'}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">{log.user_email || log.actor_id || '-'}</td>
+                          <td className="px-4 py-3"><span className="px-2 py-0.5 bg-[var(--bg-card)] text-[var(--text-secondary)] text-[10px] font-bold rounded uppercase">{log.action || '-'}</span></td>
+                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">{log.resource_type || '-'}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">{log.ip_address || '-'}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--text-muted)] max-w-xs truncate">{log.details ? JSON.stringify(log.details).substring(0,60) : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2537,14 +2636,14 @@ export const TenantsPage: React.FC = () => {
             {activeSection === 'reports' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="text-xl font-bold text-slate-100">Reports and Analytics</h2><p className="text-sm text-slate-400 mt-1">Revenue, seat utilization, tenant health</p></div>
-                  <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+                  <div><h2 className="text-xl font-bold text-[var(--text-primary)]">Reports and Analytics</h2><p className="text-sm text-[var(--text-secondary)] mt-1">Revenue, seat utilization, tenant health</p></div>
+                  <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-secondary)] cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                  <div className="glass-panel p-6 border border-[var(--border-strong)]/80 rounded-2xl space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" />Revenue Report</h3>
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                      <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" />Revenue Report</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-secondary)] cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
                     </div>
                     {revenueReport ? (
                       <div className="space-y-2">
@@ -2554,17 +2653,17 @@ export const TenantsPage: React.FC = () => {
                           { label: 'ARR', value: 'Rs.' + Number(revenueReport.arr ?? 0).toLocaleString('en-IN') },
                           { label: 'Currency', value: revenueReport.currency ?? 'INR' },
                         ].map((row, i) => (
-                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
-                            <span className="text-xs text-slate-400">{row.label}</span><span className="text-sm font-semibold text-slate-200">{row.value}</span>
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-[var(--border-strong)]/60 last:border-0">
+                            <span className="text-xs text-[var(--text-secondary)]">{row.label}</span><span className="text-sm font-semibold text-[var(--text-primary)]">{row.value}</span>
                           </div>
                         ))}
                       </div>
-                    ) : <p className="text-sm text-slate-500 py-4 text-center">No revenue data.</p>}
+                    ) : <p className="text-sm text-[var(--text-muted)] py-4 text-center">No revenue data.</p>}
                   </div>
-                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                  <div className="glass-panel p-6 border border-[var(--border-strong)]/80 rounded-2xl space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><Users className="w-4 h-4 text-sky-400" />Seat Utilization</h3>
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                      <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2"><Users className="w-4 h-4 text-sky-400" />Seat Utilization</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-secondary)] cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
                     </div>
                     {seatReport ? (
                       <div className="space-y-2">
@@ -2574,17 +2673,17 @@ export const TenantsPage: React.FC = () => {
                           { label: 'Utilization', value: (seatReport.utilization_percentage ?? 0) + '%' },
                           { label: 'Total Orgs', value: seatReport.total_orgs ?? 0 },
                         ].map((row, i) => (
-                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
-                            <span className="text-xs text-slate-400">{row.label}</span><span className="text-sm font-semibold text-slate-200">{row.value}</span>
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-[var(--border-strong)]/60 last:border-0">
+                            <span className="text-xs text-[var(--text-secondary)]">{row.label}</span><span className="text-sm font-semibold text-[var(--text-primary)]">{row.value}</span>
                           </div>
                         ))}
                         {seatReport.utilization_percentage !== undefined && (
-                          <div className="h-2 bg-slate-800 rounded-full overflow-hidden mt-2">
+                          <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden mt-2">
                             <div className="h-full bg-gradient-to-r from-brand-500 to-indigo-500 rounded-full" style={{ width: Math.min(seatReport.utilization_percentage, 100) + '%' }} />
                           </div>
                         )}
                       </div>
-                    ) : <p className="text-sm text-slate-500 py-4 text-center">No seat data.</p>}
+                    ) : <p className="text-sm text-[var(--text-muted)] py-4 text-center">No seat data.</p>}
                   </div>
                 </div>
               </div>
@@ -2597,19 +2696,19 @@ export const TenantsPage: React.FC = () => {
       {/* ALL MODALS */}
       {/* RESET OWNER PASSWORD MODAL */}
       {activeModal === 'resetPassword' && selectedTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-panel border border-slate-800/90 rounded-2xl shadow-2xl relative overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-md glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl relative overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                   <Key className="w-5 h-5 text-amber-400" />
                   Reset Admin Password
                 </h3>
-                <p className="text-xs text-slate-400">Force password reset for the primary OrgAdmin of <strong>{selectedTenant.name}</strong>.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Force password reset for the primary OrgAdmin of <strong>{selectedTenant.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2623,7 +2722,7 @@ export const TenantsPage: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">New Password</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">New Password</label>
                 <input
                   type="password"
                   placeholder="Minimum 8 characters"
@@ -2631,16 +2730,16 @@ export const TenantsPage: React.FC = () => {
                   minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
                   disabled={isModalLoading}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 transition-all cursor-pointer"
+                  className="px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2659,19 +2758,19 @@ export const TenantsPage: React.FC = () => {
 
       {/* CREATE PLAN MODAL */}
       {(activeModal === 'createPlan' || activeModal === 'editPlan') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-2xl glass-panel border border-slate-800/90 rounded-2xl shadow-2xl relative overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-2xl glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl relative overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                   <FolderKanban className="w-5 h-5 text-brand-400" />
                   {activeModal === 'createPlan' ? 'Create Plan Template' : 'Configure Plan Limits'}
                 </h3>
-                <p className="text-xs text-slate-400">Define specifications, pricing bounds, setup costs, and storage limits.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Define specifications, pricing bounds, setup costs, and storage limits.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2686,93 +2785,93 @@ export const TenantsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Plan Code Name (Slug)</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Plan Code Name (Slug)</label>
                   <input
                     type="text"
                     placeholder="starter"
                     disabled={activeModal === 'editPlan'}
                     {...regPlan('name', { required: 'Slug name is required', pattern: { value: /^[a-z0-9-]+$/i, message: 'Alphanumeric & hyphens only' } })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none disabled:opacity-50"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none disabled:opacity-50"
                   />
                   {planErrors.name && <p className="text-xs text-red-400 mt-1">{planErrors.name.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Display Name</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Display Name</label>
                   <input
                     type="text"
                     placeholder="Starter Plan"
                     {...regPlan('display_name', { required: 'Display name is required' })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.display_name && <p className="text-xs text-red-400 mt-1">{planErrors.display_name.message}</p>}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Description</label>
                 <textarea
                   placeholder="Describe target market or features highlight"
                   rows={2}
                   {...regPlan('description')}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Price Per Licensed Seat</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2">Price Per Licensed Seat</label>
                   <input
                     type="number"
                     step="0.01"
                     {...regPlan('monthly_price', { required: true, min: 0 })}
-                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Quarterly ($)</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2">Quarterly ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     {...regPlan('quarterly_price', { required: true, min: 0 })}
-                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Annual ($)</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2">Annual ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     {...regPlan('annual_price', { required: true, min: 0 })}
-                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Currency</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-2">Currency</label>
                   <input
                     type="text"
                     {...regPlan('currency', { required: true })}
-                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="border-t border-slate-800/80 pt-4">
+              <div className="border-t border-[var(--border-strong)]/80 pt-4">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Enterprise Seat Licensing Config</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] text-slate-400 mb-1.5">Default Licensed Seat Count</label>
+                    <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Default Licensed Seat Count</label>
                     <input
                       type="number"
                       {...regPlan('max_users', { required: true, min: 1 })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                      className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                     />
                   </div>
                   <div className="flex items-center pt-6">
-                    <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold cursor-pointer">
                       <input
                         type="checkbox"
                         {...regPlan('allow_additional_seats')}
-                        className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                        className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                       />
                       Allow Additional Seats
                     </label>
@@ -2780,223 +2879,223 @@ export const TenantsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 border-t border-slate-800/80 pt-4">
+              <div className="grid grid-cols-3 gap-4 border-t border-[var(--border-strong)]/80 pt-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Storage Limit (GB)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Storage Limit (GB)</label>
                   <input
                     type="number"
                     {...regPlan('storage_limit_gb', { required: true, min: 1 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Retention (Days)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Retention (Days)</label>
                   <input
                     type="number"
                     {...regPlan('recording_retention_days', { required: true, min: 1 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Display Order</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Display Order</label>
                   <input
                     type="number"
                     {...regPlan('display_order', { required: true })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3 border-t border-slate-800/80 pt-4">
+              <div className="grid grid-cols-4 gap-3 border-t border-[var(--border-strong)]/80 pt-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Setup Charge ($)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Setup Charge ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     {...regPlan('setup_charges', { required: true, min: 0 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Minimum Initial Licensed Seats</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Minimum Initial Licensed Seats</label>
                   <input
                     type="number"
                     {...regPlan('minimum_users', {
                       required: 'Minimum licensed seats is required',
                       min: { value: 10, message: 'Minimum 10 licensed seats' }
                     })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.minimum_users && <p className="text-[10px] text-red-400 mt-1">{planErrors.minimum_users.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Maximum Supported Licensed Seats</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Maximum Supported Licensed Seats</label>
                   <input
                     type="number"
                     {...regPlan('maximum_users', { required: true, min: 1 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Min Contract (m)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Min Contract (m)</label>
                   <input
                     type="number"
                     {...regPlan('minimum_contract_months', { 
                       required: 'Min contract is required', 
                       min: { value: 3, message: 'Minimum 3 months' } 
                     })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.minimum_contract_months && <p className="text-[10px] text-red-400 mt-1">{planErrors.minimum_contract_months.message}</p>}
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3 border-t border-slate-800/80 pt-4">
+              <div className="grid grid-cols-4 gap-3 border-t border-[var(--border-strong)]/80 pt-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Trial Days (0-365)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Trial Days (0-365)</label>
                   <input
                     type="number"
                     {...regPlan('trial_days', { required: true, min: 0, max: 365 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.trial_days && <p className="text-[10px] text-red-400 mt-1">{planErrors.trial_days.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Additional Seat Price</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Additional Seat Price</label>
                   <input
                     type="number"
                     step="0.01"
                     {...regPlan('extra_user_price', { required: true, min: 0 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.extra_user_price && <p className="text-[10px] text-red-400 mt-1">{planErrors.extra_user_price.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Discount % (0-100)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Discount % (0-100)</label>
                   <input
                     type="number"
                     step="0.1"
                     {...regPlan('discount_percentage', { required: true, min: 0, max: 100 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.discount_percentage && <p className="text-[10px] text-red-400 mt-1">{planErrors.discount_percentage.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">GST Tax % (0-100)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">GST Tax % (0-100)</label>
                   <input
                     type="number"
                     step="0.1"
                     {...regPlan('gst_percentage', { required: true, min: 0, max: 100 })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                   {planErrors.gst_percentage && <p className="text-[10px] text-red-400 mt-1">{planErrors.gst_percentage.message}</p>}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4">
+              <div className="grid grid-cols-2 gap-4 border-t border-[var(--border-strong)]/80 pt-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Plan Color Hex (e.g. #3b82f6)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Plan Color Hex (e.g. #3b82f6)</label>
                   <div className="flex gap-2">
                     <input
                       type="color"
                       {...regPlan('plan_color')}
-                      className="w-10 h-10 p-0.5 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer"
+                      className="w-10 h-10 p-0.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl cursor-pointer"
                     />
                     <input
                       type="text"
                       placeholder="#3b82f6"
                       {...regPlan('plan_color')}
-                      className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                      className="flex-1 px-3 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1.5">Plan Badge (e.g. Popular, Best Value)</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-1.5">Plan Badge (e.g. Popular, Best Value)</label>
                   <input
                     type="text"
                     placeholder="Enter plan badge"
                     {...regPlan('plan_badge')}
-                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 border-t border-slate-800/80 pt-4">
-                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+              <div className="grid grid-cols-3 gap-3 border-t border-[var(--border-strong)]/80 pt-4">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('popular_plan')}
-                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Popular Plan Badge
                 </label>
-                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('recommended_plan')}
-                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Recommended Plan
                 </label>
-                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('plan_active')}
-                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Plan Active / Visible
                 </label>
               </div>
 
-              <div className="grid grid-cols-4 gap-3 border-t border-slate-800/80 pt-4 col-span-2">
-                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+              <div className="grid grid-cols-4 gap-3 border-t border-[var(--border-strong)]/80 pt-4 col-span-2">
+                <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('allow_upgrade')}
-                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Allow Upgrade
                 </label>
-                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('allow_downgrade')}
-                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Allow Downgrade
                 </label>
-                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('allow_trial')}
-                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Allow Trial
                 </label>
-                <label className="flex items-center gap-1.5 text-[10px] text-slate-300 font-semibold cursor-pointer">
+                <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('auto_renew')}
-                    className="w-3.5 h-3.5 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Auto Renew
                 </label>
               </div>
 
-              <div className="flex gap-6 border-t border-slate-800/80 pt-4">
-                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+              <div className="flex gap-6 border-t border-[var(--border-strong)]/80 pt-4">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('priority_support')}
-                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   Priority Support SLA Enabled
                 </label>
-                <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold cursor-pointer">
                   <input
                     type="checkbox"
                     {...regPlan('api_access')}
-                    className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-subtle)] focus:ring-0 cursor-pointer"
                   />
                   API Credentials Access Enabled
                 </label>
@@ -3005,12 +3104,12 @@ export const TenantsPage: React.FC = () => {
               {/* Commercial Summary (Part 7) */}
               <CommercialSummaryPanel regPlan={regPlan} />
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
                   disabled={isModalLoading}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 transition-all cursor-pointer"
+                  className="px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3029,19 +3128,19 @@ export const TenantsPage: React.FC = () => {
 
       {/* CREATE TENANT MODAL */}
       {activeModal === 'createTenant' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg glass-panel border border-slate-800/90 rounded-2xl shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                   <Building className="w-5 h-5 text-brand-400" />
                   Spin Up Tenant Instance
                 </h3>
-                <p className="text-xs text-slate-400">Creates database entries for a new tenant and assigns its primary admin account.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Creates database entries for a new tenant and assigns its primary admin account.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3057,17 +3156,17 @@ export const TenantsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Company Name</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Company Name</label>
                   <input
                     type="text"
                     placeholder="Acme Corp"
                     {...regTenant('company_name', { required: 'Company name is required', maxLength: 255 })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.company_name && <p className="text-xs text-red-400 mt-1">{tenantErrors.company_name.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subdomain Slug</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Subdomain Slug</label>
                   <input
                     type="text"
                     placeholder="acme"
@@ -3075,67 +3174,94 @@ export const TenantsPage: React.FC = () => {
                       required: 'Subdomain slug is required', 
                       pattern: { value: /^[a-z0-9-]+$/i, message: 'Only alphanumeric characters and hyphens allowed' } 
                     })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.slug && <p className="text-xs text-red-400 mt-1">{tenantErrors.slug.message}</p>}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4 mt-4">
+              {/* Plan + Billing Cycle */}
+              <div className="grid grid-cols-2 gap-4 border-t border-[var(--border-color)] pt-4 mt-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seats</label>
+                  <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Plan</label>
+                  <select
+                    {...regTenant('plan_name')}
+                    defaultValue="starter"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
+                  >
+                    <option value="starter">Starter — ₹3,999/user/mo</option>
+                    <option value="growth">Growth — ₹4,999/user/mo</option>
+                    <option value="enterprise">Enterprise — ₹5,999/user/mo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Billing Cycle</label>
+                  <select
+                    {...regTenant('billing_cycle')}
+                    defaultValue="monthly"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly (advance)</option>
+                    <option value="annual">Annual (advance)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Licensed Seats</label>
                   <input
                     type="number"
                     defaultValue={10}
-                    {...regTenant('licensed_seats', { 
-                      required: 'Seats count is required', 
-                      min: { value: 10, message: 'Minimum purchase is 10 Licensed Seats' } 
+                    {...regTenant('licensed_seats', {
+                      required: 'Seats count is required',
+                      min: { value: 10, message: 'Minimum purchase is 10 Licensed Seats' }
                     })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.licensed_seats && <p className="text-xs text-red-400 mt-1">{tenantErrors.licensed_seats.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Contract Duration (Months)</label>
+                  <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Contract Duration (Months)</label>
                   <input
                     type="number"
                     defaultValue={3}
-                    {...regTenant('contract_months', { 
-                      required: 'Contract duration is required', 
-                      min: { value: 3, message: 'Minimum contract is 3 months' } 
+                    {...regTenant('contract_months', {
+                      required: 'Contract duration is required',
+                      min: { value: 3, message: 'Minimum contract is 3 months' }
                     })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.contract_months && <p className="text-xs text-red-400 mt-1">{tenantErrors.contract_months.message}</p>}
                 </div>
               </div>
 
-              <div className="border-t border-slate-800/80 my-4 pt-4">
+              <div className="border-t border-[var(--border-strong)]/80 my-4 pt-4">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Primary Administrator Credentials</h4>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">First Name</label>
+                      <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">First Name</label>
                       <input
                         type="text"
                         placeholder="John"
                         {...regTenant('first_name')}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                        className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Last Name</label>
+                      <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Last Name</label>
                       <input
                         type="text"
                         placeholder="Doe"
                         {...regTenant('last_name')}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                        className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Admin Email</label>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Admin Email</label>
                     <input
                       type="email"
                       placeholder="admin@acme.com"
@@ -3143,13 +3269,13 @@ export const TenantsPage: React.FC = () => {
                         required: 'Admin email is required',
                         pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: 'Invalid email address' }
                       })}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                      className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                     />
                     {tenantErrors.admin_email && <p className="text-xs text-red-400 mt-1">{tenantErrors.admin_email.message}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Admin Password</label>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Admin Password</label>
                     <input
                       type="password"
                       placeholder="Min 8 characters"
@@ -3157,19 +3283,19 @@ export const TenantsPage: React.FC = () => {
                         required: 'Password is required',
                         minLength: { value: 8, message: 'Password must be at least 8 characters' }
                       })}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                      className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                     />
                     {tenantErrors.admin_password && <p className="text-xs text-red-400 mt-1">{tenantErrors.admin_password.message}</p>}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
                   disabled={isModalLoading}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 transition-all cursor-pointer"
+                  className="px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3195,19 +3321,19 @@ export const TenantsPage: React.FC = () => {
 
       {/* EDIT SUBSCRIPTION CONFIG MODAL */}
       {activeModal === 'editSubscription' && selectedTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-panel border border-slate-800/90 rounded-2xl shadow-2xl relative overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-md glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl relative overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                   <Edit className="w-5 h-5 text-brand-400" />
                   Subscription Settings
                 </h3>
-                <p className="text-xs text-slate-400">Configure parameters for <strong>{selectedTenant.name}</strong>.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Configure parameters for <strong>{selectedTenant.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3222,10 +3348,10 @@ export const TenantsPage: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subscription Plan</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Subscription Plan</label>
                 <select
                   {...regSub('subscription_plan', { required: 'Plan is required' })}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                 >
                   <option value="Starter">Starter</option>
                   <option value="Growth">Growth</option>
@@ -3234,10 +3360,10 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subscription Status</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Subscription Status</label>
                 <select
                   {...regSub('subscription_status', { required: 'Status is required' })}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                 >
                   <option value="Active">Active</option>
                   <option value="Suspended">Suspended</option>
@@ -3246,33 +3372,33 @@ export const TenantsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seat Limit</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Licensed Seat Limit</label>
                 <input
                   type="number"
                   {...regSub('max_users', { required: 'Licensed seat limit is required', min: { value: 1, message: 'Must allow at least 1 licensed seat' } })}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                 />
                 {subErrors.max_users && <p className="text-xs text-red-400 mt-1">{subErrors.max_users.message}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   Subscription Expiration Date (Optional)
                 </label>
                 <input
                   type="date"
                   {...regSub('subscription_expires_at')}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
                   disabled={isModalLoading}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 transition-all cursor-pointer"
+                  className="px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3291,19 +3417,19 @@ export const TenantsPage: React.FC = () => {
 
       {/* VIEW USERS SIDE DRAWER */}
       {activeModal === 'users' && selectedTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md h-screen bg-slate-950 border-l border-slate-800 flex flex-col justify-between shadow-2xl animate-slide-in">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-md h-screen bg-[var(--bg-app)] border-l border-[var(--border-color)] flex flex-col justify-between shadow-2xl animate-slide-in">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                   <Users className="w-5 h-5 text-brand-400" />
                   Users List
                 </h3>
-                <p className="text-xs text-slate-400">Active personnel registered inside <strong>{selectedTenant.name}</strong>.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Active personnel registered inside <strong>{selectedTenant.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3317,31 +3443,31 @@ export const TenantsPage: React.FC = () => {
               )}
 
               {isModalLoading ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
+                <div className="h-full flex flex-col items-center justify-center text-[var(--text-secondary)] py-20">
                   <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-3" />
                   <p className="text-xs">Querying database users...</p>
                 </div>
               ) : tenantUsers.length === 0 ? (
-                <div className="text-center py-20 text-slate-500">
-                  <Users className="w-8 h-8 mx-auto mb-2 text-slate-700" />
+                <div className="text-center py-20 text-[var(--text-muted)]">
+                  <Users className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)]" />
                   <p className="text-sm font-semibold">No Registered Users</p>
-                  <p className="text-xs text-slate-600 mt-1">This tenant has not created any staff database profiles yet.</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">This tenant has not created any staff database profiles yet.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {tenantUsers.map((user) => {
                     const initials = `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || 'U';
                     return (
-                      <div key={user.id} className="p-3 bg-slate-900/30 border border-slate-800 rounded-xl flex items-center justify-between hover:border-slate-800/80 transition-colors">
+                      <div key={user.id} className="p-3 bg-[var(--bg-subtle)]/30 border border-[var(--border-color)] rounded-xl flex items-center justify-between hover:border-[var(--border-strong)]/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/20 flex items-center justify-center font-bold text-xs text-brand-300">
                             {initials}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-200">
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">
                               {user.first_name} {user.last_name}
                             </p>
-                            <p className="text-xs text-slate-400">{user.email}</p>
+                            <p className="text-xs text-[var(--text-secondary)]">{user.email}</p>
                           </div>
                         </div>
                         <div className="text-right">
@@ -3350,11 +3476,11 @@ export const TenantsPage: React.FC = () => {
                               ? 'bg-red-500/10 text-red-400 border-red-500/20'
                               : user.role === 'Manager'
                               ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                              : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-strong)]'
                           }`}>
                             {user.role}
                           </span>
-                          <p className={`text-[10px] mt-1 ${user.is_active ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          <p className={`text-[10px] mt-1 ${user.is_active ? 'text-emerald-400' : 'text-[var(--text-muted)]'}`}>
                             {user.is_active ? 'Active' : 'Inactive'}
                           </p>
                         </div>
@@ -3365,10 +3491,10 @@ export const TenantsPage: React.FC = () => {
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-800/80 bg-slate-950">
+            <div className="p-6 border-t border-[var(--border-strong)]/80 bg-[var(--bg-app)]">
               <button
                 onClick={() => setActiveModal(null)}
-                className="w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 text-sm font-semibold rounded-xl transition-all cursor-pointer"
+                className="w-full px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-strong)] text-[var(--text-secondary)] text-sm font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Close Drawer
               </button>
@@ -3379,19 +3505,19 @@ export const TenantsPage: React.FC = () => {
 
       {/* VIEW INVOICES MODAL */}
       {activeModal === 'invoices' && selectedTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-3xl glass-panel border border-slate-800/90 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-3xl glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
                   <FileText className="w-5 h-5 text-indigo-400" />
                   Tenant Invoices & Billing
                 </h3>
-                <p className="text-xs text-slate-400">Generate or check payment invoices for <strong>{selectedTenant.name}</strong>.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Generate or check payment invoices for <strong>{selectedTenant.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3405,40 +3531,40 @@ export const TenantsPage: React.FC = () => {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                <div className="glass-panel p-5 border border-slate-800/70 rounded-xl space-y-4">
+                <div className="glass-panel p-5 border border-[var(--border-color)]/70 rounded-xl space-y-4">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Generate Manual Invoice</h4>
                   
                   <form onSubmit={handleInvSubmit(onCreateInvoice)} className="space-y-4">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Billing Amount ($)</label>
+                      <label className="block text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Billing Amount ($)</label>
                       <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                         <input
                           type="number"
                           placeholder="299.00"
                           step="0.01"
                           {...regInv('amount', { required: 'Amount is required', min: { value: 0.01, message: 'Must be positive' } })}
-                          className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                          className="w-full pl-9 pr-4 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-500/50"
                         />
                       </div>
                       {invErrors.amount && <p className="text-xs text-red-400 mt-1">{invErrors.amount.message}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Due Date</label>
+                      <label className="block text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Due Date</label>
                       <input
                         type="date"
                         {...regInv('due_date', { required: 'Due date is required' })}
-                        className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                        className="w-full px-3.5 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                       />
                       {invErrors.due_date && <p className="text-xs text-red-400 mt-1">{invErrors.due_date.message}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Status</label>
+                      <label className="block text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Status</label>
                       <select
                         {...regInv('status', { required: 'Status is required' })}
-                        className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                        className="w-full px-3.5 py-2 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Paid">Paid</option>
@@ -3461,26 +3587,26 @@ export const TenantsPage: React.FC = () => {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400">Invoice Ledger</h4>
 
                   {isModalLoading && invoices.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400">
+                    <div className="text-center py-10 text-[var(--text-secondary)]">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-500" />
                       <p className="text-xs">Loading invoices history...</p>
                     </div>
                   ) : invoices.length === 0 ? (
-                    <div className="p-8 border border-dashed border-slate-800 rounded-xl text-center text-slate-500">
-                      <FileText className="w-6 h-6 mx-auto mb-2 text-slate-600" />
+                    <div className="p-8 border border-dashed border-[var(--border-color)] rounded-xl text-center text-[var(--text-muted)]">
+                      <FileText className="w-6 h-6 mx-auto mb-2 text-[var(--text-muted)]" />
                       <p className="text-xs font-semibold">No invoices generated</p>
-                      <p className="text-[10px] text-slate-600 mt-0.5">Generate a billing invoice on the left form to begin history.</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Generate a billing invoice on the left form to begin history.</p>
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                       {invoices.map((invoice) => (
-                        <div key={invoice.id} className="p-3 bg-slate-900/40 border border-slate-800/80 rounded-xl flex items-center justify-between hover:border-slate-800 transition-colors">
+                        <div key={invoice.id} className="p-3 bg-[var(--bg-subtle)]/40 border border-[var(--border-strong)]/80 rounded-xl flex items-center justify-between hover:border-[var(--border-color)] transition-colors">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-200">{invoice.invoice_number}</span>
+                              <span className="text-xs font-bold text-[var(--text-primary)]">{invoice.invoice_number}</span>
                               <span className="text-xs text-brand-300 font-semibold">${invoice.amount.toFixed(2)}</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1">
+                            <p className="text-[10px] text-[var(--text-muted)] mt-1">
                               Due: {new Date(invoice.due_date).toLocaleDateString()} | Created: {new Date(invoice.created_at).toLocaleDateString()}
                             </p>
                           </div>
@@ -3488,7 +3614,7 @@ export const TenantsPage: React.FC = () => {
                           <button 
                             onClick={() => onToggleInvoiceStatus(invoice.id, invoice.status)}
                             disabled={isModalLoading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-950/20 text-xs text-slate-300 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] hover:border-[var(--border-strong)] bg-[var(--bg-app)]/20 text-xs text-[var(--text-secondary)] transition-colors cursor-pointer disabled:cursor-not-allowed"
                             title="Click to toggle status: Paid -> Pending -> Overdue -> Paid"
                           >
                             {getInvoiceStatusIcon(invoice.status)}
@@ -3502,10 +3628,10 @@ export const TenantsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-800/80 bg-slate-950 shrink-0">
+            <div className="p-6 border-t border-[var(--border-strong)]/80 bg-[var(--bg-app)] shrink-0">
               <button
                 onClick={() => setActiveModal(null)}
-                className="w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 text-sm font-semibold rounded-xl transition-all cursor-pointer"
+                className="w-full px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-strong)] text-[var(--text-secondary)] text-sm font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Close Panel
               </button>
@@ -3516,24 +3642,24 @@ export const TenantsPage: React.FC = () => {
 
       {/* DELETE TENANT CONFIRMATION MODAL */}
       {activeModal === 'deleteTenantConfirm' && selectedTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
           <div className="w-full max-w-md glass-panel border border-red-500/30 rounded-2xl shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-red-500/10 rounded-lg text-red-400">
                   <ShieldAlert className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-100">
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                     Delete Tenant Instance
                   </h3>
-                  <p className="text-xs text-slate-400">This action is permanent and irreversible.</p>
+                  <p className="text-xs text-[var(--text-secondary)]">This action is permanent and irreversible.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3547,23 +3673,23 @@ export const TenantsPage: React.FC = () => {
                   This will completely erase all associated data, including users, leads, contacts, invoices, notes, activities, and subscription history from the database.
                 </p>
               </div>
-              <p className="text-sm text-slate-300">
-                Please type the tenant slug <code className="px-1.5 py-0.5 bg-slate-900 rounded border border-slate-800 font-mono text-xs text-brand-400">{selectedTenant.slug}</code> to confirm deletion:
+              <p className="text-sm text-[var(--text-secondary)]">
+                Please type the tenant slug <code className="px-1.5 py-0.5 bg-[var(--bg-subtle)] rounded border border-[var(--border-color)] font-mono text-xs text-brand-400">{selectedTenant.slug}</code> to confirm deletion:
               </p>
               <input
                 type="text"
                 placeholder={selectedTenant.slug}
                 value={deleteConfirmSlug}
                 onChange={(e) => setDeleteConfirmSlug(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-red-500/40"
+                className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-red-500/40"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-800/80 bg-slate-950/20">
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border-strong)]/80 bg-[var(--bg-app)]/20">
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 transition-all cursor-pointer"
+                className="px-4 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm font-medium text-[var(--text-secondary)] transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -3588,26 +3714,26 @@ export const TenantsPage: React.FC = () => {
       )}
 
       {activeCurrencyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Globe className="w-5 h-5 text-brand-400" />{activeCurrencyModal === 'create' ? 'Add Currency' : 'Edit ' + (selectedCurrency?.code ?? '')}</h3>
-              <button onClick={() => setActiveCurrencyModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-md glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"><Globe className="w-5 h-5 text-brand-400" />{activeCurrencyModal === 'create' ? 'Add Currency' : 'Edit ' + (selectedCurrency?.code ?? '')}</h3>
+              <button onClick={() => setActiveCurrencyModal(null)} className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               {activeCurrencyModal === 'create' && (
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency Code</label>
-                <input value={currencyForm.code || ''} onChange={e => setCurrencyForm((p: any) => ({...p, code: e.target.value.toUpperCase()}))} placeholder="USD" maxLength={10} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Currency Code</label>
+                <input value={currencyForm.code || ''} onChange={e => setCurrencyForm((p: any) => ({...p, code: e.target.value.toUpperCase()}))} placeholder="USD" maxLength={10} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               )}
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Name</label><input value={currencyForm.name || ''} onChange={e => setCurrencyForm((p: any) => ({...p, name: e.target.value}))} placeholder="US Dollar" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Symbol</label><input value={currencyForm.symbol || ''} onChange={e => setCurrencyForm((p: any) => ({...p, symbol: e.target.value}))} placeholder="$" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Name</label><input value={currencyForm.name || ''} onChange={e => setCurrencyForm((p: any) => ({...p, name: e.target.value}))} placeholder="US Dollar" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Symbol</label><input value={currencyForm.symbol || ''} onChange={e => setCurrencyForm((p: any) => ({...p, symbol: e.target.value}))} placeholder="$" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               </div>
-              <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Exchange Rate (vs Base INR)</label>
-              <input type="number" step="0.0001" value={currencyForm.exchange_rate || ''} onChange={e => setCurrencyForm((p: any) => ({...p, exchange_rate: e.target.value}))} placeholder="0.0120" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={currencyForm.is_active ?? true} onChange={e => setCurrencyForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
-                <button onClick={() => setActiveCurrencyModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Exchange Rate (vs Base INR)</label>
+              <input type="number" step="0.0001" value={currencyForm.exchange_rate || ''} onChange={e => setCurrencyForm((p: any) => ({...p, exchange_rate: e.target.value}))} placeholder="0.0120" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" checked={currencyForm.is_active ?? true} onChange={e => setCurrencyForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" /> Active</label>
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
+                <button onClick={() => setActiveCurrencyModal(null)} className="px-4 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-secondary)] cursor-pointer">Cancel</button>
                 <button onClick={handleSaveCurrency} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save</button>
               </div>
             </div>
@@ -3616,32 +3742,32 @@ export const TenantsPage: React.FC = () => {
       )}
 
       {activeTaxModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Receipt className="w-5 h-5 text-brand-400" />{activeTaxModal === 'create' ? 'Add Tax Config' : 'Edit Tax Config'}</h3>
-              <button onClick={() => setActiveTaxModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"><Receipt className="w-5 h-5 text-brand-400" />{activeTaxModal === 'create' ? 'Add Tax Config' : 'Edit Tax Config'}</h3>
+              <button onClick={() => setActiveTaxModal(null)} className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Country Code</label><input value={taxForm.country_code || ''} onChange={e => setTaxForm((p: any) => ({...p, country_code: e.target.value.toUpperCase()}))} placeholder="IN" maxLength={10} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Country Name</label><input value={taxForm.country_name || ''} onChange={e => setTaxForm((p: any) => ({...p, country_name: e.target.value}))} placeholder="India" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Country Code</label><input value={taxForm.country_code || ''} onChange={e => setTaxForm((p: any) => ({...p, country_code: e.target.value.toUpperCase()}))} placeholder="IN" maxLength={10} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Country Name</label><input value={taxForm.country_name || ''} onChange={e => setTaxForm((p: any) => ({...p, country_name: e.target.value}))} placeholder="India" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Type</label>
-                <select value={taxForm.tax_type || 'GST'} onChange={e => setTaxForm((p: any) => ({...p, tax_type: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none">
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Type</label>
+                <select value={taxForm.tax_type || 'GST'} onChange={e => setTaxForm((p: any) => ({...p, tax_type: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none">
                   {['GST','VAT','SALES_TAX','NONE'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Rate %</label><input type="number" step="0.01" value={taxForm.tax_rate || ''} onChange={e => setTaxForm((p: any) => ({...p, tax_rate: e.target.value}))} placeholder="18" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Label</label><input value={taxForm.tax_label || ''} onChange={e => setTaxForm((p: any) => ({...p, tax_label: e.target.value}))} placeholder="GST" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Rate %</label><input type="number" step="0.01" value={taxForm.tax_rate || ''} onChange={e => setTaxForm((p: any) => ({...p, tax_rate: e.target.value}))} placeholder="18" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Label</label><input value={taxForm.tax_label || ''} onChange={e => setTaxForm((p: any) => ({...p, tax_label: e.target.value}))} placeholder="GST" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               </div>
               <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={taxForm.tax_inclusive ?? false} onChange={e => setTaxForm((p: any) => ({...p, tax_inclusive: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Inclusive</label>
-                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={taxForm.is_default ?? false} onChange={e => setTaxForm((p: any) => ({...p, is_default: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Default</label>
-                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={taxForm.is_active ?? true} onChange={e => setTaxForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" checked={taxForm.tax_inclusive ?? false} onChange={e => setTaxForm((p: any) => ({...p, tax_inclusive: e.target.checked}))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" /> Inclusive</label>
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" checked={taxForm.is_default ?? false} onChange={e => setTaxForm((p: any) => ({...p, is_default: e.target.checked}))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" /> Default</label>
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" checked={taxForm.is_active ?? true} onChange={e => setTaxForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" /> Active</label>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
-                <button onClick={() => setActiveTaxModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
+                <button onClick={() => setActiveTaxModal(null)} className="px-4 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-secondary)] cursor-pointer">Cancel</button>
                 <button onClick={handleSaveTax} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save</button>
               </div>
             </div>
@@ -3650,32 +3776,32 @@ export const TenantsPage: React.FC = () => {
       )}
 
       {activeCouponModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Tag className="w-5 h-5 text-brand-400" />{activeCouponModal === 'create' ? 'Create Coupon' : 'Edit Coupon'}</h3>
-              <button onClick={() => setActiveCouponModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"><Tag className="w-5 h-5 text-brand-400" />{activeCouponModal === 'create' ? 'Create Coupon' : 'Edit Coupon'}</h3>
+              <button onClick={() => setActiveCouponModal(null)} className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Code</label><input value={couponForm.code || ''} onChange={e => setCouponForm((p: any) => ({...p, code: e.target.value.toUpperCase()}))} placeholder="SAVE20" disabled={activeCouponModal === 'edit'} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none disabled:opacity-50" /></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Type</label>
-                <select value={couponForm.discount_type || 'percentage'} onChange={e => setCouponForm((p: any) => ({...p, discount_type: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none">
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Code</label><input value={couponForm.code || ''} onChange={e => setCouponForm((p: any) => ({...p, code: e.target.value.toUpperCase()}))} placeholder="SAVE20" disabled={activeCouponModal === 'edit'} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none disabled:opacity-50" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Type</label>
+                <select value={couponForm.discount_type || 'percentage'} onChange={e => setCouponForm((p: any) => ({...p, discount_type: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none">
                   <option value="percentage">Percentage %</option><option value="flat">Flat Amount</option>
                 </select></div>
               </div>
-              <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</label><input value={couponForm.description || ''} onChange={e => setCouponForm((p: any) => ({...p, description: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Description</label><input value={couponForm.description || ''} onChange={e => setCouponForm((p: any) => ({...p, description: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Value</label><input type="number" step="0.01" value={couponForm.discount_value || ''} onChange={e => setCouponForm((p: any) => ({...p, discount_value: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max Uses</label><input type="number" value={couponForm.max_uses || ''} onChange={e => setCouponForm((p: any) => ({...p, max_uses: e.target.value}))} placeholder="blank = unlimited" className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Value</label><input type="number" step="0.01" value={couponForm.discount_value || ''} onChange={e => setCouponForm((p: any) => ({...p, discount_value: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Max Uses</label><input type="number" value={couponForm.max_uses || ''} onChange={e => setCouponForm((p: any) => ({...p, max_uses: e.target.value}))} placeholder="blank = unlimited" className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Valid From</label><input type="date" value={couponForm.valid_from || ''} onChange={e => setCouponForm((p: any) => ({...p, valid_from: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Valid Until</label><input type="date" value={couponForm.valid_until || ''} onChange={e => setCouponForm((p: any) => ({...p, valid_until: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Valid From</label><input type="date" value={couponForm.valid_from || ''} onChange={e => setCouponForm((p: any) => ({...p, valid_from: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Valid Until</label><input type="date" value={couponForm.valid_until || ''} onChange={e => setCouponForm((p: any) => ({...p, valid_until: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               </div>
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={couponForm.is_active ?? true} onChange={e => setCouponForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
-                <button onClick={() => setActiveCouponModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" checked={couponForm.is_active ?? true} onChange={e => setCouponForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" /> Active</label>
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
+                <button onClick={() => setActiveCouponModal(null)} className="px-4 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-secondary)] cursor-pointer">Cancel</button>
                 <button onClick={handleSaveCoupon} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save Coupon</button>
               </div>
             </div>
@@ -3684,25 +3810,25 @@ export const TenantsPage: React.FC = () => {
       )}
 
       {activeNotifModal === 'edit' && selectedNotif && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-xl glass-panel border border-slate-800/90 rounded-2xl shadow-2xl">
-            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
-              <div><h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2"><Bell className="w-5 h-5 text-brand-400" /> Edit Template</h3><p className="text-xs text-slate-400 mt-0.5 font-mono">{selectedNotif.template_key}</p></div>
-              <button onClick={() => setActiveNotifModal(null)} className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/80 backdrop-blur-sm">
+          <div className="w-full max-w-xl glass-panel border border-[var(--border-strong)]/90 rounded-2xl shadow-2xl">
+            <div className="px-6 py-5 border-b border-[var(--border-strong)]/80 flex items-center justify-between">
+              <div><h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"><Bell className="w-5 h-5 text-brand-400" /> Edit Template</h3><p className="text-xs text-[var(--text-secondary)] mt-0.5 font-mono">{selectedNotif.template_key}</p></div>
+              <button onClick={() => setActiveNotifModal(null)} className="p-1.5 hover:bg-[var(--bg-subtle)] rounded-lg text-[var(--text-secondary)] cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Template Name</label><input value={notifForm.template_name || ''} onChange={e => setNotifForm((p: any) => ({...p, template_name: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Template Name</label><input value={notifForm.template_name || ''} onChange={e => setNotifForm((p: any) => ({...p, template_name: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               {selectedNotif.channel === 'email' && (
-                <div><label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subject</label><input value={notifForm.subject || ''} onChange={e => setNotifForm((p: any) => ({...p, subject: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Subject</label><input value={notifForm.subject || ''} onChange={e => setNotifForm((p: any) => ({...p, subject: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none" /></div>
               )}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Body</label>
-                {selectedNotif.variables && selectedNotif.variables.length > 0 && <p className="text-[10px] text-slate-500 mb-1.5">Variables: {selectedNotif.variables.map((v: string) => '{{' + v + '}}').join(', ')}</p>}
-                <textarea rows={6} value={notifForm.body || ''} onChange={e => setNotifForm((p: any) => ({...p, body: e.target.value}))} className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none font-mono" />
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Body</label>
+                {selectedNotif.variables && selectedNotif.variables.length > 0 && <p className="text-[10px] text-[var(--text-muted)] mb-1.5">Variables: {selectedNotif.variables.map((v: string) => '{{' + v + '}}').join(', ')}</p>}
+                <textarea rows={6} value={notifForm.body || ''} onChange={e => setNotifForm((p: any) => ({...p, body: e.target.value}))} className="w-full px-3.5 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none font-mono" />
               </div>
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" checked={notifForm.is_active ?? true} onChange={e => setNotifForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-slate-900 border-slate-800" /> Active</label>
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
-                <button onClick={() => setActiveNotifModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" checked={notifForm.is_active ?? true} onChange={e => setNotifForm((p: any) => ({...p, is_active: e.target.checked}))} className="w-4 h-4 rounded bg-[var(--bg-subtle)] border-[var(--border-color)]" /> Active</label>
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-strong)]/80">
+                <button onClick={() => setActiveNotifModal(null)} className="px-4 py-2.5 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-secondary)] cursor-pointer">Cancel</button>
                 <button onClick={handleSaveNotif} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save Template</button>
               </div>
             </div>

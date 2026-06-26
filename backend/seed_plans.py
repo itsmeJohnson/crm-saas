@@ -35,13 +35,13 @@ logger = logging.getLogger("seed_plans")
 # ─────────────────────────────────────────────────────────────────────────────
 PLANS = [
     {
-        # ₹3,999/user/month × 10 users = ₹39,990 + 18% GST = ₹47,188.20/month
+        # ₹3,999/user/month | ₹11,499/user quarterly | ₹44,999/user annual | ₹50,000 setup
         "name": "starter",
         "display_name": "Starter Plan",
         "description": "Perfect for small sales teams getting started with CRM and telecalling.",
         "monthly_price": 3999.0,       # per user/month
-        "quarterly_price": 11997.0,    # 3999 × 3 months per user
-        "annual_price": 47988.0,       # 3999 × 12 months per user
+        "quarterly_price": 11499.0,    # per user/quarter (per PDF)
+        "annual_price": 44999.0,       # per user/year (per PDF)
         "currency": "INR",
         "minimum_users": 10,
         "maximum_users": 50,
@@ -49,7 +49,7 @@ PLANS = [
         "extra_user_price": 3999.0,    # same rate for add-on seats
         "storage_limit_gb": 50,
         "recording_retention_days": 30,
-        "setup_charges": 0.0,
+        "setup_charges": 50000.0,      # one-time setup charge per PDF
         "minimum_contract_months": 3,
         "trial_days": 14,
         "gst_percentage": 18.0,        # +18% GST on total
@@ -61,13 +61,13 @@ PLANS = [
         "price_per_seat": 3999.0,
     },
     {
-        # ₹4,999/user/month × 10 users = ₹49,990 + 18% GST = ₹58,988.20/month
-        "name": "professional",
-        "display_name": "Professional Plan",
+        # ₹4,999/user/month | ₹13,999/user quarterly | ₹53,999/user annual | ₹75,000 setup
+        "name": "growth",
+        "display_name": "Growth Plan",
         "description": "For growing teams that need advanced analytics, pipelines, and full telephony.",
         "monthly_price": 4999.0,       # per user/month
-        "quarterly_price": 14997.0,    # 4999 × 3 months per user
-        "annual_price": 59988.0,       # 4999 × 12 months per user
+        "quarterly_price": 13999.0,    # per user/quarter (per PDF)
+        "annual_price": 53999.0,       # per user/year (per PDF)
         "currency": "INR",
         "minimum_users": 10,
         "maximum_users": 200,
@@ -75,70 +75,92 @@ PLANS = [
         "extra_user_price": 4999.0,
         "storage_limit_gb": 100,
         "recording_retention_days": 90,
-        "setup_charges": 0.0,
+        "setup_charges": 75000.0,      # one-time setup charge per PDF
         "minimum_contract_months": 3,
         "trial_days": 0,
         "gst_percentage": 18.0,
         "discount_percentage": 0.0,
         "display_order": 2,
-        "plan_badge": "Popular",
+        "plan_badge": "Recommended",
         "plan_color": "#8b5cf6",
         "plan_active": True,
         "popular_plan": True,
         "price_per_seat": 4999.0,
     },
     {
-        # ₹7,999/user/month × 10 users = ₹79,990 + 18% GST = ₹94,388.20/month
+        # ₹5,999/user/month | ₹16,999/user quarterly | ₹64,999/user annual | ₹1,00,000 setup
         "name": "enterprise",
         "display_name": "Enterprise Plan",
-        "description": "Unlimited scale with dedicated support, custom integrations, and SLA.",
-        "monthly_price": 7999.0,       # per user/month
-        "quarterly_price": 23997.0,    # 7999 × 3 months per user
-        "annual_price": 95988.0,       # 7999 × 12 months per user
+        "description": "Unlimited scale with AI features, dedicated support, custom integrations, and SLA.",
+        "monthly_price": 5999.0,       # per user/month (per PDF)
+        "quarterly_price": 16999.0,    # per user/quarter (per PDF)
+        "annual_price": 64999.0,       # per user/year (per PDF)
         "currency": "INR",
-        "minimum_users": 25,
+        "minimum_users": 10,
         "maximum_users": 5000,
         "allow_additional_seats": True,
-        "extra_user_price": 7999.0,
+        "extra_user_price": 5999.0,
         "storage_limit_gb": 500,
         "recording_retention_days": 365,
-        "setup_charges": 0.0,
-        "minimum_contract_months": 6,
+        "setup_charges": 100000.0,     # one-time setup charge per PDF
+        "minimum_contract_months": 3,
         "trial_days": 0,
         "gst_percentage": 18.0,
-        "discount_percentage": 5.0,   # 5% loyalty discount
+        "discount_percentage": 0.0,
         "display_order": 3,
-        "plan_badge": "Best Value",
+        "plan_badge": "Enterprise",
         "plan_color": "#f59e0b",
         "plan_active": True,
         "recommended_plan": True,
         "dedicated_manager": True,
-        "price_per_seat": 7999.0,
+        "price_per_seat": 5999.0,
     },
 ]
 
+# Feature codes mapped to PDF plan tiers
 PLAN_FEATURES = {
+    # Starter: Lead & Contact Mgmt, Follow-ups & Tasks, Click-to-Call,
+    #          Inbound & Outbound Calling, Call Recording, Basic Pipeline,
+    #          Bulk Excel/CSV Import, Dashboard & Reports, Role Based Access
     "starter": [
-        "LEAD_MANAGEMENT", "BULK_ASSIGNMENT", "CLICK_TO_CALL",
-        "OUTBOUND_CALLING", "CALL_DISPOSITION", "BASIC_DASHBOARD",
+        "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT",
+        "CALL_DISPOSITION",  # Follow-ups & Tasks
+        "CLICK_TO_CALL", "INBOUND_CALLING", "OUTBOUND_CALLING", "CALL_RECORDING",
+        "SALES_PIPELINE",    # Basic Pipeline
+        "BULK_ASSIGNMENT",   # Bulk Excel/CSV Import
+        "BASIC_DASHBOARD",
         "ROLE_BASED_ACCESS",
     ],
-    "professional": [
-        "LEAD_MANAGEMENT", "BULK_ASSIGNMENT", "BULK_TRANSFER", "SMART_DISTRIBUTION",
-        "GOOGLE_SHEETS_IMPORT", "CLICK_TO_CALL", "INBOUND_CALLING", "OUTBOUND_CALLING",
-        "CALL_RECORDING", "CALL_DISPOSITION", "BASIC_DASHBOARD", "MANAGER_DASHBOARD",
-        "TEAM_LEADER_DASHBOARD", "TEAM_MONITORING", "TARGET_MANAGEMENT",
-        "CONVERSION_ANALYTICS", "SALES_PIPELINE", "ROLE_BASED_ACCESS",
-        "CONTACT_MANAGEMENT", "COMPANY_MANAGEMENT",
+    # Growth: all Starter + Google Sheets, Advanced Pipeline, Lead Distribution,
+    #         Team Leader Dashboard, KPI & Analytics, Target Management, Manager Dashboard
+    "growth": [
+        "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT",
+        "CALL_DISPOSITION", "CLICK_TO_CALL", "INBOUND_CALLING", "OUTBOUND_CALLING",
+        "CALL_RECORDING", "SALES_PIPELINE", "BULK_ASSIGNMENT", "BASIC_DASHBOARD",
+        "ROLE_BASED_ACCESS",
+        # Growth-only additions
+        "GOOGLE_SHEETS_IMPORT",
+        "CUSTOM_PIPELINE",       # Advanced Pipeline
+        "BULK_TRANSFER", "SMART_DISTRIBUTION",  # Lead Distribution & Transfers
+        "TEAM_LEADER_DASHBOARD",
+        "KPI_DASHBOARD", "CONVERSION_ANALYTICS",  # KPI & Analytics
+        "TARGET_MANAGEMENT",
+        "MANAGER_DASHBOARD",
+        "TEAM_MONITORING",
     ],
+    # Enterprise: all Growth + AI features, API Access, Custom Reports, Dedicated Manager
     "enterprise": [
-        "LEAD_MANAGEMENT", "BULK_ASSIGNMENT", "BULK_TRANSFER", "SMART_DISTRIBUTION",
-        "GOOGLE_SHEETS_IMPORT", "CLICK_TO_CALL", "INBOUND_CALLING", "OUTBOUND_CALLING",
-        "CALL_RECORDING", "CALL_DISPOSITION", "BASIC_DASHBOARD", "MANAGER_DASHBOARD",
-        "TEAM_LEADER_DASHBOARD", "TEAM_MONITORING", "TARGET_MANAGEMENT", "KPI_DASHBOARD",
-        "CONVERSION_ANALYTICS", "SALES_PIPELINE", "ROLE_BASED_ACCESS",
-        "CONTACT_MANAGEMENT", "COMPANY_MANAGEMENT", "ADVANCED_ANALYTICS",
-        "CUSTOM_PIPELINE", "CUSTOM_REPORTS",
+        "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT",
+        "CALL_DISPOSITION", "CLICK_TO_CALL", "INBOUND_CALLING", "OUTBOUND_CALLING",
+        "CALL_RECORDING", "SALES_PIPELINE", "BULK_ASSIGNMENT", "BASIC_DASHBOARD",
+        "ROLE_BASED_ACCESS",
+        "GOOGLE_SHEETS_IMPORT", "CUSTOM_PIPELINE",
+        "BULK_TRANSFER", "SMART_DISTRIBUTION",
+        "TEAM_LEADER_DASHBOARD", "KPI_DASHBOARD", "CONVERSION_ANALYTICS",
+        "TARGET_MANAGEMENT", "MANAGER_DASHBOARD", "TEAM_MONITORING",
+        # Enterprise-only additions
+        "ADVANCED_ANALYTICS", "CUSTOM_REPORTS",
+        "COMPANY_MANAGEMENT",
     ],
 }
 
@@ -149,7 +171,7 @@ DEMO_TENANT = {
     "admin_password": "Demo@1234",
     "first_name": "Riyash",
     "last_name": "Kumar",
-    "plan_name": "professional",
+    "plan_name": "growth",
     "licensed_seats": 10,
     "subscription_months": 12,
 }
@@ -157,6 +179,46 @@ DEMO_TENANT = {
 
 async def seed():
     async with async_session_maker() as session:
+
+        # ── 0. Migrate legacy plan names ─────────────────────────────────────
+        logger.info("Migrating legacy plan names...")
+        old_professional = (await session.execute(
+            select(Plan).where(Plan.name == "professional")
+        )).scalar_one_or_none()
+        if old_professional:
+            old_professional.name = "growth"
+            old_professional.display_name = "Growth Plan"
+            old_professional.quarterly_price = 13999.0
+            old_professional.annual_price = 53999.0
+            old_professional.setup_charges = 75000.0
+            old_professional.plan_badge = "Recommended"
+            await session.commit()
+            logger.info("  ✅ Renamed 'professional' → 'growth', updated prices")
+
+        old_enterprise = (await session.execute(
+            select(Plan).where(Plan.name == "enterprise")
+        )).scalar_one_or_none()
+        if old_enterprise:
+            old_enterprise.monthly_price = 5999.0
+            old_enterprise.quarterly_price = 16999.0
+            old_enterprise.annual_price = 64999.0
+            old_enterprise.extra_user_price = 5999.0
+            old_enterprise.price_per_seat = 5999.0
+            old_enterprise.setup_charges = 100000.0
+            old_enterprise.minimum_users = 10
+            old_enterprise.plan_badge = "Enterprise"
+            await session.commit()
+            logger.info("  ✅ Updated Enterprise prices to match PDF")
+
+        old_starter = (await session.execute(
+            select(Plan).where(Plan.name == "starter")
+        )).scalar_one_or_none()
+        if old_starter:
+            old_starter.quarterly_price = 11499.0
+            old_starter.annual_price = 44999.0
+            old_starter.setup_charges = 50000.0
+            await session.commit()
+            logger.info("  ✅ Updated Starter prices to match PDF")
 
         # ── 1. Seed Plans ────────────────────────────────────────────────────
         logger.info("Seeding plans...")
@@ -286,7 +348,7 @@ async def seed():
 
         logger.info("\n🎉 Seed complete!")
         logger.info("=" * 60)
-        logger.info("Plans: Starter / Professional / Enterprise")
+        logger.info("Plans: Starter / Growth / Enterprise")
         logger.info(f"Demo tenant: {DEMO_TENANT['name']}")
         logger.info(f"  Admin login: {DEMO_TENANT['admin_email']} / {DEMO_TENANT['admin_password']}")
         logger.info("=" * 60)

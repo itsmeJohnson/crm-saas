@@ -45,6 +45,10 @@ class RevenueMetrics(BaseModel):
     failed_count: int
     overdue_count: int
     currency: str = "INR"
+    # Period-filtered (reflects day/week/month toggle chosen by user)
+    period_collected: float = 0.0
+    period_onboarded: int = 0
+    period: str = "month"
 
 
 class LicensingMetrics(BaseModel):

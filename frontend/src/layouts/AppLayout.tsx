@@ -4,9 +4,20 @@ import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import {
   LayoutDashboard, LogOut, Building, Users, FolderKanban,
-  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight
+  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
+  PhoneCall, BarChart3, Target, Construction,
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
+import type { LucideIcon } from 'lucide-react';
+
+interface NavItem {
+  name: string;
+  path: string;
+  icon: LucideIcon;
+  roles?: string[];
+  featureCode?: string | null;
+  underDev?: boolean;
+}
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -20,14 +31,18 @@ export const AppLayout: React.FC = () => {
     navigate('/login');
   };
 
-  const allNavItems = [
-    { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard },
-    { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'] },
-    { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT' },
-    { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE' },
-    { name: 'Users',             path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
-    { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'] },
-    { name: 'Subscription',      path: '/portal/dashboard',  icon: CreditCard,        roles: ['OrgAdmin'] },
+  // underDev: feature is in plan but UI not fully built yet — shows "Under Development" page
+  const allNavItems: NavItem[] = [
+    { name: 'Dashboard',     path: '/',                icon: LayoutDashboard, featureCode: null,                   underDev: false },
+    { name: 'Tenants',       path: '/tenants',         icon: Building,        roles: ['SuperAdmin'],               underDev: false },
+    { name: 'Leads',         path: '/leads',           icon: FolderKanban,    featureCode: 'LEAD_MANAGEMENT',      underDev: false },
+    { name: 'Pipelines',     path: '/pipelines',       icon: Workflow,        roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE', underDev: false },
+    { name: 'Call Center',   path: '/call-center',     icon: PhoneCall,       featureCode: 'CLICK_TO_CALL',        underDev: true  },
+    { name: 'Analytics',     path: '/analytics',       icon: BarChart3,       featureCode: 'KPI_DASHBOARD',        underDev: true  },
+    { name: 'Targets',       path: '/targets',         icon: Target,          featureCode: 'TARGET_MANAGEMENT',    underDev: true  },
+    { name: 'Users',         path: '/users',           icon: Users,           roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS', underDev: false },
+    { name: 'Organization',  path: '/organization',    icon: Building,        roles: ['OrgAdmin'],                 underDev: false },
+    { name: 'Subscription',  path: '/portal/dashboard',icon: CreditCard,      roles: ['OrgAdmin'],                 underDev: false },
   ];
 
   const features = useAuthStore((state) => state.features);
@@ -102,9 +117,17 @@ export const AppLayout: React.FC = () => {
               onClick={() => setIsMobileOpen(false)}
               className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              {item.underDev && !isActive
+                ? <Construction className="w-4 h-4 flex-shrink-0 text-amber-400/70" />
+                : <Icon className="w-4 h-4 flex-shrink-0" />
+              }
               <span>{item.name}</span>
-              {isActive && (
+              {item.underDev && !isActive && (
+                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  SOON
+                </span>
+              )}
+              {isActive && !item.underDev && (
                 <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
               )}
             </Link>
