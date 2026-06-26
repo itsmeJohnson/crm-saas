@@ -76,6 +76,7 @@ export const TenantsPage: React.FC = () => {
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<any>(null);
+  const [dashboardPeriod, setDashboardPeriod] = useState<'day' | 'week' | 'month'>('month');
   const [currencies, setCurrencies] = useState<CurrencyResponse[]>([]);
   const [taxConfigs, setTaxConfigs] = useState<TaxConfigResponse[]>([]);
   const [gateways, setGateways] = useState<PaymentGatewayResponse[]>([]);
@@ -105,7 +106,7 @@ export const TenantsPage: React.FC = () => {
     setIsLoading(true); setGlobalError(null);
     try {
       switch (activeSection) {
-        case 'dashboard': { const d = await superAdminApi.getDashboard(); setDashboard(d); break; }
+        case 'dashboard': { const d = await superAdminApi.getDashboard(dashboardPeriod); setDashboard(d); break; }
         case 'tenants': { const d = await superAdminApi.getTenants(); setTenants(d); break; }
         case 'plans': { const d = await superAdminApi.getPlans(); setPlans(d); break; }
         case 'features': {
@@ -142,7 +143,7 @@ export const TenantsPage: React.FC = () => {
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { fetchAllData(); }, [activeSection]);
+  useEffect(() => { fetchAllData(); }, [activeSection, dashboardPeriod]);
 
   const showSuccess = (msg: string) => { setSuccessMessage(msg); setTimeout(() => setSuccessMessage(null), 4000); };
 
@@ -187,7 +188,7 @@ export const TenantsPage: React.FC = () => {
   const onCreateTenant = async (data: CreateTenantRequest) => {
     setIsModalLoading(true); setModalError(null);
     try {
-      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3) });
+      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3), plan_name: data.plan_name || 'starter', billing_cycle: data.billing_cycle || 'monthly' });
       showSuccess('Tenant created.'); await fetchAllData(); resetTenant(); setActiveModal(null);
     } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
     finally { setIsModalLoading(false); }
@@ -442,57 +443,108 @@ export const TenantsPage: React.FC = () => {
           <>
             {activeSection === 'dashboard' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div><h2 className="text-2xl font-bold text-slate-100">Executive Dashboard</h2><p className="text-sm text-slate-400 mt-1">Real-time platform metrics</p></div>
-                  <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-pointer hover:text-slate-200"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+                {/* Header + period toggle */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Executive Dashboard</h2>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Real-time platform metrics</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-color)' }}>
+                      {(['day', 'week', 'month'] as const).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setDashboardPeriod(p)}
+                          className={`px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer capitalize ${dashboardPeriod === p ? 'bg-brand-500 text-white' : ''}`}
+                          style={dashboardPeriod !== p ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)' } : {}}
+                        >
+                          {p === 'day' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={fetchAllData} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition-all" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', borderColor: 'var(--border-color)' }}>
+                      <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                    </button>
+                  </div>
                 </div>
+
                 {dashboard ? (
                   <>
+                    {/* Row 1: 4 KPI cards */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       {[
-                        { label: 'Total Organizations', value: dashboard.orgs?.total ?? 0, sub: (dashboard.orgs?.active ?? 0) + ' active', color: 'text-brand-400' },
-                        { label: 'MRR', value: 'Rs.' + Number(dashboard.revenue?.mrr ?? 0).toLocaleString('en-IN'), sub: 'ARR Rs.' + Number(dashboard.revenue?.arr ?? 0).toLocaleString('en-IN'), color: 'text-emerald-400' },
-                        { label: 'Licensed Seats', value: dashboard.licensing?.total_seats ?? 0, sub: (dashboard.licensing?.active_seats ?? 0) + ' active', color: 'text-sky-400' },
-                        { label: 'Trial Orgs', value: dashboard.orgs?.trial ?? 0, sub: (dashboard.activity?.expiring_soon ?? 0) + ' expiring', color: 'text-amber-400' },
+                        { label: 'Total Tenants', value: dashboard.orgs?.total ?? 0, sub: `${dashboard.orgs?.active ?? 0} active · ${dashboard.orgs?.trial ?? 0} trial`, color: 'text-brand-400' },
+                        { label: 'MRR', value: '₹' + Number(dashboard.revenue?.mrr ?? 0).toLocaleString('en-IN'), sub: 'ARR ₹' + Number(dashboard.revenue?.arr ?? 0).toLocaleString('en-IN'), color: 'text-emerald-400' },
+                        { label: 'Total Collected', value: '₹' + Number(dashboard.revenue?.total_collected ?? 0).toLocaleString('en-IN'), sub: '₹' + Number(dashboard.revenue?.pending ?? 0).toLocaleString('en-IN') + ' pending', color: 'text-sky-400' },
+                        { label: 'Pending Collection', value: '₹' + Number(dashboard.revenue?.pending ?? 0).toLocaleString('en-IN'), sub: `${dashboard.revenue?.overdue_count ?? 0} overdue invoices`, color: 'text-amber-400' },
                       ].map((c, i) => (
-                        <div key={i} className="glass-panel p-5 border border-slate-800/80 rounded-2xl">
-                          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">{c.label}</p>
+                        <div key={i} className="glass-panel p-5 rounded-2xl border" style={{ borderColor: 'var(--border-color)' }}>
+                          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{c.label}</p>
                           <p className={'text-2xl font-bold mt-2 ' + c.color}>{c.value}</p>
-                          <p className="text-xs text-slate-500 mt-1">{c.sub}</p>
+                          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{c.sub}</p>
                         </div>
                       ))}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl">
-                        <h3 className="text-sm font-bold text-slate-300 mb-4">Activity</h3>
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div><p className="text-2xl font-bold text-brand-400">{dashboard.activity?.new_signups_today ?? 0}</p><p className="text-xs text-slate-500 mt-1">Today</p></div>
-                          <div><p className="text-2xl font-bold text-emerald-400">{dashboard.activity?.active_last_7d ?? 0}</p><p className="text-xs text-slate-500 mt-1">Last 7d</p></div>
-                          <div><p className="text-2xl font-bold text-amber-400">{dashboard.activity?.expiring_soon ?? 0}</p><p className="text-xs text-slate-500 mt-1">Expiring</p></div>
-                        </div>
+
+                    {/* Row 2: Period metrics + infra */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Period onboarded */}
+                      <div className="glass-panel p-6 rounded-2xl border" style={{ borderColor: 'var(--border-color)' }}>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+                          {dashboardPeriod === 'day' ? "Today's" : dashboardPeriod === 'week' ? "This Week's" : "This Month's"} Onboarded
+                        </p>
+                        <p className="text-4xl font-bold text-brand-400">{dashboard.revenue?.period_onboarded ?? 0}</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>new tenants</p>
                       </div>
-                      <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl">
-                        <h3 className="text-sm font-bold text-slate-300 mb-4">Infrastructure</h3>
+                      {/* Period collection */}
+                      <div className="glass-panel p-6 rounded-2xl border" style={{ borderColor: 'var(--border-color)' }}>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+                          {dashboardPeriod === 'day' ? "Today's" : dashboardPeriod === 'week' ? "This Week's" : "This Month's"} Collection
+                        </p>
+                        <p className="text-4xl font-bold text-emerald-400">₹{Number(dashboard.revenue?.period_collected ?? 0).toLocaleString('en-IN')}</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>revenue collected</p>
+                      </div>
+                      {/* Infrastructure */}
+                      <div className="glass-panel p-6 rounded-2xl border" style={{ borderColor: 'var(--border-color)' }}>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Infrastructure</p>
                         <div className="space-y-3">
                           {[
-                            { label: 'API', val: dashboard.infra?.api_status ?? 'unknown', ok: dashboard.infra?.api_status === 'healthy' },
                             { label: 'Database', val: dashboard.infra?.db_status ?? 'unknown', ok: dashboard.infra?.db_status === 'healthy' },
                             { label: 'Redis', val: dashboard.infra?.redis_status ?? 'unknown', ok: dashboard.infra?.redis_status === 'healthy' },
+                            { label: 'Licensed Seats', val: `${dashboard.licensing?.active_seats ?? 0} / ${dashboard.licensing?.total_licensed_seats ?? 0}`, ok: true },
                           ].map((x, i) => (
                             <div key={i} className="flex items-center justify-between">
-                              <span className="text-xs text-slate-400">{x.label}</span>
-                              <span className={'text-xs font-bold ' + (x.ok ? 'text-emerald-400' : 'text-rose-400')}>{x.val}</span>
+                              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{x.label}</span>
+                              <span className={`text-xs font-bold ${x.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{x.val}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
+
+                    {/* Row 3: Activity */}
+                    <div className="glass-panel p-6 rounded-2xl border" style={{ borderColor: 'var(--border-color)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>Activity</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        {[
+                          { label: 'New Today', value: dashboard.orgs?.new_today ?? 0, color: 'text-brand-400' },
+                          { label: 'Renewals Due (7d)', value: dashboard.activity?.renewals_due_7days ?? 0, color: 'text-amber-400' },
+                          { label: 'Trials Expiring', value: dashboard.activity?.trials_expiring_7days ?? 0, color: 'text-rose-400' },
+                          { label: 'Invoices Today', value: dashboard.activity?.new_invoices_today ?? 0, color: 'text-sky-400' },
+                        ].map((s, i) => (
+                          <div key={i}>
+                            <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
+                            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 ) : (
-                  <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-500 text-center">
-                    <LayoutDashboard className="w-12 h-12 text-slate-600 mb-3" />
-                    <p className="font-semibold text-slate-400">No dashboard data</p>
-                    <p className="text-xs mt-1">Backend may be offline.</p>
+                  <div className="glass-panel p-16 rounded-2xl border flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--border-color)' }}>
+                    <LayoutDashboard className="w-12 h-12 mb-3" style={{ color: 'var(--text-muted)' }} />
+                    <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>No dashboard data</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Backend may be offline.</p>
                   </div>
                 )}
               </div>
@@ -3107,6 +3159,33 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                   />
                   {tenantErrors.contract_months && <p className="text-xs text-red-400 mt-1">{tenantErrors.contract_months.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Plan</label>
+                  <select
+                    {...regTenant('plan_name')}
+                    defaultValue="starter"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    <option value="starter">Starter — ₹3,999/seat/mo</option>
+                    <option value="growth">Growth — ₹4,999/seat/mo</option>
+                    <option value="enterprise">Enterprise — ₹5,999/seat/mo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Billing Cycle</label>
+                  <select
+                    {...regTenant('billing_cycle')}
+                    defaultValue="monthly"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly (save ~4%)</option>
+                    <option value="annual">Annual (save ~6%)</option>
+                  </select>
                 </div>
               </div>
 

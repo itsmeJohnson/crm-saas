@@ -2,7 +2,7 @@ import { api } from './api';
 
 // ── Phase 1: Dashboard ────────────────────────────────────────────────────────
 export interface DashboardOrgMetrics { total: number; active: number; trial: number; expired: number; suspended: number; new_today: number; }
-export interface DashboardRevenueMetrics { mrr: number; arr: number; total_collected: number; pending: number; failed_count: number; overdue_count: number; currency: string; }
+export interface DashboardRevenueMetrics { mrr: number; arr: number; total_collected: number; pending: number; failed_count: number; overdue_count: number; currency: string; period_collected: number; period_onboarded: number; period: string; }
 export interface DashboardLicensingMetrics { total_licensed_seats: number; active_seats: number; available_seats: number; utilization_percent: number; }
 export interface DashboardInfraMetrics { total_storage_gb: number; call_recording_gb: number; db_status: string; redis_status: string; }
 export interface DashboardActivityMetrics { new_orgs_today: number; renewals_due_7days: number; trials_expiring_7days: number; new_invoices_today: number; payments_today: number; }
@@ -98,6 +98,8 @@ export interface CreateTenantRequest {
   last_name?: string | null;
   licensed_seats?: number;
   contract_months?: number;
+  plan_name?: string;
+  billing_cycle?: string;
 }
 
 export const superAdminApi = {
@@ -186,8 +188,10 @@ export const superAdminApi = {
   },
 
   // Phase 1: Dashboard
-  getDashboard: async () => {
-    const response = await api.get<SuperAdminDashboard>('/super-admin/dashboard');
+  getDashboard: async (period?: 'day' | 'week' | 'month') => {
+    const response = await api.get<SuperAdminDashboard>('/super-admin/dashboard', {
+      params: { period: period || 'month' }
+    });
     return response.data;
   },
 

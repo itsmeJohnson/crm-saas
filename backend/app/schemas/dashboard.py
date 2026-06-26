@@ -19,6 +19,9 @@ class RevenueMetrics(BaseModel):
     failed_count: int
     overdue_count: int
     currency: str = "INR"
+    period_collected: float = 0.0
+    period_onboarded: int = 0
+    period: str = "month"
 
 
 class LicensingMetrics(BaseModel):
