@@ -58,29 +58,33 @@ async def login(
     try:
         user = await auth_service.authenticate_user(request_data)
     except HTTPException:
-        # Log failed login attempt (no user_id available)
-        await audit.log_event(
-            actor_id=None,
-            organization_id=None,
-            event_type="AUTH_LOGIN_FAILED",
-            description=f"Failed login attempt for email: {request_data.email}",
-            ip_address=ip_address,
-            browser_info=user_agent,
-        )
+        # Log failed login attempt (best-effort — don't let audit failure block auth)
+        try:
+            await audit.log_event(
+                organization_id=None,
+                actor_user_id=None,
+                action="AUTH_LOGIN_FAILED",
+                resource_type="auth",
+                action_metadata={"email": request_data.email, "ip": ip_address},
+            )
+        except Exception:
+            pass
         raise
 
     # MFA check: if enabled, return a short-lived challenge token instead of full session
     if user.mfa_enabled:
         from app.core.security import create_mfa_challenge_token
         mfa_token = create_mfa_challenge_token(user.id)
-        await audit.log_event(
-            actor_id=user.id,
-            organization_id=user.organization_id,
-            event_type="AUTH_MFA_CHALLENGE",
-            description=f"MFA challenge issued for login from {ip_address}",
-            ip_address=ip_address,
-            browser_info=user_agent,
-        )
+        try:
+            await audit.log_event(
+                organization_id=user.organization_id,
+                actor_user_id=user.id,
+                action="AUTH_MFA_CHALLENGE",
+                resource_type="auth",
+                action_metadata={"ip": ip_address},
+            )
+        except Exception:
+            pass
         return Token(
             access_token=mfa_token,
             refresh_token="",
@@ -92,14 +96,16 @@ async def login(
         ip_address=ip_address,
         user_agent=user_agent
     )
-    await audit.log_event(
-        actor_id=user.id,
-        organization_id=user.organization_id,
-        event_type="AUTH_LOGIN",
-        description=f"User logged in from {ip_address}",
-        ip_address=ip_address,
-        browser_info=user_agent,
-    )
+    try:
+        await audit.log_event(
+            organization_id=user.organization_id,
+            actor_user_id=user.id,
+            action="AUTH_LOGIN",
+            resource_type="auth",
+            action_metadata={"ip": ip_address, "ua": user_agent},
+        )
+    except Exception:
+        pass
     return tokens
 
 @router.post("/refresh", response_model=Token)
@@ -127,12 +133,15 @@ async def logout(
     from app.services.audit_service import AuditService
     auth_service = AuthService(db)
     await auth_service.logout_session(request_data.refresh_token)
-    await AuditService(db).log_event(
-        actor_id=current_user.id,
-        organization_id=current_user.organization_id,
-        event_type="AUTH_LOGOUT",
-        description="User logged out",
-    )
+    try:
+        await AuditService(db).log_event(
+            organization_id=current_user.organization_id,
+            actor_user_id=current_user.id,
+            action="AUTH_LOGOUT",
+            resource_type="auth",
+        )
+    except Exception:
+        pass
     return {"detail": "Logged out successfully"}
 
 @router.get("/me", response_model=AuthMeResponse)
@@ -281,13 +290,16 @@ async def mfa_enable(
         raise HTTPException(status_code=400, detail="totp_code is required to enable MFA")
     mfa_service = MFAService(db)
     result = await mfa_service.enable_mfa(current_user.id, payload.totp_code)
-    from app.services.audit_service import AuditService
-    await AuditService(db).log_event(
-        actor_id=current_user.id,
-        organization_id=current_user.organization_id,
-        event_type="AUTH_MFA_ENABLED",
-        description="User enabled MFA",
-    )
+    try:
+        from app.services.audit_service import AuditService
+        await AuditService(db).log_event(
+            organization_id=current_user.organization_id,
+            actor_user_id=current_user.id,
+            action="AUTH_MFA_ENABLED",
+            resource_type="auth",
+        )
+    except Exception:
+        pass
     return MFAEnableResponse(**result)
 
 
@@ -319,14 +331,17 @@ async def mfa_verify(
         verified = await mfa_service.verify_backup_code(user_id, payload.backup_code)
 
     if not verified:
-        from app.services.audit_service import AuditService
-        await AuditService(db).log_event(
-            actor_id=user_id,
-            organization_id=None,
-            event_type="AUTH_MFA_FAILED",
-            description="Failed MFA verification attempt",
-            ip_address=request.client.host if request.client else None,
-        )
+        try:
+            from app.services.audit_service import AuditService
+            await AuditService(db).log_event(
+                organization_id=None,
+                actor_user_id=user_id,
+                action="AUTH_MFA_FAILED",
+                resource_type="auth",
+                action_metadata={"ip": request.client.host if request.client else None},
+            )
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid TOTP code or backup code."
@@ -341,17 +356,19 @@ async def mfa_verify(
         ip_address=ip_address,
         user_agent=user_agent
     )
-    from app.services.audit_service import AuditService
-    from app.repositories.user import UserRepository
-    user = await UserRepository(db).get(user_id)
-    await AuditService(db).log_event(
-        actor_id=user_id,
-        organization_id=user.organization_id if user else None,
-        event_type="AUTH_LOGIN",
-        description=f"User completed MFA and logged in from {ip_address}",
-        ip_address=ip_address,
-        browser_info=user_agent,
-    )
+    try:
+        from app.services.audit_service import AuditService
+        from app.repositories.user import UserRepository
+        user = await UserRepository(db).get(user_id)
+        await AuditService(db).log_event(
+            organization_id=user.organization_id if user else None,
+            actor_user_id=user_id,
+            action="AUTH_LOGIN",
+            resource_type="auth",
+            action_metadata={"ip": ip_address},
+        )
+    except Exception:
+        pass
     return tokens
 
 
@@ -368,13 +385,16 @@ async def mfa_disable(
         totp_code=payload.totp_code,
         backup_code=payload.backup_code
     )
-    from app.services.audit_service import AuditService
-    await AuditService(db).log_event(
-        actor_id=current_user.id,
-        organization_id=current_user.organization_id,
-        event_type="AUTH_MFA_DISABLED",
-        description="User disabled MFA",
-    )
+    try:
+        from app.services.audit_service import AuditService
+        await AuditService(db).log_event(
+            organization_id=current_user.organization_id,
+            actor_user_id=current_user.id,
+            action="AUTH_MFA_DISABLED",
+            resource_type="auth",
+        )
+    except Exception:
+        pass
     return result
 
 
@@ -422,11 +442,14 @@ async def reset_password(
     user.token_version = (user.token_version or 1) + 1
 
     await db.commit()
-    await AuditService(db).log_event(
-        actor_id=user.id,
-        organization_id=user.organization_id,
-        event_type="AUTH_PASSWORD_RESET",
-        description="Password reset completed — all existing sessions invalidated",
-    )
+    try:
+        await AuditService(db).log_event(
+            organization_id=user.organization_id,
+            actor_user_id=user.id,
+            action="AUTH_PASSWORD_RESET",
+            resource_type="auth",
+        )
+    except Exception:
+        pass
     return {"detail": "Password has been reset successfully"}
 

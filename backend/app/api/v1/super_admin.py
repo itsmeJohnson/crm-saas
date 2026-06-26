@@ -551,8 +551,13 @@ async def update_plan(
     
     old_val = {}
     new_val = {}
-    
+
+    # Never allow these system fields to be overwritten via PATCH
+    PROTECTED = {'id', 'created_at', 'updated_at', 'deleted_at', 'is_deleted', 'price_inr'}
+
     for key, val in payload.items():
+        if key in PROTECTED:
+            continue
         if hasattr(plan, key):
             current_value = getattr(plan, key)
             if current_value != val:
@@ -1032,9 +1037,10 @@ async def get_super_admin_dashboard(
         .where(Invoice.payment_status == "failed", Invoice.is_deleted == False)
     )).scalar() or 0
 
+    now_naive = datetime(now.year, now.month, now.day, now.hour, now.minute, now.second)
     overdue_count = (await db.execute(
         select(func.count(Invoice.id))
-        .where(Invoice.payment_status == "unpaid", Invoice.due_date < now, Invoice.is_deleted == False)
+        .where(Invoice.payment_status == "unpaid", Invoice.due_date < now_naive, Invoice.is_deleted == False)
     )).scalar() or 0
 
     # ── Licensing Metrics ──

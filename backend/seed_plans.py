@@ -35,42 +35,44 @@ logger = logging.getLogger("seed_plans")
 # ─────────────────────────────────────────────────────────────────────────────
 PLANS = [
     {
+        # ₹3,999/user/month × 10 users = ₹39,990 + 18% GST = ₹47,188.20/month
         "name": "starter",
         "display_name": "Starter Plan",
         "description": "Perfect for small sales teams getting started with CRM and telecalling.",
-        "monthly_price": 1999.0,
-        "quarterly_price": 5997.0,
-        "annual_price": 23988.0,
+        "monthly_price": 3999.0,       # per user/month
+        "quarterly_price": 11997.0,    # 3999 × 3 months per user
+        "annual_price": 47988.0,       # 3999 × 12 months per user
         "currency": "INR",
         "minimum_users": 10,
         "maximum_users": 50,
         "allow_additional_seats": True,
-        "extra_user_price": 1999.0,
+        "extra_user_price": 3999.0,    # same rate for add-on seats
         "storage_limit_gb": 50,
         "recording_retention_days": 30,
         "setup_charges": 0.0,
         "minimum_contract_months": 3,
         "trial_days": 14,
-        "gst_percentage": 18.0,
+        "gst_percentage": 18.0,        # +18% GST on total
         "discount_percentage": 0.0,
         "display_order": 1,
         "plan_badge": None,
         "plan_color": "#6366f1",
         "plan_active": True,
-        "price_per_seat": 1999.0,
+        "price_per_seat": 3999.0,
     },
     {
+        # ₹4,999/user/month × 10 users = ₹49,990 + 18% GST = ₹58,988.20/month
         "name": "professional",
         "display_name": "Professional Plan",
         "description": "For growing teams that need advanced analytics, pipelines, and full telephony.",
-        "monthly_price": 3999.0,
-        "quarterly_price": 11997.0,
-        "annual_price": 47988.0,
+        "monthly_price": 4999.0,       # per user/month
+        "quarterly_price": 14997.0,    # 4999 × 3 months per user
+        "annual_price": 59988.0,       # 4999 × 12 months per user
         "currency": "INR",
         "minimum_users": 10,
         "maximum_users": 200,
         "allow_additional_seats": True,
-        "extra_user_price": 3999.0,
+        "extra_user_price": 4999.0,
         "storage_limit_gb": 100,
         "recording_retention_days": 90,
         "setup_charges": 0.0,
@@ -83,27 +85,28 @@ PLANS = [
         "plan_color": "#8b5cf6",
         "plan_active": True,
         "popular_plan": True,
-        "price_per_seat": 3999.0,
+        "price_per_seat": 4999.0,
     },
     {
+        # ₹7,999/user/month × 10 users = ₹79,990 + 18% GST = ₹94,388.20/month
         "name": "enterprise",
         "display_name": "Enterprise Plan",
         "description": "Unlimited scale with dedicated support, custom integrations, and SLA.",
-        "monthly_price": 7999.0,
-        "quarterly_price": 23997.0,
-        "annual_price": 95988.0,
+        "monthly_price": 7999.0,       # per user/month
+        "quarterly_price": 23997.0,    # 7999 × 3 months per user
+        "annual_price": 95988.0,       # 7999 × 12 months per user
         "currency": "INR",
         "minimum_users": 25,
         "maximum_users": 5000,
         "allow_additional_seats": True,
-        "extra_user_price": 6999.0,
+        "extra_user_price": 7999.0,
         "storage_limit_gb": 500,
         "recording_retention_days": 365,
         "setup_charges": 0.0,
         "minimum_contract_months": 6,
         "trial_days": 0,
         "gst_percentage": 18.0,
-        "discount_percentage": 5.0,
+        "discount_percentage": 5.0,   # 5% loyalty discount
         "display_order": 3,
         "plan_badge": "Best Value",
         "plan_color": "#f59e0b",
@@ -223,8 +226,9 @@ async def seed():
             logger.info(f"  Demo tenant '{dt['slug']}' already exists — skipping")
         else:
             plan = created_plans.get(dt["plan_name"])
-            now = datetime.now(timezone.utc)
-            expires_at = now + timedelta(days=dt["subscription_months"] * 30)
+            now_aware = datetime.now(timezone.utc)
+            now_naive = datetime.utcnow()  # naive — for TIMESTAMP WITHOUT TIME ZONE columns
+            expires_naive = now_naive + timedelta(days=dt["subscription_months"] * 30)
 
             org = Organization(
                 name=dt["name"],
@@ -232,7 +236,7 @@ async def seed():
                 is_active=True,
                 subscription_plan=dt["plan_name"],
                 subscription_status="active",
-                subscription_expires_at=expires_at,
+                subscription_expires_at=expires_naive,  # naive — column has no tz
                 max_users=dt["licensed_seats"],
             )
             session.add(org)
@@ -250,12 +254,13 @@ async def seed():
             ))
 
             if plan:
+                expires_aware = now_aware + timedelta(days=dt["subscription_months"] * 30)
                 session.add(TenantSubscription(
                     organization_id=org.id,
                     plan_id=plan.id,
                     status="active",
-                    start_date=now,       # correct: start_date not started_at
-                    end_date=expires_at,  # correct: end_date not expires_at
+                    start_date=now_aware,
+                    end_date=expires_aware,
                     users_purchased=dt["licensed_seats"],
                     users_active=1,
                     billing_cycle="monthly",
