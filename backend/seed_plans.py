@@ -3,18 +3,17 @@ Seed script: create/update plans to match CRM Commercial Proposal.
 Run: docker compose exec backend python seed_plans.py
 
 Plans (from PDF):
-  Starter:    ₹3,999/seat/mo  | ₹11,499 qtr  | ₹44,999 annual | ₹50,000 setup
-  Growth:     ₹4,999/seat/mo  | ₹13,999 qtr  | ₹53,999 annual | ₹75,000 setup
-  Enterprise: ₹5,999/seat/mo  | ₹16,999 qtr  | ₹64,999 annual | ₹1,00,000 setup
+  Starter:    Rs.3,999/seat/mo  | Rs.11,499 qtr  | Rs.44,999 annual | Rs.50,000 setup
+  Growth:     Rs.4,999/seat/mo  | Rs.13,999 qtr  | Rs.53,999 annual | Rs.75,000 setup
+  Enterprise: Rs.5,999/seat/mo  | Rs.16,999 qtr  | Rs.64,999 annual | Rs.1,00,000 setup
 """
 
 import asyncio
-from sqlalchemy import text
-from app.db.session import AsyncSessionLocal
+from sqlalchemy import text, select
+from app.core.database import async_session_maker
 from app.models.plan import Plan
 from app.models.feature import Feature
 from app.models.plan_feature import PlanFeature
-from sqlalchemy import select
 
 PLANS = [
     {
@@ -24,7 +23,7 @@ PLANS = [
         "annual_price": 44999.0,
         "setup_charges": 50000.0,
         "max_users": 50,
-        "description": "Essential CRM for growing teams. Includes Lead & Contact Management, Click-to-Call, Call Recording, Basic Pipeline, and more.",
+        "description": "Essential CRM for growing teams. Lead & Contact Management, Click-to-Call, Call Recording, Basic Pipeline.",
     },
     {
         "name": "Growth",
@@ -33,7 +32,7 @@ PLANS = [
         "annual_price": 53999.0,
         "setup_charges": 75000.0,
         "max_users": 200,
-        "description": "Advanced CRM with team management, KPI analytics, and target tracking. Recommended for scaling sales teams.",
+        "description": "Advanced CRM with team management, KPI analytics, and target tracking. Recommended for scaling teams.",
     },
     {
         "name": "Enterprise",
@@ -42,11 +41,10 @@ PLANS = [
         "annual_price": 64999.0,
         "setup_charges": 100000.0,
         "max_users": 9999,
-        "description": "Full-featured enterprise CRM with AI capabilities, custom reports, API access, and dedicated account management.",
+        "description": "Full-featured enterprise CRM with AI, custom reports, API access, and dedicated account management.",
     },
 ]
 
-# Feature codes per plan (cumulative)
 PLAN_FEATURES = {
     "starter": [
         "LEAD_MANAGEMENT",
@@ -116,8 +114,8 @@ PLAN_FEATURES = {
 
 
 async def seed():
-    async with AsyncSessionLocal() as db:
-        # ── Migrate old "professional" plan name to "growth" ──
+    async with async_session_maker() as db:
+        # Rename old "professional" plan to "growth" if it exists
         await db.execute(text("UPDATE plans SET name='Growth' WHERE LOWER(name)='professional'"))
         await db.commit()
 
@@ -127,7 +125,16 @@ async def seed():
             plan = result.scalar_one_or_none()
 
             if plan is None:
-                plan = Plan(**plan_data, plan_active=True)
+                plan = Plan(
+                    name=name,
+                    monthly_price=plan_data["monthly_price"],
+                    quarterly_price=plan_data["quarterly_price"],
+                    annual_price=plan_data["annual_price"],
+                    setup_charges=plan_data["setup_charges"],
+                    max_users=plan_data["max_users"],
+                    description=plan_data["description"],
+                    plan_active=True,
+                )
                 db.add(plan)
                 await db.flush()
                 print(f"  Created plan: {name}")
@@ -141,18 +148,28 @@ async def seed():
                 plan.plan_active = True
                 print(f"  Updated plan: {name}")
 
-            # ── Sync plan features ──
+            # Sync features for this plan
             feature_codes = PLAN_FEATURES.get(name.lower(), [])
             for code in feature_codes:
+                # Ensure feature exists
                 feat_result = await db.execute(select(Feature).where(Feature.code == code))
                 feature = feat_result.scalar_one_or_none()
                 if feature is None:
-                    feature = Feature(code=code, display_name=code.replace("_", " ").title(), category="crm", active=True)
+                    feature = Feature(
+                        code=code,
+                        display_name=code.replace("_", " ").title(),
+                        category="crm",
+                        active=True,
+                    )
                     db.add(feature)
                     await db.flush()
 
+                # Ensure plan-feature mapping exists
                 pf_result = await db.execute(
-                    select(PlanFeature).where(PlanFeature.plan_id == plan.id, PlanFeature.feature_id == feature.id)
+                    select(PlanFeature).where(
+                        PlanFeature.plan_id == plan.id,
+                        PlanFeature.feature_id == feature.id
+                    )
                 )
                 if pf_result.scalar_one_or_none() is None:
                     db.add(PlanFeature(plan_id=plan.id, feature_id=feature.id, is_enabled=True))
