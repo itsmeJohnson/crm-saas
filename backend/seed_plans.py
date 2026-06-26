@@ -172,7 +172,7 @@ async def seed():
                     )
                 )
                 if pf_result.scalar_one_or_none() is None:
-                    db.add(PlanFeature(plan_id=plan.id, feature_id=feature.id, is_enabled=True))
+                    db.add(PlanFeature(plan_id=plan.id, feature_id=feature.id, enabled=True))
 
         await db.commit()
         print("Seed complete.")
