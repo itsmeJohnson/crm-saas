@@ -2,9 +2,18 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, demo-stable, feature/sales-operations ]
+    branches:
+      - main
+      - master
+      - demo-stable
+      - 'feature/sales-operations'
+      - 'feature/**'
   pull_request:
-    branches: [ main, master, demo-stable ]
+    branches:
+      - main
+      - master
+      - demo-stable
+  workflow_dispatch:  # allow manual trigger from GitHub Actions UI
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 1: Backend — syntax check + pytest
