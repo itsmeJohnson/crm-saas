@@ -7,13 +7,32 @@ class PlanResponse(BaseModel):
 
     id: uuid.UUID
     name: str
+    display_name: str | None = None
+    description: str | None = None
     price_inr: float
     billing_cycle_days: int
+    monthly_price: float | None = None
+    quarterly_price: float | None = None
+    annual_price: float | None = None
     max_users: int
     max_admins: int
     max_managers: int
     max_team_leads: int
     max_employees: int
+    minimum_users: int | None = None
+    maximum_users: int | None = None
+    storage_limit_gb: int | None = None
+    recording_retention_days: int | None = None
+    setup_charges: float | None = None
+    extra_user_price: float | None = None
+    gst_percentage: float | None = None
+    discount_percentage: float | None = None
+    allow_additional_seats: bool | None = None
+    popular_plan: bool | None = None
+    recommended_plan: bool | None = None
+    plan_badge: str | None = None
+    plan_color: str | None = None
+    plan_active: bool | None = None
     features: dict
     is_trial: bool
     trial_days: int | None = None
@@ -30,10 +49,11 @@ class TenantSubscriptionResponse(BaseModel):
     end_date: datetime
     trial_end_date: datetime | None = None
     auto_renew: bool
+    billing_cycle: str | None = None
     users_purchased: int
     users_purchased_next: int | None = None
     users_active: int
-    plan: PlanResponse
+    plan: PlanResponse | None = None
 
 class UsageMeter(BaseModel):
     current: int

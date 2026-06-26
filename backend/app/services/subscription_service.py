@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -15,10 +16,14 @@ class SubscriptionService:
         self.db = db
 
     async def get_active_subscription(self, organization_id: uuid.UUID) -> TenantSubscription | None:
-        """Fetches the active subscription for the tenant."""
-        stmt = select(TenantSubscription).where(
-            TenantSubscription.organization_id == organization_id,
-            TenantSubscription.is_deleted == False
+        """Fetches the active subscription for the tenant, with plan eagerly loaded."""
+        stmt = (
+            select(TenantSubscription)
+            .options(selectinload(TenantSubscription.plan))
+            .where(
+                TenantSubscription.organization_id == organization_id,
+                TenantSubscription.is_deleted == False
+            )
         )
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()

@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.tenant_subscription import TenantSubscription
@@ -38,8 +39,10 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
         db.add(comm_settings)
         await db.flush()
 
-    stmt = select(TenantSubscription).where(
-        TenantSubscription.is_deleted == False
+    stmt = (
+        select(TenantSubscription)
+        .options(selectinload(TenantSubscription.plan))
+        .where(TenantSubscription.is_deleted == False)
     )
     res = await db.execute(stmt)
     subscriptions = res.scalars().all()
