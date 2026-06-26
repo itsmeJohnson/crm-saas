@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.models.invoice import Invoice
 from app.services.razorpay_service import RazorpayService

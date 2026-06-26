@@ -1,7 +1,33 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
+# ── Org CRM dashboard (used by /api/v1/dashboard/summary) ────────────────────
+# The service returns plain dicts; these open models accept any structure.
+class DashboardSummaryResponse(BaseModel):
+    model_config = {"extra": "allow"}
+
+    total_leads: Optional[int] = None
+    total_contacts: Optional[int] = None
+    total_companies: Optional[int] = None
+    active_users: Optional[int] = None
+    total_activities: Optional[int] = None
+    leads_by_status: Optional[Dict[str, int]] = None
+    recent_leads: Optional[List[Dict[str, Any]]] = None
+    performance_metrics: Optional[Dict[str, Any]] = None
+
+
+class RecentActivitiesResponse(BaseModel):
+    model_config = {"extra": "allow"}
+
+    activities: Optional[List[Dict[str, Any]]] = None
+    total: Optional[int] = None
+    page: Optional[int] = None
+    limit: Optional[int] = None
+
+
+# ── Super Admin Control Center dashboard schemas ──────────────────────────────
 class OrgMetrics(BaseModel):
     total: int
     active: int
