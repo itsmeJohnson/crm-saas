@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 class OrgMetrics(BaseModel):
@@ -53,3 +54,34 @@ class SuperAdminDashboardResponse(BaseModel):
     infra: InfraMetrics
     activity: ActivityMetrics
     generated_at: datetime
+
+
+# ── CRM Tenant Dashboard schemas (used by app/api/v1/dashboard.py) ────────────
+
+class DashboardSummaryResponse(BaseModel):
+    total_leads: int = 0
+    contacts_count: int = 0
+    companies_count: int = 0
+    user_count: int = 0
+    activities_count: int = 0
+    leads_by_status: Dict[str, int] = {}
+    assigned_leads_breakdown: List[Dict[str, Any]] = []
+
+
+class RecentActivityItem(BaseModel):
+    id: str
+    activity_type: Optional[str] = None
+    subject: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    status: Optional[str] = None
+    assigned_user_id: Optional[str] = None
+    assigned_user_name: str = "Unassigned"
+    created_at: str
+
+
+class RecentActivitiesResponse(BaseModel):
+    items: List[RecentActivityItem] = []
+    total: int = 0
+    page: int = 1
+    limit: int = 10
