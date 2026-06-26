@@ -675,7 +675,8 @@ async def list_plan_features(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Get all plan to feature mappings."""
-    stmt = select(PlanFeature).where(PlanFeature.is_deleted == False)
+    from sqlalchemy.orm import selectinload
+    stmt = select(PlanFeature).where(PlanFeature.is_deleted == False).options(selectinload(PlanFeature.feature))
     res = await db.execute(stmt)
     return res.scalars().all()
 
@@ -710,7 +711,9 @@ async def toggle_plan_feature(
         db.add(mapping)
 
     await db.commit()
-    await db.refresh(mapping)
+    from sqlalchemy.orm import selectinload
+    stmt2 = select(PlanFeature).where(PlanFeature.id == mapping.id).options(selectinload(PlanFeature.feature))
+    mapping = (await db.execute(stmt2)).scalar_one()
 
     # Invalidate all features cache
     from app.dependencies.feature_guard import invalidate_all_tenant_features
