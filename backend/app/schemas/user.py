@@ -35,6 +35,7 @@ class UserResponse(UserBase):
     is_team_leader: bool = False
     seat_number: str | None = None
     inactive_reason: str | None = None
+    mfa_enabled: bool = False
 
 class ReplaceEmployeeRequest(BaseModel):
     old_user_id: uuid.UUID

@@ -20,6 +20,9 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    # MFA challenge: when mfa_required=True, access_token is a short-lived mfa_token
+    # and refresh_token is empty. Frontend must call /auth/mfa/verify to get real tokens.
+    mfa_required: bool = False
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
@@ -35,3 +38,26 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str = Field(..., description="The password reset token")
     password: str = Field(..., min_length=8, description="The new password")
+
+# ---------- MFA Schemas ----------
+
+class MFAVerifyRequest(BaseModel):
+    """Used for: login MFA challenge, enable confirmation, disable"""
+    totp_code: str | None = Field(None, description="6-digit TOTP code from authenticator app")
+    backup_code: str | None = Field(None, description="8-character backup code")
+    mfa_token: str | None = Field(None, description="Short-lived token from login response when mfa_required=True")
+
+class MFASetupResponse(BaseModel):
+    secret: str
+    qr_uri: str
+    issuer: str
+    message: str
+
+class MFAEnableResponse(BaseModel):
+    message: str
+    backup_codes: list[str]
+    warning: str
+
+class MFAStatusResponse(BaseModel):
+    mfa_enabled: bool
+    backup_codes_remaining: int

@@ -28,6 +28,11 @@ class User(BaseModel):
     inactive_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
+    # MFA / TOTP
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_backup_codes: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # JSON list
+
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")
     reporting_to: Mapped["User | None"] = relationship("User", remote_side="User.id", back_populates="downlines")

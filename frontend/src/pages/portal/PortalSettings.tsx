@@ -3,8 +3,9 @@ import { portalApi } from '../../services/portalApi';
 import { useThemeStore } from '../../store/themeStore';
 import {
   Settings, Bell, CheckCircle2,
-  AlertTriangle, Loader2, Sun, Moon, RefreshCw
+  AlertTriangle, Loader2, Sun, Moon, RefreshCw, ShieldCheck
 } from 'lucide-react';
+import { MFASetup } from '../../components/auth/MFASetup';
 
 export const PortalSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -100,6 +101,15 @@ export const PortalSettings: React.FC = () => {
           {error}
         </div>
       )}
+
+      {/* ── Security: MFA ── */}
+      <div className="glass-panel border border-slate-900 rounded-2xl p-6 space-y-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <ShieldCheck className="w-4 h-4 text-brand-400" />
+          Two-Factor Authentication (MFA)
+        </h3>
+        <MFASetup />
+      </div>
 
       <form onSubmit={handleSubmit} className="glass-panel border border-slate-900 rounded-2xl p-6 space-y-6">
         <div className="space-y-4">
