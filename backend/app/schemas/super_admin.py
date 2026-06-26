@@ -108,6 +108,39 @@ class PlanCreate(BaseModel):
             raise ValueError("Extra user price must be greater than or equal to zero")
         return v
 
+class PlanUpdate(BaseModel):
+    name: str | None = None
+    display_name: str | None = None
+    description: str | None = None
+    monthly_price: float | None = None
+    quarterly_price: float | None = None
+    annual_price: float | None = None
+    currency: str | None = None
+    max_users: int | None = None
+    storage_limit_gb: int | None = None
+    recording_retention_days: int | None = None
+    priority_support: bool | None = None
+    api_access: bool | None = None
+    display_order: int | None = None
+    setup_charges: float | None = None
+    minimum_users: int | None = Field(None, ge=10, description="Minimum Initial Licensed Seats (default 10)")
+    maximum_users: int | None = None
+    minimum_contract_months: int | None = Field(None, ge=3, description="Minimum Initial Contract (default 3 months)")
+    trial_days: int | None = Field(None, ge=0, le=365)
+    extra_user_price: float | None = Field(None, ge=0.0)
+    discount_percentage: float | None = Field(None, ge=0.0, le=100.0)
+    gst_percentage: float | None = Field(None, ge=0.0, le=100.0)
+    plan_color: str | None = None
+    plan_badge: str | None = None
+    popular_plan: bool | None = None
+    recommended_plan: bool | None = None
+    allow_upgrade: bool | None = None
+    allow_downgrade: bool | None = None
+    allow_trial: bool | None = None
+    allow_additional_seats: bool | None = None
+    auto_renew: bool | None = None
+    plan_active: bool | None = None
+
 class PlanResponse(BaseModel):
     id: uuid.UUID
     name: str

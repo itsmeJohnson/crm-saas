@@ -223,6 +223,15 @@ export const TenantsPage: React.FC = () => {
     catch (e: any) { setGlobalError(e.response?.data?.detail || 'Failed'); }
     finally { setIsLoading(false); }
   };
+  const PLAN_FORM_FIELDS: (keyof PlanCreatePayload)[] = [
+    'name', 'display_name', 'description', 'monthly_price', 'quarterly_price', 'annual_price',
+    'currency', 'max_users', 'max_admins', 'max_managers', 'max_team_leads', 'max_employees',
+    'storage_limit_gb', 'recording_retention_days', 'priority_support', 'api_access',
+    'display_order', 'setup_charges', 'minimum_users', 'maximum_users', 'minimum_contract_months',
+    'trial_days', 'extra_user_price', 'discount_percentage', 'gst_percentage', 'plan_color',
+    'plan_badge', 'popular_plan', 'recommended_plan', 'allow_upgrade', 'allow_downgrade',
+    'allow_trial', 'allow_additional_seats', 'auto_renew', 'plan_active',
+  ];
   const cast = (data: PlanCreatePayload) => ({
     ...data,
     monthly_price: Number(data.monthly_price), quarterly_price: Number(data.quarterly_price), annual_price: Number(data.annual_price),
@@ -841,8 +850,8 @@ export const TenantsPage: React.FC = () => {
                           onClick={() => {
                             setSelectedPlan(plan);
                             setModalError(null);
-                            Object.keys(plan).forEach((key) => {
-                              setPlanValue(key as any, plan[key as keyof PlanResponse]);
+                            PLAN_FORM_FIELDS.forEach((key) => {
+                              setPlanValue(key, plan[key]);
                             });
                             setActiveModal('editPlan');
                           }}

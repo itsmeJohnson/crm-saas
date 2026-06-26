@@ -9,25 +9,22 @@ class AuditService:
 
     async def log_event(
         self,
-        organization_id: uuid.UUID,
+        organization_id: uuid.UUID | None,
         actor_user_id: uuid.UUID | None,
         action: str,
         resource_type: str,
         resource_id: str | None = None,
         action_metadata: dict | None = None
-    ) -> AuditLog:
+    ) -> AuditLog | None:
         """
-        Log an audit event with standard layout and fields.
+        Log an audit event. Silently skips if organization_id is None
+        (e.g. SuperAdmin system-level actions have no tenant org).
         Standard action names:
-        - USER_CREATED
-        - USER_UPDATED
-        - USER_DEACTIVATED
-        - USER_ACTIVATED
-        - USER_DELETED
-        - INVITE_CREATED
-        - INVITE_REVOKED
-        - INVITE_ACCEPTED
+        - USER_CREATED, USER_UPDATED, USER_DEACTIVATED, USER_ACTIVATED
+        - USER_DELETED, INVITE_CREATED, INVITE_REVOKED, INVITE_ACCEPTED
         """
+        if organization_id is None:
+            return None
         log_data = {
             "actor_user_id": actor_user_id,
             "action": action,
