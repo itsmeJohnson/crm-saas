@@ -23,10 +23,19 @@ class LeadService:
     async def get_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
-        
+
         lead = await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+
+        if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+            from app.services.user_service import UserService
+            user_service = UserService(self.db)
+            downline_ids = await user_service.get_downline_user_ids(actor)
+            allowed_user_ids = downline_ids | {actor.id}
+            if lead.assigned_user_id not in allowed_user_ids:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+
         return lead
 
     async def create_lead(self, actor: User, lead_data: dict) -> Lead:
@@ -69,7 +78,17 @@ class LeadService:
     ) -> Tuple[Sequence[Lead], int]:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
-        
+
+        # Org-wide visibility for admins/managers; everyone else is scoped to
+        # themselves plus their recursive downline (so a telecaller only sees
+        # their own leads, and a team lead sees their own + their team's).
+        allowed_user_ids: set[uuid.UUID] | None = None
+        if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+            from app.services.user_service import UserService
+            user_service = UserService(self.db)
+            downline_ids = await user_service.get_downline_user_ids(actor)
+            allowed_user_ids = downline_ids | {actor.id}
+
         if assigned_user_id:
             assigned_user = await self.user_repo.get_user_by_id(actor.organization_id, assigned_user_id)
             if not assigned_user:
@@ -77,9 +96,15 @@ class LeadService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Assigned user not found in your organization"
                 )
+            if allowed_user_ids is not None and assigned_user_id not in allowed_user_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Assigned user is not yourself or in your downline reporting chain"
+                )
 
         return await self.lead_repo.paginate_leads(
-            actor.organization_id, skip, limit, search_query, status_filter, assigned_user_id, name, city
+            actor.organization_id, skip, limit, search_query, status_filter, assigned_user_id, name, city,
+            allowed_user_ids
         )
 
     async def update_lead(self, actor: User, lead_id: uuid.UUID, lead_data: dict) -> Lead:
