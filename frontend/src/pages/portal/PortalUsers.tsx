@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { userApi, UserResponse, SeatUtilizationResponse, SeatHistoryResponse } from '../../services/userApi';
-import { portalApi } from '../../services/portalApi';
 import {
   Users, UserPlus, Search, ShieldAlert, Loader2, CheckCircle2,
   AlertTriangle, ToggleLeft, ToggleRight, RefreshCw, History,
@@ -9,7 +8,6 @@ import {
 
 export const PortalUsers: React.FC = () => {
   const [users, setUsers] = useState<UserResponse[]>([]);
-  const [stats, setStats] = useState<any>(null);
   const [seatUtilization, setSeatUtilization] = useState<SeatUtilizationResponse | null>(null);
   const [seatHistory, setSeatHistory] = useState<SeatHistoryResponse[]>([]);
   const [inactiveEmployees, setInactiveEmployees] = useState<UserResponse[]>([]);
@@ -65,13 +63,11 @@ export const PortalUsers: React.FC = () => {
       setError(null);
       
       const userList = await userApi.getUsers({});
-      const portalStats = await portalApi.getStats();
       const seatUtil = await userApi.getSeatUtilization();
       const historyList = await userApi.getSeatHistory();
       const inactiveList = await userApi.getInactiveEmployees();
-      
+
       setUsers(userList);
-      setStats(portalStats);
       setSeatUtilization(seatUtil);
       setSeatHistory(historyList);
       setInactiveEmployees(inactiveList);
@@ -132,7 +128,6 @@ export const PortalUsers: React.FC = () => {
       await userApi.createUser({
         ...formData,
         reporting_to_id: formData.reporting_to_id || null,
-        organization_id: stats?.recent_activities?.[0]?.organization_id || ''
       });
 
       setSuccess(`User invited successfully. A new seat has been allocated.`);

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -19,7 +20,7 @@ class SubscriptionService:
         stmt = select(TenantSubscription).where(
             TenantSubscription.organization_id == organization_id,
             TenantSubscription.is_deleted == False
-        )
+        ).options(selectinload(TenantSubscription.plan))
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
 
