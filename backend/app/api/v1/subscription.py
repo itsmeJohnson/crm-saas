@@ -3,6 +3,7 @@ from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.dependencies.auth import RoleChecker
@@ -62,10 +63,10 @@ async def download_invoice_pdf(
         Invoice.id == invoice_id,
         Invoice.organization_id == current_user.organization_id,
         Invoice.is_deleted == False
-    )
+    ).options(selectinload(Invoice.organization))
     res = await db.execute(stmt)
     invoice = res.scalar_one_or_none()
-    
+
     if not invoice:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
