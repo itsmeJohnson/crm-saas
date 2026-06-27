@@ -95,7 +95,6 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
         last_name: data.last_name || undefined,
         role: mappedRole,
         password: data.password,
-        organization_id: currentOrg.id,
         reporting_to_id: data.reporting_to_id !== '' ? data.reporting_to_id : null,
       };
 

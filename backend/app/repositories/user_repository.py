@@ -40,6 +40,15 @@ class UserRepository(BaseRepository[User]):
         result = await self.db.execute(query)
         return result.scalars().first()
 
+    async def get_by_phone_in_org(self, organization_id: uuid.UUID, phone: str) -> User | None:
+        query = select(self.model).filter(
+            self.model.phone == phone,
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
     async def list_users(self, organization_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Sequence[User]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,

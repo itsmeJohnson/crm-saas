@@ -164,9 +164,12 @@ async def test_list_users_scoping_and_pagination(client: AsyncClient, setup_user
     res_data = response.json()
     assert len(res_data) == 0
 
-    # Employee cannot list users
+    # Plain Employee (no direct reports) can list users, scoped to themselves only
     response = await client.get("/api/v1/users/", headers=data["headers_employee_a"])
-    assert response.status_code == 403
+    assert response.status_code == 200
+    res_data = response.json()
+    assert len(res_data) == 1
+    assert res_data[0]["email"] == "employee@org-a.com"
 
 @pytest.mark.asyncio
 async def test_get_user_by_id(client: AsyncClient, setup_users: dict):

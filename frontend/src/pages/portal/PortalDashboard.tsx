@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { portalApi, DashboardStatsResponse } from '../../services/portalApi';
+import { extractErrorMessage } from '../../utils/errors';
 import {
   Sparkles, CreditCard, Users, HardDrive, PhoneCall,
   ArrowRight, Plus, AlertTriangle, Loader2, CheckCircle2, ChevronRight
@@ -17,9 +18,13 @@ export const PortalDashboard: React.FC = () => {
   const [selectedGateway, setSelectedGateway] = useState('UPI');
   const [buyingSeats, setBuyingSeats] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
+  const [extraSeatUnitPrice, setExtraSeatUnitPrice] = useState(0);
+  const [extraSeatGstPercent, setExtraSeatGstPercent] = useState(0);
+  const [extraSeatGstInclusive, setExtraSeatGstInclusive] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchSeatPricing();
   }, []);
 
   const fetchStats = async () => {
@@ -28,10 +33,31 @@ export const PortalDashboard: React.FC = () => {
       const data = await portalApi.getStats();
       setStats(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load dashboard statistics.");
+      setError(extractErrorMessage(err, "Failed to load dashboard statistics."));
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchSeatPricing = async () => {
+    try {
+      const pricing = await portalApi.getExtraSeatPricing();
+      setExtraSeatUnitPrice(pricing.unit_price || 0);
+      setExtraSeatGstPercent(pricing.gst_percentage || 0);
+      setExtraSeatGstInclusive(pricing.gst_inclusive || false);
+    } catch {
+      // Pricing display falls back to 0 if pricing details aren't available yet
+    }
+  };
+
+  // Mirrors the backend's exact billing math (PortalService.buy_extra_seats)
+  // so the preview total always matches what gets invoiced.
+  const calculateSeatTotal = () => {
+    const baseAmount = seatCount * extraSeatUnitPrice;
+    if (extraSeatGstInclusive) {
+      return baseAmount;
+    }
+    return baseAmount * (1 + extraSeatGstPercent / 100);
   };
 
   const handleBuySeats = async () => {
@@ -52,7 +78,7 @@ export const PortalDashboard: React.FC = () => {
       setShowSeatModal(false);
       fetchStats();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to purchase additional seats.");
+      setError(extractErrorMessage(err, "Failed to purchase additional seats."));
     } finally {
       setBuyingSeats(false);
     }
@@ -358,12 +384,12 @@ export const PortalDashboard: React.FC = () => {
 
               <div className="p-4 bg-slate-900/50 rounded-xl space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Unit Price:</span>
-                  <span className="font-mono text-slate-300">₹150.00 / seat / month</span>
+                  <span className="text-slate-500">Unit Price ({stats?.plan_name || 'current plan'}):</span>
+                  <span className="font-mono text-slate-300">₹{extraSeatUnitPrice.toFixed(2)} / seat / month</span>
                 </div>
                 <div className="flex justify-between border-t border-slate-800/80 pt-2 font-bold text-sm">
-                  <span className="text-slate-400">Total + Tax:</span>
-                  <span className="text-slate-100">₹{(seatCount * 150.0 * 1.18).toFixed(2)}</span>
+                  <span className="text-slate-400">Total + Tax ({extraSeatGstPercent}% GST{extraSeatGstInclusive ? ', inclusive' : ''}):</span>
+                  <span className="text-slate-100">₹{calculateSeatTotal().toFixed(2)}</span>
                 </div>
               </div>
             </div>

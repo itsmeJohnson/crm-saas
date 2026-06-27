@@ -128,6 +128,11 @@ export const portalApi = {
     return res.data;
   },
 
+  getExtraSeatPricing: async () => {
+    const res = await api.get<{ unit_price: number; gst_percentage: number; gst_inclusive: boolean; plan_name: string | null }>('/portal/subscription/extra-seat-pricing');
+    return res.data;
+  },
+
   buyExtraSeats: async (payload: { user_count: number; gateway: string }) => {
     const res = await api.post<PortalInvoiceResponse>('/portal/subscription/add-users', payload);
     return res.data;

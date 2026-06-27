@@ -140,13 +140,10 @@ class PortalService:
             "recent_activities": recent_activities
         }
 
-    async def buy_extra_seats(
-        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, user_count: int, gateway: str
-    ) -> Invoice:
-        if user_count < 1:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat count must be at least 1.")
-
-        # Load configurations
+    async def get_extra_seat_pricing(self, organization_id: uuid.UUID) -> dict:
+        """Resolves the effective per-seat price and GST config for buying
+        additional seats: plan.extra_user_price, falling back to the global
+        CommercialSettings default - same precedence buy_extra_seats bills with."""
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
         comm_res = await self.db.execute(comm_stmt)
         comm_settings = comm_res.scalar_one_or_none()
@@ -168,12 +165,43 @@ class PortalService:
             plan_res = await self.db.execute(plan_stmt)
             plan = plan_res.scalar_one_or_none()
 
-        # Seat unit price
         unit_price = 150.0
         if plan and plan.extra_user_price:
             unit_price = float(plan.extra_user_price)
         elif comm_settings.default_extra_user_price:
             unit_price = float(comm_settings.default_extra_user_price)
+
+        return {
+            "unit_price": unit_price,
+            "gst_percentage": float(comm_settings.default_gst),
+            "gst_inclusive": comm_settings.gst_inclusive,
+            "plan_name": plan.name if plan else None
+        }
+
+    async def buy_extra_seats(
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, user_count: int, gateway: str
+    ) -> Invoice:
+        if user_count < 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat count must be at least 1.")
+
+        pricing = await self.get_extra_seat_pricing(organization_id)
+        unit_price = pricing["unit_price"]
+
+        # Load configurations
+        comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
+        comm_res = await self.db.execute(comm_stmt)
+        comm_settings = comm_res.scalar_one_or_none()
+        if not comm_settings:
+            comm_settings = CommercialSettings(id="default")
+            self.db.add(comm_settings)
+            await self.db.flush()
+
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
 
         base_amount = unit_price * user_count
         gst_rate = float(comm_settings.default_gst)
@@ -207,8 +235,8 @@ class PortalService:
             invoice_number=invoice_num,
             amount=total_amount,
             status="Pending",
-            due_date=now + timedelta(days=comm_settings.grace_period_days),
-            plan_name=plan.name if plan else "Standard",
+            due_date=(now + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
+            plan_name=pricing["plan_name"] or "Standard",
             amount_inr=total_amount if comm_settings.default_currency == "INR" else 0.0,
             currency=comm_settings.default_currency,
             issue_date=now,
@@ -299,7 +327,7 @@ class PortalService:
             invoice_number=invoice_num,
             amount=total_amount,
             status="Pending",
-            due_date=now + timedelta(days=comm_settings.grace_period_days),
+            due_date=(now + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
             plan_name=plan.name if plan else "Standard",
             amount_inr=total_amount if comm_settings.default_currency == "INR" else 0.0,
             currency=comm_settings.default_currency,
@@ -537,7 +565,7 @@ class PortalService:
             invoice_number=invoice_num,
             amount=total_amount,
             status="Pending",
-            due_date=now + timedelta(days=comm_settings.grace_period_days),
+            due_date=(now + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
             plan_name=plan.name,
             amount_inr=total_amount if comm_settings.default_currency == "INR" else 0.0,
             currency=comm_settings.default_currency,

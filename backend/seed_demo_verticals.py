@@ -28,6 +28,8 @@ from app.models.organization import Organization
 from app.models.user import User
 from app.models.lead import Lead
 from app.models.pipeline import PipelineStage
+from app.models.plan import Plan
+from app.models.tenant_subscription import TenantSubscription
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("seed_demo_verticals")
@@ -336,6 +338,28 @@ async def seed_vertical(session, spec: dict):
     )
     session.add(org)
     await session.flush()
+
+    growth_plan_res = await session.execute(
+        select(Plan).where(Plan.name == "Growth", Plan.is_deleted == False)
+    )
+    growth_plan = growth_plan_res.scalar_one_or_none()
+    if growth_plan:
+        now_utc = datetime.now(timezone.utc)
+        subscription = TenantSubscription(
+            organization_id=org.id,
+            plan_id=growth_plan.id,
+            status="active",
+            start_date=now_utc,
+            end_date=now_utc + timedelta(days=365),
+            auto_renew=True,
+            billing_cycle="monthly",
+            users_purchased=org.max_users,
+            users_active=1,
+        )
+        session.add(subscription)
+        await session.flush()
+    else:
+        logger.warning(f"Growth plan not found - '{spec['org_name']}' created without a TenantSubscription row.")
 
     pwd_hash = get_password_hash(PASSWORD)
 
