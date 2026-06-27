@@ -1,12 +1,17 @@
 """
 Seeds one demo tenant per common telecalling/sales business vertical:
 Real Estate, Loan Recovery (Collections), General Telecalling Sales,
-Insurance & Banking, EdTech, Healthcare/Diagnostics, and E-commerce/D2C.
+Insurance & Banking, EdTech, Healthcare/Diagnostics, E-commerce/D2C,
+Digital Marketing Agency, Recruitment Agency, Automobile Showroom, and
+Logistics.
 
 Each tenant gets its own org, a small reporting hierarchy (OrgAdmin -> Manager
 -> Team Lead -> 2 Telecallers), a pipeline tailored to that business, and a
-batch of realistic leads. Re-running is safe - a vertical whose org slug
-already exists is skipped entirely.
+batch of realistic leads. Re-running is safe: a vertical whose org doesn't
+exist yet gets fully created; one that already exists is topped up with
+more leads (using its existing pipeline/agents) until it reaches
+LEADS_PER_VERTICAL, so bumping the target count and re-running is enough
+to grow existing demo tenants too.
 
 Usage: python seed_demo_verticals.py
 """
@@ -172,17 +177,152 @@ VERTICALS = [
         "sources": ["Website Cart Abandonment", "Instagram Shop", "WhatsApp Catalog", "Meta Ads", "Referral"],
         "value_range": (500, 15_000),
     },
+    {
+        "slug": "pixelreach-marketing",
+        "org_name": "PixelReach Marketing Agency",
+        "admin_email": "admin@pixelreach.com",
+        "stages": ["New", "Contacted", "Proposal Sent", "Negotiation", "Onboarded", "Lost"],
+        "stage_weights": [28, 24, 18, 14, 10, 6],
+        "titles": [
+            "SEO Services Inquiry", "Social Media Management Inquiry", "Performance Marketing Inquiry",
+            "Website Redesign Inquiry", "Branding & Creative Inquiry", "Influencer Marketing Inquiry"
+        ],
+        "companies": [
+            "Zenith Technologies", "Royal Orchid Hotels", "Deccan Healthcare", "Bharat Agri Solutions",
+            "Mumbai Digital Media", "D2C Startup Founder", "Local Restaurant Chain", "Real Estate Developer"
+        ],
+        "sources": ["LinkedIn Outreach", "Referral", "Google Ads", "Website Contact Form", "Cold Email"],
+        "value_range": (15_000, 400_000),
+    },
+    {
+        "slug": "talentbridge-recruitment",
+        "org_name": "TalentBridge Recruitment",
+        "admin_email": "admin@talentbridge.com",
+        "stages": ["New", "Contacted", "Resume Shared", "Interview Scheduled", "Offer Released", "Placed", "Lost"],
+        "stage_weights": [25, 22, 16, 14, 10, 7, 6],
+        "titles": [
+            "Software Engineer Role Inquiry", "Sales Manager Hiring Request", "Bulk Hiring - BPO Associates",
+            "Senior Leadership Search", "Contract Staffing Request", "Campus Hiring Drive Inquiry"
+        ],
+        "companies": [
+            "Wipro Infotech", "Kotak Securities", "Aditya Birla Capital", "Tata Steel", "Reliance Retail",
+            "Blue Star HVAC Group", "Godrej Consumer Goods", "Self / Job Seeker"
+        ],
+        "sources": ["Naukri.com", "LinkedIn", "Referral", "Company Website", "Job Fair"],
+        "value_range": (20_000, 600_000),
+    },
+    {
+        "slug": "velocity-motors",
+        "org_name": "Velocity Motors Showroom",
+        "admin_email": "admin@velocitymotors.com",
+        "stages": ["New", "Contacted", "Test Drive Scheduled", "Test Drive Done", "Booking Confirmed", "Delivered", "Lost"],
+        "stage_weights": [25, 22, 16, 14, 12, 6, 5],
+        "titles": [
+            "Hatchback Purchase Inquiry", "SUV Purchase Inquiry", "Sedan Purchase Inquiry",
+            "Electric Vehicle Inquiry", "Exchange Offer Inquiry", "Service & Maintenance Inquiry"
+        ],
+        "companies": [
+            "Self / Individual Buyer", "Corporate Fleet - Infosys", "Corporate Fleet - TCS",
+            "Self / First-time Buyer", "Self / Upgrade Buyer"
+        ],
+        "sources": ["Showroom Walk-in", "CarDekho", "CarWale", "Referral", "Festive Offer Campaign"],
+        "value_range": (450_000, 2_500_000),
+    },
+    {
+        "slug": "swifttrack-logistics",
+        "org_name": "SwiftTrack Logistics",
+        "admin_email": "admin@swifttracklogistics.com",
+        "stages": ["New", "Contacted", "Quote Shared", "Contract Signed", "Onboarded", "Lost"],
+        "stage_weights": [28, 24, 18, 14, 10, 6],
+        "titles": [
+            "Full Truck Load Inquiry", "Part Load Shipment Inquiry", "Warehousing Inquiry",
+            "Last Mile Delivery Partnership", "Cold Chain Logistics Inquiry", "Express Courier Bulk Inquiry"
+        ],
+        "companies": [
+            "Reliance Retail", "Godrej Consumer Goods", "Mahindra Logistics Client", "Local D2C Brand",
+            "Bharat Agri Solutions", "Tata Steel BKC Division", "Mumbai Digital Media"
+        ],
+        "sources": ["Website Quote Form", "Referral", "Trade Show", "Cold Call List", "IndiaMART"],
+        "value_range": (25_000, 800_000),
+    },
 ]
 
-LEADS_PER_VERTICAL = 35
+LEADS_PER_VERTICAL = 150
+
+
+async def top_up_leads(session, spec: dict, org: Organization, needed: int):
+    """Add `needed` more leads to an already-seeded org, reusing its existing
+    pipeline stages and agents instead of recreating org/users."""
+    stage_rows = await session.execute(
+        select(PipelineStage.id, PipelineStage.name).where(PipelineStage.organization_id == org.id)
+    )
+    stage_map = {name: sid for sid, name in stage_rows.all()}
+    if not stage_map:
+        logger.warning(f"'{spec['org_name']}' has no pipeline stages - skipping top-up.")
+        return 0
+
+    agent_rows = await session.execute(
+        select(User.id).where(User.organization_id == org.id, User.role == "Employee", User.is_active == True)
+    )
+    agent_ids = [row[0] for row in agent_rows.all()]
+    admin_row = await session.execute(
+        select(User.id).where(User.organization_id == org.id, User.role == "OrgAdmin")
+    )
+    admin_id = admin_row.scalar_one_or_none()
+    if not agent_ids or not admin_id:
+        logger.warning(f"'{spec['org_name']}' is missing agents/admin - skipping top-up.")
+        return 0
+
+    lo, hi = spec["value_range"]
+    stage_names = [s for s in spec["stages"] if s in stage_map]
+    weights = [w for s, w in zip(spec["stages"], spec["stage_weights"]) if s in stage_map]
+
+    for i in range(needed):
+        stage_name = random.choices(stage_names, weights=weights, k=1)[0]
+        fn, ln = random_person()
+        value = float(random.randint(int(lo), int(hi)))
+        days_ago = random.randint(0, 20)
+        created_at_time = datetime.now(timezone.utc) - timedelta(
+            days=days_ago, hours=random.randint(0, 23), minutes=random.randint(0, 59)
+        )
+        lead = Lead(
+            organization_id=org.id,
+            first_name=fn,
+            last_name=ln,
+            email=f"{fn.lower()}.{ln.lower()}{random.randint(1000, 999999)}@gmail.com",
+            phone=random_phone(),
+            company_name=random.choice(spec["companies"]),
+            title=random.choice(spec["titles"]),
+            city=random.choice(CITIES),
+            source=random.choice(spec["sources"]),
+            status=stage_name,
+            value=value,
+            assigned_user_id=random.choice(agent_ids),
+            created_by=admin_id,
+            stage_id=stage_map[stage_name],
+            call_attempts_count=random.randint(0, 6),
+            created_at=created_at_time,
+        )
+        session.add(lead)
+    return needed
 
 
 async def seed_vertical(session, spec: dict):
     existing = await session.execute(
-        select(Organization.id).where(Organization.slug == spec["slug"])
+        select(Organization).where(Organization.slug == spec["slug"])
     )
-    if existing.first():
-        logger.info(f"Skipping '{spec['org_name']}' - already seeded.")
+    org = existing.scalar_one_or_none()
+    if org:
+        count_res = await session.execute(
+            select(Lead.id).where(Lead.organization_id == org.id)
+        )
+        current_count = len(count_res.all())
+        needed = LEADS_PER_VERTICAL - current_count
+        if needed <= 0:
+            logger.info(f"Skipping '{spec['org_name']}' - already has {current_count} leads.")
+            return
+        added = await top_up_leads(session, spec, org, needed)
+        logger.info(f"Topped up '{spec['org_name']}': +{added} leads (had {current_count}, now {current_count + added}).")
         return
 
     org = Organization(

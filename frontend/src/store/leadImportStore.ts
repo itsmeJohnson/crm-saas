@@ -26,7 +26,7 @@ interface LeadImportState {
   uploadImportFile: (file: File) => Promise<ImportPreviewResponse>;
   previewGoogleSheets: (url: string) => Promise<ImportPreviewResponse>;
   processImport: (payload: LeadImportProcessRequest) => Promise<LeadImportResponse>;
-  downloadTemplate: (format: 'csv' | 'xlsx') => Promise<Blob>;
+  downloadTemplate: (format: 'csv' | 'xlsx', vertical?: string | null) => Promise<Blob>;
   downloadFailedRows: (importId: string) => Promise<Blob>;
   clearError: () => void;
 }
@@ -144,9 +144,9 @@ export const useLeadImportStore = create<LeadImportState>((set, get) => ({
     }
   },
 
-  downloadTemplate: async (format) => {
+  downloadTemplate: async (format, vertical) => {
     try {
-      return await leadImportApi.downloadTemplate(format);
+      return await leadImportApi.downloadTemplate(format, vertical);
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || 'Failed to download template';
       throw new Error(errorMsg);

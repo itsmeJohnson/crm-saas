@@ -38,12 +38,22 @@ export interface AssignmentConfigResponse {
   last_assigned_user_id: string | null;
 }
 
+export interface BusinessTemplateType {
+  key: string;
+  label: string;
+}
+
 export const leadImportApi = {
-  downloadTemplate: async (format: 'csv' | 'xlsx') => {
+  downloadTemplate: async (format: 'csv' | 'xlsx', vertical?: string | null) => {
     const response = await api.get('/leads/import/template', {
-      params: { format },
+      params: vertical ? { format, vertical } : { format },
       responseType: 'blob',
     });
+    return response.data;
+  },
+
+  getBusinessTemplateTypes: async () => {
+    const response = await api.get<BusinessTemplateType[]>('/leads/import/template/business-types');
     return response.data;
   },
 
