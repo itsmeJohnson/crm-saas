@@ -89,25 +89,35 @@ async def delete_lead(
 
 # --- Bulk Lead Imports ---
 
+@router.get("/import/template/business-types")
+async def list_import_template_business_types(
+    actor: Annotated[User, Depends(require_tl_or_above)]
+):
+    """List business verticals with a tailored import template available."""
+    return LeadImportService.list_business_templates()
+
 @router.get("/import/template")
 async def get_import_template(
     actor: Annotated[User, Depends(require_tl_or_above)],
-    format: str = Query("csv", pattern="^(csv|xlsx)$")
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    vertical: str | None = Query(None, description="Business type key for a tailored template, e.g. 'real_estate'")
 ):
-    """Download CSV or Excel template for bulk lead imports."""
+    """Download CSV or Excel template for bulk lead imports, optionally
+    tailored to a business vertical with relevant headers and sample rows."""
+    filename_suffix = f"_{vertical}" if vertical else ""
     if format == "xlsx":
-        xlsx_bytes = LeadImportService.generate_xlsx_template()
+        xlsx_bytes = LeadImportService.generate_xlsx_template(vertical)
         return StreamingResponse(
             io.BytesIO(xlsx_bytes),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment; filename=leads_template.xlsx"}
+            headers={"Content-Disposition": f"attachment; filename=leads_template{filename_suffix}.xlsx"}
         )
     else:
-        csv_text = LeadImportService.generate_csv_template()
+        csv_text = LeadImportService.generate_csv_template(vertical)
         return StreamingResponse(
             io.StringIO(csv_text),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=leads_template.csv"}
+            headers={"Content-Disposition": f"attachment; filename=leads_template{filename_suffix}.csv"}
         )
 
 @router.post("/import/upload", response_model=ImportPreviewResponse)
