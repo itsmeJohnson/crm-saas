@@ -15,6 +15,8 @@ class RegisterTenantRequest(BaseModel):
     last_name: str | None = Field(None, max_length=100)
     licensed_seats: int = Field(10, ge=10, description="Number of purchased user licenses, minimum 10.")
     contract_months: int = Field(3, ge=3, description="Contract length in months, minimum 3.")
+    plan_name: str | None = None
+    billing_cycle: str = "monthly"
 
 class Token(BaseModel):
     access_token: str

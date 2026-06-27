@@ -115,8 +115,10 @@ PLAN_FEATURES = {
 
 async def seed():
     async with async_session_maker() as db:
-        # Rename old "professional" plan to "growth" if it exists
-        await db.execute(text("UPDATE plans SET name='Growth' WHERE LOWER(name)='professional'"))
+        # Rename old variants to match seed names
+        await db.execute(text("UPDATE plans SET name='Growth', display_name='Growth' WHERE LOWER(name) IN ('professional', 'growth plan', 'professional plan')"))
+        await db.execute(text("UPDATE plans SET name='Starter', display_name='Starter' WHERE LOWER(name) IN ('starter plan')"))
+        await db.execute(text("UPDATE plans SET name='Enterprise', display_name='Enterprise' WHERE LOWER(name) IN ('enterprise plan')"))
         await db.commit()
 
         for plan_data in PLANS:
@@ -127,6 +129,7 @@ async def seed():
             if plan is None:
                 plan = Plan(
                     name=name,
+                    display_name=name,
                     monthly_price=plan_data["monthly_price"],
                     quarterly_price=plan_data["quarterly_price"],
                     annual_price=plan_data["annual_price"],
@@ -139,6 +142,7 @@ async def seed():
                 await db.flush()
                 print(f"  Created plan: {name}")
             else:
+                plan.display_name = name
                 plan.monthly_price = plan_data["monthly_price"]
                 plan.quarterly_price = plan_data["quarterly_price"]
                 plan.annual_price = plan_data["annual_price"]

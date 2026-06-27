@@ -416,19 +416,9 @@ class UserService:
         
         reporting_to_id = None
         if actor.role == "Employee":
-            is_tl = False
-            if actor.reporting_to_id:
-                # Check if the parent role is Manager (so actor is TL)
-                parent_res = await self.db.execute(select(User.role).filter(User.id == actor.reporting_to_id))
-                parent_role = parent_res.scalar()
-                if parent_role == "Manager":
-                    is_tl = True
-            
-            if not is_tl:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You do not have enough privileges"
-                )
+            # Every Employee (TL or plain telecaller) is scoped to themselves
+            # plus their direct reports, if any - this also lets the frontend
+            # resolve "assigned to me" without a separate self-lookup.
             reporting_to_id = actor.id
 
         records, total = await self.user_repo.paginate_users(

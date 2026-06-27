@@ -28,7 +28,7 @@ async def create_user(
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
-    actor: Annotated[User, Depends(require_tl_or_above)],
+    actor: Annotated[User, Depends(require_active_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=500),
@@ -36,7 +36,8 @@ async def list_users(
     role: str | None = Query(None),
     is_active: bool | None = Query(None)
 ):
-    """List paginated, searchable users scoped to the tenant organization."""
+    """List paginated, searchable users scoped to the actor: org-wide for
+    Manager/Admin, self + direct reports for Employees (TL or plain)."""
     user_service = UserService(db)
     records, _ = await user_service.paginate_users(actor, skip, limit, search, role, is_active)
     return list(records)

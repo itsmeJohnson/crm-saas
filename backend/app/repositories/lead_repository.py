@@ -68,7 +68,8 @@ class LeadRepository(BaseRepository[Lead]):
         status: str | None = None,
         assigned_user_id: uuid.UUID | None = None,
         name: str | None = None,
-        city: str | None = None
+        city: str | None = None,
+        allowed_user_ids: set[uuid.UUID] | None = None
     ) -> Tuple[Sequence[Lead], int]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,
@@ -80,6 +81,8 @@ class LeadRepository(BaseRepository[Lead]):
 
         if assigned_user_id:
             query = query.filter(self.model.assigned_user_id == assigned_user_id)
+        elif allowed_user_ids is not None:
+            query = query.filter(self.model.assigned_user_id.in_(allowed_user_ids))
         
         if name:
             name_filter = f"%{name}%"

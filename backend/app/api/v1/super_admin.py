@@ -25,7 +25,7 @@ from app.dependencies.auth import get_current_active_user, RoleChecker
 from app.schemas.super_admin import (
     SubscriptionUpdateRequest, TenantResponse, TenantUserResponse,
     TenantInvoiceResponse, InvoiceCreateRequest,
-    PlanCreate, PlanResponse, FeatureResponse, PlanFeatureResponse,
+    PlanCreate, PlanUpdate, PlanResponse, FeatureResponse, PlanFeatureResponse,
     PlanFeatureToggle, PlanFeatureClone, SystemSettingRequest, SystemSettingResponse
 )
 from app.services.auth_service import AuthService
@@ -209,10 +209,11 @@ async def create_tenant_invoice(
     rand_suffix = secrets.token_hex(4).upper()
     invoice_number = f"INV-{datetime.now().year}-{rand_suffix}"
     
+    # due_date column is a naive TIMESTAMP; normalize to UTC then drop tzinfo
     due_date = payload.due_date
-    if due_date.tzinfo is None:
-        due_date = due_date.replace(tzinfo=timezone.utc)
-        
+    if due_date.tzinfo is not None:
+        due_date = due_date.astimezone(timezone.utc).replace(tzinfo=None)
+
     invoice = Invoice(
         organization_id=org_id,
         invoice_number=invoice_number,
@@ -540,7 +541,7 @@ async def create_plan(
 @router.patch("/plans/{plan_id}", response_model=PlanResponse)
 async def update_plan(
     plan_id: uuid.UUID,
-    payload: dict,  # Freeform dict to allow partial updates
+    payload: PlanUpdate,
     actor: Annotated[User, Depends(require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -548,25 +549,26 @@ async def update_plan(
     plan = await db.get(Plan, plan_id)
     if not plan or plan.is_deleted:
         raise HTTPException(status_code=404, detail="Plan not found")
-    
+
     old_val = {}
     new_val = {}
-    
-    for key, val in payload.items():
+    update_data = payload.model_dump(exclude_unset=True)
+
+    for key, val in update_data.items():
         if hasattr(plan, key):
             current_value = getattr(plan, key)
             if current_value != val:
                 old_val[key] = str(current_value) if current_value is not None else ""
                 new_val[key] = str(val) if val is not None else ""
                 setattr(plan, key, val)
-            
+
     # Keep price_inr in sync with monthly_price
-    if "monthly_price" in payload:
-        plan.price_inr = payload["monthly_price"]
+    if "monthly_price" in update_data:
+        plan.price_inr = update_data["monthly_price"]
 
     # Keep is_active in sync with plan_active if updated
-    if "plan_active" in payload:
-        plan.is_active = payload["plan_active"]
+    if "plan_active" in update_data:
+        plan.is_active = update_data["plan_active"]
 
     await db.commit()
     await db.refresh(plan)
