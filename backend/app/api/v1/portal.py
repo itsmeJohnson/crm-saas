@@ -3,6 +3,7 @@ from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.dependencies.auth import RoleChecker
@@ -188,12 +189,12 @@ async def download_portal_invoice_pdf(
         Invoice.id == invoice_id,
         Invoice.organization_id == current_user.organization_id,
         Invoice.is_deleted == False
-    )
+    ).options(selectinload(Invoice.organization))
     res = await db.execute(stmt)
     invoice = res.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found.")
-    
+
     pdf_bytes = generate_invoice_pdf(invoice)
     return Response(
         content=pdf_bytes,
@@ -284,7 +285,7 @@ async def list_portal_payments(
     """Retrieves payment transactions history log."""
     stmt = select(Payment).join(Invoice).where(
         Invoice.organization_id == current_user.organization_id
-    ).order_by(desc(Payment.paid_date))
+    ).options(selectinload(Payment.invoice)).order_by(desc(Payment.paid_date))
     res = await db.execute(stmt)
     
     payments = res.scalars().all()
