@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { userApi, UserResponse, SeatUtilizationResponse, SeatHistoryResponse } from '../../services/userApi';
+import { extractErrorMessage } from '../../utils/errors';
 import {
   Users, UserPlus, Search, ShieldAlert, Loader2, CheckCircle2,
   AlertTriangle, ToggleLeft, ToggleRight, RefreshCw, History,
@@ -72,7 +73,7 @@ export const PortalUsers: React.FC = () => {
       setSeatHistory(historyList);
       setInactiveEmployees(inactiveList);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load seat licensing and user data.");
+      setError(extractErrorMessage(err, "Failed to load seat licensing and user data."));
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export const PortalUsers: React.FC = () => {
         setSuccess(`User account activated successfully! A new seat has been assigned.`);
         fetchData();
       } catch (err: any) {
-        setError(err.response?.data?.detail || "Failed to activate user account. Please check seat limits.");
+        setError(extractErrorMessage(err, "Failed to activate user account. Please check seat limits."));
       }
     }
   };
@@ -107,7 +108,7 @@ export const PortalUsers: React.FC = () => {
       setDeactivateTarget(null);
       fetchData();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to deactivate user.");
+      setError(extractErrorMessage(err, "Failed to deactivate user."));
     }
   };
 
@@ -143,7 +144,7 @@ export const PortalUsers: React.FC = () => {
       });
       fetchData();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to add user seat.");
+      setError(extractErrorMessage(err, "Failed to add user seat."));
     } finally {
       setSubmitting(false);
     }
@@ -183,7 +184,7 @@ export const PortalUsers: React.FC = () => {
       });
       fetchData();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to replace employee.");
+      setError(extractErrorMessage(err, "Failed to replace employee."));
     } finally {
       setSubmitting(false);
     }

@@ -131,9 +131,19 @@ class UserService:
         existing = await self.user_repo.get_by_email_global(user_data["email"])
         if existing:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
+
+        # Check phone uniqueness within the organization
+        phone = user_data.get("phone")
+        if phone:
+            existing_phone = await self.user_repo.get_by_phone_in_org(actor.organization_id, phone)
+            if existing_phone:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number already in use by another user in your organization"
+                )
 
         # Allocate and assign seat
         available_seats = await self._get_available_seat_numbers(actor.organization_id)
@@ -598,9 +608,19 @@ class UserService:
         existing = await self.user_repo.get_by_email_global(new_user_data["email"])
         if existing:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
+
+        # Check phone uniqueness within the organization
+        new_phone = new_user_data.get("phone")
+        if new_phone:
+            existing_phone = await self.user_repo.get_by_phone_in_org(actor.organization_id, new_phone)
+            if existing_phone:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number already in use by another user in your organization"
+                )
 
         # 5. Capture the seat
         seat_to_transfer = old_user.seat_number

@@ -74,6 +74,16 @@ async def cancel_auto_renew(
     )
     return {"success": True, "message": "Auto renewal successfully cancelled."}
 
+@router.get("/subscription/extra-seat-pricing")
+async def get_extra_seat_pricing(
+    current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Resolves the effective per-seat price and GST config the org would be
+    billed for buying additional seats, for accurate display before checkout."""
+    service = PortalService(db)
+    return await service.get_extra_seat_pricing(current_user.organization_id)
+
 @router.post("/subscription/add-users", response_model=InvoiceResponse)
 async def add_user_seats(
     current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],

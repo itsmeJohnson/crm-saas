@@ -91,7 +91,7 @@ describe('ImportModal Component', () => {
     const csvBtn = screen.getByText('CSV Template');
     fireEvent.click(csvBtn);
 
-    expect(mockDownloadTemplate).toHaveBeenCalledWith('csv');
+    expect(mockDownloadTemplate).toHaveBeenCalledWith('csv', null);
   });
 
   it('transitions to mapping step on successful upload', async () => {

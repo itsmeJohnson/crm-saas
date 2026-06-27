@@ -18,6 +18,8 @@ class PlanResponse(BaseModel):
     is_trial: bool
     trial_days: int | None = None
     is_active: bool
+    extra_user_price: float = 0.0
+    gst_percentage: float = 0.0
 
 class TenantSubscriptionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
