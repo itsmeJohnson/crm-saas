@@ -76,8 +76,10 @@ class AuthService:
         from app.models.seat_history import SeatAssignmentHistory
         from app.models.payment import Payment
 
-        # Fetch Starter plan
-        plan_stmt = select(Plan).where(Plan.name == "Starter")
+        # Fetch the requested plan (case-insensitive; frontend sends lowercase slugs), falling back to Starter
+        from sqlalchemy import func as sa_func
+        requested_plan_name = request.plan_name or "Starter"
+        plan_stmt = select(Plan).where(sa_func.lower(Plan.name) == requested_plan_name.lower())
         plan_res = await self.db.execute(plan_stmt)
         plan = plan_res.scalar_one_or_none()
         if not plan:
@@ -121,7 +123,7 @@ class AuthService:
             start_date=now_utc,
             end_date=sub_end,
             auto_renew=True,
-            billing_cycle="monthly",
+            billing_cycle=request.billing_cycle,
             users_purchased=request.licensed_seats,
             users_active=1
         )
@@ -188,7 +190,7 @@ class AuthService:
             invoice_number=invoice_num,
             amount=total_amount,
             status="Paid",
-            due_date=now_utc + timedelta(days=comm_settings.grace_period_days),
+            due_date=(now_utc + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
             plan_name=plan.name,
             amount_inr=total_amount if currency == "INR" else 0.0,
             currency=currency,
