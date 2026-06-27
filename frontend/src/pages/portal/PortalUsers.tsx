@@ -202,7 +202,7 @@ export const PortalUsers: React.FC = () => {
     return matchesSearch && matchesRole;
   });
 
-  const potentialManagers = users.filter(u => u.is_active && (u.role === 'Manager' || u.role === 'OrgAdmin'));
+  const potentialManagers = users.filter(u => u.is_active && (u.role === 'Manager' || u.role === 'OrgAdmin' || u.is_team_leader));
 
   if (loading && users.length === 0) {
     return (
