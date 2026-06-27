@@ -74,7 +74,6 @@ export const userApi = {
     last_name?: string;
     role: string;
     password?: string;
-    organization_id: string;
     reporting_to_id?: string | null;
   }) => {
     const response = await api.post<UserResponse>('/users/', payload);
