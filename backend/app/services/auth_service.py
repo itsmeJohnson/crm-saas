@@ -79,9 +79,12 @@ class AuthService:
         # Fetch the requested plan (case-insensitive; frontend sends lowercase slugs), falling back to Starter
         from sqlalchemy import func as sa_func
         requested_plan_name = request.plan_name or "Starter"
-        plan_stmt = select(Plan).where(sa_func.lower(Plan.name) == requested_plan_name.lower())
+        plan_stmt = select(Plan).where(
+            sa_func.lower(Plan.name) == requested_plan_name.lower(),
+            Plan.is_deleted == False
+        )
         plan_res = await self.db.execute(plan_stmt)
-        plan = plan_res.scalar_one_or_none()
+        plan = plan_res.scalars().first()
         if not plan:
             # Fallback to any plan if Starter is not seeded
             plan_stmt = select(Plan)
