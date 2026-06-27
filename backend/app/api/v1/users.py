@@ -88,7 +88,7 @@ async def replace_employee(
     new_user, notification = await user_service.replace_employee(
         actor=actor,
         old_user_id=payload.old_user_id,
-        new_user_data=payload.model_dump(),
+        new_user_data=payload.model_dump(exclude={"old_user_id"}),
         ip_address=ip_address,
         browser_info=browser_info
     )

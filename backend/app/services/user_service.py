@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Sequence, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.user_repository import UserRepository
 from app.services.permission_service import PermissionService
@@ -695,6 +696,9 @@ class UserService:
     async def get_seat_history(self, organization_id: uuid.UUID) -> list[SeatAssignmentHistory]:
         stmt = select(SeatAssignmentHistory).where(
             SeatAssignmentHistory.organization_id == organization_id
+        ).options(
+            selectinload(SeatAssignmentHistory.user),
+            selectinload(SeatAssignmentHistory.performed_by)
         ).order_by(SeatAssignmentHistory.created_at.desc())
         res = await self.db.execute(stmt)
         return list(res.scalars().all())
