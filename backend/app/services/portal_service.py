@@ -140,10 +140,35 @@ class PortalService:
             "recent_activities": recent_activities
         }
 
+    # Number of months each billing cycle covers. Cycle prices on a plan are
+    # stored as per-seat PER-MONTH rates, so an extra seat's total for a cycle
+    # is the per-month rate x these months (matches PortalService.upgrade_subscription).
+    _CYCLE_MONTHS = {"monthly": 1, "quarterly": 3, "annual": 12}
+
+    def _extra_seat_unit_price(self, plan: "Plan | None", comm_settings: CommercialSettings, billing_cycle: str) -> float:
+        """Per-user price for ONE extra seat across the whole billing cycle."""
+        months = self._CYCLE_MONTHS.get(billing_cycle, 1)
+
+        # Resolve the per-month rate for this cycle with graceful fallbacks.
+        per_month = 0.0
+        if plan:
+            if billing_cycle == "annual" and plan.annual_price:
+                per_month = float(plan.annual_price)
+            elif billing_cycle == "quarterly" and plan.quarterly_price:
+                per_month = float(plan.quarterly_price)
+            elif plan.monthly_price:
+                per_month = float(plan.monthly_price)
+            elif plan.extra_user_price:
+                per_month = float(plan.extra_user_price)
+        if per_month <= 0:
+            per_month = float(comm_settings.default_extra_user_price or 150.0)
+
+        return per_month * months
+
     async def get_extra_seat_pricing(self, organization_id: uuid.UUID) -> dict:
-        """Resolves the effective per-seat price and GST config for buying
-        additional seats: plan.extra_user_price, falling back to the global
-        CommercialSettings default - same precedence buy_extra_seats bills with."""
+        """Resolves the effective per-seat price (per billing cycle) and GST
+        config for buying additional seats, plus whether the org is currently
+        eligible to purchase them."""
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
         comm_res = await self.db.execute(comm_stmt)
         comm_settings = comm_res.scalar_one_or_none()
@@ -165,27 +190,61 @@ class PortalService:
             plan_res = await self.db.execute(plan_stmt)
             plan = plan_res.scalar_one_or_none()
 
-        unit_price = 150.0
-        if plan and plan.extra_user_price:
-            unit_price = float(plan.extra_user_price)
-        elif comm_settings.default_extra_user_price:
-            unit_price = float(comm_settings.default_extra_user_price)
+        cycle_prices = {
+            cycle: self._extra_seat_unit_price(plan, comm_settings, cycle)
+            for cycle in self._CYCLE_MONTHS
+        }
+
+        minimum_users = plan.minimum_users if plan else 10
+        users_purchased = sub.users_purchased if sub else 0
+        allow_additional = plan.allow_additional_seats if plan else True
+        # Extra seats can only be bought on an active paid plan that has met its
+        # committed minimum — not while trialing or lapsed.
+        can_add_extra = bool(
+            sub
+            and sub.status == "active"
+            and allow_additional
+            and users_purchased >= minimum_users
+        )
 
         return {
-            "unit_price": unit_price,
+            # Back-compat: monthly per-seat price.
+            "unit_price": cycle_prices["monthly"],
+            "cycle_prices": cycle_prices,
             "gst_percentage": float(comm_settings.default_gst),
             "gst_inclusive": comm_settings.gst_inclusive,
-            "plan_name": plan.name if plan else None
+            "plan_name": plan.name if plan else None,
+            "minimum_users": minimum_users,
+            "users_purchased": users_purchased,
+            "allow_additional_seats": allow_additional,
+            "can_add_extra": can_add_extra,
+            "subscription_status": sub.status if sub else "inactive",
         }
 
     async def buy_extra_seats(
-        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, user_count: int, gateway: str
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, user_count: int, gateway: str, billing_cycle: str = "monthly"
     ) -> Invoice:
         if user_count < 1:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat count must be at least 1.")
+        if user_count > 500:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can purchase at most 500 seats in a single transaction. Please contact sales for larger volumes.")
+        if billing_cycle not in self._CYCLE_MONTHS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid billing cycle.")
 
         pricing = await self.get_extra_seat_pricing(organization_id)
-        unit_price = pricing["unit_price"]
+        # The "minimum reached" rule only gates the UI affordance; the API just
+        # requires an active plan that permits additional seats.
+        if pricing["subscription_status"] != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Additional seats can only be purchased on an active subscription. Please activate or renew your plan first."
+            )
+        if not pricing["allow_additional_seats"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your current plan does not allow purchasing additional seats."
+            )
+        unit_price = pricing["cycle_prices"].get(billing_cycle, pricing["unit_price"])
 
         # Load configurations
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
@@ -253,6 +312,8 @@ class PortalService:
         invoice.action_metadata = {
             "action_type": "buy_extra_seats",
             "user_count": user_count,
+            "billing_cycle": billing_cycle,
+            "unit_price": unit_price,
             "gateway": gateway
         }
         self.db.add(invoice)

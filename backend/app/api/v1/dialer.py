@@ -12,8 +12,9 @@ from app.schemas.lead import LeadResponse
 from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest
 from app.services.agent_state_service import AgentStateService
 from app.services.disposition_service import DispositionService
+from app.dependencies.feature_guard import require_feature
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_feature("OUTBOUND_CALLING"))])
 logger = logging.getLogger(__name__)
 
 async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
@@ -94,6 +95,14 @@ async def get_next_lead(
     # 4.5. Trigger Knowlarity Click-to-Call if telephony credentials are provided
     call_sid = f"outbound-{uuid.uuid4()}"
     if payload.knowlarity_api_key and payload.agent_phone_number:
+        # Integrated calling is a paid feature — plans without it (e.g. Core CRM)
+        # can use the dialer console with their own phone but not trigger calls here.
+        from app.dependencies.feature_guard import tenant_has_feature
+        if not await tenant_has_feature(db, actor, "OUTBOUND_CALLING"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Integrated outbound calling is not included in your plan. Please upgrade to enable click-to-call."
+            )
         try:
             from app.services.knowlarity_service import trigger_knowlarity_call
             call_res = await trigger_knowlarity_call(

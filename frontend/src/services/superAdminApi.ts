@@ -20,6 +20,7 @@ export interface TaxConfigUpdate { tax_rate?: number; tax_label?: string; tax_ty
 
 // ── Phase 9: Payment Gateways ─────────────────────────────────────────────────
 export interface PaymentGatewayResponse { id: string; name: string; display_name: string; is_enabled: boolean; is_sandbox: boolean; api_key_set: boolean; webhook_secret_set: boolean; sort_order: number; description: string | null; extra_config: Record<string, any> | null; }
+export interface PaymentGatewayCreate { name: string; display_name: string; is_enabled?: boolean; is_sandbox?: boolean; api_key?: string; api_secret?: string; webhook_secret?: string; description?: string; }
 export interface PaymentGatewayUpdate { display_name?: string; is_enabled?: boolean; is_sandbox?: boolean; api_key?: string; api_secret?: string; webhook_secret?: string; description?: string; }
 
 // ── Phase 12: Notification Templates ─────────────────────────────────────────
@@ -40,6 +41,7 @@ export interface RevenueReport { period_start: string; period_end: string; curre
 export interface TenantReport { total: number; active: number; trial: number; expired: number; suspended: number; by_plan: Array<{ plan: string; count: number }>; }
 export interface SeatUtilizationReport { total_licensed: number; total_active: number; utilization_pct: number; by_organization: Array<{ name: string; licensed: number; active: number; utilization_pct: number }>; }
 export interface InvoiceReport { period_start: string; period_end: string; total_invoices: number; paid_count: number; paid_amount: number; unpaid_count: number; unpaid_amount: number; }
+export interface ChurnReport { period: string; churned_subscriptions: number; active_at_period_start: number; churn_rate_pct: number; healthy: boolean; benchmark: string; }
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 export interface AuditLogEntry { id: string; organization_id?: string; actor_user_id?: string; action: string; resource_type: string; resource_id?: string; metadata?: Record<string, any>; created_at: string; }
@@ -56,6 +58,7 @@ export interface TenantResponse {
   max_users: number;
   user_count: number;
   invoice_count: number;
+  call_recording_usage: number;
 }
 
 export interface TenantUserResponse {
@@ -100,6 +103,7 @@ export interface CreateTenantRequest {
   contract_months?: number;
   plan_name?: string;
   billing_cycle?: string;
+  is_trial?: boolean;
 }
 
 export const superAdminApi = {
@@ -120,6 +124,11 @@ export const superAdminApi = {
 
   updateSubscription: async (orgId: string, payload: SubscriptionUpdateRequest) => {
     const response = await api.put<TenantResponse>(`/super-admin/tenants/${orgId}/subscription`, payload);
+    return response.data;
+  },
+
+  updateTenantUsage: async (orgId: string, call_recording_usage: number) => {
+    const response = await api.put<TenantResponse>(`/super-admin/tenants/${orgId}/usage`, { call_recording_usage });
     return response.data;
   },
 
@@ -233,6 +242,7 @@ export const superAdminApi = {
 
   // Phase 9: Payment Gateways
   getPaymentGateways: async () => { const r = await api.get<PaymentGatewayResponse[]>('/super-admin/payment-gateways'); return r.data; },
+  createPaymentGateway: async (p: PaymentGatewayCreate) => { const r = await api.post<PaymentGatewayResponse>('/super-admin/payment-gateways', p); return r.data; },
   updatePaymentGateway: async (id: string, p: PaymentGatewayUpdate) => { const r = await api.patch<PaymentGatewayResponse>(`/super-admin/payment-gateways/${id}`, p); return r.data; },
   togglePaymentGateway: async (id: string) => { const r = await api.post<{ is_enabled: boolean }>(`/super-admin/payment-gateways/${id}/toggle`); return r.data; },
 
@@ -257,6 +267,10 @@ export const superAdminApi = {
   getSeatUtilization: async () => { const r = await api.get<SeatUtilizationReport>('/super-admin/reports/seat-utilization'); return r.data; },
   getInvoiceReport: async (start_date?: string, end_date?: string) => {
     const r = await api.get<InvoiceReport>('/super-admin/reports/invoices', { params: { start_date, end_date } });
+    return r.data;
+  },
+  getChurnReport: async () => {
+    const r = await api.get<ChurnReport>('/super-admin/reports/churn');
     return r.data;
   },
 

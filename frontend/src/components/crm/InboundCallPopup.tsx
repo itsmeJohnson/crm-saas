@@ -16,14 +16,14 @@ interface InboundCallEvent {
 }
 
 export const InboundCallPopup: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, features } = useAuthStore();
   const navigate = useNavigate();
   const { answerInboundCall } = useDialerStore();
   const [activeCall, setActiveCall] = useState<InboundCallEvent | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !features.includes('INBOUND_CALLING')) return;
 
     // Connect to backend WebSocket endpoint for telephony alerts
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -85,9 +85,9 @@ export const InboundCallPopup: React.FC = () => {
       if (socket) socket.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, [user]);
+  }, [user, features]);
 
-  if (!activeCall) return null;
+  if (!features.includes('INBOUND_CALLING') || !activeCall) return null;
 
 
   const handleAnswerCall = async () => {

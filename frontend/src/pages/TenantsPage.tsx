@@ -6,7 +6,7 @@ import {
   Workflow, CheckSquare, Settings, Lock, Unlock, Check, Key, ArrowUpDown, FolderKanban,
   Upload, Mail, CreditCard, Image, Receipt, Percent, LayoutDashboard,
   Globe, Tag, Bell, Shield, BarChart3, RefreshCw, ToggleLeft, ToggleRight,
-  Download, Eye, EyeOff
+  Download, Eye, EyeOff, TrendingDown
 } from 'lucide-react';
 import { 
   superAdminApi, TenantResponse, TenantUserResponse, TenantInvoiceResponse,
@@ -68,7 +68,7 @@ export const TenantsPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<TenantResponse | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanResponse | null>(null);
-  const [activeModal, setActiveModal] = useState<'createTenant' | 'editSubscription' | 'users' | 'invoices' | 'deleteTenantConfirm' | 'resetPassword' | 'createPlan' | 'editPlan' | null>(null);
+  const [activeModal, setActiveModal] = useState<'createTenant' | 'editSubscription' | 'users' | 'invoices' | 'deleteTenantConfirm' | 'resetPassword' | 'createPlan' | 'editPlan' | 'createGateway' | null>(null);
   const [deleteConfirmSlug, setDeleteConfirmSlug] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [tenantUsers, setTenantUsers] = useState<TenantUserResponse[]>([]);
@@ -86,6 +86,9 @@ export const TenantsPage: React.FC = () => {
   const [auditSearch, setAuditSearch] = useState('');
   const [revenueReport, setRevenueReport] = useState<any>(null);
   const [seatReport, setSeatReport] = useState<any>(null);
+  const [tenantReport, setTenantReport] = useState<any>(null);
+  const [invoiceReport, setInvoiceReport] = useState<any>(null);
+  const [churnReport, setChurnReport] = useState<any>(null);
   const [currencyForm, setCurrencyForm] = useState<any>({});
   const [activeCurrencyModal, setActiveCurrencyModal] = useState<'create' | 'edit' | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyResponse | null>(null);
@@ -96,8 +99,9 @@ export const TenantsPage: React.FC = () => {
   const [activeCouponModal, setActiveCouponModal] = useState<'create' | 'edit' | null>(null);
   const [selectedCoupon, setSelectedCoupon] = useState<CouponResponse | null>(null);
   const [notifForm, setNotifForm] = useState<any>({});
-  const [activeNotifModal, setActiveNotifModal] = useState<'edit' | null>(null);
+  const [activeNotifModal, setActiveNotifModal] = useState<'create' | 'edit' | null>(null);
   const [selectedNotif, setSelectedNotif] = useState<NotificationTemplateResponse | null>(null);
+  const [gatewayForm, setGatewayForm] = useState<any>({ name: '', display_name: '', is_enabled: true, is_sandbox: true, api_key: '', api_secret: '', webhook_secret: '', description: '' });
   const [gatewayForms, setGatewayForms] = useState<Record<string, any>>({});
   const [expandedGateway, setExpandedGateway] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -107,7 +111,7 @@ export const TenantsPage: React.FC = () => {
     try {
       switch (activeSection) {
         case 'dashboard': { const d = await superAdminApi.getDashboard(dashboardPeriod); setDashboard(d); break; }
-        case 'tenants': { const d = await superAdminApi.getTenants(); setTenants(d); break; }
+        case 'tenants': { const [d, p] = await Promise.all([superAdminApi.getTenants(), superAdminApi.getPlans()]); setTenants(d); setPlans(p); break; }
         case 'plans': { const d = await superAdminApi.getPlans(); setPlans(d); break; }
         case 'features': {
           const [p,f,m] = await Promise.all([superAdminApi.getPlans(),superAdminApi.getFeatures(),superAdminApi.getPlanFeatures()]);
@@ -134,8 +138,21 @@ export const TenantsPage: React.FC = () => {
           setAuditLogs(Array.isArray(d) ? d : (d as any).items || []); break;
         }
         case 'reports': {
-          const [rv,st] = await Promise.all([superAdminApi.getRevenueReport(),superAdminApi.getSeatUtilization()]);
-          setRevenueReport(rv); setSeatReport(st); break;
+          const [rv, st, tr, ir, ch, logs] = await Promise.all([
+            superAdminApi.getRevenueReport(),
+            superAdminApi.getSeatUtilization(),
+            superAdminApi.getTenantReport(),
+            superAdminApi.getInvoiceReport(),
+            superAdminApi.getChurnReport(),
+            superAdminApi.getAuditLogs({ limit: 5 })
+          ]);
+          setRevenueReport(rv);
+          setSeatReport(st);
+          setTenantReport(tr);
+          setInvoiceReport(ir);
+          setChurnReport(ch);
+          setAuditLogs(Array.isArray(logs) ? logs : (logs as any).items || []);
+          break;
         }
         default: break;
       }
@@ -174,7 +191,7 @@ export const TenantsPage: React.FC = () => {
   };
   const { register: regTenant, handleSubmit: handleTenantSubmit, reset: resetTenant, formState: { errors: tenantErrors } } = useForm<CreateTenantRequest>();
   const { register: regSub, handleSubmit: handleSubSubmit, setValue: setSubValue, formState: { errors: subErrors } } = useForm<SubscriptionUpdateRequest>();
-  const { register: regInv, handleSubmit: handleInvSubmit, reset: resetInv, formState: { errors: invErrors } } = useForm<InvoiceCreateRequest>();
+  const { register: regInv, handleSubmit: handleInvSubmit, reset: resetInv, setValue: setInvValue, formState: { errors: invErrors } } = useForm<InvoiceCreateRequest>();
   const { register: regPlan, handleSubmit: handlePlanSubmit, reset: resetPlan, setValue: setPlanValue, formState: { errors: planErrors } } = useForm<PlanCreatePayload>();
   const openEditSubModal = (tenant: TenantResponse) => { setSelectedTenant(tenant); setModalError(null); setActiveModal('editSubscription'); };
   useEffect(() => {
@@ -188,8 +205,8 @@ export const TenantsPage: React.FC = () => {
   const onCreateTenant = async (data: CreateTenantRequest) => {
     setIsModalLoading(true); setModalError(null);
     try {
-      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3), plan_name: data.plan_name || 'starter', billing_cycle: data.billing_cycle || 'monthly' });
-      showSuccess('Tenant created.'); await fetchAllData(); resetTenant(); setActiveModal(null);
+      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3), plan_name: data.plan_name || plans[0]?.name || 'CoreCRM', billing_cycle: data.billing_cycle || 'monthly', is_trial: Boolean(data.is_trial) });
+      showSuccess(data.is_trial ? 'Tenant created on a 7-day trial.' : 'Tenant created.'); await fetchAllData(); resetTenant(); setActiveModal(null);
     } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
     finally { setIsModalLoading(false); }
   };
@@ -1046,6 +1063,8 @@ export const TenantsPage: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
                           <input
                             type="text"
+                            inputMode="tel"
+                            maxLength={20}
                             value={editedConfig.phone_number || ''}
                             onChange={(e) => setEditedConfig({ ...editedConfig, phone_number: e.target.value })}
                             className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
@@ -2463,7 +2482,31 @@ export const TenantsPage: React.FC = () => {
 
             {activeSection === 'gateways' && (
               <div className="space-y-4">
-                <div><h2 className="text-xl font-bold text-slate-100">Payment Gateways</h2><p className="text-sm text-slate-400 mt-1">API keys encrypted server-side - never returned in responses</p></div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-100">Payment Gateways</h2>
+                    <p className="text-sm text-slate-400 mt-1">API keys encrypted server-side - never returned in responses</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setGatewayForm({
+                        name: '',
+                        display_name: '',
+                        is_enabled: true,
+                        is_sandbox: true,
+                        api_key: '',
+                        api_secret: '',
+                        webhook_secret: '',
+                        description: ''
+                      });
+                      setModalError(null);
+                      setActiveModal('createGateway');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-all hover:opacity-90"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Gateway
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {gateways.length === 0 ? <div className="glass-panel p-12 rounded-2xl border border-slate-800/80 flex items-center justify-center text-slate-500">No gateways seeded.</div>
                   : gateways.map(gw => (
@@ -2551,7 +2594,31 @@ export const TenantsPage: React.FC = () => {
 
             {activeSection === 'notifications' && (
               <div className="space-y-4">
-                <div><h2 className="text-xl font-bold text-slate-100">Notification Templates</h2><p className="text-sm text-slate-400 mt-1">Email, SMS, and WhatsApp templates</p></div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-100">Notification Templates</h2>
+                    <p className="text-sm text-slate-400 mt-1">Email, SMS, and WhatsApp templates</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNotifForm({
+                        template_key: '',
+                        template_name: '',
+                        channel: 'email',
+                        subject: '',
+                        body: '',
+                        variables: '',
+                        category: 'general',
+                        description: ''
+                      });
+                      setModalError(null);
+                      setActiveNotifModal('create');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-tr from-brand-500 to-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-all hover:opacity-90"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Template
+                  </button>
+                </div>
                 <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
                   <table className="w-full text-left border-collapse">
                     <thead><tr className="border-b border-slate-800 bg-slate-900/20">{['Template','Channel','Category','Status','Actions'].map(h=><th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{h}</th>)}</tr></thead>
@@ -2563,7 +2630,42 @@ export const TenantsPage: React.FC = () => {
                           <td className="px-5 py-3.5"><span className={'px-2 py-0.5 text-[10px] font-bold rounded uppercase border ' + (t.channel === 'email' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : t.channel === 'sms' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : t.channel === 'whatsapp' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700')}>{t.channel}</span></td>
                           <td className="px-5 py-3.5 text-xs text-slate-400">{t.category}</td>
                           <td className="px-5 py-3.5"><span className={'text-xs font-semibold ' + (t.is_active ? 'text-emerald-400' : 'text-slate-500')}>{t.is_active ? 'Active' : 'Off'}</span></td>
-                          <td className="px-5 py-3.5"><button onClick={() => { setSelectedNotif(t); setNotifForm({ template_name: t.template_name, subject: t.subject || '', body: t.body, is_active: t.is_active, description: t.description || '' }); setActiveNotifModal('edit'); }} className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"><Edit className="w-3.5 h-3.5" /></button></td>
+                          <td className="px-5 py-3.5 flex gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedNotif(t);
+                                setNotifForm({
+                                  template_name: t.template_name,
+                                  subject: t.subject || '',
+                                  body: t.body,
+                                  is_active: t.is_active,
+                                  description: t.description || ''
+                                });
+                                setActiveNotifModal('edit');
+                              }}
+                              className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 cursor-pointer"
+                              title="Edit Template"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to delete template ${t.template_name}?`)) {
+                                  try {
+                                    await superAdminApi.deleteNotificationTemplate(t.id);
+                                    showSuccess('Template deleted.');
+                                    await fetchAllData();
+                                  } catch (err: any) {
+                                    alert(err.response?.data?.detail || 'Failed to delete template');
+                                  }
+                                }
+                              }}
+                              className="p-1.5 border border-red-900/30 hover:bg-red-950/20 rounded-lg text-red-400 cursor-pointer"
+                              title="Delete Template"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2605,7 +2707,7 @@ export const TenantsPage: React.FC = () => {
             {activeSection === 'reports' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="text-xl font-bold text-slate-100">Reports and Analytics</h2><p className="text-sm text-slate-400 mt-1">Revenue, seat utilization, tenant health</p></div>
+                  <div><h2 className="text-xl font-bold text-slate-100">Reports and Analytics</h2><p className="text-sm text-slate-400 mt-1">Revenue, seat utilization, tenant health, invoices, churn, and activity logs</p></div>
                   <button onClick={fetchAllData} className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2653,6 +2755,99 @@ export const TenantsPage: React.FC = () => {
                         )}
                       </div>
                     ) : <p className="text-sm text-slate-500 py-4 text-center">No seat data.</p>}
+                  </div>
+
+                  {/* Tenant Distribution */}
+                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><Building className="w-4 h-4 text-indigo-400" />Tenant Distribution</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                    </div>
+                    {tenantReport ? (
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Total Tenants', value: tenantReport.total ?? 0 },
+                          { label: 'Active', value: tenantReport.active ?? 0 },
+                          { label: 'Trial', value: tenantReport.trial ?? 0 },
+                          { label: 'Expired', value: tenantReport.expired ?? 0 },
+                          { label: 'Suspended', value: tenantReport.suspended ?? 0 },
+                        ].map((row, i) => (
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
+                            <span className="text-xs text-slate-400">{row.label}</span><span className="text-sm font-semibold text-slate-200">{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-slate-500 py-4 text-center">No tenant distribution data.</p>}
+                  </div>
+
+                  {/* Invoice Analytics */}
+                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><FileText className="w-4 h-4 text-purple-400" />Invoice Report (Last 30 Days)</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                    </div>
+                    {invoiceReport ? (
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Total Invoices', value: invoiceReport.total_invoices ?? 0 },
+                          { label: 'Paid Count', value: invoiceReport.paid_count ?? 0 },
+                          { label: 'Paid Amount', value: 'Rs.' + Number(invoiceReport.paid_amount ?? 0).toLocaleString('en-IN') },
+                          { label: 'Unpaid Count', value: invoiceReport.unpaid_count ?? 0 },
+                          { label: 'Unpaid Amount', value: 'Rs.' + Number(invoiceReport.unpaid_amount ?? 0).toLocaleString('en-IN') },
+                        ].map((row, i) => (
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
+                            <span className="text-xs text-slate-400">{row.label}</span><span className="text-sm font-semibold text-slate-200">{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-slate-500 py-4 text-center">No invoice data.</p>}
+                  </div>
+
+                  {/* Churn Analytics */}
+                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><TrendingDown className="w-4 h-4 text-rose-400" />Churn Report</h3>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer"><Download className="w-3.5 h-3.5" /> Export</button>
+                    </div>
+                    {churnReport ? (
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Churn Rate', value: (churnReport.churn_rate_pct ?? 0) + '%' },
+                          { label: 'Churned Subscriptions', value: churnReport.churned_subscriptions ?? 0 },
+                          { label: 'Active at Period Start', value: churnReport.active_at_period_start ?? 0 },
+                          { label: 'Health Status', value: churnReport.healthy ? 'Healthy' : 'Needs attention' },
+                          { label: 'Benchmark', value: churnReport.benchmark ?? '' },
+                        ].map((row, i) => (
+                          <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
+                            <span className="text-xs text-slate-400">{row.label}</span>
+                            <span className={`text-sm font-semibold ${row.label === 'Health Status' ? (churnReport.healthy ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-200'}`}>{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-slate-500 py-4 text-center">No churn data.</p>}
+                  </div>
+
+                  {/* Recent Activity Log */}
+                  <div className="glass-panel p-6 border border-slate-800/80 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2"><Shield className="w-4 h-4 text-amber-400" />Recent System Activity</h3>
+                      <button onClick={fetchAllData} className="p-1 hover:bg-slate-900 rounded text-slate-400 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      {auditLogs.length === 0 ? <p className="text-xs text-slate-500 py-4 text-center">No recent activities.</p>
+                      : auditLogs.slice(0, 5).map((log: any, i: number) => (
+                        <div key={log.id || i} className="flex flex-col gap-1 py-2 border-b border-slate-800/60 last:border-0">
+                          <div className="flex justify-between items-center text-[10px] text-slate-500">
+                            <span>{log.created_at ? new Date(log.created_at).toLocaleTimeString() : '-'}</span>
+                            <span className="font-mono text-slate-400 truncate max-w-[120px]">{log.user_email || log.actor_id || '-'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs mt-0.5">
+                            <span className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-semibold text-slate-300 uppercase text-[9px]">{log.action || '-'}</span>
+                            <span className="text-slate-400 truncate max-w-[180px]">{log.resource_type || '-'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3183,12 +3378,11 @@ export const TenantsPage: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Plan</label>
                   <select
                     {...regTenant('plan_name')}
-                    defaultValue="starter"
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                   >
-                    <option value="starter">Starter — ₹3,999/seat/mo</option>
-                    <option value="growth">Growth — ₹4,999/seat/mo</option>
-                    <option value="enterprise">Enterprise — ₹5,999/seat/mo</option>
+                    {plans.map((p) => (
+                      <option key={p.id} value={p.name}>{p.display_name || p.name} — ₹{Number(p.monthly_price).toLocaleString('en-IN')}/seat/mo</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -3204,6 +3398,18 @@ export const TenantsPage: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              <label className="flex items-start gap-3 border-t border-slate-800/80 pt-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...regTenant('is_trial')}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-700 bg-slate-900 text-brand-500 focus:ring-brand-500/40"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-200">Start on a 7-day free trial</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">No invoice is raised. The tenant must activate a paid plan before the trial ends to keep using the CRM.</span>
+                </span>
+              </label>
 
               <div className="border-t border-slate-800/80 my-4 pt-4">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3">Primary Administrator Credentials</h4>
@@ -3322,9 +3528,13 @@ export const TenantsPage: React.FC = () => {
                   {...regSub('subscription_plan', { required: 'Plan is required' })}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                 >
-                  <option value="Starter">Starter</option>
-                  <option value="Growth">Growth</option>
-                  <option value="Enterprise">Enterprise</option>
+                  {/* If the tenant's current plan isn't in the active list, still show it so the selection isn't blank */}
+                  {selectedTenant.subscription_plan && !plans.some(p => p.name === selectedTenant.subscription_plan) && (
+                    <option value={selectedTenant.subscription_plan}>{selectedTenant.subscription_plan} (current)</option>
+                  )}
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.name}>{p.display_name || p.name} — ₹{Number(p.monthly_price).toLocaleString('en-IN')}/seat/mo</option>
+                  ))}
                 </select>
               </div>
 
@@ -3334,9 +3544,11 @@ export const TenantsPage: React.FC = () => {
                   {...regSub('subscription_status', { required: 'Status is required' })}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                 >
-                  <option value="Active">Active</option>
-                  <option value="Suspended">Suspended</option>
-                  <option value="Trial">Trial</option>
+                  <option value="active">Active</option>
+                  <option value="trial">Trial</option>
+                  <option value="expiring_soon">Expiring Soon</option>
+                  <option value="expired">Expired</option>
+                  <option value="suspended">Suspended</option>
                 </select>
               </div>
 
@@ -3344,7 +3556,9 @@ export const TenantsPage: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seat Limit</label>
                 <input
                   type="number"
-                  {...regSub('max_users', { required: 'Licensed seat limit is required', min: { value: 1, message: 'Must allow at least 1 licensed seat' } })}
+                  min={1}
+                  max={1000}
+                  {...regSub('max_users', { required: 'Licensed seat limit is required', min: { value: 1, message: 'Must allow at least 1 licensed seat' }, max: { value: 1000, message: 'Licensed seats cannot exceed 1000. Contact sales for higher volumes.' } })}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                 />
                 {subErrors.max_users && <p className="text-xs text-red-400 mt-1">{subErrors.max_users.message}</p>}
@@ -3505,15 +3719,19 @@ export const TenantsPage: React.FC = () => {
                   
                   <form onSubmit={handleInvSubmit(onCreateInvoice)} className="space-y-4">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Billing Amount ($)</label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        Billing Amount ({selectedTenant.subscription_plan.toLowerCase() === 'professional' || selectedTenant.subscription_plan.toLowerCase() === 'core crm' || selectedTenant.subscription_plan.toLowerCase() === 'business' ? '₹' : '$'})
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-3.5 text-slate-500 font-bold text-sm select-none">
+                          {selectedTenant.subscription_plan.toLowerCase() === 'professional' || selectedTenant.subscription_plan.toLowerCase() === 'core crm' || selectedTenant.subscription_plan.toLowerCase() === 'business' ? '₹' : '$'}
+                        </span>
                         <input
                           type="number"
                           placeholder="299.00"
                           step="0.01"
                           {...regInv('amount', { required: 'Amount is required', min: { value: 0.01, message: 'Must be positive' } })}
-                          className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                          className="w-full pl-8 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                         />
                       </div>
                       {invErrors.amount && <p className="text-xs text-red-400 mt-1">{invErrors.amount.message}</p>}
@@ -3551,6 +3769,68 @@ export const TenantsPage: React.FC = () => {
                     </button>
                   </form>
                 </div>
+
+                {selectedTenant.subscription_plan.toLowerCase() === 'professional' && (
+                  <div className="glass-panel p-5 border border-slate-800/70 rounded-xl space-y-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400">Log Calling Usage</h4>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="Minutes"
+                        defaultValue={selectedTenant.call_recording_usage || 0}
+                        id="tenant-usage-minutes"
+                        className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const input = document.getElementById('tenant-usage-minutes') as HTMLInputElement;
+                          if (!input) return;
+                          const val = Number(input.value);
+                          setIsModalLoading(true);
+                          setModalError(null);
+                          try {
+                            const updated = await superAdminApi.updateTenantUsage(selectedTenant.id, val);
+                            setSelectedTenant(updated);
+                            showSuccess('Usage logged.');
+                            await fetchAllData();
+                          } catch (e: any) {
+                            setModalError(e.response?.data?.detail || 'Failed');
+                          } finally {
+                            setIsModalLoading(false);
+                          }
+                        }}
+                        className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs text-slate-200 font-bold transition-all shrink-0 cursor-pointer"
+                      >
+                        Save
+                      </button>
+                    </div>
+                    <div className="p-3 bg-slate-900/60 border border-slate-800/80 rounded-xl text-xs space-y-1 text-slate-400">
+                      <p>Logged calling: <strong className="text-slate-200">{selectedTenant.call_recording_usage || 0} mins</strong></p>
+                      <p>Rate: <strong className="text-slate-200">₹0.65 / min</strong></p>
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-800/40">
+                        <span>Billing Amount:</span>
+                        <span className="text-slate-200 font-bold">₹{((selectedTenant.call_recording_usage || 0) * 0.65).toFixed(2)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const charge = ((selectedTenant.call_recording_usage || 0) * 0.65).toFixed(2);
+                          setInvValue('amount', Number(charge));
+                          const amountInput = document.getElementsByName('amount')[0] as HTMLInputElement;
+                          if (amountInput) {
+                            amountInput.value = charge;
+                            const event = new Event('input', { bubbles: true });
+                            amountInput.dispatchEvent(event);
+                          }
+                        }}
+                        className="w-full mt-2 text-[10px] uppercase font-bold text-brand-400 hover:text-brand-300 transition-colors text-left cursor-pointer"
+                      >
+                        Apply to Invoice Amount
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="md:col-span-2 space-y-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400">Invoice Ledger</h4>
@@ -3799,6 +4079,340 @@ export const TenantsPage: React.FC = () => {
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
                 <button onClick={() => setActiveNotifModal(null)} className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer">Cancel</button>
                 <button onClick={handleSaveNotif} className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer">Save Template</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'createGateway' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg glass-panel border border-slate-800/90 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-brand-400" />
+                Add Payment Gateway
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {modalError && (
+              <div className="p-4 mx-6 mt-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                {modalError}
+              </div>
+            )}
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Technical Name / Key</label>
+                  <input
+                    type="text"
+                    value={gatewayForm.name || ''}
+                    onChange={e => setGatewayForm((p: any) => ({ ...p, name: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') }))}
+                    placeholder="razorpay"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none animate-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Display Name</label>
+                  <input
+                    type="text"
+                    value={gatewayForm.display_name || ''}
+                    onChange={e => setGatewayForm((p: any) => ({ ...p, display_name: e.target.value }))}
+                    placeholder="Razorpay Checkout"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</label>
+                <input
+                  type="text"
+                  value={gatewayForm.description || ''}
+                  onChange={e => setGatewayForm((p: any) => ({ ...p, description: e.target.value }))}
+                  placeholder="Indian payment gateway support cards, UPI, netbanking"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">API Key / Client ID</label>
+                  <input
+                    type="text"
+                    value={gatewayForm.api_key || ''}
+                    onChange={e => setGatewayForm((p: any) => ({ ...p, api_key: e.target.value }))}
+                    placeholder="rzp_test_..."
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">API Secret (optional)</label>
+                  <input
+                    type="password"
+                    value={gatewayForm.api_secret || ''}
+                    onChange={e => setGatewayForm((p: any) => ({ ...p, api_secret: e.target.value }))}
+                    placeholder="••••••••"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Webhook Secret</label>
+                <input
+                  type="password"
+                  value={gatewayForm.webhook_secret || ''}
+                  onChange={e => setGatewayForm((p: any) => ({ ...p, webhook_secret: e.target.value }))}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gatewayForm.is_sandbox ?? true}
+                    onChange={e => setGatewayForm((p: any) => ({ ...p, is_sandbox: e.target.checked }))}
+                    className="w-4 h-4 rounded bg-slate-900 border-slate-800"
+                  />
+                  Sandbox / Test Mode
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gatewayForm.is_enabled ?? true}
+                    onChange={e => setGatewayForm((p: any) => ({ ...p, is_enabled: e.target.checked }))}
+                    className="w-4 h-4 rounded bg-slate-900 border-slate-800"
+                  />
+                  Enabled
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isModalLoading}
+                  onClick={async () => {
+                    if (!gatewayForm.name || !gatewayForm.display_name) {
+                      setModalError('Technical Name and Display Name are required.');
+                      return;
+                    }
+                    setIsModalLoading(true);
+                    setModalError(null);
+                    try {
+                      await superAdminApi.createPaymentGateway({
+                        name: gatewayForm.name,
+                        display_name: gatewayForm.display_name,
+                        is_enabled: gatewayForm.is_enabled,
+                        is_sandbox: gatewayForm.is_sandbox,
+                        api_key: gatewayForm.api_key || undefined,
+                        api_secret: gatewayForm.api_secret || undefined,
+                        webhook_secret: gatewayForm.webhook_secret || undefined,
+                        description: gatewayForm.description || undefined
+                      });
+                      showSuccess('Payment gateway created successfully.');
+                      setActiveModal(null);
+                      const updated = await superAdminApi.getPaymentGateways();
+                      setGateways(updated);
+                    } catch (e: any) {
+                      setModalError(e.response?.data?.detail || 'Failed to create payment gateway.');
+                    } finally {
+                      setIsModalLoading(false);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  {isModalLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Save Gateway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeNotifModal === 'create' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-xl glass-panel border border-slate-800/90 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-brand-400" />
+                Create Notification Template
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveNotifModal(null)}
+                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {modalError && (
+              <div className="p-4 mx-6 mt-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                {modalError}
+              </div>
+            )}
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Template Key (Unique)</label>
+                  <input
+                    type="text"
+                    value={notifForm.template_key || ''}
+                    onChange={e => setNotifForm((p: any) => ({ ...p, template_key: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') }))}
+                    placeholder="welcome_email"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Template Name</label>
+                  <input
+                    type="text"
+                    value={notifForm.template_name || ''}
+                    onChange={e => setNotifForm((p: any) => ({ ...p, template_name: e.target.value }))}
+                    placeholder="Welcome email message"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Channel</label>
+                  <select
+                    value={notifForm.channel || 'email'}
+                    onChange={e => setNotifForm((p: any) => ({ ...p, channel: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  >
+                    <option value="email">Email</option>
+                    <option value="sms">SMS</option>
+                    <option value="whatsapp">WhatsApp</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Category</label>
+                  <input
+                    type="text"
+                    value={notifForm.category || 'general'}
+                    onChange={e => setNotifForm((p: any) => ({ ...p, category: e.target.value }))}
+                    placeholder="general"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</label>
+                <input
+                  type="text"
+                  value={notifForm.description || ''}
+                  onChange={e => setNotifForm((p: any) => ({ ...p, description: e.target.value }))}
+                  placeholder="Sent to new user when workspace is initialized"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                />
+              </div>
+
+              {notifForm.channel === 'email' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Subject</label>
+                  <input
+                    type="text"
+                    value={notifForm.subject || ''}
+                    onChange={e => setNotifForm((p: any) => ({ ...p, subject: e.target.value }))}
+                    placeholder="Welcome to Johnson CRM!"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Body (Supports GFM Markdown)</label>
+                <textarea
+                  rows={5}
+                  value={notifForm.body || ''}
+                  onChange={e => setNotifForm((p: any) => ({ ...p, body: e.target.value }))}
+                  placeholder="Hello {{first_name}},\n\nYour workspace is ready at {{app_url}}."
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Variables (Comma-separated)</label>
+                <input
+                  type="text"
+                  value={notifForm.variables || ''}
+                  onChange={e => setNotifForm((p: any) => ({ ...p, variables: e.target.value }))}
+                  placeholder="first_name, app_url"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => setActiveNotifModal(null)}
+                  className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isModalLoading}
+                  onClick={async () => {
+                    if (!notifForm.template_key || !notifForm.template_name || !notifForm.body) {
+                      setModalError('Template Key, Template Name, and Body are required.');
+                      return;
+                    }
+                    setIsModalLoading(true);
+                    setModalError(null);
+                    try {
+                      const vars = notifForm.variables
+                        ? notifForm.variables.split(',').map((v: string) => v.trim()).filter(Boolean)
+                        : [];
+                      await superAdminApi.createNotificationTemplate({
+                        template_key: notifForm.template_key,
+                        template_name: notifForm.template_name,
+                        channel: notifForm.channel || 'email',
+                        subject: notifForm.subject || undefined,
+                        body: notifForm.body,
+                        variables: vars,
+                        category: notifForm.category || 'general',
+                        description: notifForm.description || undefined
+                      });
+                      showSuccess('Notification template created successfully.');
+                      setActiveNotifModal(null);
+                      const updated = await superAdminApi.getNotificationTemplates();
+                      setNotifTemplates(updated);
+                    } catch (e: any) {
+                      setModalError(e.response?.data?.detail || 'Failed to create template.');
+                    } finally {
+                      setIsModalLoading(false);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  {isModalLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Save Template
+                </button>
               </div>
             </div>
           </div>

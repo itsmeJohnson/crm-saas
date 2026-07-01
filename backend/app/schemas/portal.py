@@ -31,7 +31,8 @@ class OrgNotificationSettingsUpdate(BaseModel):
     theme: str = Field("dark", pattern="^(light|dark)$")
 
 class PurchaseSeatsRequest(BaseModel):
-    user_count: int = Field(..., ge=1)
+    user_count: int = Field(..., ge=1, le=500)
+    billing_cycle: str = Field("monthly", pattern="^(monthly|quarterly|annual)$")
     gateway: str = Field("UPI", pattern="^(UPI|Stripe|Razorpay|Cashfree|PhonePe|Bank)$")
 
 class PurchaseStorageRequest(BaseModel):

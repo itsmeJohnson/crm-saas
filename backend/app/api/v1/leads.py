@@ -128,17 +128,23 @@ async def upload_import_file(
 ):
     """Upload bulk lead CSV/Excel and retrieve mapping suggestions and preview."""
     import_service = LeadImportService(db)
-    content = await file.read()
-    
-    from app.core.storage import validate_and_sanitize_file
+
     from fastapi import HTTPException
-    
+    from app.core.storage import validate_and_sanitize_file
+
+    # Bounded read: never pull more than the limit (+1 byte to detect overflow)
+    # into memory, so an oversized upload can't exhaust server memory.
+    MAX_UPLOAD = 2 * 1024 * 1024
+    content = await file.read(MAX_UPLOAD + 1)
+    if len(content) > MAX_UPLOAD:
+        raise HTTPException(status_code=400, detail="File exceeds the limit of 2.0MB")
+
     try:
         sanitized_filename, ext = validate_and_sanitize_file(
             content=content,
             filename=file.filename or "leads.csv",
             allowed_extensions={"csv", "xlsx", "xls"},
-            max_size=2 * 1024 * 1024
+            max_size=MAX_UPLOAD
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

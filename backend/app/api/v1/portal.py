@@ -98,7 +98,8 @@ async def add_user_seats(
         actor_user_id=current_user.id,
         actor_name=user_name,
         user_count=payload.user_count,
-        gateway=payload.gateway
+        gateway=payload.gateway,
+        billing_cycle=payload.billing_cycle
     )
     return invoice
 
@@ -221,7 +222,22 @@ async def pay_portal_invoice(
     payload: PayInvoiceRequest,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Simulates or executes invoice payment verification through chosen gateway details."""
+    """Confirm an invoice payment. Marking an invoice paid requires cryptographic
+    proof from the gateway; unverified "simulated" payments are allowed only in
+    non-production environments (for local/demo use)."""
+    from app.core.config import settings
+
+    # Load the invoice up front (also enforces org ownership).
+    inv_stmt = select(Invoice).where(
+        Invoice.id == invoice_id,
+        Invoice.organization_id == current_user.organization_id,
+        Invoice.is_deleted == False,
+    )
+    inv_res = await db.execute(inv_stmt)
+    invoice_row = inv_res.scalar_one_or_none()
+    if not invoice_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found.")
+
     if payload.gateway == "Razorpay":
         if not payload.razorpay_order_id or not payload.razorpay_signature or not payload.transaction_id:
             raise HTTPException(
@@ -238,6 +254,29 @@ async def pay_portal_invoice(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid Razorpay payment signature"
+            )
+    elif payload.gateway == "Cashfree":
+        from app.services.cashfree_service import CashfreeService
+        cf_order_id = (invoice_row.action_metadata or {}).get("cashfree_order_id")
+        if not cf_order_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Cashfree order found for this invoice. Start checkout first."
+            )
+        cf_service = CashfreeService(db)
+        # Server-to-server confirmation — never trusts the client's word.
+        if not await cf_service.is_order_paid(cf_order_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment not confirmed by Cashfree yet."
+            )
+    else:
+        # UPI/Stripe/PhonePe/Bank "instant" path is a simulation with no gateway
+        # verification — permitted only outside production so real money can't be bypassed.
+        if settings.is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This payment method must be completed through a verified gateway (Razorpay or Cashfree)."
             )
 
     service = PortalService(db)
@@ -285,6 +324,34 @@ async def create_razorpay_checkout_order(
     rzp_service = RazorpayService(db)
     order_data = await rzp_service.create_checkout_order(invoice)
     return order_data
+
+
+@router.post("/invoices/{invoice_id}/cashfree-checkout")
+async def create_cashfree_checkout_order(
+    invoice_id: uuid.UUID,
+    current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Initiates a Cashfree order session and returns a payment_session_id for the checkout SDK."""
+    from app.services.cashfree_service import CashfreeService
+
+    stmt = select(Invoice).where(
+        Invoice.id == invoice_id,
+        Invoice.organization_id == current_user.organization_id,
+        Invoice.is_deleted == False
+    )
+    res = await db.execute(stmt)
+    invoice = res.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found.")
+    if invoice.payment_status == "paid":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invoice is already paid.")
+
+    cf_service = CashfreeService(db)
+    try:
+        return await cf_service.create_checkout_order(invoice, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/payments")

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DialerConsole } from '../dialer/DialerConsole';
 import { useAnalyticsStore } from '../../store/analyticsStore';
+import { useAuthStore } from '../../store/authStore';
 import {
   Phone,
   CheckCircle,
@@ -22,6 +23,7 @@ import {
 
 export const AnalyticsDashboard: React.FC = () => {
   const { dashboardData, isLoading, error, fetchDashboardMetrics } = useAnalyticsStore();
+  const { features } = useAuthStore();
   const [enableDialer, setEnableDialer] = useState(false);
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export const AnalyticsDashboard: React.FC = () => {
     return (
       <div className="glass-panel p-8 rounded-2xl border border-red-500/20 bg-red-500/5 flex flex-col items-center text-center space-y-4">
         <AlertCircle className="w-12 h-12 text-red-400" />
-        <h3 className="text-lg font-bold text-white">Failed to Load Performance Analytics</h3>
+        <h3 className="text-lg font-bold text-slate-100">Failed to Load Performance Analytics</h3>
         <p className="text-slate-400 text-sm max-w-md">{error}</p>
         <button
           onClick={() => fetchDashboardMetrics()}
@@ -90,7 +92,7 @@ export const AnalyticsDashboard: React.FC = () => {
           <div key={idx} className="glass-panel p-6 rounded-2xl flex items-center justify-between border border-slate-800/80 hover:border-slate-700/60 transition-all group">
             <div className="space-y-1">
               <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">{card.title}</p>
-              <p className="text-3xl font-extrabold text-white group-hover:scale-[1.02] transition-transform origin-left">{card.value}</p>
+              <p className="text-3xl font-extrabold text-slate-100 group-hover:scale-[1.02] transition-transform origin-left">{card.value}</p>
             </div>
             <div className={`p-3 rounded-xl border ${card.color}`}>
               <card.icon className="w-6 h-6" />
@@ -115,7 +117,7 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="glass-panel p-6 rounded-2xl flex items-center justify-between border border-slate-800/80">
             <div className="space-y-1">
               <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Team Calls Made</p>
-              <p className="text-3xl font-extrabold text-white">{totalCalls}</p>
+              <p className="text-3xl font-extrabold text-slate-100">{totalCalls}</p>
             </div>
             <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-indigo-400">
               <Phone className="w-6 h-6" />
@@ -124,7 +126,7 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="glass-panel p-6 rounded-2xl flex items-center justify-between border border-slate-800/80">
             <div className="space-y-1">
               <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Team Conversions</p>
-              <p className="text-3xl font-extrabold text-white">{totalConversions}</p>
+              <p className="text-3xl font-extrabold text-slate-100">{totalConversions}</p>
             </div>
             <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-400">
               <CheckCircle className="w-6 h-6" />
@@ -142,7 +144,7 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="glass-panel p-6 rounded-2xl flex items-center justify-between border border-slate-800/80">
             <div className="space-y-1">
               <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Active Downlines</p>
-              <p className="text-3xl font-extrabold text-white">{tlMetrics.downlines?.length || 0}</p>
+              <p className="text-3xl font-extrabold text-slate-100">{tlMetrics.downlines?.length || 0}</p>
             </div>
             <div className="p-3 rounded-xl bg-slate-500/5 border border-slate-500/10 text-slate-400">
               <Users className="w-6 h-6" />
@@ -154,7 +156,7 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
           <div className="px-6 py-5 border-b border-slate-800/60 bg-slate-900/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold text-white">Telecaller Performance Matrix</h3>
+              <h3 className="text-lg font-bold text-slate-100">Telecaller Performance Matrix</h3>
               <p className="text-xs text-slate-400 mt-1">Real-time team leaderboard based on conversion metrics.</p>
             </div>
           </div>
@@ -179,14 +181,14 @@ export const AnalyticsDashboard: React.FC = () => {
 
                   return (
                     <tr key={agent.user_id} className="hover:bg-slate-900/10 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-white">
+                      <td className="px-6 py-4 font-semibold text-slate-100">
                         {`${agent.first_name || ''} ${agent.last_name || ''}`.trim() || '—'}
                       </td>
                       <td className="px-6 py-4 text-slate-400">{agent.email}</td>
                       <td className="px-6 py-4">{agent.calls_made}</td>
                       <td className="px-6 py-4">{agent.unique_leads_contacted}</td>
                       <td className="px-6 py-4">{agent.conversions}</td>
-                      <td className="px-6 py-4 font-medium text-white">{agent.conversion_rate}%</td>
+                      <td className="px-6 py-4 font-medium text-slate-100">{agent.conversion_rate}%</td>
                       <td className="px-6 py-4 text-right">
                         {isTop && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-500/20">
@@ -218,30 +220,32 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
 
         {/* Optional Team Leader Dialer Workspace */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800/80 space-y-4 bg-gradient-to-tr from-slate-950/20 via-slate-900/5 to-brand-950/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-white">TL Dialer Workspace</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Enable dialer mode to make calls directly from your own lead queue.</p>
+        {features.includes('OUTBOUND_CALLING') && (
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800/80 space-y-4 bg-gradient-to-tr from-slate-950/20 via-slate-900/5 to-brand-950/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-100">TL Dialer Workspace</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Enable dialer mode to make calls directly from your own lead queue.</p>
+              </div>
+              <button
+                onClick={() => setEnableDialer(!enableDialer)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  enableDialer
+                    ? 'bg-brand-500/10 text-brand-300 border-brand-500/30 shadow-lg shadow-brand-500/5'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                {enableDialer ? 'Disable Dialer Mode' : 'Enable Dialer Mode'}
+              </button>
             </div>
-            <button
-              onClick={() => setEnableDialer(!enableDialer)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                enableDialer
-                  ? 'bg-brand-500/10 text-brand-300 border-brand-500/30 shadow-lg shadow-brand-500/5'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              {enableDialer ? 'Disable Dialer Mode' : 'Enable Dialer Mode'}
-            </button>
-          </div>
 
-          {enableDialer && (
-            <div className="pt-4 border-t border-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200">
-              <DialerConsole />
-            </div>
-          )}
-        </div>
+            {enableDialer && (
+              <div className="pt-4 border-t border-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200">
+                <DialerConsole />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -256,13 +260,13 @@ export const AnalyticsDashboard: React.FC = () => {
         {/* Manager Summary totals card */}
         <div className="glass-panel p-8 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-tr from-slate-950/40 via-slate-900/10 to-indigo-950/10">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-white">Manager Operational Cluster overview</h3>
-            <p className="text-sm text-slate-400">Comparing performance metrics across active Team Leader teams.</p>
+            <h3 className="text-lg font-bold text-slate-100">Manager Operational Cluster overview</h3>
+            <p className="text-sm text-slate-550 dark:text-slate-400">Comparing performance metrics across active Team Leader teams.</p>
           </div>
           <div className="flex flex-wrap items-center gap-8">
             <div className="space-y-1">
               <p className="text-xs text-slate-500 uppercase font-semibold">Total Cluster Calls</p>
-              <p className="text-2xl font-black text-white">{mgrMetrics.total_calls_made}</p>
+              <p className="text-2xl font-black text-slate-100">{mgrMetrics.total_calls_made}</p>
             </div>
             <div className="w-[1px] h-10 bg-slate-800 hidden md:block"></div>
             <div className="space-y-1">
@@ -296,7 +300,7 @@ export const AnalyticsDashboard: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-bold text-white">
+                      <p className="text-sm font-bold text-slate-100">
                         {`${team.tl_first_name || ''} ${team.tl_last_name || ''}`.trim() || 'TL Team'}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">{team.tl_email}</p>
@@ -315,12 +319,12 @@ export const AnalyticsDashboard: React.FC = () => {
 
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-800/40">
                     <div className="space-y-0.5">
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Calls</p>
-                      <p className="text-md font-bold text-white">{team.total_calls_made}</p>
+                      <p className="text-[10px] text-slate-550 dark:text-slate-500 uppercase tracking-wider">Calls</p>
+                      <p className="text-md font-bold text-slate-100">{team.total_calls_made}</p>
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Conversions</p>
-                      <p className="text-md font-bold text-white">{team.total_conversions}</p>
+                      <p className="text-[10px] text-slate-550 dark:text-slate-500 uppercase tracking-wider">Conversions</p>
+                      <p className="text-md font-bold text-slate-100">{team.total_conversions}</p>
                     </div>
                     <div className="space-y-0.5">
                       <p className="text-[10px] text-slate-500 uppercase tracking-wider">Ratio</p>
@@ -349,7 +353,7 @@ export const AnalyticsDashboard: React.FC = () => {
       <div className="glass-panel p-6 rounded-2xl border border-slate-800/80 space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
               <Target className="w-5 h-5 text-brand-400" />
               Organizational Performance Milestones
             </h3>
@@ -372,8 +376,8 @@ export const AnalyticsDashboard: React.FC = () => {
                     </span>
                     <span className="text-slate-200 font-semibold">{metricLabel}</span>
                   </div>
-                  <span className="text-xs text-slate-400">
-                    <span className="text-white font-extrabold">{gauge.progress_percentage.toFixed(0)}%</span> of {typeLabel} {gauge.metric_type === 'CALLS_MADE' ? 'Call' : 'Conversion'} Goal Achieved
+                  <span className="text-xs text-slate-550 dark:text-slate-400">
+                    <span className="text-slate-100 font-extrabold">{gauge.progress_percentage.toFixed(0)}%</span> of {typeLabel} {gauge.metric_type === 'CALLS_MADE' ? 'Call' : 'Conversion'} Goal Achieved
                   </span>
                 </div>
 

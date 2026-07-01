@@ -10,7 +10,7 @@ import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
 
 export const Home: React.FC = () => {
-  const { user, organization } = useAuthStore();
+  const { user, organization, features } = useAuthStore();
   const {
     summary,
     recentActivities,
@@ -43,14 +43,14 @@ export const Home: React.FC = () => {
         <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none"></div>
         
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-300 text-xs font-semibold rounded-full border border-brand-500/20">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-600 dark:text-brand-300 text-xs font-semibold rounded-full border border-brand-500/20">
             <Sparkles className="w-3.5 h-3.5" />
             Operations Overview
           </div>
-          <h1 className="text-4xl font-extrabold text-white tracking-tight">
+          <h1 className="text-4xl font-extrabold text-slate-100 tracking-tight">
             Welcome back, <span className="gradient-text">{user?.first_name || 'Admin'}</span>
           </h1>
-          <p className="text-slate-400 text-sm md:text-base max-w-xl">
+          <p className="text-slate-500 dark:text-slate-400 text-sm md:text-base max-w-xl">
             Real-time analytics and activity summary for your organization workspace.
           </p>
         </div>
@@ -59,28 +59,28 @@ export const Home: React.FC = () => {
           <button
             onClick={handleRefresh}
             title="Refresh dashboard data"
-            className="p-3 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer bg-slate-950/20"
+            className="p-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer bg-slate-50 dark:bg-slate-950/20"
           >
             <RefreshCw className={`w-4 h-4 ${(isLoadingSummary || isLoadingActivities) ? 'animate-spin' : ''}`} />
           </button>
 
-          <div className="flex items-center gap-3 px-5 py-4 bg-slate-900/60 border border-slate-800 rounded-xl">
+          <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl">
             <Building className="w-10 h-10 text-brand-400" />
             <div>
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Active Tenant</p>
-              <p className="text-md font-bold text-white">{organization?.name}</p>
-              <p className="text-xs text-slate-400">/{organization?.slug}</p>
+              <p className="text-md font-bold text-slate-100">{organization?.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">/{organization?.slug}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Relocated Telecaller Dialer Workspace at the absolute top */}
-      {dashboardData?.role === 'Telecaller' && (
+      {dashboardData?.role === 'Telecaller' && features.includes('OUTBOUND_CALLING') && (
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-bold text-white">Agent Dialer cockpit</h3>
-            <p className="text-xs text-slate-400 mt-1">Start your dialing session to contact leads assigned to your queue.</p>
+            <h3 className="text-lg font-bold text-slate-100">Agent Dialer cockpit</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Start your dialing session to contact leads assigned to your queue.</p>
           </div>
           <DialerConsole />
         </div>

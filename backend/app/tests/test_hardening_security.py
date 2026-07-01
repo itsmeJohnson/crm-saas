@@ -18,8 +18,8 @@ async def test_password_reset_hardening_flow(client: AsyncClient, db: AsyncSessi
         "first_name": "Security",
         "last_name": "Architect"
     }
-    response = await client.post("/api/v1/auth/register", json=reg_payload)
-    assert response.status_code == 200
+    response = await client.post("/api/v1/auth/public-register", json=reg_payload)
+    assert response.status_code == 201
 
     # 2. Trigger forgot password with SMTP send_email mocked to inspect the generated link
     forgot_payload = {
@@ -102,8 +102,8 @@ async def test_password_reset_expiration(client: AsyncClient, db: AsyncSession):
         "first_name": "Expiry",
         "last_name": "Tester"
     }
-    response = await client.post("/api/v1/auth/register", json=reg_payload)
-    assert response.status_code == 200
+    response = await client.post("/api/v1/auth/public-register", json=reg_payload)
+    assert response.status_code == 201
 
     # 2. Request password reset
     forgot_payload = {

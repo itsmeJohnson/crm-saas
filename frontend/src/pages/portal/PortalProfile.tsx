@@ -190,6 +190,8 @@ export const PortalProfile: React.FC = () => {
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="tel"
+                inputMode="tel"
+                maxLength={20}
                 placeholder="+91 99999 99999"
                 value={supportPhone}
                 onChange={(e) => setSupportPhone(e.target.value)}

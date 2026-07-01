@@ -85,6 +85,7 @@ async def setup_masking_data(db: AsyncSession):
         phone="+919876543210",
         title="Opportunity",
         created_by=super_admin.id,
+        assigned_user_id=telecaller.id,
         stage_id=default_stage_id
     )
     db.add(lead)

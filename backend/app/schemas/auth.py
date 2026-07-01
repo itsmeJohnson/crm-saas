@@ -17,6 +17,7 @@ class RegisterTenantRequest(BaseModel):
     contract_months: int = Field(3, ge=3, description="Contract length in months, minimum 3.")
     plan_name: str | None = None
     billing_cycle: str = "monthly"
+    is_trial: bool = False
 
 class Token(BaseModel):
     access_token: str

@@ -90,28 +90,40 @@ async def main():
         safe_org_id = safe_user.organization_id
         print(f"Keeping org: {safe_org_id} ({SAFE_EMAIL})\n")
 
-        # ── 2. Soft-delete all other orgs and their users ──────────────────
-        all_orgs = (await db.execute(
-            select(Organization).where(Organization.is_deleted == False)
-        )).scalars().all()
-
-        deleted_orgs = 0
-        for org in all_orgs:
-            if org.id == safe_org_id:
-                continue
-            # soft-delete users
+        # ── 2. Hard-delete all other orgs and their data to prevent constraint failures ──
+        from sqlalchemy import text
+        
+        # 1. Clean tables referencing organizations (excluding users first)
+        tables_with_org_id = [
+            "activities", "notes", "leads", "contacts", "companies", "invoices", "support_tickets",
+            "performance_targets", "seat_assignment_history", "user_invitations", "lead_imports",
+            "pipeline_stages", "assignment_configs", "audit_logs", "tenant_subscriptions"
+        ]
+        for tbl in tables_with_org_id:
             await db.execute(
-                update(User)
-                .where(User.organization_id == org.id)
-                .values(is_deleted=True, is_active=False)
+                text(f"DELETE FROM {tbl} WHERE organization_id != :safe_id"),
+                {"safe_id": safe_org_id}
             )
-            org.is_deleted = True
-            org.is_active = False
-            deleted_orgs += 1
-            print(f"  Deleted org: {org.name}")
+        
+        # 2. Clean user sessions before users
+        await db.execute(
+            text("DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM users WHERE organization_id != :safe_id)"),
+            {"safe_id": safe_org_id}
+        )
 
-        await db.flush()
-        print(f"\nDeleted {deleted_orgs} tenant(s).\n")
+        # 3. Clean users
+        await db.execute(
+            text("DELETE FROM users WHERE organization_id != :safe_id"),
+            {"safe_id": safe_org_id}
+        )
+        
+        # 4. Clean organizations
+        await db.execute(
+            text("DELETE FROM organizations WHERE id != :safe_id"),
+            {"safe_id": safe_org_id}
+        )
+        print(f"Purged old organizations and related data.")
+        await db.commit()
 
         # ── 3. Create demo tenants ─────────────────────────────────────────
         for t in DEMO_TENANTS:
@@ -130,7 +142,7 @@ async def main():
                 subscription_plan=plan.display_name,
                 subscription_status="active",
                 subscription_expires_at=(now + timedelta(days=365)).replace(tzinfo=None),
-                max_users=plan.max_users,
+                max_users=plan.minimum_users,
             )
             db.add(org)
             await db.flush()
@@ -174,6 +186,7 @@ async def main():
             admin.seat_number = "Seat-001"
             await db.flush()
 
+            created_employee_ids = []
             for u in t["users"]:
                 email = f"{u['first'].lower()}.{u['last'].lower()}@{t['slug']}.demo"
                 reporting = None
@@ -201,10 +214,47 @@ async def main():
                     manager_id = new_user.id
                 if u.get("tl"):
                     tl_id = new_user.id
+                if u["role"] == "Employee":
+                    created_employee_ids.append(new_user.id)
 
             # Default pipeline stages (PipelineStage links directly to org)
-            for i, stage in enumerate(["New Lead", "Contacted", "Interested", "Negotiation", "Won", "Lost"], 1):
-                db.add(PipelineStage(organization_id=org.id, name=stage, order_position=i))
+            stages = []
+            for i, stage_name in enumerate(["New Lead", "Contacted", "Interested", "Negotiation", "Won", "Lost"], 1):
+                s = PipelineStage(organization_id=org.id, name=stage_name, order_position=i)
+                db.add(s)
+                stages.append(s)
+            await db.flush()
+
+            # Create demo leads assigned to the created employees
+            from app.models.lead import Lead
+            lead_names = [
+                ("Aarav", "Sharma", "+919876543210", "aarav@gmail.com", "Aarav Corp", 50000.0),
+                ("Ishaan", "Gupta", "+919876543211", "ishaan@yahoo.com", "Ishaan Tech", 120000.0),
+                ("Kavya", "Iyer", "+919876543212", "kavya@hotmail.com", "Kavya Design", 30000.0),
+                ("Riya", "Sen", "+919876543213", "riya@outlook.com", "Riya Retail", 85000.0),
+                ("Kabir", "Kapoor", "+919876543214", "kabir@gmail.com", "Kapoor & Co", 150000.0),
+            ]
+
+            for index, (first, last, phone, email, company, value) in enumerate(lead_names):
+                assign_to = admin.id
+                if created_employee_ids:
+                    assign_to = created_employee_ids[index % len(created_employee_ids)]
+                
+                lead = Lead(
+                    organization_id=org.id,
+                    first_name=first,
+                    last_name=last,
+                    phone=phone,
+                    email=email,
+                    company_name=company,
+                    title=f"Deal for {company}",
+                    status="New",
+                    value=value,
+                    assigned_user_id=assign_to,
+                    created_by=admin.id,
+                    stage_id=stages[index % 3].id,  # Distribute across first 3 stages
+                )
+                db.add(lead)
 
             total_users = 1 + len(t["users"])  # admin + team
             print(f"  Created '{t['org_name']}' on {plan.display_name} plan")

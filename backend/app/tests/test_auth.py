@@ -12,12 +12,20 @@ async def test_register_and_login(client: AsyncClient):
         "first_name": "John",
         "last_name": "Doe"
     }
-    response = await client.post("/api/v1/auth/register", json=reg_payload)
+    response = await client.post("/api/v1/auth/public-register", json=reg_payload)
+    assert response.status_code == 201
+    tokens = response.json()
+    assert "access_token" in tokens
+    assert "refresh_token" in tokens
+
+    # Access Protected Route /me
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    response = await client.get("/api/v1/auth/me", headers=headers)
     assert response.status_code == 200
-    data = response.json()
-    assert data["organization"]["slug"] == "acme"
-    assert data["user"]["email"] == "admin@acme.com"
-    assert data["user"]["role"] == "OrgAdmin"
+    me_data = response.json()
+    assert me_data["user"]["email"] == "admin@acme.com"
+    assert me_data["organization"]["name"] == "Acme Corp"
+    assert me_data["user"]["role"] == "OrgAdmin"
 
     # Login
     login_payload = {
@@ -30,7 +38,7 @@ async def test_register_and_login(client: AsyncClient):
     assert "access_token" in tokens
     assert "refresh_token" in tokens
 
-    # Access Protected Route /me
+    # Access Protected Route /me with login token
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
     response = await client.get("/api/v1/auth/me", headers=headers)
     assert response.status_code == 200
@@ -57,7 +65,7 @@ async def test_register_and_login(client: AsyncClient):
     logout_payload = {
         "refresh_token": new_tokens["refresh_token"]
     }
-    response = await client.post("/api/v1/auth/logout", json=logout_payload)
+    response = await client.post("/api/v1/auth/logout", json=logout_payload, headers=new_headers)
     assert response.status_code == 200
 
     # Try to reuse the logged out refresh token (should fail)

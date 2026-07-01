@@ -18,5 +18,9 @@ class OrganizationResponse(OrganizationBase):
 
     id: uuid.UUID
     is_active: bool
+    subscription_plan: str | None = None
+    subscription_status: str | None = None
+    subscription_expires_at: datetime | None = None
+    max_users: int | None = None
     created_at: datetime
     updated_at: datetime

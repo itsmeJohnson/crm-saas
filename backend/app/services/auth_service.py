@@ -116,15 +116,28 @@ class AuthService:
                 await self.db.flush()
 
         now_utc = datetime.now(timezone.utc)
-        sub_end = now_utc + timedelta(days=request.contract_months * 30)
-        
+
+        # A new tenant may start on a free trial: they get full access for the
+        # trial window and must activate (pay) a plan before it ends to continue.
+        trial_days = plan.trial_days if (plan.trial_days and plan.trial_days > 0) else 7
+        if request.is_trial:
+            trial_end = now_utc + timedelta(days=trial_days)
+            sub_status = "trial"
+            sub_end = trial_end
+            trial_end_date = trial_end
+        else:
+            sub_status = "active"
+            sub_end = now_utc + timedelta(days=request.contract_months * 30)
+            trial_end_date = None
+
         # 1. Create TenantSubscription
         sub = TenantSubscription(
             organization_id=org.id,
             plan_id=plan.id,
-            status="active",
+            status=sub_status,
             start_date=now_utc,
             end_date=sub_end,
+            trial_end_date=trial_end_date,
             auto_renew=True,
             billing_cycle=request.billing_cycle,
             users_purchased=request.licensed_seats,
@@ -137,7 +150,7 @@ class AuthService:
         org.subscription_plan = plan.name
         org.max_users = request.licensed_seats
         org.subscription_expires_at = sub_end.replace(tzinfo=None)
-        org.subscription_status = "active"
+        org.subscription_status = sub_status
         self.db.add(org)
 
         # 3. Assign Seat to the newly created admin user
@@ -154,73 +167,75 @@ class AuthService:
         )
         self.db.add(history)
 
-        # 4. Generate initial paid Invoice
-        comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
-        comm_res = await self.db.execute(comm_stmt)
-        comm_settings = comm_res.scalar_one_or_none()
-        if not comm_settings:
-            comm_settings = CommercialSettings(id="default")
-            self.db.add(comm_settings)
+        # 4. Generate the initial paid Invoice + Payment.
+        # Trials owe nothing until they activate, so no invoice is raised yet.
+        if not request.is_trial:
+            comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
+            comm_res = await self.db.execute(comm_stmt)
+            comm_settings = comm_res.scalar_one_or_none()
+            if not comm_settings:
+                comm_settings = CommercialSettings(id="default")
+                self.db.add(comm_settings)
+                await self.db.flush()
+
+            config_stmt = select(InvoiceConfig).where(InvoiceConfig.id == "default")
+            config_res = await self.db.execute(config_stmt)
+            invoice_config = config_res.scalar_one_or_none()
+            if not invoice_config:
+                invoice_config = InvoiceConfig(id="default")
+                self.db.add(invoice_config)
+                await self.db.flush()
+
+            prefix = invoice_config.invoice_prefix or "INV"
+            currency = invoice_config.currency or comm_settings.default_currency or "INR"
+            invoice_num = f"{prefix}-REG-{uuid.uuid4().hex[:8].upper()}-{int(now_utc.timestamp())}"
+
+            price_per_seat = float(plan.monthly_price if plan.monthly_price > 0 else plan.price_inr)
+            base_amount = price_per_seat * request.licensed_seats
+
+            gst_rate = float(comm_settings.default_gst)
+            if comm_settings.gst_inclusive:
+                gst_amount = base_amount * (gst_rate / (100.0 + gst_rate))
+                taxable_amount = base_amount - gst_amount
+                total_amount = base_amount
+            else:
+                taxable_amount = base_amount
+                gst_amount = taxable_amount * (gst_rate / 100.0)
+                total_amount = taxable_amount + gst_amount
+
+            invoice = Invoice(
+                organization_id=org.id,
+                invoice_number=invoice_num,
+                amount=total_amount,
+                status="Paid",
+                due_date=(now_utc + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
+                plan_name=plan.name,
+                amount_inr=total_amount if currency == "INR" else 0.0,
+                currency=currency,
+                issue_date=now_utc,
+                payment_status="paid",
+                subscription_id=sub.id,
+                setup_charges=0.0,
+                extra_users_amount=0.0,
+                discount_amount=0.0,
+                gst_amount=gst_amount,
+                total_amount=total_amount
+            )
+            self.db.add(invoice)
             await self.db.flush()
 
-        config_stmt = select(InvoiceConfig).where(InvoiceConfig.id == "default")
-        config_res = await self.db.execute(config_stmt)
-        invoice_config = config_res.scalar_one_or_none()
-        if not invoice_config:
-            invoice_config = InvoiceConfig(id="default")
-            self.db.add(invoice_config)
+            # 5. Create Payment record
+            payment = Payment(
+                invoice_id=invoice.id,
+                payment_reference=f"REF-REG-{uuid.uuid4().hex[:8].upper()}",
+                gateway="UPI",
+                status="Paid",
+                transaction_id=f"TXN-REG-{uuid.uuid4().hex[:12].upper()}",
+                paid_date=now_utc,
+                remarks="Initial registration payment"
+            )
+            self.db.add(payment)
             await self.db.flush()
-
-        prefix = invoice_config.invoice_prefix or "INV"
-        currency = invoice_config.currency or comm_settings.default_currency or "INR"
-        invoice_num = f"{prefix}-REG-{uuid.uuid4().hex[:8].upper()}-{int(now_utc.timestamp())}"
-
-        price_per_seat = float(plan.monthly_price if plan.monthly_price > 0 else plan.price_inr)
-        base_amount = price_per_seat * request.licensed_seats
-        
-        gst_rate = float(comm_settings.default_gst)
-        if comm_settings.gst_inclusive:
-            gst_amount = base_amount * (gst_rate / (100.0 + gst_rate))
-            taxable_amount = base_amount - gst_amount
-            total_amount = base_amount
-        else:
-            taxable_amount = base_amount
-            gst_amount = taxable_amount * (gst_rate / 100.0)
-            total_amount = taxable_amount + gst_amount
-
-        invoice = Invoice(
-            organization_id=org.id,
-            invoice_number=invoice_num,
-            amount=total_amount,
-            status="Paid",
-            due_date=(now_utc + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
-            plan_name=plan.name,
-            amount_inr=total_amount if currency == "INR" else 0.0,
-            currency=currency,
-            issue_date=now_utc,
-            payment_status="paid",
-            subscription_id=sub.id,
-            setup_charges=0.0,
-            extra_users_amount=0.0,
-            discount_amount=0.0,
-            gst_amount=gst_amount,
-            total_amount=total_amount
-        )
-        self.db.add(invoice)
-        await self.db.flush()
-
-        # 5. Create Payment record
-        payment = Payment(
-            invoice_id=invoice.id,
-            payment_reference=f"REF-REG-{uuid.uuid4().hex[:8].upper()}",
-            gateway="UPI",
-            status="Paid",
-            transaction_id=f"TXN-REG-{uuid.uuid4().hex[:12].upper()}",
-            paid_date=now_utc,
-            remarks="Initial registration payment"
-        )
-        self.db.add(payment)
-        await self.db.flush()
 
         return user, org
 

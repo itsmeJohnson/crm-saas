@@ -7,6 +7,7 @@ import {
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
+import { SubscriptionGate } from '../components/SubscriptionGate';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -204,7 +205,9 @@ export const AppLayout: React.FC = () => {
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-app)' }}>
           <div className="p-4 md:p-6 min-h-full">
-            <Outlet />
+            <SubscriptionGate>
+              <Outlet />
+            </SubscriptionGate>
           </div>
         </main>
       </div>

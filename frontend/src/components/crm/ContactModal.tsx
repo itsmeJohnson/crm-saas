@@ -163,6 +163,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Phone</label>
               <input
                 type="text"
+                inputMode="tel"
+                maxLength={20}
                 {...register('phone')}
                 placeholder="e.g. +1 555-0100"
                 className="w-full px-4 py-3 rounded-xl glass-input"

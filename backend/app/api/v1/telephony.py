@@ -52,7 +52,32 @@ class ConnectionManager:
 ws_manager = ConnectionManager()
 
 @router.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        await websocket.accept()
+        await websocket.close(code=1008, reason="Invalid User ID format")
+        return
+
+    from app.models.user import User
+    res = await db.execute(select(User).where(User.id == user_uuid, User.is_active == True, User.is_deleted == False))
+    user = res.scalar_one_or_none()
+    if not user:
+        await websocket.accept()
+        await websocket.close(code=1008, reason="User not active")
+        return
+
+    from app.dependencies.feature_guard import tenant_has_feature
+    if not await tenant_has_feature(db, user, "INBOUND_CALLING"):
+        await websocket.accept()
+        await websocket.close(code=1008, reason="Inbound calling feature not available")
+        return
+
     await ws_manager.connect(user_id, websocket)
     try:
         while True:

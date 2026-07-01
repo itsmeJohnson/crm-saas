@@ -96,8 +96,18 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: str | None = None
     RAZORPAY_WEBHOOK_SECRET: str | None = None
 
+    # Cashfree Settings
+    CASHFREE_APP_ID: str | None = None
+    CASHFREE_SECRET_KEY: str | None = None
+    CASHFREE_WEBHOOK_SECRET: str | None = None
+    CASHFREE_ENV: str = "sandbox"  # "sandbox" or "production"
+
     # Profile Mode
     ENVIRONMENT: str = "development"
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
 
     @model_validator(mode="after")
     def validate_production_config(self) -> "Settings":

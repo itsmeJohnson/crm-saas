@@ -129,11 +129,21 @@ export const portalApi = {
   },
 
   getExtraSeatPricing: async () => {
-    const res = await api.get<{ unit_price: number; gst_percentage: number; gst_inclusive: boolean; plan_name: string | null }>('/portal/subscription/extra-seat-pricing');
+    const res = await api.get<{
+      unit_price: number;
+      cycle_prices: { monthly: number; quarterly: number; annual: number };
+      gst_percentage: number;
+      gst_inclusive: boolean;
+      plan_name: string | null;
+      minimum_users: number;
+      users_purchased: number;
+      can_add_extra: boolean;
+      subscription_status: string;
+    }>('/portal/subscription/extra-seat-pricing');
     return res.data;
   },
 
-  buyExtraSeats: async (payload: { user_count: number; gateway: string }) => {
+  buyExtraSeats: async (payload: { user_count: number; gateway: string; billing_cycle: string }) => {
     const res = await api.post<PortalInvoiceResponse>('/portal/subscription/add-users', payload);
     return res.data;
   },

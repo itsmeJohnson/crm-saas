@@ -47,8 +47,41 @@ async def razorpay_webhook(
         )
 
     processed = await rzp_service.process_webhook(event_data)
-    
+
     if not processed:
         return {"status": "skipped", "reason": "event ignored or target invoice not found"}
 
+    return {"status": "processed"}
+
+
+@router.post("/cashfree")
+async def cashfree_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle Cashfree PG webhook events. Verifies the signature before processing."""
+    from app.services.cashfree_service import CashfreeService
+
+    body = await request.body()
+    signature = request.headers.get("x-webhook-signature")
+    timestamp = request.headers.get("x-webhook-timestamp")
+
+    if not signature or not timestamp:
+        logger.error("Missing Cashfree webhook signature/timestamp headers")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing signature headers")
+
+    cf_service = CashfreeService(db)
+    if not cf_service.verify_webhook_signature(body, signature, timestamp):
+        logger.error("Invalid Cashfree webhook signature")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
+
+    try:
+        event_data = json.loads(body.decode("utf-8"))
+    except Exception as e:
+        logger.error(f"Failed to parse Cashfree webhook JSON: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload")
+
+    processed = await cf_service.process_webhook(event_data)
+    if not processed:
+        return {"status": "skipped", "reason": "event ignored or target invoice not found"}
     return {"status": "processed"}

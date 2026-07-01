@@ -211,6 +211,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               </div>
               <input
                 type="text"
+                inputMode="tel"
+                maxLength={20}
                 {...register('phone')}
                 placeholder="e.g. +1 555-0900"
                 readOnly={lead?.phone?.includes('*')}
