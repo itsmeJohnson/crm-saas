@@ -6,14 +6,17 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.company import CompanyResponse, CompanyCreate, CompanyUpdate
 from app.services.company_service import CompanyService
-from app.middleware.permissions import require_active_user
+from app.middleware.permissions import require_active_user, require_role
+
+# Company records are an OrgAdmin/Manager surface (matches the frontend route guard).
+_oa_or_mgr = require_role(["OrgAdmin", "Manager"])
 
 router = APIRouter()
 
 @router.post("/", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)
 async def create_company(
     company_in: CompanyCreate,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new company for the organization."""
@@ -22,7 +25,7 @@ async def create_company(
 
 @router.get("/", response_model=List[CompanyResponse])
 async def list_companies(
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -36,7 +39,7 @@ async def list_companies(
 @router.get("/{company_id}", response_model=CompanyResponse)
 async def get_company(
     company_id: uuid.UUID,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Retrieve detailed company profile scoped to organization."""
@@ -47,7 +50,7 @@ async def get_company(
 async def update_company(
     company_id: uuid.UUID,
     company_in: CompanyUpdate,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update properties of a scoped company."""
@@ -57,7 +60,7 @@ async def update_company(
 @router.delete("/{company_id}", response_model=CompanyResponse)
 async def delete_company(
     company_id: uuid.UUID,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Soft delete company from organization database."""

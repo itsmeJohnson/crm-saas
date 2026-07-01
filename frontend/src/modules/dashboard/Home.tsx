@@ -75,12 +75,17 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Relocated Telecaller Dialer Workspace at the absolute top */}
-      {dashboardData?.role === 'Telecaller' && features.includes('OUTBOUND_CALLING') && (
+      {/* Telecaller cockpit — available on all plans. Plans with OUTBOUND_CALLING get
+          integrated click-to-call; entry plans (e.g. Core CRM) get the manual workflow. */}
+      {dashboardData?.role === 'Telecaller' && (
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-bold text-slate-100">Agent Dialer cockpit</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Start your dialing session to contact leads assigned to your queue.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {features.includes('OUTBOUND_CALLING')
+                ? 'Start your dialing session to contact leads assigned to your queue.'
+                : 'Work your assigned queue — call on your own phone, then log the outcome and update the pipeline.'}
+            </p>
           </div>
           <DialerConsole />
         </div>

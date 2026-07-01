@@ -12,9 +12,12 @@ from app.schemas.lead import LeadResponse
 from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest
 from app.services.agent_state_service import AgentStateService
 from app.services.disposition_service import DispositionService
-from app.dependencies.feature_guard import require_feature
 
-router = APIRouter(dependencies=[Depends(require_feature("OUTBOUND_CALLING"))])
+# The dialer cockpit (next-lead queue + manual disposition / pipeline updates) is
+# available to telecallers on ALL plans. Only the integrated Knowlarity click-to-call
+# is feature-gated (see the OUTBOUND_CALLING check inside get_next_lead), so entry
+# plans like Core CRM get a manual telecalling workflow without paid calling.
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 async def check_is_telecaller(user: User, db: AsyncSession) -> bool:

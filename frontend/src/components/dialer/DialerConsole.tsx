@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
+import { useAuthStore } from '../../store/authStore';
 import { MaskedField } from '../common/MaskedField';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
@@ -36,6 +37,9 @@ export const DialerConsole: React.FC = () => {
   } = useDialerStore();
 
   const { stages, fetchStages } = usePipelineStore();
+  // Integrated click-to-call is a paid feature; without it the cockpit runs in
+  // manual mode (fetch lead → agent calls on own phone → log disposition).
+  const callingEnabled = useAuthStore((s) => s.features.includes('OUTBOUND_CALLING'));
 
   // Local state for break countdown (15 minutes = 900 seconds)
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(900);
@@ -148,7 +152,7 @@ export const DialerConsole: React.FC = () => {
 
   const handleStartDialing = async () => {
     try {
-      if (knowlarityApiKey && agentPhoneNumber) {
+      if (callingEnabled && knowlarityApiKey && agentPhoneNumber) {
         await startCalling(
           collectivePooling,
           knowlarityApiKey,
@@ -403,7 +407,8 @@ export const DialerConsole: React.FC = () => {
             )}
           </div>
 
-          {/* Outbound Telephony Settings */}
+          {/* Outbound Telephony Settings — only for plans with integrated calling */}
+          {callingEnabled && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <button
               type="button"
@@ -465,6 +470,7 @@ export const DialerConsole: React.FC = () => {
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* RIGHT CONTEXT PANEL (Cols 6-12) */}
