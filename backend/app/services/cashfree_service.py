@@ -42,7 +42,10 @@ class CashfreeService:
             raise ValueError("Cashfree is not configured. Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY.")
 
         amount = float(invoice.total_amount or invoice.amount)
-        order_id = f"CF-{invoice.invoice_number}"[:50]
+        # Unique per checkout attempt. A deterministic id would collide with a
+        # previously-created order when the user retries "Pay Now" on the same
+        # invoice (Cashfree rejects duplicates with order_already_exists).
+        order_id = f"CF-{invoice.invoice_number}"[:40] + "-" + uuid.uuid4().hex[:6]
 
         import httpx
         payload = {
