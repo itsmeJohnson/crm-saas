@@ -143,18 +143,25 @@ export const PortalPlans: React.FC = () => {
           const monthlyRate = getCycleMonthlyRate(plan);
           const isPopular = plan.popular_plan;
           const isRecommended = plan.recommended_plan;
+          const isCurrent = !!subscription && String(subscription.plan_id) === String(plan.id);
 
           return (
             <div
               key={plan.id}
               className={`glass-panel border rounded-2xl p-6 flex flex-col justify-between relative transition-all duration-200 ${
-                isRecommended
-                  ? 'border-brand-500/40 shadow-lg shadow-brand-500/5 bg-slate-950/40'
-                  : 'border-slate-900 hover:border-slate-800'
+                isCurrent
+                  ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/5 bg-emerald-500/[0.03]'
+                  : isRecommended
+                    ? 'border-brand-500/40 shadow-lg shadow-brand-500/5 bg-slate-950/40'
+                    : 'border-slate-900 hover:border-slate-800'
               }`}
             >
-              {/* Badge */}
-              {(isPopular || isRecommended || plan.plan_badge) && (
+              {/* Badge — the tenant's active plan gets a "Current Plan" badge */}
+              {isCurrent ? (
+                <span className="absolute top-4 right-4 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Current Plan
+                </span>
+              ) : (isPopular || isRecommended || plan.plan_badge) && (
                 <span className="absolute top-4 right-4 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase rounded bg-brand-500/20 text-brand-400 border border-brand-500/20">
                   {plan.plan_badge || (isRecommended ? 'Recommended' : 'Popular')}
                 </span>
@@ -219,22 +226,28 @@ export const PortalPlans: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Button */}
+              {/* Action — the active plan shows a status pill instead of a select button */}
               <div className="mt-8">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlan(plan)}
-                  disabled={!plan.allow_upgrade}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    plan.allow_upgrade
-                      ? isRecommended
-                        ? 'bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white shadow-md shadow-brand-500/10'
-                        : 'bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-slate-100'
-                      : 'bg-slate-950 border border-slate-900/50 text-slate-600 cursor-not-allowed'
-                  }`}
-                >
-                  {plan.allow_upgrade ? 'Select Tier Plan' : 'Plan Locked'}
-                </button>
+                {isCurrent ? (
+                  <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center gap-1.5">
+                    <Check className="w-4 h-4" /> Your Active Plan
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPlan(plan)}
+                    disabled={!plan.allow_upgrade}
+                    className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      plan.allow_upgrade
+                        ? isRecommended
+                          ? 'bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white shadow-md shadow-brand-500/10'
+                          : 'bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-slate-100'
+                        : 'bg-slate-950 border border-slate-900/50 text-slate-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {plan.allow_upgrade ? 'Select Tier Plan' : 'Plan Locked'}
+                  </button>
+                )}
               </div>
             </div>
           );
