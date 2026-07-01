@@ -136,6 +136,7 @@ async def main():
             await db.flush()
 
             # Create TenantSubscription
+            total_team = 1 + len(t["users"])  # admin + team members
             sub = TenantSubscription(
                 organization_id=org.id,
                 plan_id=plan.id,
@@ -145,7 +146,7 @@ async def main():
                 auto_renew=True,
                 billing_cycle="monthly",
                 users_purchased=plan.minimum_users,
-                users_active=1,
+                users_active=total_team,
             )
             db.add(sub)
             await db.flush()
@@ -167,6 +168,11 @@ async def main():
             # TL = Employee whose reporting_to_id points to a Manager
             manager_id = None
             tl_id = None
+            seat_counter = 2  # Admin already gets Seat-001
+
+            # Assign admin seat
+            admin.seat_number = "Seat-001"
+            await db.flush()
 
             for u in t["users"]:
                 email = f"{u['first'].lower()}.{u['last'].lower()}@{t['slug']}.demo"
@@ -185,9 +191,11 @@ async def main():
                     role=u["role"],
                     reporting_to_id=reporting,
                     is_active=True,
+                    seat_number=f"Seat-{seat_counter:03d}",
                 )
                 db.add(new_user)
                 await db.flush()
+                seat_counter += 1
 
                 if u["role"] == "Manager":
                     manager_id = new_user.id
