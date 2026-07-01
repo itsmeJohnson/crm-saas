@@ -37,11 +37,15 @@ export const PortalPlans: React.FC = () => {
     }
   };
 
-  const getCyclePrice = (plan: any) => {
-    if (billingCycle === 'annual') return plan.annual_price > 0 ? plan.annual_price : plan.monthly_price * 12;
-    if (billingCycle === 'quarterly') return plan.quarterly_price > 0 ? plan.quarterly_price : plan.monthly_price * 3;
+  // Returns the per-seat per-MONTH rate for the chosen billing cycle (discounted rate).
+  const getCycleMonthlyRate = (plan: any): number => {
+    if (billingCycle === 'annual') return plan.annual_price > 0 ? plan.annual_price : plan.monthly_price;
+    if (billingCycle === 'quarterly') return plan.quarterly_price > 0 ? plan.quarterly_price : plan.monthly_price;
     return plan.monthly_price > 0 ? plan.monthly_price : plan.price_inr;
   };
+
+  // Number of months covered by one invoice for the current cycle.
+  const cycleMonths = billingCycle === 'annual' ? 12 : billingCycle === 'quarterly' ? 3 : 1;
 
   const handleCheckout = async () => {
     if (!selectedPlan) return;
@@ -130,7 +134,7 @@ export const PortalPlans: React.FC = () => {
       {/* Plans Comparison Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
         {plans.map((plan) => {
-          const price = getCyclePrice(plan);
+          const monthlyRate = getCycleMonthlyRate(plan);
           const isPopular = plan.popular_plan;
           const isRecommended = plan.recommended_plan;
 
@@ -160,15 +164,20 @@ export const PortalPlans: React.FC = () => {
                 {/* Price Display */}
                 <div className="py-2 space-y-1">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-slate-100">₹{parseFloat(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    <span className="text-[10px] text-slate-500 font-medium">/ seat / {billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'}</span>
+                    <span className="text-2xl font-bold text-slate-100">₹{monthlyRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[10px] text-slate-500 font-medium">/ seat / mo</span>
                   </div>
+                  {billingCycle !== 'monthly' && (
+                    <p className="text-[9px] text-amber-400 font-semibold">
+                      Billed {billingCycle === 'quarterly' ? 'every 3 months' : 'annually'} — one invoice covers {cycleMonths} months
+                    </p>
+                  )}
                   <p className="text-[10px] text-brand-400 font-semibold">
-                    Starts from: ₹{(parseFloat(price) * plan.minimum_users).toLocaleString('en-IN')}/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'} (Min {plan.minimum_users} seats)
+                    Starts from: ₹{(monthlyRate * plan.minimum_users * cycleMonths).toLocaleString('en-IN')}/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'} (Min {plan.minimum_users} seats)
                   </p>
                   {subscription && (
                     <p className="text-[10px] text-indigo-400 font-semibold">
-                      Your cost ({Math.max(subscription.users_purchased, plan.minimum_users)} seats): ₹{(parseFloat(price) * Math.max(subscription.users_purchased, plan.minimum_users)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'}
+                      Your cost ({Math.max(subscription.users_purchased, plan.minimum_users)} seats): ₹{(monthlyRate * Math.max(subscription.users_purchased, plan.minimum_users) * cycleMonths).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'quarter' : 'yr'}
                     </p>
                   )}
                   {plan.setup_charges > 0 && (
@@ -229,8 +238,8 @@ export const PortalPlans: React.FC = () => {
       {/* Checkout Modal */}
       {selectedPlan && (() => {
         const currentSeatCount = subscription ? Math.max(subscription.users_purchased, selectedPlan.minimum_users) : selectedPlan.minimum_users;
-        const rawPricePerSeat = parseFloat(getCyclePrice(selectedPlan));
-        const tierPrice = rawPricePerSeat * currentSeatCount;
+        const ratePerSeatPerMonth = getCycleMonthlyRate(selectedPlan);
+        const tierPrice = ratePerSeatPerMonth * currentSeatCount * cycleMonths;
         const setupCharges = parseFloat(selectedPlan.setup_charges || 0.0);
         const gstAmount = tierPrice * 0.18;
         const totalPrice = tierPrice + gstAmount + setupCharges;
@@ -272,36 +281,40 @@ export const PortalPlans: React.FC = () => {
                 {/* Total calculations */}
                 <div className="p-4 bg-slate-900/50 rounded-xl space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Price per seat:</span>
-                    <span className="font-mono text-slate-300">₹{rawPricePerSeat.toFixed(2)}</span>
+                    <span className="text-slate-500">Rate per seat / mo:</span>
+                    <span className="font-mono text-slate-300">₹{ratePerSeatPerMonth.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Seats to Purchase:</span>
+                    <span className="text-slate-500">Licensed seats:</span>
                     <span className="font-semibold text-slate-300">
-                      {currentSeatCount} Seats
+                      {currentSeatCount} seats
                       {subscription && subscription.users_purchased < selectedPlan.minimum_users && (
                         <span className="text-[9px] text-brand-400 block font-normal">
-                          (Adjusted to plan minimum of {selectedPlan.minimum_users})
+                          (adjusted to plan minimum of {selectedPlan.minimum_users})
                         </span>
                       )}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Billing period:</span>
+                    <span className="font-semibold text-slate-300">{cycleMonths} month{cycleMonths > 1 ? 's' : ''}</span>
+                  </div>
                   <div className="flex justify-between border-t border-slate-800/80 pt-1">
-                    <span className="text-slate-500">Subtotal Price:</span>
+                    <span className="text-slate-500">Subtotal ({currentSeatCount} × ₹{ratePerSeatPerMonth.toFixed(0)} × {cycleMonths}mo):</span>
                     <span className="font-mono text-slate-300">₹{tierPrice.toFixed(2)}</span>
                   </div>
                   {setupCharges > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Setup Charges:</span>
+                      <span className="text-slate-500">Setup charges (one-time):</span>
                       <span className="font-mono text-slate-300">₹{setupCharges.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-slate-500">GST (18% inclusive/applicable):</span>
+                    <span className="text-slate-500">GST @18%:</span>
                     <span className="font-mono text-slate-300">₹{gstAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-800/80 pt-2 font-bold text-sm">
-                    <span className="text-slate-400">Total Price:</span>
+                    <span className="text-slate-400">Total due now:</span>
                     <span className="text-slate-100">₹{totalPrice.toFixed(2)}</span>
                   </div>
                 </div>

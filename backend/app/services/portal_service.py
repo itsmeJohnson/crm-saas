@@ -527,15 +527,19 @@ class PortalService:
 
         licensed_seats = max(sub.users_purchased, plan.minimum_users) if sub else max(plan.minimum_users, 10)
 
-        # Determine price per seat based on cycle
+        # price_per_seat is the discounted per-seat PER-MONTH rate for the cycle.
+        # billing_months is how many months one invoice covers.
         if billing_cycle == "annual":
-            price_per_seat = float(plan.annual_price) if plan.annual_price > 0 else float(plan.monthly_price) * 12
+            price_per_seat = float(plan.annual_price) if plan.annual_price > 0 else float(plan.monthly_price)
+            billing_months = 12
         elif billing_cycle == "quarterly":
-            price_per_seat = float(plan.quarterly_price) if plan.quarterly_price > 0 else float(plan.monthly_price) * 3
+            price_per_seat = float(plan.quarterly_price) if plan.quarterly_price > 0 else float(plan.monthly_price)
+            billing_months = 3
         else:
             price_per_seat = float(plan.monthly_price) if plan.monthly_price > 0 else float(plan.price_inr)
+            billing_months = 1
 
-        base_amount = price_per_seat * licensed_seats
+        base_amount = price_per_seat * licensed_seats * billing_months
 
         gst_rate = float(comm_settings.default_gst)
         if comm_settings.gst_inclusive:
@@ -583,6 +587,8 @@ class PortalService:
             "action_type": "upgrade_plan",
             "plan_id": str(plan_id),
             "billing_cycle": billing_cycle,
+            "billing_months": billing_months,
+            "rate_per_seat_per_month": price_per_seat,
             "gateway": gateway,
             "licensed_seats": licensed_seats
         }
