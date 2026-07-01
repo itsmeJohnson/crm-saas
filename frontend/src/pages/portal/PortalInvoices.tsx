@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi, PortalInvoiceResponse } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
 import {
   Download, CreditCard, Search,
   AlertTriangle, Loader2, CheckCircle2, SlidersHorizontal
@@ -17,7 +18,7 @@ export const PortalInvoices: React.FC = () => {
 
   // Checkout modal state
   const [selectedInvoice, setSelectedInvoice] = useState<PortalInvoiceResponse | null>(null);
-  const [selectedGateway, setSelectedGateway] = useState('UPI');
+  const [selectedGateway, setSelectedGateway] = useState('Cashfree');
   const [paying, setPaying] = useState(false);
 
   useEffect(() => {
@@ -59,13 +60,17 @@ export const PortalInvoices: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      const txnId = `TXN-INV-${Math.random().toString(36).substring(2, 14).toUpperCase()}`;
-      await portalApi.payInvoice(selectedInvoice.id, {
-        gateway: selectedGateway,
-        transaction_id: txnId
-      });
+      if (selectedGateway === 'Cashfree') {
+        await payInvoiceViaCashfree(selectedInvoice.id);
+      } else {
+        const txnId = `TXN-INV-${Math.random().toString(36).substring(2, 14).toUpperCase()}`;
+        await portalApi.payInvoice(selectedInvoice.id, {
+          gateway: selectedGateway,
+          transaction_id: txnId
+        });
+      }
 
-      setSuccess(`Invoice ${selectedInvoice.invoice_number} paid successfully via ${selectedGateway}! Transaction reference: ${txnId}`);
+      setSuccess(`Invoice ${selectedInvoice.invoice_number} paid successfully!`);
       setSelectedInvoice(null);
       fetchInvoices();
     } catch (err: any) {
@@ -266,11 +271,8 @@ export const PortalInvoices: React.FC = () => {
                   onChange={(e) => setSelectedGateway(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 >
-                  <option value="UPI">UPI / Instant QR</option>
-                  <option value="Stripe">Stripe Checkout</option>
-                  <option value="Razorpay">Razorpay Gateway</option>
-                  <option value="PhonePe">PhonePe Portal</option>
-                  <option value="Bank">Direct Bank Transfer</option>
+                  <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
+                  <option value="UPI">UPI / Instant (test only)</option>
                 </select>
               </div>
             </div>

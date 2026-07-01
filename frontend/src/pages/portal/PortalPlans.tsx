@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
 import {
-  CheckCircle2, AlertTriangle, Loader2, CreditCard, Check, 
+  CheckCircle2, AlertTriangle, Loader2, CreditCard, Check,
 } from 'lucide-react';
 
 export const PortalPlans: React.FC = () => {
@@ -14,7 +15,7 @@ export const PortalPlans: React.FC = () => {
 
   // Checkout states
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
-  const [selectedGateway, setSelectedGateway] = useState('UPI');
+  const [selectedGateway, setSelectedGateway] = useState('Cashfree');
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -61,13 +62,18 @@ export const PortalPlans: React.FC = () => {
         gateway: selectedGateway
       });
 
-      // 2. Pay immediately via simulated transaction ID
-      await portalApi.payInvoice(invoice.id, {
-        gateway: selectedGateway,
-        transaction_id: `TXN-UPGRADE-${Math.random().toString(36).substring(2, 14).toUpperCase()}`
-      });
+      // 2. Pay. Cashfree = real hosted checkout + server-side verification;
+      //    other options are dev-only simulated payments (rejected in production).
+      if (selectedGateway === 'Cashfree') {
+        await payInvoiceViaCashfree(invoice.id);
+      } else {
+        await portalApi.payInvoice(invoice.id, {
+          gateway: selectedGateway,
+          transaction_id: `TXN-UPGRADE-${Math.random().toString(36).substring(2, 14).toUpperCase()}`
+        });
+      }
 
-      setSuccess(`Successfully upgraded to the "${selectedPlan.display_name || selectedPlan.name}" plan! Your limits have been instantly updated.`);
+      setSuccess(`Successfully upgraded to the "${selectedPlan.display_name || selectedPlan.name}" plan! Your subscription has been updated.`);
       setSelectedPlan(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       fetchPlans();
@@ -270,11 +276,8 @@ export const PortalPlans: React.FC = () => {
                     onChange={(e) => setSelectedGateway(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   >
-                    <option value="UPI">UPI / Instant QR</option>
-                    <option value="Stripe">Stripe Checkout</option>
-                    <option value="Razorpay">Razorpay Gateway</option>
-                    <option value="PhonePe">PhonePe Transfer</option>
-                    <option value="Bank">Direct Bank Transfer</option>
+                    <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
+                    <option value="UPI">UPI / Instant (test only)</option>
                   </select>
                 </div>
 

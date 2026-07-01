@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
 import {
   HardDrive, Plus, CreditCard, Loader2, CheckCircle2,
   AlertTriangle, 
@@ -14,7 +15,7 @@ export const PortalStorage: React.FC = () => {
   // Storage purchase modal
   const [showModal, setShowModal] = useState(false);
   const [storageGb, setStorageGb] = useState(10);
-  const [selectedGateway, setSelectedGateway] = useState('UPI');
+  const [selectedGateway, setSelectedGateway] = useState('Cashfree');
   const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
@@ -45,11 +46,16 @@ export const PortalStorage: React.FC = () => {
         gateway: selectedGateway
       });
 
-      // 2. Pay immediately via simulated transaction ID
-      await portalApi.payInvoice(invoice.id, {
-        gateway: selectedGateway,
-        transaction_id: `TXN-STORAGE-${Math.random().toString(36).substring(2, 14).toUpperCase()}`
-      });
+      // 2. Pay. Cashfree = real hosted checkout + server-side verification;
+      //    other options are dev-only simulated payments (rejected in production).
+      if (selectedGateway === 'Cashfree') {
+        await payInvoiceViaCashfree(invoice.id);
+      } else {
+        await portalApi.payInvoice(invoice.id, {
+          gateway: selectedGateway,
+          transaction_id: `TXN-STORAGE-${Math.random().toString(36).substring(2, 14).toUpperCase()}`
+        });
+      }
 
       setSuccess(`Successfully purchased ${storageGb} GB extra storage! Your boundary limits are updated.`);
       setShowModal(false);
@@ -241,11 +247,8 @@ export const PortalStorage: React.FC = () => {
                   onChange={(e) => setSelectedGateway(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 >
-                  <option value="UPI">UPI / Instant QR</option>
-                  <option value="Stripe">Stripe Checkout</option>
-                  <option value="Razorpay">Razorpay Gateway</option>
-                  <option value="PhonePe">PhonePe Portal</option>
-                  <option value="Bank">Direct Bank Transfer</option>
+                  <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
+                  <option value="UPI">UPI / Instant (test only)</option>
                 </select>
               </div>
 

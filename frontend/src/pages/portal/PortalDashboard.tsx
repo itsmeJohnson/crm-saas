@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { portalApi, DashboardStatsResponse } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
 import { extractErrorMessage } from '../../utils/errors';
 import {
   Sparkles, CreditCard, Users, HardDrive, PhoneCall,
@@ -15,7 +16,7 @@ export const PortalDashboard: React.FC = () => {
   // Seat purchase state
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [seatCount, setSeatCount] = useState(1);
-  const [selectedGateway, setSelectedGateway] = useState('UPI');
+  const [selectedGateway, setSelectedGateway] = useState('Cashfree');
   const [buyingSeats, setBuyingSeats] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
   const [extraSeatUnitPrice, setExtraSeatUnitPrice] = useState(0);
@@ -75,11 +76,16 @@ export const PortalDashboard: React.FC = () => {
         gateway: selectedGateway,
         billing_cycle: billingCycle
       });
-      // 2. Pay Invoice (Simulated immediately on checkout)
-      await portalApi.payInvoice(invoice.id, {
-        gateway: selectedGateway,
-        transaction_id: `TXN-SEAT-${uuidFast()}`
-      });
+      // 2. Pay. Cashfree runs the real hosted checkout + server-side verification;
+      //    the other options are dev-only simulated payments (rejected in production).
+      if (selectedGateway === 'Cashfree') {
+        await payInvoiceViaCashfree(invoice.id);
+      } else {
+        await portalApi.payInvoice(invoice.id, {
+          gateway: selectedGateway,
+          transaction_id: `TXN-SEAT-${uuidFast()}`
+        });
+      }
       setPurchaseSuccess(`Successfully added ${seatCount} user seats! Your limits have been updated.`);
       setShowSeatModal(false);
       fetchStats();
@@ -407,11 +413,8 @@ export const PortalDashboard: React.FC = () => {
                   onChange={(e) => setSelectedGateway(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 >
-                  <option value="UPI">UPI / Instant QR</option>
-                  <option value="Stripe">Stripe Gateway</option>
-                  <option value="Razorpay">Razorpay Checkout</option>
-                  <option value="PhonePe">PhonePe Transfer</option>
-                  <option value="Bank">Direct Bank Transfer</option>
+                  <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
+                  <option value="UPI">UPI / Instant (test only)</option>
                 </select>
               </div>
 

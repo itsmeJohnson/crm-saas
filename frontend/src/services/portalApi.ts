@@ -185,6 +185,18 @@ export const portalApi = {
     return res.data;
   },
 
+  createCashfreeCheckout: async (invoiceId: string) => {
+    const res = await api.post<{
+      cf_order_id: string;
+      order_id: string;
+      payment_session_id: string;
+      order_amount: number;
+      order_currency: string;
+      env: 'sandbox' | 'production';
+    }>(`/portal/invoices/${invoiceId}/cashfree-checkout`);
+    return res.data;
+  },
+
   getPayments: async () => {
     const res = await api.get<PortalPaymentResponse[]>('/portal/payments');
     return res.data;
