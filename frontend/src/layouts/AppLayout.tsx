@@ -3,7 +3,7 @@ import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import {
-  LayoutDashboard, LogOut, Building, Users, FolderKanban,
+  LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
@@ -25,6 +25,8 @@ export const AppLayout: React.FC = () => {
     { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard },
     { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'] },
     { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT' },
+    { name: 'Companies',         path: '/companies',         icon: Building2,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
+    { name: 'Contacts',          path: '/contacts',          icon: Contact,           roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
     { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE' },
     { name: 'Users',             path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
     { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'] },

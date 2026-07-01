@@ -132,13 +132,13 @@ async def get_manager_metrics(
 
     return await AnalyticsService.get_manager_metrics(db, actor, target_date)
 
-@router.get("/super-admin", response_model=SuperAdminMetricsResponse)
-async def get_super_admin_metrics(
+@router.get("/org-admin", response_model=SuperAdminMetricsResponse)
+async def get_org_admin_metrics(
     target_date: Optional[date] = None,
     actor: User = Depends(require_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get organizational target progress gauges for the calling Admin."""
+    """Org-wide target-progress gauges for the calling OrgAdmin (their own organization)."""
     # Guard: must be OrgAdmin or SuperAdmin
     if actor.role not in ["OrgAdmin", "SuperAdmin"]:
         raise HTTPException(
