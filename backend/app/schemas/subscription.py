@@ -32,6 +32,7 @@ class TenantSubscriptionResponse(BaseModel):
     end_date: datetime
     trial_end_date: datetime | None = None
     auto_renew: bool
+    billing_cycle: str
     users_purchased: int
     users_purchased_next: int | None = None
     users_active: int

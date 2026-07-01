@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
 import {
   Shield, Check, AlertTriangle,
   RotateCcw, Loader2, CheckCircle2, ShieldAlert, Users, X
@@ -51,17 +52,28 @@ export const PortalSubscription: React.FC = () => {
       setRenewing(true);
       setError(null);
       setSuccess(null);
-      
-      // 1. Trigger subscription renewal (simulated immediate extension)
-      await portalApi.payInvoice(data.subscription.id, {
-        gateway: 'UPI',
-        transaction_id: `TXN-RENEW-${Math.random().toString(36).substring(2, 12).toUpperCase()}`
+
+      const sub = data?.subscription;
+      if (!sub?.plan_id) {
+        setError("No active subscription found to renew.");
+        return;
+      }
+
+      // Renewal = a fresh invoice for the CURRENT plan + billing cycle. Paying it
+      // extends the subscription for another period (handled by the upgrade_plan
+      // action on the backend). Verified & charged through Cashfree.
+      const invoice = await portalApi.upgradePlan({
+        plan_id: sub.plan_id,
+        billing_cycle: sub.billing_cycle || 'monthly',
+        gateway: 'Cashfree'
       });
-      
-      setSuccess("Subscription extended successfully!");
+
+      await payInvoiceViaCashfree(invoice.id);
+
+      setSuccess("Subscription renewed successfully! Your billing period has been extended.");
       fetchSubscription();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to renew subscription.");
+      setError(err.response?.data?.detail || err?.message || "Failed to renew subscription.");
     } finally {
       setRenewing(false);
     }
