@@ -767,11 +767,18 @@ export const TenantsPage: React.FC = () => {
                           : 'border-slate-800/80 hover:border-slate-700'
                       }`}
                     >
-                      {/* MOST POPULAR badge */}
+                      {/* MOST POPULAR / custom badge */}
                       {plan.popular_plan && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                           <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-brand-500 to-indigo-500 text-white text-[10px] font-bold rounded-full shadow-md shadow-brand-500/30 uppercase tracking-widest whitespace-nowrap">
                             ⭐ Most Popular
+                          </span>
+                        </div>
+                      )}
+                      {!plan.popular_plan && plan.plan_badge && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-700 border border-slate-600 text-slate-300 text-[10px] font-bold rounded-full uppercase tracking-widest whitespace-nowrap">
+                            {plan.plan_badge}
                           </span>
                         </div>
                       )}
