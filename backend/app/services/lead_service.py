@@ -8,6 +8,7 @@ from app.repositories.activity_repository import ActivityRepository
 from app.repositories.note_repository import NoteRepository
 from app.services.audit_service import AuditService
 from app.services.dashboard_service import DashboardService
+from app.services.notification_service import NotificationService
 from app.models.user import User
 from app.models.lead import Lead
 
@@ -19,6 +20,7 @@ class LeadService:
         self.activity_repo = ActivityRepository(db)
         self.note_repo = NoteRepository(db)
         self.audit_service = AuditService(db)
+        self.notification_service = NotificationService(db)
 
     async def get_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         if not actor.is_active:
@@ -62,6 +64,18 @@ class LeadService:
             resource_id=str(lead.id),
             action_metadata={"title": lead.title, "status": lead.status}
         )
+
+        if assigned_user_id and assigned_user_id != actor.id:
+            await self.notification_service.create_notification(
+                organization_id=actor.organization_id,
+                user_id=assigned_user_id,
+                category="lead",
+                title="New lead assigned to you",
+                body=f'"{lead.title}" was assigned to you.',
+                link_url=f"/leads?leadId={lead.id}",
+                action_metadata={"lead_id": str(lead.id)},
+            )
+
         await DashboardService.invalidate_cache(actor.organization_id)
         return lead
 

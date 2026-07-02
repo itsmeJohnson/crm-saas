@@ -27,6 +27,7 @@ from app.api.v1.subscription import router as subscription_router
 from app.api.v1.telephony import router as telephony_router
 from app.api.v1.portal import router as portal_router
 from app.api.v1.billing_webhook import router as billing_webhook_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.monitoring import router as monitoring_router, record_http_request
 from app.middleware.correlation import correlation_id_middleware
 from app.middleware.rate_limiter import RateLimiterMiddleware
@@ -167,6 +168,7 @@ app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant
 app.include_router(telephony_router,       prefix=f"{settings.API_V1_STR}/telephony",       tags=["telephony"])
 app.include_router(portal_router,          prefix=f"{settings.API_V1_STR}/portal",          tags=["portal"])
 app.include_router(billing_webhook_router, prefix=f"{settings.API_V1_STR}/billing/webhook", tags=["billing-webhook"])
+app.include_router(notifications_router,   prefix=f"{settings.API_V1_STR}/notifications",   tags=["notifications"])
 app.include_router(monitoring_router)
 
 @app.get("/health")

@@ -29,6 +29,7 @@ from app.models.tax_config import TaxConfig
 from app.models.payment_gateway import PaymentGateway
 from app.models.notification_template import NotificationTemplate
 from app.models.coupon import Coupon
+from app.models.notification import Notification
 
 __all__ = [
     "Base", 
@@ -66,5 +67,6 @@ __all__ = [
     "TaxConfig",
     "PaymentGateway",
     "NotificationTemplate",
-    "Coupon"
+    "Coupon",
+    "Notification"
 ]

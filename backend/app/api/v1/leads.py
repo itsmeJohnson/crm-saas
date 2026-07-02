@@ -249,11 +249,13 @@ async def transfer_leads(
     """
     from app.services.user_service import UserService
     from app.services.audit_service import AuditService
+    from app.services.notification_service import NotificationService
     from app.models.lead import Lead
     from sqlalchemy import select
 
     user_service = UserService(db)
     audit_service = AuditService(db)
+    notification_service = NotificationService(db)
 
     # 1. Fetch actor downline ids recursively
     downline_ids = await user_service.get_downline_user_ids(actor)
@@ -350,6 +352,17 @@ async def transfer_leads(
                 }
             )
             idx += 1
+
+        if chunk_size > 0 and dest_id != actor.id:
+            await notification_service.create_notification(
+                organization_id=actor.organization_id,
+                user_id=dest_id,
+                category="lead",
+                title="Leads transferred to you",
+                body=f"{chunk_size} lead(s) have been transferred to you.",
+                link_url="/leads",
+                action_metadata={"count": chunk_size, "source_user_id": str(req.source_user_id)},
+            )
 
     await db.flush()
 

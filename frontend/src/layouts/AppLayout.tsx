@@ -9,6 +9,7 @@ import {
   UserCog, User, Landmark, Settings, LifeBuoy, Activity
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -243,12 +244,20 @@ export const AppLayout: React.FC = () => {
             </div>
             <span className="font-semibold text-sm text-slate-100">CRM Enterprise</span>
           </div>
-          <button
-            onClick={() => setIsMobileOpen(true)}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => setIsMobileOpen(true)}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Persistent Top Bar (desktop only — mobile gets the bell in its own top bar above) */}
+        <header className="hidden md:flex items-center justify-end px-6 py-2.5 border-b border-slate-800/60 z-20" style={{ backgroundColor: 'var(--bg-surface)' }}>
+          <NotificationBell />
         </header>
 
         {/* Main Content */}

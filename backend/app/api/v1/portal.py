@@ -626,6 +626,7 @@ async def comment_on_support_ticket(
     return await service.add_comment(
         organization_id=current_user.organization_id,
         ticket_id=ticket_id,
+        actor_user_id=current_user.id,
         actor_name=actor_name,
         content=payload.content
     )
