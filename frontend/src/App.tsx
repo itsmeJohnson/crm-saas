@@ -16,6 +16,11 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { ContactReportsPage } from './pages/ContactReportsPage';
 import { CompanyReportsPage } from './pages/CompanyReportsPage';
+import { CustomersPage } from './pages/CustomersPage';
+import { CustomerReportsPage } from './pages/CustomerReportsPage';
+import { TasksPage } from './pages/TasksPage';
+import { TaskReportsPage } from './pages/TaskReportsPage';
+import { CalendarPage } from './pages/CalendarPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -69,6 +74,11 @@ export const App: React.FC = () => {
               <Route element={<SubscriptionGateRoute />}>
                 <Route path="/" element={<Home />} />
 
+                {/* Tasks & Calendar — available to all active users */}
+                <Route path="/tasks" element={<TasksPage />} />
+                <Route path="/tasks/reports" element={<TaskReportsPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+
                 {/* Lead Management Feature Guard */}
                 <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>
                   <Route path="/leads" element={<LeadsPage />} />
@@ -81,6 +91,8 @@ export const App: React.FC = () => {
                     <Route path="/companies/reports" element={<CompanyReportsPage />} />
                     <Route path="/contacts" element={<ContactsPage />} />
                     <Route path="/contacts/reports" element={<ContactReportsPage />} />
+                    <Route path="/customers" element={<CustomersPage />} />
+                    <Route path="/customers/reports" element={<CustomerReportsPage />} />
                   </Route>
                 </Route>
 

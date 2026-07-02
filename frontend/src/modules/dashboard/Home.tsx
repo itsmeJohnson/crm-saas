@@ -11,6 +11,7 @@ import { LeadSourcesWidget } from '../../components/dashboard/LeadSourcesWidget'
 import { TeamStatusWidget } from '../../components/dashboard/TeamStatusWidget';
 import { QuickActionsWidget } from '../../components/dashboard/QuickActionsWidget';
 import { DashboardNotificationsWidget } from '../../components/dashboard/DashboardNotificationsWidget';
+import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -139,6 +140,11 @@ export const Home: React.FC = () => {
         <PipelineWidget summary={summary} isLoading={isLoadingSummary} />
         <LeadSourcesWidget summary={summary} isLoading={isLoadingSummary} />
         <DashboardNotificationsWidget />
+      </div>
+
+      {/* My Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <MyTasksWidget />
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

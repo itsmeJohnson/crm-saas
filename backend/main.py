@@ -14,6 +14,9 @@ from app.api.v1.organization import router as org_router
 from app.api.v1.users import router as users_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.contacts import router as contacts_router
+from app.api.v1.customers import router as customers_router
+from app.api.v1.tasks import router as tasks_router
+from app.api.v1.calendar import router as calendar_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.activities import router as activities_router
 from app.api.v1.notes import router as notes_router
@@ -34,6 +37,7 @@ from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.core.database import async_session_maker
 from app.cron.subscription_cron import run_daily_subscription_check
 from app.cron.lead_cron import run_lead_automation_check
+from app.cron.customer_cron import run_customer_dunning_check
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -79,6 +83,7 @@ async def subscription_cron_scheduler():
                     logger.info("Acquired daily cron lock. Running daily subscription check.")
                     await run_daily_subscription_check(async_session_maker)
                     await run_lead_automation_check(async_session_maker)
+                    await run_customer_dunning_check(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -157,6 +162,9 @@ app.include_router(org_router,             prefix=f"{settings.API_V1_STR}/organi
 app.include_router(users_router,           prefix=f"{settings.API_V1_STR}/users",           tags=["users"])
 app.include_router(companies_router,       prefix=f"{settings.API_V1_STR}/companies",       tags=["companies"])
 app.include_router(contacts_router,        prefix=f"{settings.API_V1_STR}/contacts",        tags=["contacts"])
+app.include_router(customers_router,       prefix=f"{settings.API_V1_STR}/customers",       tags=["customers"])
+app.include_router(tasks_router,           prefix=f"{settings.API_V1_STR}/tasks",           tags=["tasks"])
+app.include_router(calendar_router,        prefix=f"{settings.API_V1_STR}/calendar",        tags=["calendar"])
 app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"])
 app.include_router(activities_router,      prefix=f"{settings.API_V1_STR}/activities",      tags=["activities"])
 app.include_router(notes_router,           prefix=f"{settings.API_V1_STR}/notes",           tags=["notes"])

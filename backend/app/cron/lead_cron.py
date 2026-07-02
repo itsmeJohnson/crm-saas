@@ -131,14 +131,91 @@ async def run_escalation_scan(db: AsyncSession) -> int:
     return total
 
 
+async def dispatch_task_reminders(db: AsyncSession) -> int:
+    """Notify assignees of tasks whose remind_at has passed. Returns count sent."""
+    from app.models.task import Task
+    now = datetime.now(timezone.utc)
+    res = await db.execute(
+        select(Task).filter(
+            Task.is_deleted == False,
+            Task.reminded == False,
+            Task.remind_at.isnot(None),
+            Task.remind_at <= now,
+            Task.status.in_(["Todo", "InProgress"]),
+        )
+    )
+    tasks = res.scalars().all()
+    notif_service = NotificationService(db)
+    sent = 0
+    for t in tasks:
+        target = t.assigned_user_id or t.created_by
+        if target:
+            await notif_service.create_notification(
+                organization_id=t.organization_id,
+                user_id=target,
+                category="task",
+                title="Task reminder",
+                body=f'Reminder: "{t.title}"' + (f" is due {t.due_date.date()}" if t.due_date else ""),
+                link_url=f"/tasks?taskId={t.id}",
+                action_metadata={"task_id": str(t.id)},
+            )
+            sent += 1
+        t.reminded = True
+        db.add(t)
+    await db.flush()
+    return sent
+
+
+async def dispatch_event_reminders(db: AsyncSession) -> int:
+    """Notify owners/attendees of calendar events whose remind_at has passed. Returns count sent."""
+    from app.models.calendar_event import CalendarEvent
+    now = datetime.now(timezone.utc)
+    res = await db.execute(
+        select(CalendarEvent).filter(
+            CalendarEvent.is_deleted == False,
+            CalendarEvent.reminded == False,
+            CalendarEvent.remind_at.isnot(None),
+            CalendarEvent.remind_at <= now,
+            CalendarEvent.status == "Scheduled",
+        )
+    )
+    events = res.scalars().all()
+    notif_service = NotificationService(db)
+    sent = 0
+    import uuid as _uuid
+    for ev in events:
+        recipients = set()
+        if ev.assigned_user_id:
+            recipients.add(ev.assigned_user_id)
+        for a in (ev.attendees or []):
+            if a.get("user_id"):
+                try:
+                    recipients.add(_uuid.UUID(str(a["user_id"])))
+                except ValueError:
+                    pass
+        for uid in recipients:
+            await notif_service.create_notification(
+                organization_id=ev.organization_id, user_id=uid, category="calendar",
+                title="Event reminder", body=f'"{ev.title}" starts {ev.start_at.strftime("%b %d, %H:%M")}',
+                link_url=f"/calendar?eventId={ev.id}", action_metadata={"event_id": str(ev.id)})
+            sent += 1
+        ev.reminded = True
+        db.add(ev)
+    await db.flush()
+    return sent
+
+
 async def run_lead_automation_check(session_maker) -> None:
     """Scheduler entry point: dispatch reminders then run escalation."""
     async with session_maker() as db:
         try:
             sent = await dispatch_due_reminders(db)
             escalated = await run_escalation_scan(db)
+            task_reminders = await dispatch_task_reminders(db)
+            event_reminders = await dispatch_event_reminders(db)
             await db.commit()
-            logger.info("Lead automation: %d reminders sent, %d leads escalated", sent, escalated)
+            logger.info("Lead automation: %d reminders, %d escalations, %d task reminders, %d event reminders",
+                        sent, escalated, task_reminders, event_reminders)
         except Exception as e:
             await db.rollback()
             logger.error("Lead automation check failed: %s", e)

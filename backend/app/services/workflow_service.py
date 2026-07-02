@@ -22,19 +22,32 @@ ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_
 CONTACT_CONDITION_FIELDS = {"job_title", "email", "phone", "company_id", "first_name", "last_name"}
 CONTACT_ACTION_TYPES = {"assign_user", "add_note", "notify_user", "add_tag"}
 
+# Task-entity variants
+TASK_CONDITION_FIELDS = {"status", "priority", "assigned_user_id", "recurrence"}
+TASK_ACTION_TYPES = {"set_status", "set_priority", "assign_user", "notify_user"}
+
 # Which field/action sets & entity apply per trigger
 _TRIGGER_ENTITY = {
     "lead_created": "lead", "lead_updated": "lead",
     "contact_created": "contact", "contact_updated": "contact",
+    "task_created": "task", "task_updated": "task",
 }
 
 
 def _fields_for(entity_type: str) -> set:
-    return CONTACT_CONDITION_FIELDS if entity_type == "contact" else CONDITION_FIELDS
+    if entity_type == "contact":
+        return CONTACT_CONDITION_FIELDS
+    if entity_type == "task":
+        return TASK_CONDITION_FIELDS
+    return CONDITION_FIELDS
 
 
 def _actions_for(entity_type: str) -> set:
-    return CONTACT_ACTION_TYPES if entity_type == "contact" else ACTION_TYPES
+    if entity_type == "contact":
+        return CONTACT_ACTION_TYPES
+    if entity_type == "task":
+        return TASK_ACTION_TYPES
+    return ACTION_TYPES
 
 
 def _coerce_number(v):
@@ -81,7 +94,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -170,17 +183,66 @@ class WorkflowService:
         for rule in rules:
             if not self.matches(entity, rule.conditions, entity_type):
                 continue
+            rule_applied: list[str] = []
             for action in (rule.actions or []):
                 if entity_type == "contact":
                     desc = await self._apply_contact_action(entity, action, actor, rule)
+                elif entity_type == "task":
+                    desc = await self._apply_task_action(entity, action, actor, rule)
                 else:
                     desc = await self._apply_action(entity, action, actor, rule)
                 if desc:
-                    applied.append(desc)
+                    rule_applied.append(desc)
+            if rule_applied:
+                applied.extend(rule_applied)
+                # Audit each firing so it surfaces in timelines (workflow/automation events)
+                from app.services.audit_service import AuditService
+                await AuditService(self.db).log_event(
+                    organization_id=entity.organization_id,
+                    actor_user_id=getattr(actor, "id", None),
+                    action="WORKFLOW_EXECUTED",
+                    resource_type=entity_type,
+                    resource_id=str(entity.id),
+                    action_metadata={"rule": rule.name, "trigger": trigger_event, "actions": rule_applied},
+                )
         if applied:
             self.db.add(entity)
             await self.db.flush()
         return applied
+
+    async def _apply_task_action(self, task, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        atype = action.get("type")
+        if atype not in TASK_ACTION_TYPES:
+            return None
+        if atype == "set_status" and action.get("value"):
+            task.status = str(action["value"])
+            return f"set_status={task.status}"
+        if atype == "set_priority" and action.get("value"):
+            task.priority = str(action["value"])
+            return f"set_priority={task.priority}"
+        if atype == "assign_user" and action.get("user_id"):
+            try:
+                task.assigned_user_id = uuid.UUID(str(action["user_id"]))
+                return "assign_user"
+            except ValueError:
+                return None
+        if atype == "notify_user":
+            from app.services.notification_service import NotificationService
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else task.assigned_user_id
+            except ValueError:
+                target_id = task.assigned_user_id
+            if target_id:
+                await NotificationService(self.db).create_notification(
+                    organization_id=task.organization_id, user_id=target_id, category="task",
+                    title=f"Workflow: {rule.name}",
+                    body=str(action.get("message") or f'Rule "{rule.name}" fired for task "{task.title}".'),
+                    link_url=f"/tasks?taskId={task.id}",
+                    action_metadata={"task_id": str(task.id), "rule_id": str(rule.id)},
+                )
+                return "notify_user"
+        return None
 
     async def _apply_contact_action(self, contact, action: dict, actor: User, rule: WorkflowRule) -> str | None:
         atype = action.get("type")

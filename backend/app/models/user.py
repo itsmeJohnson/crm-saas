@@ -32,6 +32,7 @@ class User(BaseModel):
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mfa_backup_codes: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # JSON list
+    calendar_feed_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # secret for .ics subscribe URL
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")

@@ -36,6 +36,14 @@ from app.models.escalation_config import EscalationConfig
 from app.models.workflow_rule import WorkflowRule
 from app.models.custom_field_definition import CustomFieldDefinition
 from app.models.contact_relationship import ContactRelationship
+from app.models.customer_order import CustomerOrder
+from app.models.customer_invoice import CustomerInvoice
+from app.models.customer_payment import CustomerPayment
+from app.models.contract import Contract
+from app.models.task import Task
+from app.models.task_comment import TaskComment
+from app.models.task_dependency import TaskDependency
+from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 
 __all__ = [
     "Base", 
@@ -80,5 +88,15 @@ __all__ = [
     "EscalationConfig",
     "WorkflowRule",
     "CustomFieldDefinition",
-    "ContactRelationship"
+    "ContactRelationship",
+    "CustomerOrder",
+    "CustomerInvoice",
+    "CustomerPayment",
+    "Contract",
+    "Task",
+    "TaskComment",
+    "TaskDependency",
+    "CalendarEvent",
+    "Holiday",
+    "WorkingHoursConfig"
 ]

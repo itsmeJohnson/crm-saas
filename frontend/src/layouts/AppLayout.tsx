@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -27,12 +27,16 @@ export const AppLayout: React.FC = () => {
     // ── Workspace ──────────────────────────────────────────────────────────
     { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard,  section: 'workspace' },
     { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace' },
+    { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
+    { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },
     { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Lead Reports',      path: '/leads/reports',     icon: BarChart3,         featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Lead Automation',   path: '/leads/automation',  icon: Zap,               roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Companies',         path: '/companies',         icon: Building2,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Company Reports',   path: '/companies/reports', icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Contacts',          path: '/contacts',          icon: Contact,           roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Customers',         path: '/customers',         icon: HeartHandshake,    roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Customer Reports',  path: '/customers/reports', icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Contact Reports',   path: '/contacts/reports',  icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE', section: 'workspace' },
     { name: 'Team Members',      path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS', section: 'workspace' },
