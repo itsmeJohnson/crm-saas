@@ -48,6 +48,16 @@ export const PortalPlans: React.FC = () => {
   // Number of months covered by one invoice for the current cycle.
   const cycleMonths = billingCycle === 'annual' ? 12 : billingCycle === 'quarterly' ? 3 : 1;
 
+  // Predicts (client-side, for UX) whether a switch to `plan` will be scheduled
+  // for later rather than applied now — mirrors the backend's rule: an active,
+  // unexpired subscription on a DIFFERENT plan defers to end_date.
+  const willBeScheduled = (plan: any): boolean => {
+    if (!subscription || !plan) return false;
+    if (subscription.status !== 'active') return false;
+    if (String(subscription.plan_id) === String(plan.id)) return false;
+    return new Date(subscription.end_date).getTime() > Date.now();
+  };
+
   const handleCheckout = async () => {
     if (!selectedPlan) return;
     try {
@@ -55,15 +65,25 @@ export const PortalPlans: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      // 1. Generate upgrade invoice
-      const invoice = await portalApi.upgradePlan({
+      const result = await portalApi.upgradePlan({
         plan_id: selectedPlan.id,
         billing_cycle: billingCycle,
         gateway: selectedGateway
       });
 
-      // 2. Pay. Cashfree = real hosted checkout + server-side verification;
-      //    other options are dev-only simulated payments (rejected in production).
+      if (result.scheduled_change) {
+        // Deferred: no payment due today. The switch takes effect when the
+        // current commitment ends.
+        setSuccess(result.scheduled_change.message);
+        setSelectedPlan(null);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        fetchPlans();
+        return;
+      }
+
+      const invoice = result.invoice!;
+      // Pay. Cashfree = real hosted checkout + server-side verification;
+      // other options are dev-only simulated payments (rejected in production).
       if (selectedGateway === 'Cashfree') {
         await payInvoiceViaCashfree(invoice.id);
       } else {
@@ -81,6 +101,21 @@ export const PortalPlans: React.FC = () => {
       setError(err.response?.data?.detail || "Failed to process plan upgrade.");
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const [cancellingPending, setCancellingPending] = useState(false);
+  const handleCancelPendingChange = async () => {
+    try {
+      setCancellingPending(true);
+      setError(null);
+      await portalApi.cancelPendingPlanChange();
+      setSuccess('Scheduled plan change cancelled. You will remain on your current plan.');
+      fetchPlans();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to cancel the scheduled plan change.");
+    } finally {
+      setCancellingPending(false);
     }
   };
 
@@ -137,6 +172,23 @@ export const PortalPlans: React.FC = () => {
         </div>
       )}
 
+      {subscription?.pending_plan_id && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-medium flex items-center justify-between gap-3 flex-wrap">
+          <span className="flex items-center gap-2 text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            Scheduled switch to <strong>{subscription.pending_plan?.display_name || subscription.pending_plan?.name || plans.find(p => p.id === subscription.pending_plan_id)?.display_name}</strong> — takes effect on {new Date(subscription.end_date).toLocaleDateString()}. No charge until then.
+          </span>
+          <button
+            type="button"
+            onClick={handleCancelPendingChange}
+            disabled={cancellingPending}
+            className="px-3 py-1.5 border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 rounded-lg text-[11px] font-bold whitespace-nowrap cursor-pointer disabled:opacity-50"
+          >
+            {cancellingPending ? 'Cancelling...' : 'Cancel Scheduled Change'}
+          </button>
+        </div>
+      )}
+
       {/* Plans Comparison Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
         {plans.map((plan) => {
@@ -144,6 +196,7 @@ export const PortalPlans: React.FC = () => {
           const isPopular = plan.popular_plan;
           const isRecommended = plan.recommended_plan;
           const isCurrent = !!subscription && String(subscription.plan_id) === String(plan.id);
+          const isPendingTarget = !!subscription && String(subscription.pending_plan_id || '') === String(plan.id);
 
           return (
             <div
@@ -232,6 +285,15 @@ export const PortalPlans: React.FC = () => {
                   <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center gap-1.5">
                     <Check className="w-4 h-4" /> Your Active Plan
                   </div>
+                ) : isPendingTarget ? (
+                  <button
+                    type="button"
+                    onClick={handleCancelPendingChange}
+                    disabled={cancellingPending}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold text-center bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/15 cursor-pointer disabled:opacity-50"
+                  >
+                    {cancellingPending ? 'Cancelling...' : 'Scheduled — Cancel Switch'}
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -256,6 +318,7 @@ export const PortalPlans: React.FC = () => {
 
       {/* Checkout Modal */}
       {selectedPlan && (() => {
+        const scheduled = willBeScheduled(selectedPlan);
         const currentSeatCount = subscription ? Math.max(subscription.users_purchased, selectedPlan.minimum_users) : selectedPlan.minimum_users;
         const ratePerSeatPerMonth = getCycleMonthlyRate(selectedPlan);
         const tierPrice = ratePerSeatPerMonth * currentSeatCount * cycleMonths;
@@ -267,9 +330,11 @@ export const PortalPlans: React.FC = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-left">
             <div className="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-6 bg-slate-950">
               <div>
-                <h3 className="text-lg font-bold text-slate-100">Upgrade Plan Checkout</h3>
+                <h3 className="text-lg font-bold text-slate-100">{scheduled ? 'Schedule Plan Switch' : 'Upgrade Plan Checkout'}</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Verify upgrade specifications. Billing updates automatically after processed transaction.
+                  {scheduled
+                    ? 'You already have an active plan — this switch is scheduled, not immediate.'
+                    : 'Verify upgrade specifications. Billing updates automatically after processed transaction.'}
                 </p>
               </div>
 
@@ -282,17 +347,31 @@ export const PortalPlans: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Payment Gateway</label>
-                  <select
-                    value={selectedGateway}
-                    onChange={(e) => setSelectedGateway(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                  >
-                    <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
-                    <option value="UPI">UPI / Instant (test only)</option>
-                  </select>
-                </div>
+                {scheduled && subscription && (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-300 space-y-1">
+                    <p className="font-semibold">
+                      You're on an active plan until {new Date(subscription.end_date).toLocaleDateString()}.
+                    </p>
+                    <p>
+                      This switch will take effect on that date — <strong>no charge today</strong>. You can cancel the
+                      scheduled switch any time before then.
+                    </p>
+                  </div>
+                )}
+
+                {!scheduled && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Payment Gateway</label>
+                    <select
+                      value={selectedGateway}
+                      onChange={(e) => setSelectedGateway(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                    >
+                      <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
+                      <option value="UPI">UPI / Instant (test only)</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* Total calculations */}
                 <div className="p-4 bg-slate-900/50 rounded-xl space-y-2 text-xs">
@@ -330,7 +409,7 @@ export const PortalPlans: React.FC = () => {
                     <span className="font-mono text-slate-300">₹{gstAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-800/80 pt-2 font-bold text-sm">
-                    <span className="text-slate-400">Total due now:</span>
+                    <span className="text-slate-400">{scheduled ? 'Estimated cost when it starts:' : 'Total due now:'}</span>
                     <span className="text-slate-100">₹{totalPrice.toFixed(2)}</span>
                   </div>
                 </div>
@@ -352,6 +431,8 @@ export const PortalPlans: React.FC = () => {
                 >
                   {processing ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : scheduled ? (
+                    <>Schedule Switch</>
                   ) : (
                     <>
                       <CreditCard className="w-3.5 h-3.5" />

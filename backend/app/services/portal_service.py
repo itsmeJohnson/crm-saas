@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -498,6 +499,9 @@ class PortalService:
                     sub.users_purchased = int(licensed_seats)
                 else:
                     sub.users_purchased = max(sub.users_purchased, plan.minimum_users)
+                # Any resolved scheduled tier switch is now applied — clear it.
+                sub.pending_plan_id = None
+                sub.pending_billing_cycle = None
                 days_to_add = 30
                 if billing_cycle == "quarterly":
                     days_to_add = 90
@@ -557,7 +561,11 @@ class PortalService:
 
     async def upgrade_subscription(
         self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, plan_id: uuid.UUID, billing_cycle: str, gateway: str
-    ) -> Invoice:
+    ) -> dict:
+        """Returns {"invoice": Invoice} for an immediately-payable change, or
+        {"scheduled_change": {...}} when the tenant already holds an active,
+        unexpired subscription on a DIFFERENT plan — that switch is deferred to
+        take effect at end_date instead of cutting their paid period short."""
         # Load configurations
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
         comm_res = await self.db.execute(comm_stmt)
@@ -599,6 +607,53 @@ class PortalService:
         else:
             price_per_seat = float(plan.monthly_price) if plan.monthly_price > 0 else float(plan.price_inr)
             billing_months = 1
+
+        # Enforce the plan's minimum contract length: the chosen billing cycle must
+        # cover at least minimum_contract_months (e.g. a 3-month-minimum plan can't
+        # be taken on a 1-month monthly cycle).
+        min_months = plan.minimum_contract_months or 1
+        if billing_months < min_months:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The {plan.display_name or plan.name} plan requires a minimum commitment of {min_months} months. Please choose a longer billing cycle."
+            )
+
+        # If the tenant already holds an active, unexpired subscription on a
+        # DIFFERENT plan, don't charge/switch now — that would cut their current
+        # paid commitment short. Schedule the switch to apply at end_date instead.
+        # (Renewing the SAME plan, or acting on a trial/expired/suspended sub,
+        # still goes through the immediate path below.)
+        now_check = datetime.now(timezone.utc)
+        sub_end_check = sub.end_date if sub else None
+        if sub_end_check and sub_end_check.tzinfo is None:
+            sub_end_check = sub_end_check.replace(tzinfo=timezone.utc)
+        if sub and sub.status == "active" and sub_end_check and sub_end_check > now_check and sub.plan_id != plan.id:
+            sub.pending_plan_id = plan.id
+            sub.pending_billing_cycle = billing_cycle
+            await self.db.commit()
+
+            await self.audit_service.log_event(
+                organization_id=organization_id,
+                actor_user_id=actor_user_id,
+                action="SCHEDULE_PLAN_CHANGE",
+                resource_type="SUBSCRIPTION",
+                resource_id=str(sub.id),
+                action_metadata={"pending_plan_id": str(plan.id), "pending_billing_cycle": billing_cycle, "effective_date": sub.end_date.isoformat()}
+            )
+
+            return {
+                "scheduled_change": {
+                    "plan_id": plan.id,
+                    "plan_name": plan.display_name or plan.name,
+                    "billing_cycle": billing_cycle,
+                    "effective_date": sub.end_date,
+                    "message": (
+                        f"You're currently on an active plan until {sub.end_date.strftime('%d %b %Y')}. "
+                        f"Your switch to {plan.display_name or plan.name} is scheduled and will take effect on that date — "
+                        f"no charge today."
+                    ),
+                }
+            }
 
         base_amount = price_per_seat * licensed_seats * billing_months
 
@@ -665,7 +720,38 @@ class PortalService:
             resource_id=str(invoice.id),
             action_metadata={"plan_name": plan.name, "billing_cycle": billing_cycle, "amount": total_amount}
         )
-        return invoice
+        return {"invoice": invoice}
+
+    async def cancel_pending_plan_change(
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID
+    ) -> TenantSubscription:
+        """Cancels a scheduled tier switch, keeping the tenant on their current plan."""
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        ).options(selectinload(TenantSubscription.plan), selectinload(TenantSubscription.pending_plan))
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found.")
+        if not sub.pending_plan_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No scheduled plan change to cancel.")
+
+        cancelled_plan_id = sub.pending_plan_id
+        sub.pending_plan_id = None
+        sub.pending_billing_cycle = None
+        await self.db.commit()
+        await self.db.refresh(sub)
+
+        await self.audit_service.log_event(
+            organization_id=organization_id,
+            actor_user_id=actor_user_id,
+            action="CANCEL_SCHEDULED_PLAN_CHANGE",
+            resource_type="SUBSCRIPTION",
+            resource_id=str(sub.id),
+            action_metadata={"cancelled_pending_plan_id": str(cancelled_plan_id)}
+        )
+        return sub
 
     async def reduce_licensed_seats(
         self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, new_seat_count: int

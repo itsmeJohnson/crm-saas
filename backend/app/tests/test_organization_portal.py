@@ -1,5 +1,6 @@
 import pytest
 import uuid
+from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -212,9 +213,18 @@ async def test_purchase_storage_flow(client: AsyncClient, setup_portal_data: dic
 
 @pytest.mark.asyncio
 async def test_plan_upgrade_flow(client: AsyncClient, setup_portal_data: dict, db: AsyncSession):
+    """When the tenant's current subscription has already expired, switching plans
+    applies immediately (this is effectively a reactivation, not a mid-commitment
+    switch), so it goes through the normal pay-now flow."""
     headers = setup_portal_data["headers"]
     org_id = setup_portal_data["org"].id
     premium_plan_id = setup_portal_data["premium_plan"].id
+
+    # Make the current subscription expired so the upgrade applies immediately.
+    sub_stmt = select(TenantSubscription).where(TenantSubscription.organization_id == org_id)
+    sub = (await db.execute(sub_stmt)).scalar_one()
+    sub.end_date = datetime.now(timezone.utc) - timedelta(days=1)
+    await db.commit()
 
     # 1. Generate Upgrade Invoice
     payload = {
@@ -224,7 +234,10 @@ async def test_plan_upgrade_flow(client: AsyncClient, setup_portal_data: dict, d
     }
     response = await client.post("/api/v1/portal/subscription/upgrade", json=payload, headers=headers)
     assert response.status_code == 200
-    inv_data = response.json()
+    result = response.json()
+    assert result["invoice"] is not None
+    assert result["scheduled_change"] is None
+    inv_data = result["invoice"]
     invoice_id = uuid.UUID(inv_data["id"])
 
     # 1b. Initiate checkout session
@@ -254,6 +267,90 @@ async def test_plan_upgrade_flow(client: AsyncClient, setup_portal_data: dict, d
     sub = (await db.execute(sub_stmt)).scalar_one()
     assert sub.plan_id == premium_plan_id
     assert sub.billing_cycle == "annual"
+
+@pytest.mark.asyncio
+async def test_plan_switch_while_active_is_scheduled_not_immediate(client: AsyncClient, setup_portal_data: dict, db: AsyncSession):
+    """Switching to a DIFFERENT plan while the tenant's current subscription is
+    still active and unexpired must NOT charge or switch immediately — it should
+    be scheduled to take effect at the current commitment's end_date."""
+    headers = setup_portal_data["headers"]
+    org_id = setup_portal_data["org"].id
+    premium_plan_id = setup_portal_data["premium_plan"].id
+
+    sub_stmt = select(TenantSubscription).where(TenantSubscription.organization_id == org_id)
+    sub_before = (await db.execute(sub_stmt)).scalar_one()
+    original_plan_id = sub_before.plan_id
+    # Fixture sets end_date = now + 30 days, so it's active/unexpired.
+
+    payload = {"plan_id": str(premium_plan_id), "billing_cycle": "annual", "gateway": "Cashfree"}
+    response = await client.post("/api/v1/portal/subscription/upgrade", json=payload, headers=headers)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["invoice"] is None
+    assert result["scheduled_change"] is not None
+    assert result["scheduled_change"]["plan_id"] == str(premium_plan_id)
+    assert result["scheduled_change"]["billing_cycle"] == "annual"
+
+    # Nothing should have changed yet — org and plan stay on the CURRENT plan.
+    await db.refresh(setup_portal_data["org"])
+    assert setup_portal_data["org"].subscription_plan != "Enterprise"
+
+    sub_after = (await db.execute(sub_stmt)).scalar_one()
+    assert sub_after.plan_id == original_plan_id
+    assert sub_after.pending_plan_id == premium_plan_id
+    assert sub_after.pending_billing_cycle == "annual"
+
+    # Renewal (simulating the cron / commitment ending) should apply the scheduled switch.
+    from app.services.subscription_service import SubscriptionService
+    service = SubscriptionService(db)
+    await service.renew_subscription(org_id)
+
+    sub_final = (await db.execute(sub_stmt)).scalar_one()
+    assert sub_final.plan_id == premium_plan_id
+    assert sub_final.pending_plan_id is None
+    assert sub_final.pending_billing_cycle is None
+
+@pytest.mark.asyncio
+async def test_cancel_scheduled_plan_change(client: AsyncClient, setup_portal_data: dict, db: AsyncSession):
+    headers = setup_portal_data["headers"]
+    org_id = setup_portal_data["org"].id
+    premium_plan_id = setup_portal_data["premium_plan"].id
+
+    payload = {"plan_id": str(premium_plan_id), "billing_cycle": "annual", "gateway": "Cashfree"}
+    response = await client.post("/api/v1/portal/subscription/upgrade", json=payload, headers=headers)
+    assert response.json()["scheduled_change"] is not None
+
+    cancel_response = await client.post("/api/v1/portal/subscription/cancel-pending-change", headers=headers)
+    assert cancel_response.status_code == 200
+    assert cancel_response.json()["pending_plan_id"] is None
+
+    sub_stmt = select(TenantSubscription).where(TenantSubscription.organization_id == org_id)
+    sub = (await db.execute(sub_stmt)).scalar_one()
+    assert sub.pending_plan_id is None
+    assert sub.pending_billing_cycle is None
+
+@pytest.mark.asyncio
+async def test_minimum_contract_months_enforced(client: AsyncClient, setup_portal_data: dict, db: AsyncSession):
+    """A plan with minimum_contract_months=3 can't be purchased on a 1-month cycle."""
+    headers = setup_portal_data["headers"]
+    org_id = setup_portal_data["org"].id
+    premium_plan_id = setup_portal_data["premium_plan"].id
+
+    plan_stmt = select(Plan).where(Plan.id == premium_plan_id)
+    plan = (await db.execute(plan_stmt)).scalar_one()
+    plan.minimum_contract_months = 3
+    await db.commit()
+
+    # Expire the current sub so we hit the pricing/validation path (not the schedule branch).
+    sub_stmt = select(TenantSubscription).where(TenantSubscription.organization_id == org_id)
+    sub = (await db.execute(sub_stmt)).scalar_one()
+    sub.end_date = datetime.now(timezone.utc) - timedelta(days=1)
+    await db.commit()
+
+    payload = {"plan_id": str(premium_plan_id), "billing_cycle": "monthly", "gateway": "Cashfree"}
+    response = await client.post("/api/v1/portal/subscription/upgrade", json=payload, headers=headers)
+    assert response.status_code == 400
+    assert "minimum commitment of 3 months" in response.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_support_tickets_operations(client: AsyncClient, setup_portal_data: dict, db: AsyncSession):

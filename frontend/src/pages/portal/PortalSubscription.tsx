@@ -59,18 +59,22 @@ export const PortalSubscription: React.FC = () => {
         return;
       }
 
-      // Renewal = a fresh invoice for the CURRENT plan + billing cycle. Paying it
-      // extends the subscription for another period (handled by the upgrade_plan
-      // action on the backend). Verified & charged through Cashfree.
-      const invoice = await portalApi.upgradePlan({
-        plan_id: sub.plan_id,
-        billing_cycle: sub.billing_cycle || 'monthly',
+      // Renewal = a fresh invoice for the plan + cycle the tenant should be on next
+      // (their pending scheduled switch, if any, otherwise their current plan).
+      // Paying it extends the subscription for another period (handled by the
+      // upgrade_plan action on the backend). Verified & charged through Cashfree.
+      const result = await portalApi.upgradePlan({
+        plan_id: sub.pending_plan_id || sub.plan_id,
+        billing_cycle: sub.pending_billing_cycle || sub.billing_cycle || 'monthly',
         gateway: 'Cashfree'
       });
 
-      await payInvoiceViaCashfree(invoice.id);
-
-      setSuccess("Subscription renewed successfully! Your billing period has been extended.");
+      if (result.scheduled_change) {
+        setSuccess(result.scheduled_change.message);
+      } else if (result.invoice) {
+        await payInvoiceViaCashfree(result.invoice.id);
+        setSuccess("Subscription renewed successfully! Your billing period has been extended.");
+      }
       fetchSubscription();
     } catch (err: any) {
       setError(err.response?.data?.detail || err?.message || "Failed to renew subscription.");
@@ -187,6 +191,13 @@ export const PortalSubscription: React.FC = () => {
                   <p className="text-slate-200 font-semibold">{new Date(sub.end_date).toLocaleDateString()}</p>
                 </div>
               </div>
+
+              {sub.pending_plan_id && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-[11px] text-amber-300">
+                  Scheduled switch to <strong>{sub.pending_plan?.display_name || sub.pending_plan?.name}</strong> on {new Date(sub.end_date).toLocaleDateString()} — no charge until then. Manage this on the{' '}
+                  <a href="/portal/plans" className="underline">Plans</a> page.
+                </div>
+              )}
             </div>
 
             {/* Limits Card */}

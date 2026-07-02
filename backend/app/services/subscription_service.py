@@ -20,7 +20,7 @@ class SubscriptionService:
         stmt = select(TenantSubscription).where(
             TenantSubscription.organization_id == organization_id,
             TenantSubscription.is_deleted == False
-        ).options(selectinload(TenantSubscription.plan))
+        ).options(selectinload(TenantSubscription.plan), selectinload(TenantSubscription.pending_plan))
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
 
@@ -191,13 +191,30 @@ class SubscriptionService:
                 detail="Subscription record not found."
             )
 
+        # Apply a scheduled tier switch on renewal: the tenant's current paid
+        # commitment has now run out, so the deferred plan change takes effect.
+        if sub.pending_plan_id:
+            pending_plan_stmt = select(Plan).where(Plan.id == sub.pending_plan_id, Plan.is_deleted == False)
+            pending_plan_res = await self.db.execute(pending_plan_stmt)
+            pending_plan = pending_plan_res.scalar_one_or_none()
+            if pending_plan:
+                sub.plan_id = pending_plan.id
+                sub.plan = pending_plan
+                sub.billing_cycle = sub.pending_billing_cycle or sub.billing_cycle
+                sub.users_purchased = max(sub.users_purchased, pending_plan.minimum_users)
+            sub.pending_plan_id = None
+            sub.pending_billing_cycle = None
+
         plan = sub.plan
         days_to_add = plan.billing_cycle_days
         now = datetime.now(timezone.utc)
-        
+
         # If subscription is active, extend from current end date.
         # If it is expired, extend from now.
-        start_date = sub.end_date if sub.end_date > now else now
+        sub_end_date = sub.end_date
+        if sub_end_date.tzinfo is None:
+            sub_end_date = sub_end_date.replace(tzinfo=timezone.utc)
+        start_date = sub.end_date if sub_end_date > now else now
         new_end_date = start_date + timedelta(days=days_to_add)
 
         sub.start_date = start_date

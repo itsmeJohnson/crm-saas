@@ -19,7 +19,7 @@ from app.schemas.portal import (
     OrgProfileUpdate, OrgBillingUpdate, OrgNotificationSettingsUpdate, UpgradeSubscriptionRequest
 )
 from app.schemas.super_admin import PlanResponse
-from app.schemas.subscription import SubscriptionDetailsResponse, InvoiceResponse, ReduceSeatsRequest, TenantSubscriptionResponse
+from app.schemas.subscription import SubscriptionDetailsResponse, InvoiceResponse, ReduceSeatsRequest, TenantSubscriptionResponse, UpgradeSubscriptionResult
 from app.schemas.support_ticket import (
     SupportTicketCreate, SupportTicketUpdate, SupportTicketCommentRequest, SupportTicketResponse
 )
@@ -157,16 +157,18 @@ async def list_portal_plans(
         plans = res.scalars().all()
     return plans
 
-@router.post("/subscription/upgrade", response_model=InvoiceResponse)
+@router.post("/subscription/upgrade", response_model=UpgradeSubscriptionResult)
 async def upgrade_tenant_subscription(
     current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],
     payload: UpgradeSubscriptionRequest,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Generates an unpaid upgrade invoice. Once paid, the tenant subscription updates to the new plan."""
+    """Generates an unpaid upgrade invoice, OR — if the tenant already holds an
+    active, unexpired subscription on a different plan — schedules the tier
+    switch to apply at renewal instead of charging/switching immediately."""
     service = PortalService(db)
     user_name = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email
-    invoice = await service.upgrade_subscription(
+    result = await service.upgrade_subscription(
         organization_id=current_user.organization_id,
         actor_user_id=current_user.id,
         actor_name=user_name,
@@ -174,7 +176,19 @@ async def upgrade_tenant_subscription(
         billing_cycle=payload.billing_cycle,
         gateway=payload.gateway
     )
-    return invoice
+    return result
+
+@router.post("/subscription/cancel-pending-change", response_model=TenantSubscriptionResponse)
+async def cancel_scheduled_plan_change(
+    current_user: Annotated[User, Depends(RoleChecker(["OrgAdmin"]))],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Cancels a scheduled tier switch, keeping the tenant on their current plan."""
+    service = PortalService(db)
+    return await service.cancel_pending_plan_change(
+        organization_id=current_user.organization_id,
+        actor_user_id=current_user.id
+    )
 
 @router.get("/invoices", response_model=List[InvoiceResponse])
 async def list_portal_invoices(
