@@ -14,9 +14,9 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
+import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
 
 // Self Service Portal imports
-import { OrgPortalLayout } from './layouts/OrgPortalLayout';
 import { PortalDashboard } from './pages/portal/PortalDashboard';
 import { PortalSubscription } from './pages/portal/PortalSubscription';
 import { PortalPlans } from './pages/portal/PortalPlans';
@@ -55,50 +55,55 @@ export const App: React.FC = () => {
             <Route path="/register" element={<Register />} />
           </Route>
 
-          {/* Protected Routes */}
+          {/* Protected Routes — single shared shell (AppLayout) for the whole app */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<Home />} />
-              
-              {/* Lead Management Feature Guard */}
-              <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>
-                <Route path="/leads" element={<LeadsPage />} />
-                
-                {/* OrgAdmin & Manager only */}
-                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
-                  <Route path="/companies" element={<CompaniesPage />} />
-                  <Route path="/contacts" element={<ContactsPage />} />
+
+              {/* Operational workspace routes: blocked by SubscriptionGate once a
+                  tenant's plan lapses (the billing routes below stay reachable so
+                  an OrgAdmin can reactivate). */}
+              <Route element={<SubscriptionGateRoute />}>
+                <Route path="/" element={<Home />} />
+
+                {/* Lead Management Feature Guard */}
+                <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>
+                  <Route path="/leads" element={<LeadsPage />} />
+
+                  {/* OrgAdmin & Manager only */}
+                  <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                    <Route path="/companies" element={<CompaniesPage />} />
+                    <Route path="/contacts" element={<ContactsPage />} />
+                  </Route>
                 </Route>
-              </Route>
-              
-              {/* Sales Pipeline Feature Guard */}
-              <Route element={<FeatureGuardRoute featureCode="SALES_PIPELINE" />}>
+
+                {/* Sales Pipeline Feature Guard */}
+                <Route element={<FeatureGuardRoute featureCode="SALES_PIPELINE" />}>
+                  <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+                    <Route path="/pipelines" element={<PipelineSettings />} />
+                  </Route>
+                </Route>
+
+                {/* Role-Based Access Feature Guard */}
+                <Route element={<FeatureGuardRoute featureCode="ROLE_BASED_ACCESS" />}>
+                  <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} allowTeamLeader={true} />}>
+                    <Route path="/users" element={<UsersPage />} />
+                  </Route>
+                </Route>
+
+                {/* OrgAdmin only (general profile always allowed) */}
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
-                  <Route path="/pipelines" element={<PipelineSettings />} />
+                  <Route path="/organization" element={<Profile />} />
+                </Route>
+
+                {/* SuperAdmin only */}
+                <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
+                  <Route path="/tenants" element={<TenantsPage />} />
                 </Route>
               </Route>
 
-              {/* Role-Based Access Feature Guard */}
-              <Route element={<FeatureGuardRoute featureCode="ROLE_BASED_ACCESS" />}>
-                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} allowTeamLeader={true} />}>
-                  <Route path="/users" element={<UsersPage />} />
-                </Route>
-              </Route>
-
-              {/* OrgAdmin only (general profile always allowed) */}
+              {/* Billing & Account routes (OrgAdmin only) — intentionally OUTSIDE
+                  SubscriptionGateRoute so a lapsed tenant can still reactivate. */}
               <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
-                <Route path="/organization" element={<Profile />} />
-              </Route>
-
-              {/* SuperAdmin only */}
-              <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
-                <Route path="/tenants" element={<TenantsPage />} />
-              </Route>
-            </Route>
-
-            {/* Organization Self-Service Portal Layout (restricted to OrgAdmin) */}
-            <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
-              <Route element={<OrgPortalLayout />}>
                 <Route path="/portal/dashboard" element={<PortalDashboard />} />
                 <Route path="/portal/subscription" element={<PortalSubscription />} />
                 <Route path="/portal/plans" element={<PortalPlans />} />

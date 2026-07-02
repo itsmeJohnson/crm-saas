@@ -9,8 +9,9 @@ import { AlertTriangle, CreditCard } from 'lucide-react';
  * A lapse is detected either from the persisted status ("expired"/"suspended",
  * set by the subscription cron) or, to catch a trial/plan that runs out while
  * the user is still logged in, from a past `subscription_expires_at`. SuperAdmin
- * is never gated. The billing portal lives in a separate layout, so an OrgAdmin
- * can still reach /portal/plans to activate.
+ * is never gated. Applied via SubscriptionGateRoute only to the operational
+ * workspace routes — /portal/* is intentionally excluded so an OrgAdmin can
+ * still reach /portal/plans to activate.
  */
 export const SubscriptionGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, organization } = useAuthStore();

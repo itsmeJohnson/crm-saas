@@ -4,10 +4,11 @@ import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
-  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight
+  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
+  Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
-import { SubscriptionGate } from '../components/SubscriptionGate';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -22,15 +23,31 @@ export const AppLayout: React.FC = () => {
   };
 
   const allNavItems = [
-    { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard },
-    { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'] },
-    { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT' },
-    { name: 'Companies',         path: '/companies',         icon: Building2,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
-    { name: 'Contacts',          path: '/contacts',          icon: Contact,           roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
-    { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE' },
-    { name: 'Users',             path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
-    { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'] },
-    { name: 'Subscription',      path: '/portal/dashboard',  icon: CreditCard,        roles: ['OrgAdmin'] },
+    // ── Workspace ──────────────────────────────────────────────────────────
+    { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard,  section: 'workspace' },
+    { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace' },
+    { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Companies',         path: '/companies',         icon: Building2,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Contacts',          path: '/contacts',          icon: Contact,           roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE', section: 'workspace' },
+    { name: 'Team Members',      path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS', section: 'workspace' },
+    { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'], section: 'workspace' },
+
+    // ── Billing & Account (OrgAdmin only) ─────────────────────────────────
+    { name: 'Billing Overview',  path: '/portal/dashboard',  icon: Gauge,             roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Subscription',      path: '/portal/subscription', icon: CreditCard,      roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Plans',             path: '/portal/plans',      icon: Sparkles,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Invoices',          path: '/portal/invoices',   icon: FileText,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Payments',          path: '/portal/payments',   icon: Receipt,           roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Usage',             path: '/portal/usage',      icon: BarChart3,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Storage',           path: '/portal/storage',    icon: HardDrive,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Call Recordings',   path: '/portal/recordings', icon: PhoneCall,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Seat Licensing',    path: '/portal/users',      icon: UserCog,           roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Company Profile',   path: '/portal/profile',    icon: User,              roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Billing Details',   path: '/portal/billing',    icon: Landmark,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Preferences',       path: '/portal/settings',   icon: Settings,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Support',           path: '/portal/support',    icon: LifeBuoy,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Activity Logs',     path: '/portal/activity',   icon: Activity,          roles: ['OrgAdmin'], section: 'billing' },
   ];
 
   const features = useAuthStore((state) => state.features);
@@ -40,7 +57,7 @@ export const AppLayout: React.FC = () => {
 
     if (item.roles) {
       const hasRole = item.roles.includes(user.role);
-      const isTeamLeaderUsers = item.name === 'Users' && user.role === 'Employee' && user.is_team_leader;
+      const isTeamLeaderUsers = item.name === 'Team Members' && user.role === 'Employee' && user.is_team_leader;
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
 
@@ -50,6 +67,9 @@ export const AppLayout: React.FC = () => {
 
     return true;
   });
+
+  const workspaceItems = navItems.filter((item) => item.section === 'workspace');
+  const billingItems = navItems.filter((item) => item.section === 'billing');
 
   /* ── Avatar initials ── */
   const initials = [user?.first_name?.[0], user?.last_name?.[0]]
@@ -94,7 +114,7 @@ export const AppLayout: React.FC = () => {
 
       {/* ── Navigation ── */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
+        {workspaceItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path ||
             (item.path !== '/' && location.pathname.startsWith(item.path));
@@ -113,6 +133,33 @@ export const AppLayout: React.FC = () => {
             </Link>
           );
         })}
+
+        {billingItems.length > 0 && (
+          <>
+            <p className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Billing &amp; Account
+            </p>
+            {billingItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path ||
+                (item.path !== '/' && location.pathname.startsWith(item.path));
+              return (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{item.name}</span>
+                  {isActive && (
+                    <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
+                  )}
+                </Link>
+              );
+            })}
+          </>
+        )}
       </nav>
 
       {/* ── User Profile & Footer ── */}
@@ -207,9 +254,7 @@ export const AppLayout: React.FC = () => {
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-app)' }}>
           <div className="p-4 md:p-6 min-h-full">
-            <SubscriptionGate>
-              <Outlet />
-            </SubscriptionGate>
+            <Outlet />
           </div>
         </main>
       </div>
