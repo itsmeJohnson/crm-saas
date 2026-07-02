@@ -14,6 +14,7 @@ class Lead(BaseModel):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    company_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="New", nullable=False)
     source: Mapped[str | None] = mapped_column(String(100), nullable=True)

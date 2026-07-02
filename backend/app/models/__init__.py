@@ -34,6 +34,8 @@ from app.models.saved_filter import SavedFilter
 from app.models.lead_reminder import LeadReminder
 from app.models.escalation_config import EscalationConfig
 from app.models.workflow_rule import WorkflowRule
+from app.models.custom_field_definition import CustomFieldDefinition
+from app.models.contact_relationship import ContactRelationship
 
 __all__ = [
     "Base", 
@@ -76,5 +78,7 @@ __all__ = [
     "SavedFilter",
     "LeadReminder",
     "EscalationConfig",
-    "WorkflowRule"
+    "WorkflowRule",
+    "CustomFieldDefinition",
+    "ContactRelationship"
 ]

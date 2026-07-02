@@ -56,6 +56,21 @@ class LeadService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
+        # Auto-link to a company when the free-text name matches an existing account
+        if lead_data.get("company_name") and not lead_data.get("company_id"):
+            from sqlalchemy import select, func
+            from app.models.company import Company
+            comp_res = await self.db.execute(
+                select(Company.id).filter(
+                    Company.organization_id == actor.organization_id,
+                    func.lower(Company.name) == lead_data["company_name"].strip().lower(),
+                    Company.is_deleted == False,
+                ).limit(1)
+            )
+            matched = comp_res.scalar()
+            if matched:
+                lead_data["company_id"] = matched
+
         # Compute initial lead score from provided attributes
         lead_data["score"] = compute_score(
             email=lead_data.get("email"),

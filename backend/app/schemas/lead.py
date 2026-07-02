@@ -122,6 +122,7 @@ class LeadResponse(LeadBase):
     attachments: list | None = None
     converted_contact_id: uuid.UUID | None = None
     converted_at: datetime | None = None
+    company_id: uuid.UUID | None = None
     stage: PipelineStageResponse | None = None
 
     @field_serializer("phone")

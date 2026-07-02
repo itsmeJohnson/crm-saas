@@ -14,6 +14,8 @@ import { LeadReportsPage } from './pages/LeadReportsPage';
 import { LeadAutomationPage } from './pages/LeadAutomationPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { ContactsPage } from './pages/ContactsPage';
+import { ContactReportsPage } from './pages/ContactReportsPage';
+import { CompanyReportsPage } from './pages/CompanyReportsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -76,7 +78,9 @@ export const App: React.FC = () => {
                   <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                     <Route path="/leads/automation" element={<LeadAutomationPage />} />
                     <Route path="/companies" element={<CompaniesPage />} />
+                    <Route path="/companies/reports" element={<CompanyReportsPage />} />
                     <Route path="/contacts" element={<ContactsPage />} />
+                    <Route path="/contacts/reports" element={<ContactReportsPage />} />
                   </Route>
                 </Route>
 

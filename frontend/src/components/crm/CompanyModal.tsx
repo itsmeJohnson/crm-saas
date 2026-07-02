@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,6 +14,10 @@ const companySchema = z.object({
   website: z.string().max(255).optional().or(z.literal('')),
   phone: z.string().max(50).optional().or(z.literal('')),
   assigned_user_id: z.string().optional().or(z.literal('')),
+  company_type: z.string().min(1),
+  source: z.string().max(100).optional().or(z.literal('')),
+  employee_count: z.coerce.number().int().min(0).optional().or(z.literal('')),
+  annual_revenue: z.coerce.number().min(0).optional().or(z.literal('')),
 });
 
 type CompanyFormValues = z.infer<typeof companySchema>;
@@ -33,6 +37,8 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
   const { users, fetchUsers } = useUserStore();
   const activeUsers = users.filter(u => u.is_active);
 
+  const [tagsInput, setTagsInput] = useState('');
+
   const {
     register,
     handleSubmit,
@@ -47,6 +53,10 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
       website: '',
       phone: '',
       assigned_user_id: '',
+      company_type: 'Prospect',
+      source: '',
+      employee_count: '',
+      annual_revenue: '',
     }
   });
 
@@ -58,6 +68,7 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
 
   useEffect(() => {
     if (company) {
+      setTagsInput((company.tags || []).join(', '));
       reset({
         name: company.name,
         domain: company.domain || '',
@@ -65,8 +76,13 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
         website: company.website || '',
         phone: company.phone || '',
         assigned_user_id: company.assigned_user_id || '',
+        company_type: company.company_type || 'Prospect',
+        source: company.source || '',
+        employee_count: company.employee_count ?? '',
+        annual_revenue: company.annual_revenue ?? '',
       });
     } else {
+      setTagsInput('');
       reset({
         name: '',
         domain: '',
@@ -74,6 +90,10 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
         website: '',
         phone: '',
         assigned_user_id: '',
+        company_type: 'Prospect',
+        source: '',
+        employee_count: '',
+        annual_revenue: '',
       });
     }
   }, [company, reset, isOpen]);
@@ -82,6 +102,7 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
 
   const onSubmit = async (values: CompanyFormValues) => {
     try {
+      const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
       const payload = {
         name: values.name,
         domain: values.domain || undefined,
@@ -89,6 +110,11 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
         website: values.website || undefined,
         phone: values.phone || undefined,
         assigned_user_id: values.assigned_user_id || null,
+        company_type: values.company_type,
+        source: values.source || null,
+        employee_count: values.employee_count !== '' ? Number(values.employee_count) : null,
+        annual_revenue: values.annual_revenue !== '' ? Number(values.annual_revenue) : null,
+        tags: tags.length ? tags : null,
       };
 
       if (company) {
@@ -172,6 +198,64 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
                 className="w-full px-4 py-3 rounded-xl glass-input"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Type</label>
+              <select
+                {...register('company_type')}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+              >
+                <option value="Prospect">Prospect</option>
+                <option value="Customer">Customer</option>
+                <option value="Partner">Partner</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Source</label>
+              <input
+                type="text"
+                {...register('source')}
+                placeholder="e.g. Referral, Event"
+                className="w-full px-4 py-3 rounded-xl glass-input"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Employees</label>
+              <input
+                type="number"
+                min={0}
+                {...register('employee_count')}
+                placeholder="e.g. 250"
+                className="w-full px-4 py-3 rounded-xl glass-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Annual Revenue ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                {...register('annual_revenue')}
+                placeholder="e.g. 5000000"
+                className="w-full px-4 py-3 rounded-xl glass-input"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tags</label>
+            <input
+              type="text"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="Comma-separated, e.g. strategic, enterprise"
+              className="w-full px-4 py-3 rounded-xl glass-input"
+            />
           </div>
 
           <div>

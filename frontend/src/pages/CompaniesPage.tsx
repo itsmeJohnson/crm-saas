@@ -6,8 +6,11 @@ import { Filters } from '../components/crm/Filters';
 import { Pagination } from '../components/crm/Pagination';
 import { ActivityTimeline } from '../components/crm/ActivityTimeline';
 import { NotesPanel } from '../components/crm/NotesPanel';
+import { CompanyAssociations } from '../components/crm/CompanyAssociations';
+import { CompanyCommunications } from '../components/crm/CompanyCommunications';
+import { CompanyFiles } from '../components/crm/CompanyFiles';
 import { CompanyResponse } from '../services/companyApi';
-import { Plus, X, Globe, User, Calendar, ExternalLink } from 'lucide-react';
+import { Plus, X, Globe, User, Calendar, ExternalLink, DollarSign, Users2, Building } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 
 export const CompaniesPage: React.FC = () => {
@@ -22,6 +25,7 @@ export const CompaniesPage: React.FC = () => {
   } = useCompanyStore();
 
   const { users, fetchUsers } = useUserStore();
+  const activeUsers = users.filter((u) => u.is_active);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -77,7 +81,50 @@ export const CompaniesPage: React.FC = () => {
           onSearchChange={(search) => setFilters({ search })}
           placeholder="Search by company name or domain..."
           onReset={resetFilters}
-        />
+        >
+          <div className="w-full sm:w-44">
+            <select
+              value={filters.company_type}
+              onChange={(e) => setFilters({ company_type: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 transition-all"
+            >
+              <option value="All">All Types</option>
+              <option value="Prospect">Prospect</option>
+              <option value="Customer">Customer</option>
+              <option value="Partner">Partner</option>
+            </select>
+          </div>
+          <div className="w-full sm:w-44">
+            <input
+              type="text"
+              value={filters.industry}
+              onChange={(e) => setFilters({ industry: e.target.value })}
+              placeholder="Industry"
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 transition-all"
+            />
+          </div>
+          <div className="w-full sm:w-40">
+            <input
+              type="text"
+              value={filters.tag}
+              onChange={(e) => setFilters({ tag: e.target.value })}
+              placeholder="Tag"
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 transition-all"
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <select
+              value={filters.assigned_user_id}
+              onChange={(e) => setFilters({ assigned_user_id: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 transition-all"
+            >
+              <option value="All">All Owners</option>
+              {activeUsers.map((u) => (
+                <option key={u.id} value={u.id}>{`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email}</option>
+              ))}
+            </select>
+          </div>
+        </Filters>
         <CompanyTable onEditClick={handleEditClick} onRowClick={handleRowClick} />
         <Pagination
           skip={pagination.skip}
@@ -173,6 +220,53 @@ export const CompaniesPage: React.FC = () => {
                     {new Date(detailCompany.created_at).toLocaleDateString()}
                   </p>
                 </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Type</p>
+                  <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold ${
+                    detailCompany.company_type === 'Customer' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/25'
+                    : detailCompany.company_type === 'Partner' ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/25'
+                    : 'bg-slate-500/10 text-slate-300 border border-slate-500/25'
+                  }`}>
+                    {detailCompany.company_type}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Annual Revenue</p>
+                  <p className="text-sm font-medium text-slate-200 mt-0.5 flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    {detailCompany.annual_revenue != null
+                      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(detailCompany.annual_revenue)
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Employees</p>
+                  <p className="text-sm font-medium text-slate-200 mt-0.5 flex items-center gap-1.5">
+                    <Users2 className="w-3.5 h-3.5 text-slate-500" />
+                    {detailCompany.employee_count ?? '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Source</p>
+                  <p className="text-sm font-medium text-slate-200 mt-0.5 flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-indigo-400" />
+                    {detailCompany.source || '—'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tags */}
+              {detailCompany.tags && detailCompany.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {detailCompany.tags.map((t) => (
+                    <span key={t} className="inline-flex items-center px-2.5 py-1 bg-brand-500/10 border border-brand-500/25 rounded-lg text-xs font-medium text-brand-300">{t}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* Associations: deals, leads, people */}
+              <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                <CompanyAssociations companyId={detailCompany.id} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/60">
@@ -184,6 +278,16 @@ export const CompaniesPage: React.FC = () => {
                 {/* Activities timeline */}
                 <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
                   <ActivityTimeline companyId={detailCompany.id} />
+                </div>
+
+                {/* Communication history */}
+                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                  <CompanyCommunications companyId={detailCompany.id} />
+                </div>
+
+                {/* Files */}
+                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                  <CompanyFiles companyId={detailCompany.id} />
                 </div>
               </div>
             </div>

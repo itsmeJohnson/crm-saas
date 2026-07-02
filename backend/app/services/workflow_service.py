@@ -18,6 +18,24 @@ from app.models.user import User
 CONDITION_FIELDS = {"status", "source", "priority", "value", "stage_id", "city", "company_name"}
 ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage"}
 
+# Contact-entity variants
+CONTACT_CONDITION_FIELDS = {"job_title", "email", "phone", "company_id", "first_name", "last_name"}
+CONTACT_ACTION_TYPES = {"assign_user", "add_note", "notify_user", "add_tag"}
+
+# Which field/action sets & entity apply per trigger
+_TRIGGER_ENTITY = {
+    "lead_created": "lead", "lead_updated": "lead",
+    "contact_created": "contact", "contact_updated": "contact",
+}
+
+
+def _fields_for(entity_type: str) -> set:
+    return CONTACT_CONDITION_FIELDS if entity_type == "contact" else CONDITION_FIELDS
+
+
+def _actions_for(entity_type: str) -> set:
+    return CONTACT_ACTION_TYPES if entity_type == "contact" else ACTION_TYPES
+
 
 def _coerce_number(v):
     if isinstance(v, Decimal):
@@ -28,14 +46,14 @@ def _coerce_number(v):
         return None
 
 
-def _match_condition(lead: Lead, cond: dict) -> bool:
+def _match_condition(entity, cond: dict, allowed_fields: set) -> bool:
     field = cond.get("field")
     op = cond.get("op")
     expected = cond.get("value")
-    if field not in CONDITION_FIELDS:
+    if field not in allowed_fields:
         return False
-    actual = getattr(lead, field, None)
-    if field == "stage_id" and actual is not None:
+    actual = getattr(entity, field, None)
+    if field in ("stage_id", "company_id") and actual is not None:
         actual = str(actual)
 
     if op in ("gt", "gte", "lt", "lte"):
@@ -57,23 +75,27 @@ class WorkflowService:
         self.db = db
 
     @staticmethod
-    def matches(lead: Lead, conditions: list) -> bool:
+    def matches(entity, conditions: list, entity_type: str = "lead") -> bool:
         """All conditions must hold (AND). Empty conditions => always matches."""
-        return all(_match_condition(lead, c) for c in (conditions or []))
+        allowed = _fields_for(entity_type)
+        return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
         if trigger_event not in self.VALID_TRIGGERS:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid trigger_event. Allowed: {sorted(self.VALID_TRIGGERS)}")
+        entity_type = _TRIGGER_ENTITY.get(trigger_event, "lead")
+        allowed_fields = _fields_for(entity_type)
+        allowed_actions = _actions_for(entity_type)
         for c in (conditions or []):
-            if c.get("field") not in CONDITION_FIELDS:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid condition field: {c.get('field')}")
+            if c.get("field") not in allowed_fields:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid condition field for {entity_type}: {c.get('field')}")
         for a in (actions or []):
-            if a.get("type") not in ACTION_TYPES:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid action type: {a.get('type')}")
+            if a.get("type") not in allowed_actions:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid action type for {entity_type}: {a.get('type')}")
 
     async def list_rules(self, actor: User) -> list[WorkflowRule]:
         res = await self.db.execute(
@@ -133,11 +155,11 @@ class WorkflowService:
         self.db.add(rule)
         await self.db.flush()
 
-    async def run(self, trigger_event: str, lead: Lead, actor: User) -> list[str]:
+    async def run(self, trigger_event: str, entity, actor: User, entity_type: str = "lead") -> list[str]:
         """Apply every active matching rule; return a list of applied action descriptions."""
         res = await self.db.execute(
             select(WorkflowRule).filter(
-                WorkflowRule.organization_id == lead.organization_id,
+                WorkflowRule.organization_id == entity.organization_id,
                 WorkflowRule.trigger_event == trigger_event,
                 WorkflowRule.is_active == True,
                 WorkflowRule.is_deleted == False,
@@ -146,16 +168,65 @@ class WorkflowService:
         rules = res.scalars().all()
         applied: list[str] = []
         for rule in rules:
-            if not self.matches(lead, rule.conditions):
+            if not self.matches(entity, rule.conditions, entity_type):
                 continue
             for action in (rule.actions or []):
-                desc = await self._apply_action(lead, action, actor, rule)
+                if entity_type == "contact":
+                    desc = await self._apply_contact_action(entity, action, actor, rule)
+                else:
+                    desc = await self._apply_action(entity, action, actor, rule)
                 if desc:
                     applied.append(desc)
         if applied:
-            self.db.add(lead)
+            self.db.add(entity)
             await self.db.flush()
         return applied
+
+    async def _apply_contact_action(self, contact, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        atype = action.get("type")
+        if atype not in CONTACT_ACTION_TYPES:
+            return None
+        if atype == "add_tag" and action.get("value"):
+            tags = list(contact.tags or [])
+            tag = str(action["value"])
+            if tag not in tags:
+                tags.append(tag)
+            contact.tags = tags
+            return f"add_tag={tag}"
+        if atype == "assign_user" and action.get("user_id"):
+            try:
+                contact.assigned_user_id = uuid.UUID(str(action["user_id"]))
+                return "assign_user"
+            except ValueError:
+                return None
+        if atype == "add_note" and action.get("content"):
+            from app.models.note import Note
+            self.db.add(Note(
+                organization_id=contact.organization_id,
+                content=str(action["content"]),
+                contact_id=contact.id,
+                created_by=actor.id,
+            ))
+            return "add_note"
+        if atype == "notify_user":
+            from app.services.notification_service import NotificationService
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else contact.assigned_user_id
+            except ValueError:
+                target_id = contact.assigned_user_id
+            if target_id:
+                await NotificationService(self.db).create_notification(
+                    organization_id=contact.organization_id,
+                    user_id=target_id,
+                    category="contact",
+                    title=f"Workflow: {rule.name}",
+                    body=str(action.get("message") or f'Rule "{rule.name}" fired for {contact.first_name} {contact.last_name}.'),
+                    link_url=f"/contacts?contactId={contact.id}",
+                    action_metadata={"contact_id": str(contact.id), "rule_id": str(rule.id)},
+                )
+                return "notify_user"
+        return None
 
     async def _apply_action(self, lead: Lead, action: dict, actor: User, rule: WorkflowRule) -> str | None:
         atype = action.get("type")
