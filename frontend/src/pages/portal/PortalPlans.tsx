@@ -300,14 +300,16 @@ export const PortalPlans: React.FC = () => {
                     onClick={() => setSelectedPlan(plan)}
                     disabled={!plan.allow_upgrade}
                     className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      plan.allow_upgrade
-                        ? isRecommended
-                          ? 'bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white shadow-md shadow-brand-500/10'
-                          : 'bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-slate-100'
-                        : 'bg-slate-950 border border-slate-900/50 text-slate-600 cursor-not-allowed'
+                      !plan.allow_upgrade
+                        ? 'bg-slate-950 border border-slate-900/50 text-slate-600 cursor-not-allowed'
+                        : willBeScheduled(plan)
+                          ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/15'
+                          : isRecommended
+                            ? 'bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white shadow-md shadow-brand-500/10'
+                            : 'bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-slate-100'
                     }`}
                   >
-                    {plan.allow_upgrade ? 'Select Tier Plan' : 'Plan Locked'}
+                    {!plan.allow_upgrade ? 'Plan Locked' : willBeScheduled(plan) ? `Schedule for ${new Date(subscription.end_date).toLocaleDateString()}` : 'Select Tier Plan'}
                   </button>
                 )}
               </div>
