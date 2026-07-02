@@ -1,5 +1,6 @@
 import uuid
 import io
+from datetime import datetime
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, Query, status, UploadFile, File, Response, HTTPException
 from fastapi.responses import StreamingResponse
@@ -7,7 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.lead import LeadResponse, LeadCreate, LeadUpdate
+from app.schemas.lead import (
+    LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
+    LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
+    LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
+)
+from app.schemas.saved_filter import SavedFilterCreate, SavedFilterUpdate, SavedFilterResponse
+from app.schemas.reports import LeadReportResponse
+from app.schemas.escalation import EscalationConfigUpdate, EscalationConfigResponse
+from app.schemas.workflow import WorkflowRuleCreate, WorkflowRuleUpdate, WorkflowRuleResponse
+from app.services.saved_filter_service import SavedFilterService
+from app.services.workflow_service import WorkflowService
+from app.services.escalation_service import EscalationService
 from app.schemas.lead_import import GoogleSheetsPreviewRequest, ImportPreviewResponse, LeadImportProcessRequest, LeadImportResponse
 from app.schemas.assignment_config import AssignmentConfigUpdate, AssignmentConfigResponse
 from app.schemas.lead_assign import LeadBulkAssignRequest, LeadBulkAssignResponse
@@ -47,14 +59,206 @@ async def list_leads(
     status: str | None = Query(None),
     assigned_user_id: uuid.UUID | None = Query(None),
     name: str | None = Query(None),
-    city: str | None = Query(None)
+    city: str | None = Query(None),
+    source: str | None = Query(None),
+    stage_id: uuid.UUID | None = Query(None),
+    priority: str | None = Query(None),
+    min_value: float | None = Query(None),
+    max_value: float | None = Query(None),
+    created_from: datetime | None = Query(None),
+    created_to: datetime | None = Query(None),
+    include_archived: bool = Query(False),
 ):
     """List paginated, searchable leads scoped to the tenant organization."""
     lead_service = LeadService(db)
     records, _ = await lead_service.paginate_leads(
-        actor, skip, limit, search, status, assigned_user_id, name, city
+        actor, skip, limit, search, status, assigned_user_id, name, city,
+        source=source, stage_id=stage_id, priority=priority, min_value=min_value,
+        max_value=max_value, created_from=created_from, created_to=created_to,
+        include_archived=include_archived,
     )
     return list(records)
+
+@router.get("/export")
+async def export_leads(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    search: str | None = Query(None),
+    status: str | None = Query(None),
+    assigned_user_id: uuid.UUID | None = Query(None),
+    name: str | None = Query(None),
+    city: str | None = Query(None),
+    source: str | None = Query(None),
+    stage_id: uuid.UUID | None = Query(None),
+    priority: str | None = Query(None),
+    min_value: float | None = Query(None),
+    max_value: float | None = Query(None),
+    created_from: datetime | None = Query(None),
+    created_to: datetime | None = Query(None),
+    include_archived: bool = Query(False),
+):
+    """Export the caller's visible leads (matching the same filters as listing) as CSV or Excel."""
+    lead_service = LeadService(db)
+    filters = {
+        "search_query": search, "status": status, "assigned_user_id": assigned_user_id,
+        "name": name, "city": city, "source": source, "stage_id": stage_id,
+        "priority": priority, "min_value": min_value, "max_value": max_value,
+        "created_from": created_from, "created_to": created_to, "include_archived": include_archived,
+    }
+    leads = await lead_service.export_leads(actor, filters)
+    if format == "xlsx":
+        content = LeadService.build_export_xlsx(leads)
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=leads_export.xlsx"},
+        )
+    csv_text = LeadService.build_export_csv(leads)
+    return StreamingResponse(
+        io.StringIO(csv_text),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=leads_export.csv"},
+    )
+
+@router.get("/duplicates", response_model=List[LeadResponse])
+async def find_duplicate_leads(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    email: str | None = Query(None),
+    phone: str | None = Query(None),
+    exclude_lead_id: uuid.UUID | None = Query(None),
+):
+    """Find existing leads that share the given email or phone within the organization."""
+    lead_service = LeadService(db)
+    return list(await lead_service.find_duplicates(actor, email=email, phone=phone, exclude_lead_id=exclude_lead_id))
+
+@router.post("/bulk-update", response_model=LeadBulkUpdateResponse)
+async def bulk_update_leads(
+    req: LeadBulkUpdateRequest,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Apply the same field changes to multiple scoped leads at once."""
+    lead_service = LeadService(db)
+    fields = req.fields.model_dump(exclude_unset=True, exclude_none=True)
+    result = await lead_service.bulk_update(actor, req.lead_ids, fields)
+    return LeadBulkUpdateResponse(**result)
+
+# --- Lead Reports ---
+
+@router.get("/reports", response_model=LeadReportResponse)
+async def get_lead_reports(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+):
+    """Tenant-scoped lead analytics: totals plus breakdowns by source, status, priority, stage, and owner."""
+    lead_service = LeadService(db)
+    return await lead_service.get_lead_report(actor, date_from=date_from, date_to=date_to)
+
+# --- Escalation config (OrgAdmin / Manager) ---
+
+@router.get("/escalation/config", response_model=EscalationConfigResponse)
+async def get_escalation_config(
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Retrieve the org's idle-lead escalation configuration."""
+    return await EscalationService(db).get_or_create_config(actor.organization_id)
+
+@router.patch("/escalation/config", response_model=EscalationConfigResponse)
+async def update_escalation_config(
+    req: EscalationConfigUpdate,
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Enable/disable escalation and set the idle-day threshold."""
+    return await EscalationService(db).update_config(actor.organization_id, req.model_dump(exclude_unset=True))
+
+# --- Workflow automation rules (OrgAdmin / Manager) ---
+
+@router.get("/workflows", response_model=List[WorkflowRuleResponse])
+async def list_workflow_rules(
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """List lead-automation rules for the organization."""
+    return list(await WorkflowService(db).list_rules(actor))
+
+@router.post("/workflows", response_model=WorkflowRuleResponse, status_code=status.HTTP_201_CREATED)
+async def create_workflow_rule(
+    req: WorkflowRuleCreate,
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Create a lead-automation rule (trigger + conditions + actions)."""
+    return await WorkflowService(db).create_rule(actor, req.model_dump())
+
+@router.patch("/workflows/{rule_id}", response_model=WorkflowRuleResponse)
+async def update_workflow_rule(
+    rule_id: uuid.UUID,
+    req: WorkflowRuleUpdate,
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Update an automation rule."""
+    return await WorkflowService(db).update_rule(actor, rule_id, req.model_dump(exclude_unset=True))
+
+@router.delete("/workflows/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workflow_rule(
+    rule_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_role(["OrgAdmin", "Manager"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete an automation rule."""
+    await WorkflowService(db).delete_rule(actor, rule_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# --- Saved Filters ---
+
+@router.get("/saved-filters", response_model=List[SavedFilterResponse])
+async def list_saved_filters(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    entity_type: str | None = Query("lead"),
+):
+    """List the caller's saved filters plus any shared org-wide ones."""
+    service = SavedFilterService(db)
+    return list(await service.list_filters(actor, entity_type))
+
+@router.post("/saved-filters", response_model=SavedFilterResponse, status_code=status.HTTP_201_CREATED)
+async def create_saved_filter(
+    req: SavedFilterCreate,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Save a reusable filter definition."""
+    service = SavedFilterService(db)
+    return await service.create_filter(actor, req.model_dump())
+
+@router.patch("/saved-filters/{filter_id}", response_model=SavedFilterResponse)
+async def update_saved_filter(
+    filter_id: uuid.UUID,
+    req: SavedFilterUpdate,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Rename, re-share, or redefine an owned saved filter."""
+    service = SavedFilterService(db)
+    return await service.update_filter(actor, filter_id, req.model_dump(exclude_unset=True))
+
+@router.delete("/saved-filters/{filter_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_saved_filter(
+    filter_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete an owned saved filter."""
+    service = SavedFilterService(db)
+    await service.delete_filter(actor, filter_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/{lead_id}", response_model=LeadResponse)
 async def get_lead(
@@ -86,6 +290,137 @@ async def delete_lead(
     """Soft delete lead from organization database."""
     lead_service = LeadService(db)
     return await lead_service.soft_delete_lead(actor, lead_id)
+
+@router.post("/{lead_id}/archive", response_model=LeadResponse)
+async def archive_lead(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Archive a lead (hidden from default listings, retained for restore)."""
+    lead_service = LeadService(db)
+    return await lead_service.archive_lead(actor, lead_id)
+
+@router.post("/{lead_id}/restore", response_model=LeadResponse)
+async def restore_lead(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Restore an archived or soft-deleted lead back to active state."""
+    lead_service = LeadService(db)
+    return await lead_service.restore_lead(actor, lead_id)
+
+@router.post("/{lead_id}/recompute-score", response_model=LeadResponse)
+async def recompute_lead_score(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Recompute the rule-based score for a lead."""
+    lead_service = LeadService(db)
+    return await lead_service.recompute_score(actor, lead_id)
+
+@router.post("/{lead_id}/convert", response_model=LeadConvertResponse)
+async def convert_lead(
+    lead_id: uuid.UUID,
+    req: LeadConvertRequest,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Convert a lead into a Contact (+ optional Company); archives and links the lead."""
+    lead_service = LeadService(db)
+    result = await lead_service.convert_lead(actor, lead_id, create_company=req.create_company)
+    return LeadConvertResponse(**result)
+
+@router.get("/{lead_id}/reminders", response_model=List[LeadReminderResponse])
+async def list_lead_reminders(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """List reminders set on a lead."""
+    lead_service = LeadService(db)
+    return list(await lead_service.list_reminders(actor, lead_id))
+
+@router.post("/{lead_id}/reminders", response_model=LeadReminderResponse, status_code=status.HTTP_201_CREATED)
+async def create_lead_reminder(
+    lead_id: uuid.UUID,
+    req: LeadReminderCreate,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Schedule a reminder for a lead; fires an in-app notification when due."""
+    lead_service = LeadService(db)
+    return await lead_service.create_reminder(actor, lead_id, req.remind_at, req.note, req.user_id)
+
+@router.delete("/{lead_id}/reminders/{reminder_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_lead_reminder(
+    lead_id: uuid.UUID,
+    reminder_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Delete a lead reminder."""
+    lead_service = LeadService(db)
+    await lead_service.delete_reminder(actor, lead_id, reminder_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get("/{lead_id}/timeline", response_model=List[LeadTimelineEvent])
+async def get_lead_timeline(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Unified chronological feed of notes, activities, and audit events for a lead."""
+    lead_service = LeadService(db)
+    return await lead_service.get_timeline(actor, lead_id)
+
+@router.get("/{lead_id}/audit", response_model=List[LeadAuditEvent])
+async def get_lead_audit(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Tenant-visible audit trail for a single lead."""
+    lead_service = LeadService(db)
+    return await lead_service.get_audit_trail(actor, lead_id)
+
+@router.get("/{lead_id}/attachments", response_model=List[LeadAttachmentResponse])
+async def list_lead_attachments(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """List files attached to a lead."""
+    lead_service = LeadService(db)
+    return await lead_service.list_attachments(actor, lead_id)
+
+@router.post("/{lead_id}/attachments", response_model=LeadAttachmentResponse, status_code=status.HTTP_201_CREATED)
+async def upload_lead_attachment(
+    lead_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...)
+):
+    """Attach a file (pdf/image/csv/xlsx/docx, max 5MB) to a lead."""
+    MAX_UPLOAD = 5 * 1024 * 1024
+    content = await file.read(MAX_UPLOAD + 1)
+    if len(content) > MAX_UPLOAD:
+        raise HTTPException(status_code=400, detail="File exceeds the limit of 5.0MB")
+    lead_service = LeadService(db)
+    return await lead_service.add_attachment(actor, lead_id, content, file.filename or "attachment")
+
+@router.delete("/{lead_id}/attachments/{stored_name}")
+async def delete_lead_attachment(
+    lead_id: uuid.UUID,
+    stored_name: str,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Remove a file attached to a lead."""
+    lead_service = LeadService(db)
+    return await lead_service.delete_attachment(actor, lead_id, stored_name)
 
 # --- Bulk Lead Imports ---
 

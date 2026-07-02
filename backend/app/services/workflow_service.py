@@ -1,0 +1,224 @@
+"""Bounded lead-automation engine.
+
+Evaluates active WorkflowRule rows for a trigger event, checks their conditions
+against a lead, and applies their actions. Intentionally NOT a general-purpose
+engine: a fixed, safe set of fields/operators/action-types keeps evaluation
+predictable and injection-free. Actions mutate the lead directly (never via the
+lead update path) so a rule cannot recursively re-trigger itself.
+"""
+import uuid
+from decimal import Decimal
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.workflow_rule import WorkflowRule
+from app.models.lead import Lead
+from app.models.user import User
+
+CONDITION_FIELDS = {"status", "source", "priority", "value", "stage_id", "city", "company_name"}
+ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage"}
+
+
+def _coerce_number(v):
+    if isinstance(v, Decimal):
+        return float(v)
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _match_condition(lead: Lead, cond: dict) -> bool:
+    field = cond.get("field")
+    op = cond.get("op")
+    expected = cond.get("value")
+    if field not in CONDITION_FIELDS:
+        return False
+    actual = getattr(lead, field, None)
+    if field == "stage_id" and actual is not None:
+        actual = str(actual)
+
+    if op in ("gt", "gte", "lt", "lte"):
+        a, e = _coerce_number(actual), _coerce_number(expected)
+        if a is None or e is None:
+            return False
+        return {"gt": a > e, "gte": a >= e, "lt": a < e, "lte": a <= e}[op]
+    if op == "eq":
+        return str(actual) == str(expected)
+    if op == "neq":
+        return str(actual) != str(expected)
+    if op == "contains":
+        return expected is not None and actual is not None and str(expected).lower() in str(actual).lower()
+    return False
+
+
+class WorkflowService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    @staticmethod
+    def matches(lead: Lead, conditions: list) -> bool:
+        """All conditions must hold (AND). Empty conditions => always matches."""
+        return all(_match_condition(lead, c) for c in (conditions or []))
+
+    # --- CRUD ---
+    VALID_TRIGGERS = {"lead_created", "lead_updated"}
+
+    def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
+        from fastapi import HTTPException, status
+        if trigger_event not in self.VALID_TRIGGERS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid trigger_event. Allowed: {sorted(self.VALID_TRIGGERS)}")
+        for c in (conditions or []):
+            if c.get("field") not in CONDITION_FIELDS:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid condition field: {c.get('field')}")
+        for a in (actions or []):
+            if a.get("type") not in ACTION_TYPES:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid action type: {a.get('type')}")
+
+    async def list_rules(self, actor: User) -> list[WorkflowRule]:
+        res = await self.db.execute(
+            select(WorkflowRule).filter(
+                WorkflowRule.organization_id == actor.organization_id,
+                WorkflowRule.is_deleted == False,
+            ).order_by(WorkflowRule.created_at.desc())
+        )
+        return list(res.scalars().all())
+
+    async def create_rule(self, actor: User, data: dict) -> WorkflowRule:
+        self._validate_rule(data.get("conditions"), data.get("actions"), data.get("trigger_event"))
+        rule = WorkflowRule(
+            organization_id=actor.organization_id,
+            name=data["name"],
+            trigger_event=data["trigger_event"],
+            is_active=data.get("is_active", True),
+            conditions=data.get("conditions", []),
+            actions=data.get("actions", []),
+            created_by=actor.id,
+        )
+        self.db.add(rule)
+        await self.db.flush()
+        await self.db.refresh(rule)
+        return rule
+
+    async def _get_owned_rule(self, actor: User, rule_id: uuid.UUID) -> WorkflowRule:
+        from fastapi import HTTPException, status
+        res = await self.db.execute(
+            select(WorkflowRule).filter(
+                WorkflowRule.id == rule_id,
+                WorkflowRule.organization_id == actor.organization_id,
+                WorkflowRule.is_deleted == False,
+            )
+        )
+        rule = res.scalars().first()
+        if not rule:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow rule not found")
+        return rule
+
+    async def update_rule(self, actor: User, rule_id: uuid.UUID, data: dict) -> WorkflowRule:
+        rule = await self._get_owned_rule(actor, rule_id)
+        merged_conditions = data.get("conditions", rule.conditions)
+        merged_actions = data.get("actions", rule.actions)
+        merged_trigger = data.get("trigger_event", rule.trigger_event)
+        self._validate_rule(merged_conditions, merged_actions, merged_trigger)
+        for key, val in data.items():
+            setattr(rule, key, val)
+        self.db.add(rule)
+        await self.db.flush()
+        await self.db.refresh(rule)
+        return rule
+
+    async def delete_rule(self, actor: User, rule_id: uuid.UUID) -> None:
+        rule = await self._get_owned_rule(actor, rule_id)
+        rule.is_deleted = True
+        self.db.add(rule)
+        await self.db.flush()
+
+    async def run(self, trigger_event: str, lead: Lead, actor: User) -> list[str]:
+        """Apply every active matching rule; return a list of applied action descriptions."""
+        res = await self.db.execute(
+            select(WorkflowRule).filter(
+                WorkflowRule.organization_id == lead.organization_id,
+                WorkflowRule.trigger_event == trigger_event,
+                WorkflowRule.is_active == True,
+                WorkflowRule.is_deleted == False,
+            )
+        )
+        rules = res.scalars().all()
+        applied: list[str] = []
+        for rule in rules:
+            if not self.matches(lead, rule.conditions):
+                continue
+            for action in (rule.actions or []):
+                desc = await self._apply_action(lead, action, actor, rule)
+                if desc:
+                    applied.append(desc)
+        if applied:
+            self.db.add(lead)
+            await self.db.flush()
+        return applied
+
+    async def _apply_action(self, lead: Lead, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        atype = action.get("type")
+        if atype not in ACTION_TYPES:
+            return None
+
+        if atype == "set_priority" and action.get("value"):
+            lead.priority = str(action["value"])
+            return f"set_priority={lead.priority}"
+        if atype == "set_status" and action.get("value"):
+            lead.status = str(action["value"])
+            return f"set_status={lead.status}"
+        if atype == "set_source" and action.get("value"):
+            lead.source = str(action["value"])
+            return f"set_source={lead.source}"
+        if atype == "assign_user" and action.get("user_id"):
+            try:
+                lead.assigned_user_id = uuid.UUID(str(action["user_id"]))
+                return "assign_user"
+            except ValueError:
+                return None
+        if atype == "move_stage" and action.get("stage_id"):
+            from app.models.pipeline import PipelineStage
+            try:
+                stage_uuid = uuid.UUID(str(action["stage_id"]))
+            except ValueError:
+                return None
+            st = await self.db.execute(
+                select(PipelineStage.id).filter(
+                    PipelineStage.id == stage_uuid,
+                    PipelineStage.organization_id == lead.organization_id,
+                    PipelineStage.is_deleted == False,
+                )
+            )
+            if st.scalar():
+                lead.stage_id = stage_uuid
+                return "move_stage"
+            return None
+        if atype == "add_note" and action.get("content"):
+            from app.models.note import Note
+            self.db.add(Note(
+                organization_id=lead.organization_id,
+                content=str(action["content"]),
+                lead_id=lead.id,
+                created_by=actor.id,
+            ))
+            return "add_note"
+        if atype == "notify_user":
+            from app.services.notification_service import NotificationService
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else lead.assigned_user_id
+            except ValueError:
+                target_id = lead.assigned_user_id
+            if target_id:
+                await NotificationService(self.db).create_notification(
+                    organization_id=lead.organization_id,
+                    user_id=target_id,
+                    category="lead",
+                    title=f"Workflow: {rule.name}",
+                    body=str(action.get("message") or f'Rule "{rule.name}" fired for lead "{lead.title}".'),
+                    link_url=f"/leads?leadId={lead.id}",
+                    action_metadata={"lead_id": str(lead.id), "rule_id": str(rule.id)},
+                )
+                return "notify_user"
+        return None

@@ -16,6 +16,7 @@ const leadSchema = z.object({
   phone: z.string().max(50).optional().or(z.literal('')),
   company_name: z.string().max(255).optional().or(z.literal('')),
   status: z.string().min(1, 'Status is required'),
+  priority: z.string().min(1, 'Priority is required'),
   source: z.string().max(100).optional().or(z.literal('')),
   value: z.coerce.number().min(0, 'Value must be positive').optional().or(z.literal('')),
   assigned_user_id: z.string().optional().or(z.literal('')),
@@ -55,6 +56,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       phone: '',
       company_name: '',
       status: 'New',
+      priority: 'Medium',
       source: '',
       value: '',
       assigned_user_id: '',
@@ -81,6 +83,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         phone: lead.phone || '',
         company_name: lead.company_name || '',
         status: lead.status,
+        priority: lead.priority || 'Medium',
         source: lead.source || '',
         value: lead.value || '',
         assigned_user_id: lead.assigned_user_id || '',
@@ -114,6 +117,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         email: values.email || null,
         company_name: values.company_name || null,
         status: values.status,
+        priority: values.priority,
         source: values.source || null,
         value: values.value !== '' ? Number(values.value) : null,
         assigned_user_id: values.assigned_user_id || null,
@@ -259,14 +263,27 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Source</label>
-              <input
-                type="text"
-                {...register('source')}
-                placeholder="e.g. Website, Referral"
-                className="w-full px-4 py-3 rounded-xl glass-input"
-              />
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Priority</label>
+              <select
+                {...register('priority')}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Source</label>
+            <input
+              type="text"
+              {...register('source')}
+              placeholder="e.g. Website, Referral"
+              className="w-full px-4 py-3 rounded-xl glass-input"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

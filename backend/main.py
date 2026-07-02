@@ -33,6 +33,7 @@ from app.middleware.correlation import correlation_id_middleware
 from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.core.database import async_session_maker
 from app.cron.subscription_cron import run_daily_subscription_check
+from app.cron.lead_cron import run_lead_automation_check
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -77,6 +78,7 @@ async def subscription_cron_scheduler():
                 if locked:
                     logger.info("Acquired daily cron lock. Running daily subscription check.")
                     await run_daily_subscription_check(async_session_maker)
+                    await run_lead_automation_check(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:

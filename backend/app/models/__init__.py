@@ -30,6 +30,10 @@ from app.models.payment_gateway import PaymentGateway
 from app.models.notification_template import NotificationTemplate
 from app.models.coupon import Coupon
 from app.models.notification import Notification
+from app.models.saved_filter import SavedFilter
+from app.models.lead_reminder import LeadReminder
+from app.models.escalation_config import EscalationConfig
+from app.models.workflow_rule import WorkflowRule
 
 __all__ = [
     "Base", 
@@ -68,5 +72,9 @@ __all__ = [
     "PaymentGateway",
     "NotificationTemplate",
     "Coupon",
-    "Notification"
+    "Notification",
+    "SavedFilter",
+    "LeadReminder",
+    "EscalationConfig",
+    "WorkflowRule"
 ]

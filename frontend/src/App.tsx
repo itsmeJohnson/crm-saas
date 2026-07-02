@@ -10,6 +10,8 @@ import { Home } from './modules/dashboard/Home';
 import { Profile } from './modules/organization/Profile';
 import { UsersPage } from './pages/UsersPage';
 import { LeadsPage } from './pages/LeadsPage';
+import { LeadReportsPage } from './pages/LeadReportsPage';
+import { LeadAutomationPage } from './pages/LeadAutomationPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
@@ -68,9 +70,11 @@ export const App: React.FC = () => {
                 {/* Lead Management Feature Guard */}
                 <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>
                   <Route path="/leads" element={<LeadsPage />} />
+                  <Route path="/leads/reports" element={<LeadReportsPage />} />
 
                   {/* OrgAdmin & Manager only */}
                   <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                    <Route path="/leads/automation" element={<LeadAutomationPage />} />
                     <Route path="/companies" element={<CompaniesPage />} />
                     <Route path="/contacts" element={<ContactsPage />} />
                   </Route>
