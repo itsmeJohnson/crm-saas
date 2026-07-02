@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, DateTime, Text
+from sqlalchemy import String, ForeignKey, DateTime, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import BaseModel
 
@@ -27,3 +27,5 @@ class Activity(BaseModel):
     recording_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     call_duration: Mapped[int | None] = mapped_column(nullable=True)
     call_direction: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Communication attachments (reused for the Communication Center; INBOUND/OUTBOUND direction reuses call_direction)
+    attachments: Mapped[list | None] = mapped_column(JSON, nullable=True)  # list of {filename, url, size, uploaded_by, uploaded_at}

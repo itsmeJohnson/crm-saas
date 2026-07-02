@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -29,6 +29,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace' },
     { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
     { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },
+    { name: 'Communications',    path: '/communications',    icon: MessagesSquare,    section: 'workspace' },
     { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Lead Reports',      path: '/leads/reports',     icon: BarChart3,         featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Lead Automation',   path: '/leads/automation',  icon: Zap,               roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },

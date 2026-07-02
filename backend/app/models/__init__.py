@@ -44,6 +44,7 @@ from app.models.task import Task
 from app.models.task_comment import TaskComment
 from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
+from app.models.communication import CommunicationTemplate, CommunicationFlag
 
 __all__ = [
     "Base", 
@@ -98,5 +99,7 @@ __all__ = [
     "TaskDependency",
     "CalendarEvent",
     "Holiday",
-    "WorkingHoursConfig"
+    "WorkingHoursConfig",
+    "CommunicationTemplate",
+    "CommunicationFlag"
 ]

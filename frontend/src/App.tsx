@@ -21,6 +21,7 @@ import { CustomerReportsPage } from './pages/CustomerReportsPage';
 import { TasksPage } from './pages/TasksPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
 import { CalendarPage } from './pages/CalendarPage';
+import { CommunicationCenterPage } from './pages/CommunicationCenterPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -78,6 +79,7 @@ export const App: React.FC = () => {
                 <Route path="/tasks" element={<TasksPage />} />
                 <Route path="/tasks/reports" element={<TaskReportsPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/communications" element={<CommunicationCenterPage />} />
 
                 {/* Lead Management Feature Guard */}
                 <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>

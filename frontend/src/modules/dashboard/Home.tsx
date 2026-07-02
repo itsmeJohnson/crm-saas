@@ -12,6 +12,7 @@ import { TeamStatusWidget } from '../../components/dashboard/TeamStatusWidget';
 import { QuickActionsWidget } from '../../components/dashboard/QuickActionsWidget';
 import { DashboardNotificationsWidget } from '../../components/dashboard/DashboardNotificationsWidget';
 import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
+import { CommunicationsWidget } from '../../components/dashboard/CommunicationsWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -142,9 +143,10 @@ export const Home: React.FC = () => {
         <DashboardNotificationsWidget />
       </div>
 
-      {/* My Tasks */}
+      {/* My Tasks + Communications */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <MyTasksWidget />
+        <CommunicationsWidget />
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (
