@@ -5,6 +5,12 @@ import { SummaryCards } from '../../components/dashboard/SummaryCards';
 import { LeadStatusChart } from '../../components/dashboard/LeadStatusChart';
 import { RecentActivitiesWidget } from '../../components/dashboard/RecentActivitiesWidget';
 import { AnalyticsDashboard } from '../../components/dashboard/AnalyticsDashboard';
+import { TodayAgendaWidget } from '../../components/dashboard/TodayAgendaWidget';
+import { PipelineWidget } from '../../components/dashboard/PipelineWidget';
+import { LeadSourcesWidget } from '../../components/dashboard/LeadSourcesWidget';
+import { TeamStatusWidget } from '../../components/dashboard/TeamStatusWidget';
+import { QuickActionsWidget } from '../../components/dashboard/QuickActionsWidget';
+import { DashboardNotificationsWidget } from '../../components/dashboard/DashboardNotificationsWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -97,6 +103,16 @@ export const Home: React.FC = () => {
       {/* KPI Cards Widget */}
       <SummaryCards summary={summary} isLoading={isLoadingSummary} />
 
+      {/* Today's Agenda + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <TodayAgendaWidget summary={summary} isLoading={isLoadingSummary} />
+        </div>
+        <div className="lg:col-span-1">
+          <QuickActionsWidget />
+        </div>
+      </div>
+
       {/* Analytics Charts & Timelines Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Lead Status Chart */}
@@ -116,6 +132,20 @@ export const Home: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Pipeline, Lead Sources & Notifications — Live Team Status only for
+          Manager/TeamLeader/OrgAdmin (not relevant to an individual Telecaller). */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <PipelineWidget summary={summary} isLoading={isLoadingSummary} />
+        <LeadSourcesWidget summary={summary} isLoading={isLoadingSummary} />
+        <DashboardNotificationsWidget />
+      </div>
+
+      {dashboardData?.role && dashboardData.role !== 'Telecaller' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TeamStatusWidget />
+        </div>
+      )}
     </div>
   );
 };
