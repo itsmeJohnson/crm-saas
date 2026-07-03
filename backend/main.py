@@ -29,6 +29,9 @@ from app.api.v1.calling import router as calling_router
 from app.api.v1.sms import router as sms_router
 from app.api.v1.whatsapp import router as whatsapp_router
 from app.api.v1.email import router as email_router
+from app.api.v1.templates import router as templates_router
+from app.api.v1.campaigns import router as campaigns_router
+from app.api.v1.communication_analytics import router as comm_analytics_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -46,6 +49,7 @@ from app.cron.customer_cron import run_customer_dunning_check
 from app.cron.calling_cron import run_missed_call_check
 from app.cron.sms_cron import run_sms_retry_check
 from app.cron.email_cron import run_email_sync
+from app.cron.campaign_cron import run_campaign_check
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -95,6 +99,7 @@ async def subscription_cron_scheduler():
                     await run_missed_call_check(async_session_maker)
                     await run_sms_retry_check(async_session_maker)
                     await run_email_sync(async_session_maker)
+                    await run_campaign_check(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -188,6 +193,9 @@ app.include_router(calling_router,         prefix=f"{settings.API_V1_STR}/callin
 app.include_router(sms_router,             prefix=f"{settings.API_V1_STR}/sms",             tags=["sms"])
 app.include_router(whatsapp_router,        prefix=f"{settings.API_V1_STR}/whatsapp",        tags=["whatsapp"])
 app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email",           tags=["email"])
+app.include_router(templates_router,       prefix=f"{settings.API_V1_STR}/templates",       tags=["templates"])
+app.include_router(campaigns_router,       prefix=f"{settings.API_V1_STR}/campaigns",       tags=["campaigns"])
+app.include_router(comm_analytics_router,  prefix=f"{settings.API_V1_STR}/comm-analytics",  tags=["comm-analytics"])
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

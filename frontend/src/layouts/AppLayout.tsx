@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -30,6 +30,10 @@ export const AppLayout: React.FC = () => {
     { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
     { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },
     { name: 'Communications',    path: '/communications',    icon: MessagesSquare,    section: 'workspace' },
+    { name: 'Notifications',     path: '/notifications',     icon: Bell,              section: 'workspace' },
+    { name: 'Templates',         path: '/templates',         icon: LayoutTemplate,    section: 'workspace' },
+    { name: 'Campaigns',         path: '/campaigns',         icon: Megaphone,         featureCode: 'CAMPAIGN_MANAGEMENT', section: 'workspace' },
+    { name: 'Comm Analytics',    path: '/communication-analytics', icon: BarChart3,   roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Calling',           path: '/calling',           icon: PhoneCall,         section: 'workspace' },
     { name: 'Call Reports',      path: '/calling/reports',   icon: BarChart3,         section: 'workspace' },
     { name: 'SMS',               path: '/sms',               icon: MessageSquare,     featureCode: 'SMS_MESSAGING', section: 'workspace' },

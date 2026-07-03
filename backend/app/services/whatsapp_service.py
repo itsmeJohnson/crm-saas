@@ -205,6 +205,8 @@ class WhatsAppService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found.")
             template_name = template_name or t.name
             body = body or t.body
+            from app.services.template_service import TemplateService
+            await TemplateService.mark_used(self.db, t.id)
         if not template_name:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="template_id or template_name is required.")
         provider = get_provider(settings_row)

@@ -29,7 +29,7 @@ from app.models.tax_config import TaxConfig
 from app.models.payment_gateway import PaymentGateway
 from app.models.notification_template import NotificationTemplate
 from app.models.coupon import Coupon
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationPreference, PushSubscription
 from app.models.saved_filter import SavedFilter
 from app.models.lead_reminder import LeadReminder
 from app.models.escalation_config import EscalationConfig
@@ -44,10 +44,11 @@ from app.models.task import Task
 from app.models.task_comment import TaskComment
 from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
-from app.models.communication import CommunicationTemplate, CommunicationFlag
+from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
 from app.models.sms_settings import SmsSettings
 from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
 from app.models.email_settings import EmailSettings
+from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment
 
 __all__ = [
     "Base", 
@@ -105,9 +106,15 @@ __all__ = [
     "WorkingHoursConfig",
     "CommunicationTemplate",
     "CommunicationFlag",
+    "CommunicationTemplateVersion",
     "SmsSettings",
     "WhatsAppSettings",
     "WhatsAppConversation",
     "WhatsAppQuickReply",
-    "EmailSettings"
+    "EmailSettings",
+    "Campaign",
+    "CampaignRecipient",
+    "CampaignSegment",
+    "NotificationPreference",
+    "PushSubscription"
 ]

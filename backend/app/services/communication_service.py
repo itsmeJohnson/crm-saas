@@ -343,8 +343,11 @@ class CommunicationService:
 
     # ---------- Templates ----------
     async def list_templates(self, actor: User) -> list[CommunicationTemplate]:
+        # Composers only offer approved, active templates. The managed template
+        # module (/templates) exposes drafts/pending for editing/approval.
         res = await self.db.execute(select(CommunicationTemplate).filter(
-            CommunicationTemplate.organization_id == actor.organization_id, CommunicationTemplate.is_deleted == False).order_by(CommunicationTemplate.name.asc()))
+            CommunicationTemplate.organization_id == actor.organization_id, CommunicationTemplate.is_deleted == False,
+            CommunicationTemplate.status == "approved", CommunicationTemplate.is_active == True).order_by(CommunicationTemplate.name.asc()))
         return list(res.scalars().all())
 
     async def create_template(self, actor: User, data: dict) -> CommunicationTemplate:
@@ -406,6 +409,10 @@ class CommunicationService:
             if not text:
                 return text
             return re.sub(r"\{\{\s*(\w+)\s*\}\}", lambda m: str(ctx.get(m.group(1), m.group(0))), text)
+
+        # Rendering a template for use counts as usage (drives the template reports).
+        from app.services.template_service import TemplateService
+        await TemplateService.mark_used(self.db, t.id)
 
         return {"subject": sub(t.subject), "body": sub(t.body)}
 

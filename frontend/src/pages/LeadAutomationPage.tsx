@@ -4,7 +4,7 @@ import { Zap, ShieldAlert, Trash2, Plus, Loader2 } from 'lucide-react';
 
 const CONDITION_FIELDS = ['status', 'source', 'priority', 'value', 'city', 'company_name'];
 const OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains'];
-const ACTION_TYPES = ['set_priority', 'set_status', 'set_source', 'add_note', 'notify_user', 'send_sms', 'send_whatsapp', 'send_email'];
+const ACTION_TYPES = ['set_priority', 'set_status', 'set_source', 'add_note', 'notify_user', 'send_sms', 'send_whatsapp', 'send_email', 'add_to_campaign'];
 
 export const LeadAutomationPage: React.FC = () => {
   const [escalation, setEscalation] = useState<EscalationConfig | null>(null);
@@ -52,6 +52,8 @@ export const LeadAutomationPage: React.FC = () => {
       const actions = [
         actionType === 'add_note'
           ? { type: actionType, content: actionValue }
+          : actionType === 'add_to_campaign'
+          ? { type: actionType, campaign_id: actionValue }
           : actionType === 'notify_user' || actionType === 'send_sms' || actionType === 'send_whatsapp' || actionType === 'send_email'
           ? { type: actionType, message: actionValue }
           : { type: actionType, value: actionValue },

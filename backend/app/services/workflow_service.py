@@ -16,7 +16,7 @@ from app.models.lead import Lead
 from app.models.user import User
 
 CONDITION_FIELDS = {"status", "source", "priority", "value", "stage_id", "city", "company_name"}
-ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage", "send_sms", "send_whatsapp", "send_email"}
+ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage", "send_sms", "send_whatsapp", "send_email", "add_to_campaign"}
 
 # Contact-entity variants
 CONTACT_CONDITION_FIELDS = {"job_title", "email", "phone", "company_id", "first_name", "last_name"}
@@ -349,7 +349,9 @@ class WorkflowService:
             except ValueError:
                 target_id = lead.assigned_user_id
             if target_id:
-                await NotificationService(self.db).create_notification(
+                # Dispatch honours the recipient's per-category channel preferences
+                # (in-app always; email/SMS/WhatsApp/push only if they opted in).
+                await NotificationService(self.db).dispatch(
                     organization_id=lead.organization_id,
                     user_id=target_id,
                     category="lead",
@@ -396,6 +398,18 @@ class WorkflowService:
                     "lead_id": lead.id,
                 })
                 return "send_email"
+            except Exception:
+                return None
+        if atype == "add_to_campaign" and action.get("campaign_id"):
+            # Enrol the lead into a campaign's recipient queue.
+            from app.services.campaign_service import CampaignService
+            try:
+                cid = uuid.UUID(str(action["campaign_id"]))
+            except ValueError:
+                return None
+            try:
+                added = await CampaignService(self.db).add_lead(cid, lead)
+                return "add_to_campaign" if added else None
             except Exception:
                 return None
         return None

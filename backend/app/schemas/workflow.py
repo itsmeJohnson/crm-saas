@@ -18,6 +18,8 @@ class WorkflowAction(BaseModel):
     stage_id: str | None = None
     content: str | None = None
     message: str | None = None
+    subject: str | None = None       # send_email
+    campaign_id: str | None = None   # add_to_campaign
 
 
 class WorkflowRuleCreate(BaseModel):

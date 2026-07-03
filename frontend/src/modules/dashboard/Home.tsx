@@ -17,6 +17,9 @@ import { CallingWidget } from '../../components/dashboard/CallingWidget';
 import { SmsWidget } from '../../components/dashboard/SmsWidget';
 import { WhatsAppWidget } from '../../components/dashboard/WhatsAppWidget';
 import { EmailWidget } from '../../components/dashboard/EmailWidget';
+import { TemplatesWidget } from '../../components/dashboard/TemplatesWidget';
+import { CampaignsWidget } from '../../components/dashboard/CampaignsWidget';
+import { CommAnalyticsWidget } from '../../components/dashboard/CommAnalyticsWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -155,6 +158,9 @@ export const Home: React.FC = () => {
         {features.includes('SMS_MESSAGING') && <SmsWidget />}
         {features.includes('WHATSAPP_MESSAGING') && <WhatsAppWidget />}
         {features.includes('EMAIL_MESSAGING') && <EmailWidget />}
+        <TemplatesWidget />
+        {features.includes('CAMPAIGN_MANAGEMENT') && <CampaignsWidget />}
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <CommAnalyticsWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (
