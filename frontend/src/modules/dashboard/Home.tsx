@@ -13,6 +13,10 @@ import { QuickActionsWidget } from '../../components/dashboard/QuickActionsWidge
 import { DashboardNotificationsWidget } from '../../components/dashboard/DashboardNotificationsWidget';
 import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
 import { CommunicationsWidget } from '../../components/dashboard/CommunicationsWidget';
+import { CallingWidget } from '../../components/dashboard/CallingWidget';
+import { SmsWidget } from '../../components/dashboard/SmsWidget';
+import { WhatsAppWidget } from '../../components/dashboard/WhatsAppWidget';
+import { EmailWidget } from '../../components/dashboard/EmailWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -143,10 +147,14 @@ export const Home: React.FC = () => {
         <DashboardNotificationsWidget />
       </div>
 
-      {/* My Tasks + Communications */}
+      {/* My Tasks + Communications + Calling + SMS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <MyTasksWidget />
         <CommunicationsWidget />
+        <CallingWidget />
+        {features.includes('SMS_MESSAGING') && <SmsWidget />}
+        {features.includes('WHATSAPP_MESSAGING') && <WhatsAppWidget />}
+        {features.includes('EMAIL_MESSAGING') && <EmailWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

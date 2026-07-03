@@ -22,6 +22,16 @@ import { TasksPage } from './pages/TasksPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { CommunicationCenterPage } from './pages/CommunicationCenterPage';
+import { CallingPage } from './pages/CallingPage';
+import { CallingReportsPage } from './pages/CallingReportsPage';
+import { SmsPage } from './pages/SmsPage';
+import { SmsReportsPage } from './pages/SmsReportsPage';
+import { WhatsAppPage } from './pages/WhatsAppPage';
+import { WhatsAppSettingsPage } from './pages/WhatsAppSettingsPage';
+import { WhatsAppReportsPage } from './pages/WhatsAppReportsPage';
+import { EmailPage } from './pages/EmailPage';
+import { EmailSettingsPage } from './pages/EmailSettingsPage';
+import { EmailReportsPage } from './pages/EmailReportsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -80,6 +90,20 @@ export const App: React.FC = () => {
                 <Route path="/tasks/reports" element={<TaskReportsPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/communications" element={<CommunicationCenterPage />} />
+                <Route path="/calling" element={<CallingPage />} />
+                <Route path="/calling/reports" element={<CallingReportsPage />} />
+                <Route path="/sms" element={<SmsPage />} />
+                <Route path="/sms/reports" element={<SmsReportsPage />} />
+                <Route path="/whatsapp" element={<WhatsAppPage />} />
+                <Route path="/whatsapp/reports" element={<WhatsAppReportsPage />} />
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+                  <Route path="/whatsapp/settings" element={<WhatsAppSettingsPage />} />
+                </Route>
+                <Route path="/email" element={<EmailPage />} />
+                <Route path="/email/reports" element={<EmailReportsPage />} />
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+                  <Route path="/email/settings" element={<EmailSettingsPage />} />
+                </Route>
 
                 {/* Lead Management Feature Guard */}
                 <Route element={<FeatureGuardRoute featureCode="LEAD_MANAGEMENT" />}>

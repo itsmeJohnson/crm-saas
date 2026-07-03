@@ -118,6 +118,7 @@ class DispositionService:
             latest_call_activity.status = "Completed"
             latest_call_activity.subject = f"Call: {payload.status.value}"
             latest_call_activity.description = desc_str
+            latest_call_activity.call_disposition = payload.status.value
             db.add(latest_call_activity)
         else:
             # Fallback: create completed activity
@@ -130,9 +131,14 @@ class DispositionService:
                 assigned_user_id=actor.id,
                 lead_id=lead.id,
                 created_by=actor.id,
-                call_direction="OUTBOUND"
+                call_direction="OUTBOUND",
+                call_disposition=payload.status.value
             )
             db.add(new_call_activity)
+
+        # 3.6. Fire call_disposition workflow rules against the lead
+        from app.services.workflow_service import WorkflowService
+        await WorkflowService(db).run("call_disposition", lead, actor)
 
         # 4. Transition agent's Redis state to IDLE
         state_service = AgentStateService()

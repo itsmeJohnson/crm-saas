@@ -16,7 +16,7 @@ from app.models.lead import Lead
 from app.models.user import User
 
 CONDITION_FIELDS = {"status", "source", "priority", "value", "stage_id", "city", "company_name"}
-ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage"}
+ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage", "send_sms", "send_whatsapp", "send_email"}
 
 # Contact-entity variants
 CONTACT_CONDITION_FIELDS = {"job_title", "email", "phone", "company_id", "first_name", "last_name"}
@@ -27,10 +27,15 @@ TASK_CONDITION_FIELDS = {"status", "priority", "assigned_user_id", "recurrence"}
 TASK_ACTION_TYPES = {"set_status", "set_priority", "assign_user", "notify_user"}
 
 # Which field/action sets & entity apply per trigger
+# call_logged fires when a Call activity is created against a lead (dialer,
+# inbound webhook, or Communication Center); call_disposition fires when a
+# telecaller submits a disposition. Both act on the linked lead.
 _TRIGGER_ENTITY = {
     "lead_created": "lead", "lead_updated": "lead",
     "contact_created": "contact", "contact_updated": "contact",
     "task_created": "task", "task_updated": "task",
+    "call_logged": "lead", "call_disposition": "lead",
+    "sms_received": "lead", "whatsapp_received": "lead", "email_received": "lead",
 }
 
 
@@ -94,7 +99,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -354,4 +359,43 @@ class WorkflowService:
                     action_metadata={"lead_id": str(lead.id), "rule_id": str(rule.id)},
                 )
                 return "notify_user"
+        if atype == "send_sms" and action.get("message") and lead.phone:
+            # Automated outbound SMS to the lead's phone via the org's provider.
+            # Failures are swallowed so a provider outage can't break rule evaluation.
+            from app.services.sms_service import SmsService
+            try:
+                await SmsService(self.db).send(actor, {
+                    "body": str(action["message"]),
+                    "to_number": lead.phone,
+                    "lead_id": lead.id,
+                }, _skip_cap=True)
+                return "send_sms"
+            except Exception:
+                return None
+        if atype == "send_whatsapp" and action.get("message") and lead.phone:
+            # Automated WhatsApp reply to the lead. Best-effort: a closed 24h window
+            # or provider outage raises, which we swallow so rule evaluation continues.
+            from app.services.whatsapp_service import WhatsAppService
+            try:
+                await WhatsAppService(self.db).send_text(actor, {
+                    "body": str(action["message"]),
+                    "to_number": lead.phone,
+                    "lead_id": lead.id,
+                })
+                return "send_whatsapp"
+            except Exception:
+                return None
+        if atype == "send_email" and action.get("message") and lead.email:
+            # Automated email to the lead. Best-effort; swallow transport errors.
+            from app.services.email_service_module import EmailModuleService
+            try:
+                await EmailModuleService(self.db).send(actor, {
+                    "subject": str(action.get("subject") or f'Regarding {lead.title}'),
+                    "body": str(action["message"]),
+                    "to": lead.email,
+                    "lead_id": lead.id,
+                })
+                return "send_email"
+            except Exception:
+                return None
         return None

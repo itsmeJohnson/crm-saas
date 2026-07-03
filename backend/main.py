@@ -25,6 +25,10 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.health import router as active_health_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.dialer import router as dialer_router
+from app.api.v1.calling import router as calling_router
+from app.api.v1.sms import router as sms_router
+from app.api.v1.whatsapp import router as whatsapp_router
+from app.api.v1.email import router as email_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -39,6 +43,9 @@ from app.core.database import async_session_maker
 from app.cron.subscription_cron import run_daily_subscription_check
 from app.cron.lead_cron import run_lead_automation_check
 from app.cron.customer_cron import run_customer_dunning_check
+from app.cron.calling_cron import run_missed_call_check
+from app.cron.sms_cron import run_sms_retry_check
+from app.cron.email_cron import run_email_sync
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -85,6 +92,9 @@ async def subscription_cron_scheduler():
                     await run_daily_subscription_check(async_session_maker)
                     await run_lead_automation_check(async_session_maker)
                     await run_customer_dunning_check(async_session_maker)
+                    await run_missed_call_check(async_session_maker)
+                    await run_sms_retry_check(async_session_maker)
+                    await run_email_sync(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -174,6 +184,10 @@ app.include_router(dashboard_router,       prefix=f"{settings.API_V1_STR}/dashbo
 app.include_router(active_health_router,   prefix=f"{settings.API_V1_STR}/health",          tags=["health"])
 app.include_router(pipelines_router,       prefix=f"{settings.API_V1_STR}/pipelines",       tags=["pipelines"])
 app.include_router(dialer_router,          prefix=f"{settings.API_V1_STR}/dialer",          tags=["dialer"])
+app.include_router(calling_router,         prefix=f"{settings.API_V1_STR}/calling",         tags=["calling"])
+app.include_router(sms_router,             prefix=f"{settings.API_V1_STR}/sms",             tags=["sms"])
+app.include_router(whatsapp_router,        prefix=f"{settings.API_V1_STR}/whatsapp",        tags=["whatsapp"])
+app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email",           tags=["email"])
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

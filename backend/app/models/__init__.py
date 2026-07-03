@@ -45,6 +45,9 @@ from app.models.task_comment import TaskComment
 from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 from app.models.communication import CommunicationTemplate, CommunicationFlag
+from app.models.sms_settings import SmsSettings
+from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
+from app.models.email_settings import EmailSettings
 
 __all__ = [
     "Base", 
@@ -101,5 +104,10 @@ __all__ = [
     "Holiday",
     "WorkingHoursConfig",
     "CommunicationTemplate",
-    "CommunicationFlag"
+    "CommunicationFlag",
+    "SmsSettings",
+    "WhatsAppSettings",
+    "WhatsAppConversation",
+    "WhatsAppQuickReply",
+    "EmailSettings"
 ]

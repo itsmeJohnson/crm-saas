@@ -168,6 +168,17 @@ async def inbound_call_trigger(
         call_direction="INBOUND"
     )
     db.add(new_call_activity)
+
+    # Fire call_logged workflow rules; webhook has no authenticated actor, so act
+    # as the lead's assigned agent (or its creator) for note attribution.
+    workflow_actor_id = assigned_user_id or created_by_user_id
+    if workflow_actor_id:
+        actor_res = await db.execute(select(User).filter(User.id == workflow_actor_id))
+        workflow_actor = actor_res.scalars().first()
+        if workflow_actor:
+            from app.services.workflow_service import WorkflowService
+            await WorkflowService(db).run("call_logged", lead, workflow_actor)
+
     await db.commit()
     await db.refresh(new_call_activity)
     

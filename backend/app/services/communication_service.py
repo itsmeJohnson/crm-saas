@@ -77,6 +77,16 @@ class CommunicationService:
         await self.audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
                                    action="COMMUNICATION_LOGGED", resource_type="communication", resource_id=str(act.id),
                                    action_metadata={"channel": channel, "direction": act.call_direction})
+
+        # Manually logged calls linked to a lead fire call_logged workflow rules too
+        if channel == "Call" and act.lead_id:
+            from app.models.lead import Lead
+            from app.services.workflow_service import WorkflowService
+            lead = (await self.db.execute(select(Lead).filter(
+                Lead.id == act.lead_id, Lead.organization_id == actor.organization_id,
+                Lead.is_deleted == False))).scalars().first()
+            if lead:
+                await WorkflowService(self.db).run("call_logged", lead, actor)
         return self._activity_item(act, actor_name=f"{actor.first_name or ''} {actor.last_name or ''}".strip() or actor.email,
                                    is_read=outbound, is_pinned=False)
 

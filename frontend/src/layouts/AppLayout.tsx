@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -30,6 +30,16 @@ export const AppLayout: React.FC = () => {
     { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
     { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },
     { name: 'Communications',    path: '/communications',    icon: MessagesSquare,    section: 'workspace' },
+    { name: 'Calling',           path: '/calling',           icon: PhoneCall,         section: 'workspace' },
+    { name: 'Call Reports',      path: '/calling/reports',   icon: BarChart3,         section: 'workspace' },
+    { name: 'SMS',               path: '/sms',               icon: MessageSquare,     featureCode: 'SMS_MESSAGING', section: 'workspace' },
+    { name: 'SMS Reports',       path: '/sms/reports',       icon: BarChart3,         featureCode: 'SMS_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp',          path: '/whatsapp',          icon: MessageCircle,     featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp Reports',  path: '/whatsapp/reports',  icon: BarChart3,         featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp Settings', path: '/whatsapp/settings', icon: Settings,          roles: ['OrgAdmin'], featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'Email',             path: '/email',             icon: Mail,              featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Email Reports',     path: '/email/reports',     icon: BarChart3,         featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Email Settings',    path: '/email/settings',    icon: Settings,          roles: ['OrgAdmin'], featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
     { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Lead Reports',      path: '/leads/reports',     icon: BarChart3,         featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Lead Automation',   path: '/leads/automation',  icon: Zap,               roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },

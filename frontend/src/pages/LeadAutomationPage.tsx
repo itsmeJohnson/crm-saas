@@ -4,7 +4,7 @@ import { Zap, ShieldAlert, Trash2, Plus, Loader2 } from 'lucide-react';
 
 const CONDITION_FIELDS = ['status', 'source', 'priority', 'value', 'city', 'company_name'];
 const OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains'];
-const ACTION_TYPES = ['set_priority', 'set_status', 'set_source', 'add_note', 'notify_user'];
+const ACTION_TYPES = ['set_priority', 'set_status', 'set_source', 'add_note', 'notify_user', 'send_sms', 'send_whatsapp', 'send_email'];
 
 export const LeadAutomationPage: React.FC = () => {
   const [escalation, setEscalation] = useState<EscalationConfig | null>(null);
@@ -52,7 +52,7 @@ export const LeadAutomationPage: React.FC = () => {
       const actions = [
         actionType === 'add_note'
           ? { type: actionType, content: actionValue }
-          : actionType === 'notify_user'
+          : actionType === 'notify_user' || actionType === 'send_sms' || actionType === 'send_whatsapp' || actionType === 'send_email'
           ? { type: actionType, message: actionValue }
           : { type: actionType, value: actionValue },
       ];
@@ -142,6 +142,11 @@ export const LeadAutomationPage: React.FC = () => {
           <select value={trigger} onChange={(e) => setTrigger(e.target.value)} className="px-2 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200">
             <option value="lead_created">On create</option>
             <option value="lead_updated">On update</option>
+            <option value="call_logged">On call logged</option>
+            <option value="call_disposition">On call disposition</option>
+            <option value="sms_received">On SMS received</option>
+            <option value="whatsapp_received">On WhatsApp received</option>
+            <option value="email_received">On email received</option>
           </select>
           <div className="lg:col-span-3 flex items-center gap-1 text-[11px] text-slate-500">
             <span>IF</span>

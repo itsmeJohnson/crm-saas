@@ -142,6 +142,10 @@ async def get_next_lead(
     )
     db.add(new_call_activity)
 
+    # 4.6. Fire call_logged workflow rules against the lead
+    from app.services.workflow_service import WorkflowService
+    await WorkflowService(db).run("call_logged", lead, actor)
+
     # 5. Transition agent's Redis state to ACTIVE_CALLING
     await state_service.set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")
 
