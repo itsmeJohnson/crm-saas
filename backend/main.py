@@ -33,6 +33,11 @@ from app.api.v1.templates import router as templates_router
 from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.communication_analytics import router as comm_analytics_router
 from app.api.v1.departments import router as departments_router
+from app.api.v1.roles import router as roles_router
+from app.api.v1.teams import router as teams_router
+from app.api.v1.branches import router as branches_router
+from app.api.v1.territories import router as territories_router
+from app.api.v1.attendance import router as attendance_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -174,16 +179,25 @@ os.makedirs("uploads/branding", exist_ok=True)
 app.mount("/api/v1/uploads/branding", StaticFiles(directory="uploads/branding"), name="branding")
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+# Custom-role matrix enforcement (no-op for users without a custom role). Only
+# attached to routers whose routes are ALL authenticated — never to routers
+# with public endpoints (users/invitations/accept, email tracking, webhooks).
+from fastapi import Depends as _Depends
+from app.middleware.permissions import enforce_resource as _enforce
+
+def _rbac(resource: str):
+    return [_Depends(_enforce(resource))]
+
 app.include_router(auth_router,            prefix=f"{settings.API_V1_STR}/auth",            tags=["auth"])
 app.include_router(org_router,             prefix=f"{settings.API_V1_STR}/organizations",   tags=["organizations"])
 app.include_router(users_router,           prefix=f"{settings.API_V1_STR}/users",           tags=["users"])
-app.include_router(companies_router,       prefix=f"{settings.API_V1_STR}/companies",       tags=["companies"])
-app.include_router(contacts_router,        prefix=f"{settings.API_V1_STR}/contacts",        tags=["contacts"])
-app.include_router(customers_router,       prefix=f"{settings.API_V1_STR}/customers",       tags=["customers"])
-app.include_router(tasks_router,           prefix=f"{settings.API_V1_STR}/tasks",           tags=["tasks"])
+app.include_router(companies_router,       prefix=f"{settings.API_V1_STR}/companies",       tags=["companies"], dependencies=_rbac("companies"))
+app.include_router(contacts_router,        prefix=f"{settings.API_V1_STR}/contacts",        tags=["contacts"], dependencies=_rbac("contacts"))
+app.include_router(customers_router,       prefix=f"{settings.API_V1_STR}/customers",       tags=["customers"], dependencies=_rbac("customers"))
+app.include_router(tasks_router,           prefix=f"{settings.API_V1_STR}/tasks",           tags=["tasks"], dependencies=_rbac("tasks"))
 app.include_router(calendar_router,        prefix=f"{settings.API_V1_STR}/calendar",        tags=["calendar"])
 app.include_router(communications_router,  prefix=f"{settings.API_V1_STR}/communications",  tags=["communications"])
-app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"])
+app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"], dependencies=_rbac("leads"))
 app.include_router(activities_router,      prefix=f"{settings.API_V1_STR}/activities",      tags=["activities"])
 app.include_router(notes_router,           prefix=f"{settings.API_V1_STR}/notes",           tags=["notes"])
 app.include_router(dashboard_router,       prefix=f"{settings.API_V1_STR}/dashboard",       tags=["dashboard"])
@@ -197,7 +211,12 @@ app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email"
 app.include_router(templates_router,       prefix=f"{settings.API_V1_STR}/templates",       tags=["templates"])
 app.include_router(campaigns_router,       prefix=f"{settings.API_V1_STR}/campaigns",       tags=["campaigns"])
 app.include_router(comm_analytics_router,  prefix=f"{settings.API_V1_STR}/comm-analytics",  tags=["comm-analytics"])
-app.include_router(departments_router,     prefix=f"{settings.API_V1_STR}/departments",     tags=["departments"])
+app.include_router(departments_router,     prefix=f"{settings.API_V1_STR}/departments",     tags=["departments"], dependencies=_rbac("departments"))
+app.include_router(roles_router,           prefix=f"{settings.API_V1_STR}/roles",           tags=["roles"])
+app.include_router(teams_router,           prefix=f"{settings.API_V1_STR}/teams",           tags=["teams"], dependencies=_rbac("teams"))
+app.include_router(branches_router,        prefix=f"{settings.API_V1_STR}/branches",        tags=["branches"], dependencies=_rbac("branches"))
+app.include_router(territories_router,     prefix=f"{settings.API_V1_STR}/territories",     tags=["territories"], dependencies=_rbac("territories"))
+app.include_router(attendance_router,      prefix=f"{settings.API_V1_STR}/attendance",      tags=["attendance"], dependencies=_rbac("attendance"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

@@ -138,6 +138,9 @@ class TaskService:
 
     async def update_task(self, actor: User, task_id: uuid.UUID, data: dict) -> Task:
         task = await self._get(actor, task_id)
+        # Field-level permission check (no-op unless actor has a custom role)
+        from app.services.permission_service import PermissionService
+        await PermissionService(self.db).enforce_field_writes(actor, "tasks", data)
         if "assigned_user_id" in data:
             await self._validate_assignee(actor, data["assigned_user_id"])
         prev_assignee = task.assigned_user_id

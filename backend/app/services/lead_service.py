@@ -71,6 +71,17 @@ class LeadService:
             if matched:
                 lead_data["company_id"] = matched
 
+        # Auto-resolve branch & territory from the lead's PIN/city if a mapping
+        # exists and the caller didn't set them (backward compatible: only fills
+        # NULLs, best-effort — never blocks lead creation).
+        if not lead_data.get("territory_id") or not lead_data.get("branch_id"):
+            try:
+                from app.services.branch_territory_service import BranchTerritoryService
+                await BranchTerritoryService(self.db).apply_resolution_to_lead_data(
+                    actor.organization_id, lead_data)
+            except Exception:
+                pass
+
         # Compute initial lead score from provided attributes
         lead_data["score"] = compute_score(
             email=lead_data.get("email"),
@@ -300,6 +311,10 @@ class LeadService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
         lead = await self.get_lead(actor, lead_id)
+
+        # Field-level permission check (no-op unless actor has a custom role)
+        from app.services.permission_service import PermissionService
+        await PermissionService(self.db).enforce_field_writes(actor, "leads", lead_data)
 
         # Validate assigned user organization if updated
         assigned_user_id = lead_data.get("assigned_user_id")

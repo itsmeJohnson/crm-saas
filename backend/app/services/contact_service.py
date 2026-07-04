@@ -150,6 +150,10 @@ class ContactService:
 
         contact = await self.get_contact(actor, contact_id)
 
+        # Field-level permission check (no-op unless actor has a custom role)
+        from app.services.permission_service import PermissionService
+        await PermissionService(self.db).enforce_field_writes(actor, "contacts", contact_data)
+
         # Validate company reference if updated
         company_id = contact_data.get("company_id")
         if company_id:

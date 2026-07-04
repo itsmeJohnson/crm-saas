@@ -37,6 +37,10 @@ import { CampaignsPage } from './pages/CampaignsPage';
 import { NotificationCenterPage } from './pages/NotificationCenterPage';
 import { CommunicationAnalyticsPage } from './pages/CommunicationAnalyticsPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
+import { TeamsPage } from './pages/TeamsPage';
+import { RolesPermissionsPage } from './pages/RolesPermissionsPage';
+import { BranchTerritoryPage } from './pages/BranchTerritoryPage';
+import { AttendancePage } from './pages/AttendancePage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -112,6 +116,17 @@ export const App: React.FC = () => {
                 <Route path="/communication-analytics" element={<CommunicationAnalyticsPage />} />
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                   <Route path="/departments" element={<DepartmentsPage />} />
+                </Route>
+                {/* Teams: all authenticated roles (visibility is scoped server-side) */}
+                <Route path="/teams" element={<TeamsPage />} />
+                {/* Attendance: all authenticated roles (self clock; managers see their team) */}
+                <Route path="/attendance" element={<AttendancePage />} />
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
+                  <Route path="/roles" element={<RolesPermissionsPage />} />
+                </Route>
+                {/* Branches & Territories: OrgAdmin/Manager (managers view, admins manage) */}
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                  <Route path="/branches" element={<BranchTerritoryPage />} />
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                   <Route path="/email/settings" element={<EmailSettingsPage />} />

@@ -17,6 +17,9 @@ class LeadBase(BaseModel):
     priority: str = Field("Medium", max_length=20)
     assigned_user_id: uuid.UUID | None = None
     stage_id: uuid.UUID | None = None
+    pin_code: str | None = Field(None, max_length=20)
+    branch_id: uuid.UUID | None = None
+    territory_id: uuid.UUID | None = None
 
 class LeadCreate(LeadBase):
     pass
@@ -35,6 +38,9 @@ class LeadUpdate(BaseModel):
     priority: str | None = Field(None, max_length=20)
     assigned_user_id: uuid.UUID | None = None
     stage_id: uuid.UUID | None = None
+    pin_code: str | None = Field(None, max_length=20)
+    branch_id: uuid.UUID | None = None
+    territory_id: uuid.UUID | None = None
 
 class LeadTimelineEvent(BaseModel):
     type: str  # "note" | "activity" | "audit"

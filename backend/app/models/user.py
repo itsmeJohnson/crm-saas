@@ -32,6 +32,10 @@ class User(BaseModel):
     # breaks the users↔departments FK cycle for metadata create/drop ordering.
     department_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("departments.id", use_alter=True, name="fk_users_department"), nullable=True, index=True)
+    # Optional custom-role overlay (nullable — legacy role checks stay authoritative
+    # when NULL). use_alter breaks the users↔custom_roles FK cycle like departments.
+    custom_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("custom_roles.id", use_alter=True, name="fk_users_custom_role"), nullable=True, index=True)
 
     # MFA / TOTP
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

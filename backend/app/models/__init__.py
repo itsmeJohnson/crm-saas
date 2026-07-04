@@ -50,6 +50,12 @@ from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsApp
 from app.models.email_settings import EmailSettings
 from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment
 from app.models.department import Department, DepartmentTarget
+from app.models.custom_role import CustomRole, RolePermission, FieldPermission
+from app.models.team import Team, TeamMember, TeamTarget
+from app.models.branch import Territory, Branch, TerritoryPincode
+from app.models.attendance import (
+    Shift, ShiftAssignment, AttendanceRecord, AttendanceBreak, AttendanceCorrection,
+)
 
 __all__ = [
     "Base", 
@@ -119,5 +125,19 @@ __all__ = [
     "NotificationPreference",
     "PushSubscription",
     "Department",
-    "DepartmentTarget"
+    "DepartmentTarget",
+    "CustomRole",
+    "RolePermission",
+    "FieldPermission",
+    "Team",
+    "TeamMember",
+    "TeamTarget",
+    "Territory",
+    "Branch",
+    "TerritoryPincode",
+    "Shift",
+    "ShiftAssignment",
+    "AttendanceRecord",
+    "AttendanceBreak",
+    "AttendanceCorrection"
 ]

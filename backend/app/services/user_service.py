@@ -76,6 +76,22 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Department not found in this organization.")
 
+    async def _validate_custom_role(self, organization_id: uuid.UUID, data: dict) -> None:
+        """If a custom_role_id is supplied, ensure it belongs to this org (or is None)."""
+        if "custom_role_id" not in data or data["custom_role_id"] is None:
+            return
+        role_id = data["custom_role_id"]
+        if isinstance(role_id, str):
+            role_id = uuid.UUID(role_id)
+            data["custom_role_id"] = role_id
+        from app.models.custom_role import CustomRole
+        ok = (await self.db.execute(select(CustomRole.id).filter(
+            CustomRole.id == role_id, CustomRole.organization_id == organization_id,
+            CustomRole.is_deleted == False))).scalar()
+        if not ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Custom role not found in this organization.")
+
     async def get_user_by_id(self, actor: User, user_id: uuid.UUID) -> User:
         """Fetch a specific user inside the same organization."""
         if not actor.is_active:
@@ -175,6 +191,7 @@ class UserService:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
 
         await self._validate_department(actor.organization_id, user_data)
+        await self._validate_custom_role(actor.organization_id, user_data)
 
         user = await self.user_repo.create_user(actor.organization_id, user_data)
         user.is_team_leader = await self.is_team_leader(user)
@@ -276,6 +293,7 @@ class UserService:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
 
         await self._validate_department(actor.organization_id, update_data)
+        await self._validate_custom_role(actor.organization_id, update_data)
 
         updated = await self.user_repo.update_user(actor.organization_id, user_id, update_data)
         if updated:

@@ -16,7 +16,7 @@ from app.models.lead import Lead
 from app.models.user import User
 
 CONDITION_FIELDS = {"status", "source", "priority", "value", "stage_id", "city", "company_name"}
-ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage", "send_sms", "send_whatsapp", "send_email", "add_to_campaign"}
+ACTION_TYPES = {"set_priority", "set_status", "set_source", "assign_user", "add_note", "notify_user", "move_stage", "send_sms", "send_whatsapp", "send_email", "add_to_campaign", "assign_to_team", "assign_territory"}
 
 # Contact-entity variants
 CONTACT_CONDITION_FIELDS = {"job_title", "email", "phone", "company_id", "first_name", "last_name"}
@@ -25,6 +25,10 @@ CONTACT_ACTION_TYPES = {"assign_user", "add_note", "notify_user", "add_tag"}
 # Task-entity variants
 TASK_CONDITION_FIELDS = {"status", "priority", "assigned_user_id", "recurrence"}
 TASK_ACTION_TYPES = {"set_status", "set_priority", "assign_user", "notify_user"}
+
+# Attendance-entity variants (event-driven, read-only conditions on the record)
+ATTENDANCE_CONDITION_FIELDS = {"status", "is_late", "late_minutes", "shift_id"}
+ATTENDANCE_ACTION_TYPES = {"notify_user", "notify_manager", "add_note"}
 
 # Which field/action sets & entity apply per trigger
 # call_logged fires when a Call activity is created against a lead (dialer,
@@ -36,6 +40,7 @@ _TRIGGER_ENTITY = {
     "task_created": "task", "task_updated": "task",
     "call_logged": "lead", "call_disposition": "lead",
     "sms_received": "lead", "whatsapp_received": "lead", "email_received": "lead",
+    "attendance_marked": "attendance", "late_login": "attendance",
 }
 
 
@@ -44,6 +49,8 @@ def _fields_for(entity_type: str) -> set:
         return CONTACT_CONDITION_FIELDS
     if entity_type == "task":
         return TASK_CONDITION_FIELDS
+    if entity_type == "attendance":
+        return ATTENDANCE_CONDITION_FIELDS
     return CONDITION_FIELDS
 
 
@@ -52,6 +59,8 @@ def _actions_for(entity_type: str) -> set:
         return CONTACT_ACTION_TYPES
     if entity_type == "task":
         return TASK_ACTION_TYPES
+    if entity_type == "attendance":
+        return ATTENDANCE_ACTION_TYPES
     return ACTION_TYPES
 
 
@@ -99,7 +108,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -194,6 +203,8 @@ class WorkflowService:
                     desc = await self._apply_contact_action(entity, action, actor, rule)
                 elif entity_type == "task":
                     desc = await self._apply_task_action(entity, action, actor, rule)
+                elif entity_type == "attendance":
+                    desc = await self._apply_attendance_action(entity, action, actor, rule)
                 else:
                     desc = await self._apply_action(entity, action, actor, rule)
                 if desc:
@@ -247,6 +258,42 @@ class WorkflowService:
                     action_metadata={"task_id": str(task.id), "rule_id": str(rule.id)},
                 )
                 return "notify_user"
+        return None
+
+    async def _apply_attendance_action(self, record, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        """Attendance rules fire on clock-in (attendance_marked) and on a late
+        arrival (late_login). Actions are notification/annotation only — the
+        record is never mutated in a way that recomputes attendance."""
+        atype = action.get("type")
+        if atype not in ATTENDANCE_ACTION_TYPES:
+            return None
+        from app.services.notification_service import NotificationService
+        if atype == "add_note":
+            note = str(action.get("content") or action.get("message") or "").strip()
+            if not note:
+                return None
+            record.notes = f"{record.notes}\n{note}" if record.notes else note
+            return "add_note"
+        if atype in ("notify_user", "notify_manager"):
+            target_id = None
+            if atype == "notify_manager":
+                target_id = (await self.db.execute(
+                    select(User.reporting_to_id).filter(User.id == record.user_id))).scalar()
+            else:
+                target = action.get("user_id")
+                try:
+                    target_id = uuid.UUID(str(target)) if target else record.user_id
+                except ValueError:
+                    target_id = record.user_id
+            if target_id:
+                await NotificationService(self.db).create_notification(
+                    organization_id=record.organization_id, user_id=target_id, category="attendance",
+                    title=f"Workflow: {rule.name}",
+                    body=str(action.get("message") or f'Rule "{rule.name}" fired for attendance on {record.work_date}.'),
+                    link_url="/attendance",
+                    action_metadata={"attendance_id": str(record.id), "rule_id": str(rule.id)},
+                )
+                return atype
         return None
 
     async def _apply_contact_action(self, contact, action: dict, actor: User, rule: WorkflowRule) -> str | None:
@@ -400,6 +447,57 @@ class WorkflowService:
                 return "send_email"
             except Exception:
                 return None
+        if atype == "assign_to_team" and action.get("team_id"):
+            # Distribute the lead to the least-loaded active member of a team.
+            from app.models.team import Team
+            from app.services.team_service import TeamService
+            try:
+                team_uuid = uuid.UUID(str(action["team_id"]))
+            except ValueError:
+                return None
+            team = (await self.db.execute(select(Team).filter(
+                Team.id == team_uuid, Team.organization_id == lead.organization_id,
+                Team.is_deleted == False, Team.status == "active"))).scalars().first()
+            if not team:
+                return None
+            svc = TeamService(self.db)
+            member_ids = await svc._member_ids(team.id)
+            if not member_ids:
+                return None
+            active = list((await self.db.execute(select(User.id).filter(
+                User.id.in_(member_ids), User.is_active == True,
+                User.is_deleted == False))).scalars().all())
+            if not active:
+                return None
+            lead.assigned_user_id = await svc._pick_least_loaded(lead.organization_id, active)
+            return "assign_to_team"
+        if atype == "assign_territory":
+            # Resolve the lead's branch+territory from its PIN/city mapping (or
+            # apply an explicit territory_id/branch_id from the action).
+            from app.services.branch_territory_service import BranchTerritoryService
+            svc = BranchTerritoryService(self.db)
+            tid = bid = None
+            if action.get("territory_id"):
+                try:
+                    tid = uuid.UUID(str(action["territory_id"]))
+                except ValueError:
+                    tid = None
+            if action.get("branch_id"):
+                try:
+                    bid = uuid.UUID(str(action["branch_id"]))
+                except ValueError:
+                    bid = None
+            if tid is None and bid is None:
+                resolved = await svc.resolve_for_lead(lead.organization_id, lead.pin_code, lead.city)
+                if not resolved:
+                    return None
+                tid = resolved.get("territory_id")
+                bid = resolved.get("branch_id")
+            if tid:
+                lead.territory_id = tid
+            if bid:
+                lead.branch_id = bid
+            return "assign_territory" if (tid or bid) else None
         if atype == "add_to_campaign" and action.get("campaign_id"):
             # Enrol the lead into a campaign's recipient queue.
             from app.services.campaign_service import CampaignService

@@ -21,6 +21,9 @@ import { TemplatesWidget } from '../../components/dashboard/TemplatesWidget';
 import { CampaignsWidget } from '../../components/dashboard/CampaignsWidget';
 import { CommAnalyticsWidget } from '../../components/dashboard/CommAnalyticsWidget';
 import { DepartmentsWidget } from '../../components/dashboard/DepartmentsWidget';
+import { TeamsWidget } from '../../components/dashboard/TeamsWidget';
+import { BranchesWidget } from '../../components/dashboard/BranchesWidget';
+import { AttendanceWidget } from '../../components/dashboard/AttendanceWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -163,6 +166,9 @@ export const Home: React.FC = () => {
         {features.includes('CAMPAIGN_MANAGEMENT') && <CampaignsWidget />}
         {dashboardData?.role && dashboardData.role !== 'Telecaller' && <CommAnalyticsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <DepartmentsWidget />}
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <TeamsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <BranchesWidget />}
+        <AttendanceWidget />
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

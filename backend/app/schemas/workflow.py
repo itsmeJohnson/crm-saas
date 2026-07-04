@@ -20,6 +20,9 @@ class WorkflowAction(BaseModel):
     message: str | None = None
     subject: str | None = None       # send_email
     campaign_id: str | None = None   # add_to_campaign
+    team_id: str | None = None       # assign_to_team
+    territory_id: str | None = None  # assign_territory
+    branch_id: str | None = None     # assign_territory
 
 
 class WorkflowRuleCreate(BaseModel):

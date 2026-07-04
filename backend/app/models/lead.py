@@ -32,6 +32,11 @@ class Lead(BaseModel):
     attachments: Mapped[list | None] = mapped_column(JSON, nullable=True)  # list of {filename, url, size, uploaded_by, uploaded_at}
     converted_contact_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contacts.id"), nullable=True, index=True)
     converted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    # Branch & Territory (nullable — backward compatible; populated by PIN/city
+    # resolution or explicit assignment. Existing leads stay NULL.)
+    pin_code: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("branches.id"), nullable=True, index=True)
+    territory_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("territories.id"), nullable=True, index=True)
 
     # Relationships
     import_batch: Mapped["LeadImport | None"] = relationship("LeadImport", back_populates="leads")

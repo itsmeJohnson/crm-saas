@@ -10,6 +10,7 @@ class UserBase(BaseModel):
     reporting_to_id: uuid.UUID | None = None
     phone: str | None = Field(None, max_length=50)
     department_id: uuid.UUID | None = None  # optional department membership (backward compatible)
+    custom_role_id: uuid.UUID | None = None  # optional custom-role overlay (backward compatible)
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
@@ -22,6 +23,7 @@ class UserUpdate(BaseModel):
     role: str | None = Field(None, pattern="^(OrgAdmin|Manager|Employee)$")
     reporting_to_id: uuid.UUID | None = None
     department_id: uuid.UUID | None = None
+    custom_role_id: uuid.UUID | None = None
 
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
