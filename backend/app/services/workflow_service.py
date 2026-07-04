@@ -30,6 +30,10 @@ TASK_ACTION_TYPES = {"set_status", "set_priority", "assign_user", "notify_user"}
 ATTENDANCE_CONDITION_FIELDS = {"status", "is_late", "late_minutes", "shift_id"}
 ATTENDANCE_ACTION_TYPES = {"notify_user", "notify_manager", "add_note"}
 
+# Leave-entity variants (event-driven; conditions on the request)
+LEAVE_CONDITION_FIELDS = {"status", "request_type", "leave_type_id", "day_count", "is_half_day"}
+LEAVE_ACTION_TYPES = {"notify_user", "notify_manager", "add_note"}
+
 # Which field/action sets & entity apply per trigger
 # call_logged fires when a Call activity is created against a lead (dialer,
 # inbound webhook, or Communication Center); call_disposition fires when a
@@ -41,6 +45,7 @@ _TRIGGER_ENTITY = {
     "call_logged": "lead", "call_disposition": "lead",
     "sms_received": "lead", "whatsapp_received": "lead", "email_received": "lead",
     "attendance_marked": "attendance", "late_login": "attendance",
+    "leave_applied": "leave", "leave_approved": "leave",
 }
 
 
@@ -51,6 +56,8 @@ def _fields_for(entity_type: str) -> set:
         return TASK_CONDITION_FIELDS
     if entity_type == "attendance":
         return ATTENDANCE_CONDITION_FIELDS
+    if entity_type == "leave":
+        return LEAVE_CONDITION_FIELDS
     return CONDITION_FIELDS
 
 
@@ -61,6 +68,8 @@ def _actions_for(entity_type: str) -> set:
         return TASK_ACTION_TYPES
     if entity_type == "attendance":
         return ATTENDANCE_ACTION_TYPES
+    if entity_type == "leave":
+        return LEAVE_ACTION_TYPES
     return ACTION_TYPES
 
 
@@ -108,7 +117,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -205,6 +214,8 @@ class WorkflowService:
                     desc = await self._apply_task_action(entity, action, actor, rule)
                 elif entity_type == "attendance":
                     desc = await self._apply_attendance_action(entity, action, actor, rule)
+                elif entity_type == "leave":
+                    desc = await self._apply_leave_action(entity, action, actor, rule)
                 else:
                     desc = await self._apply_action(entity, action, actor, rule)
                 if desc:
@@ -292,6 +303,40 @@ class WorkflowService:
                     body=str(action.get("message") or f'Rule "{rule.name}" fired for attendance on {record.work_date}.'),
                     link_url="/attendance",
                     action_metadata={"attendance_id": str(record.id), "rule_id": str(rule.id)},
+                )
+                return atype
+        return None
+
+    async def _apply_leave_action(self, req, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        """Leave rules fire when a request is applied (leave_applied) or approved
+        (leave_approved). Actions notify or annotate only."""
+        atype = action.get("type")
+        if atype not in LEAVE_ACTION_TYPES:
+            return None
+        from app.services.notification_service import NotificationService
+        if atype == "add_note":
+            note = str(action.get("content") or action.get("message") or "").strip()
+            if not note:
+                return None
+            req.review_note = f"{req.review_note}\n{note}" if req.review_note else note
+            return "add_note"
+        if atype in ("notify_user", "notify_manager"):
+            if atype == "notify_manager":
+                target_id = (await self.db.execute(
+                    select(User.reporting_to_id).filter(User.id == req.user_id))).scalar()
+            else:
+                target = action.get("user_id")
+                try:
+                    target_id = uuid.UUID(str(target)) if target else req.user_id
+                except ValueError:
+                    target_id = req.user_id
+            if target_id:
+                await NotificationService(self.db).create_notification(
+                    organization_id=req.organization_id, user_id=target_id, category="leave",
+                    title=f"Workflow: {rule.name}",
+                    body=str(action.get("message") or f'Rule "{rule.name}" fired for a leave request ({req.start_date} → {req.end_date}).'),
+                    link_url="/leaves",
+                    action_metadata={"request_id": str(req.id), "rule_id": str(rule.id)},
                 )
                 return atype
         return None

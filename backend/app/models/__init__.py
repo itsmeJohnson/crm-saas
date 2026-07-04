@@ -56,6 +56,7 @@ from app.models.branch import Territory, Branch, TerritoryPincode
 from app.models.attendance import (
     Shift, ShiftAssignment, AttendanceRecord, AttendanceBreak, AttendanceCorrection,
 )
+from app.models.leave import LeaveType, LeaveBalance, LeaveRequest
 
 __all__ = [
     "Base", 
@@ -139,5 +140,8 @@ __all__ = [
     "ShiftAssignment",
     "AttendanceRecord",
     "AttendanceBreak",
-    "AttendanceCorrection"
+    "AttendanceCorrection",
+    "LeaveType",
+    "LeaveBalance",
+    "LeaveRequest"
 ]

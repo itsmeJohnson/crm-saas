@@ -32,7 +32,7 @@ RESOURCES = (
     "leads", "contacts", "companies", "customers", "tasks", "calendar",
     "communications", "calling", "sms", "whatsapp", "email", "templates",
     "campaigns", "notifications", "analytics", "departments", "teams",
-    "branches", "territories", "attendance", "users", "roles", "settings",
+    "branches", "territories", "attendance", "leave", "users", "roles", "settings",
 )
 ACTIONS = ("view", "create", "edit", "delete", "export", "import", "assign", "bulk")
 SCOPES = ("own", "team", "department", "all")

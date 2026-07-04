@@ -38,6 +38,7 @@ from app.api.v1.teams import router as teams_router
 from app.api.v1.branches import router as branches_router
 from app.api.v1.territories import router as territories_router
 from app.api.v1.attendance import router as attendance_router
+from app.api.v1.leaves import router as leaves_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -217,6 +218,7 @@ app.include_router(teams_router,           prefix=f"{settings.API_V1_STR}/teams"
 app.include_router(branches_router,        prefix=f"{settings.API_V1_STR}/branches",        tags=["branches"], dependencies=_rbac("branches"))
 app.include_router(territories_router,     prefix=f"{settings.API_V1_STR}/territories",     tags=["territories"], dependencies=_rbac("territories"))
 app.include_router(attendance_router,      prefix=f"{settings.API_V1_STR}/attendance",      tags=["attendance"], dependencies=_rbac("attendance"))
+app.include_router(leaves_router,          prefix=f"{settings.API_V1_STR}/leaves",          tags=["leaves"], dependencies=_rbac("leave"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

@@ -24,6 +24,7 @@ import { DepartmentsWidget } from '../../components/dashboard/DepartmentsWidget'
 import { TeamsWidget } from '../../components/dashboard/TeamsWidget';
 import { BranchesWidget } from '../../components/dashboard/BranchesWidget';
 import { AttendanceWidget } from '../../components/dashboard/AttendanceWidget';
+import { LeaveWidget } from '../../components/dashboard/LeaveWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -169,6 +170,7 @@ export const Home: React.FC = () => {
         {dashboardData?.role && dashboardData.role !== 'Telecaller' && <TeamsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <BranchesWidget />}
         <AttendanceWidget />
+        <LeaveWidget />
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

@@ -41,6 +41,7 @@ import { TeamsPage } from './pages/TeamsPage';
 import { RolesPermissionsPage } from './pages/RolesPermissionsPage';
 import { BranchTerritoryPage } from './pages/BranchTerritoryPage';
 import { AttendancePage } from './pages/AttendancePage';
+import { LeavePage } from './pages/LeavePage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -121,6 +122,8 @@ export const App: React.FC = () => {
                 <Route path="/teams" element={<TeamsPage />} />
                 {/* Attendance: all authenticated roles (self clock; managers see their team) */}
                 <Route path="/attendance" element={<AttendancePage />} />
+                {/* Leave: all authenticated roles (self apply; managers approve) */}
+                <Route path="/leaves" element={<LeavePage />} />
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                   <Route path="/roles" element={<RolesPermissionsPage />} />
                 </Route>
