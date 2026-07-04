@@ -32,6 +32,7 @@ from app.api.v1.email import router as email_router
 from app.api.v1.templates import router as templates_router
 from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.communication_analytics import router as comm_analytics_router
+from app.api.v1.departments import router as departments_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -196,6 +197,7 @@ app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email"
 app.include_router(templates_router,       prefix=f"{settings.API_V1_STR}/templates",       tags=["templates"])
 app.include_router(campaigns_router,       prefix=f"{settings.API_V1_STR}/campaigns",       tags=["campaigns"])
 app.include_router(comm_analytics_router,  prefix=f"{settings.API_V1_STR}/comm-analytics",  tags=["comm-analytics"])
+app.include_router(departments_router,     prefix=f"{settings.API_V1_STR}/departments",     tags=["departments"])
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

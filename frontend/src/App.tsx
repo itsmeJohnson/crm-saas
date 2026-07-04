@@ -36,6 +36,7 @@ import { TemplatesPage } from './pages/TemplatesPage';
 import { CampaignsPage } from './pages/CampaignsPage';
 import { NotificationCenterPage } from './pages/NotificationCenterPage';
 import { CommunicationAnalyticsPage } from './pages/CommunicationAnalyticsPage';
+import { DepartmentsPage } from './pages/DepartmentsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -109,6 +110,9 @@ export const App: React.FC = () => {
                 <Route path="/campaigns" element={<CampaignsPage />} />
                 <Route path="/notifications" element={<NotificationCenterPage />} />
                 <Route path="/communication-analytics" element={<CommunicationAnalyticsPage />} />
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                  <Route path="/departments" element={<DepartmentsPage />} />
+                </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                   <Route path="/email/settings" element={<EmailSettingsPage />} />
                 </Route>

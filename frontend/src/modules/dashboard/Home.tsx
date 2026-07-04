@@ -20,6 +20,7 @@ import { EmailWidget } from '../../components/dashboard/EmailWidget';
 import { TemplatesWidget } from '../../components/dashboard/TemplatesWidget';
 import { CampaignsWidget } from '../../components/dashboard/CampaignsWidget';
 import { CommAnalyticsWidget } from '../../components/dashboard/CommAnalyticsWidget';
+import { DepartmentsWidget } from '../../components/dashboard/DepartmentsWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
@@ -161,6 +162,7 @@ export const Home: React.FC = () => {
         <TemplatesWidget />
         {features.includes('CAMPAIGN_MANAGEMENT') && <CampaignsWidget />}
         {dashboardData?.role && dashboardData.role !== 'Telecaller' && <CommAnalyticsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <DepartmentsWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

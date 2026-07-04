@@ -55,6 +55,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Contact Reports',   path: '/contacts/reports',  icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE', section: 'workspace' },
     { name: 'Team Members',      path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS', section: 'workspace' },
+    { name: 'Departments',       path: '/departments',       icon: Building2,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'], section: 'workspace' },
 
     // ── Billing & Account (OrgAdmin only) ─────────────────────────────────

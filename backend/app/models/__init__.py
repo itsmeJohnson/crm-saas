@@ -49,6 +49,7 @@ from app.models.sms_settings import SmsSettings
 from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
 from app.models.email_settings import EmailSettings
 from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment
+from app.models.department import Department, DepartmentTarget
 
 __all__ = [
     "Base", 
@@ -116,5 +117,7 @@ __all__ = [
     "CampaignRecipient",
     "CampaignSegment",
     "NotificationPreference",
-    "PushSubscription"
+    "PushSubscription",
+    "Department",
+    "DepartmentTarget"
 ]

@@ -60,6 +60,22 @@ class UserService:
         parent_role = parent_res.scalar()
         return parent_role == "Manager"
 
+    async def _validate_department(self, organization_id: uuid.UUID, data: dict) -> None:
+        """If a department_id is supplied, ensure it belongs to this org (or is None)."""
+        if "department_id" not in data or data["department_id"] is None:
+            return
+        dept_id = data["department_id"]
+        if isinstance(dept_id, str):
+            dept_id = uuid.UUID(dept_id)
+            data["department_id"] = dept_id
+        from app.models.department import Department
+        ok = (await self.db.execute(select(Department.id).filter(
+            Department.id == dept_id, Department.organization_id == organization_id,
+            Department.is_deleted == False))).scalar()
+        if not ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Department not found in this organization.")
+
     async def get_user_by_id(self, actor: User, user_id: uuid.UUID) -> User:
         """Fetch a specific user inside the same organization."""
         if not actor.is_active:
@@ -157,7 +173,9 @@ class UserService:
 
         if "password" in user_data:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
-        
+
+        await self._validate_department(actor.organization_id, user_data)
+
         user = await self.user_repo.create_user(actor.organization_id, user_data)
         user.is_team_leader = await self.is_team_leader(user)
 
@@ -256,6 +274,8 @@ class UserService:
 
         if "password" in update_data:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
+
+        await self._validate_department(actor.organization_id, update_data)
 
         updated = await self.user_repo.update_user(actor.organization_id, user_id, update_data)
         if updated:

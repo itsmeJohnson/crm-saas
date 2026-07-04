@@ -27,6 +27,11 @@ class User(BaseModel):
     seat_number: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     inactive_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Department membership (nullable — orthogonal to the reporting hierarchy;
+    # existing users default to NULL, preserving backward compatibility). use_alter
+    # breaks the users↔departments FK cycle for metadata create/drop ordering.
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("departments.id", use_alter=True, name="fk_users_department"), nullable=True, index=True)
 
     # MFA / TOTP
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
