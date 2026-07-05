@@ -66,6 +66,11 @@ from app.models.announcement import Announcement
 from app.models.workflow import (
     Workflow, WorkflowVersion, WorkflowExecution, WorkflowExecutionStep,
 )
+from app.models.rule import Rule, RuleEvaluation
+from app.models.automation import (
+    AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
+)
+from app.models.event import Event, EventSubscription, EventDelivery
 
 __all__ = [
     "Base", 
@@ -166,5 +171,15 @@ __all__ = [
     "Workflow",
     "WorkflowVersion",
     "WorkflowExecution",
-    "WorkflowExecutionStep"
+    "WorkflowExecutionStep",
+    "Rule",
+    "RuleEvaluation",
+    "AutomationJob",
+    "AutomationRun",
+    "SLAPolicy",
+    "SLABreach",
+    "ScheduledReport",
+    "Event",
+    "EventSubscription",
+    "EventDelivery"
 ]

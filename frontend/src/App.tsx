@@ -48,6 +48,9 @@ import { TargetsPage } from './pages/TargetsPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 import { OrganizationAnalyticsPage } from './pages/OrganizationAnalyticsPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
+import { RulesPage } from './pages/RulesPage';
+import { AutomationPage } from './pages/AutomationPage';
+import { EventsPage } from './pages/EventsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -142,6 +145,9 @@ export const App: React.FC = () => {
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                   <Route path="/org-analytics" element={<OrganizationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
+                  <Route path="/rules" element={<RulesPage />} />
+                  <Route path="/automation" element={<AutomationPage />} />
+                  <Route path="/events" element={<EventsPage />} />
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                   <Route path="/roles" element={<RolesPermissionsPage />} />

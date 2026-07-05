@@ -339,8 +339,10 @@ class WorkflowEngineService:
         trigger_node = next((n for n in nodes.values() if n.get("type") == "trigger"), None)
         if not trigger_node:
             return {"skipped": True}
-        if not is_test and not self._match_conditions(entity, (trigger_node.get("config") or {}).get("conditions") or []):
-            return {"skipped": True}
+        if not is_test:
+            trigger_conds = await self._effective_conditions(trigger_node, w.organization_id)
+            if not self._match_conditions(entity, trigger_conds):
+                return {"skipped": True}
 
         ex = WorkflowExecution(organization_id=w.organization_id, workflow_id=w.id, version=w.version,
                                trigger_event=w.trigger_event, entity_type=entity_type,
@@ -386,7 +388,8 @@ class WorkflowEngineService:
                         cur = self._next_node(cur, "exit", edges) or self._next_node(cur, None, edges)
                     continue
                 if ntype == "branch":
-                    ok = self._match_conditions(entity, cfg.get("conditions") or []) if not is_test else True
+                    branch_conds = await self._effective_conditions(node, w.organization_id)
+                    ok = self._match_conditions(entity, branch_conds) if not is_test else True
                     branch_taken = "true" if ok else "false"
                     await self._log(ex, seq, node, "success", f"Branch → {branch_taken}"); seq += 1
                     cur = self._next_node(cur, branch_taken, edges) or self._next_node(cur, None, edges); continue
@@ -428,9 +431,37 @@ class WorkflowEngineService:
         return None
 
     # ---------- condition matching (reuses the legacy matcher semantics) ----------
-    def _match_conditions(self, entity, conditions: list) -> bool:
+    @staticmethod
+    def _is_group(conditions) -> bool:
+        """A nested expression tree (Rule Engine format) vs. the flat legacy list."""
+        if isinstance(conditions, dict):
+            return conditions.get("type") == "group" or "children" in conditions
+        if isinstance(conditions, list):
+            return any(isinstance(c, dict) and (c.get("type") == "group" or "children" in c)
+                       for c in conditions)
+        return False
+
+    def _facts_for(self, entity, fields: set) -> dict:
+        facts = {}
+        for f in fields:
+            # only direct attributes are resolvable synchronously; cross-entity
+            # dotted facts are the RuleService's domain (async traversal).
+            val = getattr(entity, f, None) if "." not in f else None
+            if isinstance(val, uuid.UUID):
+                val = str(val)
+            facts[f] = val
+        return facts
+
+    def _match_conditions(self, entity, conditions) -> bool:
         if not conditions:
             return True
+        # New Rule-Engine expression tree (AND/OR/NOT, rich ops, date/time,
+        # dynamic variables) → delegate to the shared pure evaluator.
+        if self._is_group(conditions):
+            from app.services import rule_evaluator as ev
+            facts = self._facts_for(entity, ev.collect_fields(conditions))
+            return ev.evaluate(conditions, facts, {"now": _now()})
+        # Legacy flat list (unchanged behaviour for backward compatibility).
         from app.services.workflow_service import _coerce_number
         for c in conditions:
             field, op, expected = c.get("field"), c.get("op"), c.get("value")
@@ -450,6 +481,24 @@ class WorkflowEngineService:
             if not ok:
                 return False
         return True
+
+    async def _effective_conditions(self, node: dict, org_id):
+        """Resolve a node's conditions — inline conditions, or the definition of
+        a saved Rule referenced by `rule_id` (reusable rules across workflows)."""
+        cfg = node.get("config") or {}
+        rid = cfg.get("rule_id")
+        if rid:
+            from app.models.rule import Rule
+            try:
+                ruuid = uuid.UUID(str(rid))
+            except (ValueError, TypeError):
+                return cfg.get("conditions") or []
+            rule = (await self.db.execute(select(Rule).filter(
+                Rule.id == ruuid, Rule.organization_id == org_id,
+                Rule.is_deleted == False))).scalars().first()
+            if rule is not None:
+                return rule.definition
+        return cfg.get("conditions") or []
 
     # ---------- action node executor (reuses existing modules) ----------
     async def _apply_action_node(self, ex, seq, node, entity, actor, is_test):

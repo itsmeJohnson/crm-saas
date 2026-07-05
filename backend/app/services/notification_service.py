@@ -97,6 +97,18 @@ class NotificationService:
             notif.dismissed_at = datetime.now(timezone.utc)
             self.db.add(notif)
             await self.db.flush()
+        # Event-driven: emit a notification.created domain event so webhook/custom
+        # subscribers can react. Guarded against reentrancy — notifications raised
+        # by event handlers themselves must not re-emit and cause an event storm.
+        try:
+            from app.services.event_bus import EventBus
+            if not EventBus.is_dispatching():
+                await EventBus(self.db).publish(
+                    "notification.created", entity_type="notification", entity_id=str(notif.id),
+                    organization_id=organization_id, source="system",
+                    payload={"category": category, "title": title, "user_id": str(user_id)})
+        except Exception:
+            pass
         return notif
 
     async def _send_email(self, user: User, title: str, body: str) -> bool:

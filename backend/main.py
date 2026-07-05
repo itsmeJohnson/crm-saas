@@ -46,6 +46,9 @@ from app.api.v1.approvals import router as approvals_router
 from app.api.v1.announcements import router as announcements_router
 from app.api.v1.org_analytics import router as org_analytics_router
 from app.api.v1.workflows import router as workflows_router
+from app.api.v1.rules import router as rules_router
+from app.api.v1.automation import router as automation_router
+from app.api.v1.events import router as events_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -64,6 +67,7 @@ from app.cron.calling_cron import run_missed_call_check
 from app.cron.sms_cron import run_sms_retry_check
 from app.cron.email_cron import run_email_sync
 from app.cron.campaign_cron import run_campaign_check
+from app.cron.automation_cron import run_automation_cycle
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -114,6 +118,8 @@ async def subscription_cron_scheduler():
                     await run_sms_retry_check(async_session_maker)
                     await run_email_sync(async_session_maker)
                     await run_campaign_check(async_session_maker)
+                    # Automation Engine: SLA scan + scheduled reports (tracked, per-org)
+                    await run_automation_cycle(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -233,6 +239,9 @@ app.include_router(approvals_router,       prefix=f"{settings.API_V1_STR}/approv
 app.include_router(announcements_router,   prefix=f"{settings.API_V1_STR}/announcements",   tags=["announcements"], dependencies=_rbac("announcements"))
 app.include_router(org_analytics_router,   prefix=f"{settings.API_V1_STR}/org-analytics",   tags=["org-analytics"], dependencies=_rbac("analytics"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
+app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
+app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))
+app.include_router(events_router,          prefix=f"{settings.API_V1_STR}/events",          tags=["events"], dependencies=_rbac("events"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

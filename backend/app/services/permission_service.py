@@ -33,7 +33,7 @@ RESOURCES = (
     "communications", "calling", "sms", "whatsapp", "email", "templates",
     "campaigns", "notifications", "analytics", "departments", "teams",
     "branches", "territories", "attendance", "leave", "shifts", "performance",
-    "targets", "approvals", "announcements", "workflows", "users", "roles", "settings",
+    "targets", "approvals", "announcements", "workflows", "rules", "automation", "events", "users", "roles", "settings",
 )
 ACTIONS = ("view", "create", "edit", "delete", "export", "import", "assign", "bulk")
 SCOPES = ("own", "team", "department", "all")

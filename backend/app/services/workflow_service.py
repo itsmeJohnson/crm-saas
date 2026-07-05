@@ -273,12 +273,14 @@ class WorkflowService:
             if isinstance(entity, _Base):
                 self.db.add(entity)
                 await self.db.flush()
-        # Orchestration layer: additionally run any published multi-step
-        # Workflows subscribed to this trigger. Best-effort and self-contained —
-        # it must never affect the legacy rule result or the originating action.
+        # Event-driven fan-out: publish the domain event onto the Event Bus
+        # instead of calling consumers directly. The workflow engine is now a bus
+        # SUBSCRIBER (it still runs exactly once), and webhook / custom subscribers
+        # receive the same event — producers no longer reference their consumers.
+        # Best-effort and self-contained: a bus problem never breaks the action.
         try:
-            from app.services.workflow_engine_service import WorkflowEngineService
-            await WorkflowEngineService(self.db).dispatch(trigger_event, entity, actor, entity_type)
+            from app.services.event_bus import EventBus
+            await EventBus(self.db).publish_from_trigger(trigger_event, entity, actor, entity_type)
         except Exception:
             pass
         return applied
