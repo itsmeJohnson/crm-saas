@@ -21,6 +21,11 @@ class Shift(BaseModel):
     grace_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # late-login grace window
     working_days: Mapped[list | None] = mapped_column(JSON, nullable=True)  # ["mon","tue",...]; null = Mon-Fri
     is_night_shift: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Shift Management extensions (additive, backward compatible — existing rows
+    # default to a fixed "general" shift that is not flexible).
+    shift_type: Mapped[str] = mapped_column(String(20), default="general", nullable=False, index=True)  # morning|evening|night|flexible|general
+    is_flexible: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # flexi-time: no late/early
+    works_on_holidays: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False, index=True)  # active|archived
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)

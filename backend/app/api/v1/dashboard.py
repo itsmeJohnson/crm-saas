@@ -37,3 +37,12 @@ async def get_team_status(
     """Live agent-state snapshot for the caller's downline (Manager/TeamLeader/OrgAdmin only)."""
     dashboard_service = DashboardService(db)
     return await dashboard_service.get_team_status(actor)
+
+@router.get("/employee", status_code=status.HTTP_200_OK)
+async def get_employee_summary(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Personal snapshot for the Employee Dashboard (my leads / today's calls &
+    meetings / my tasks), scoped to the caller."""
+    return await DashboardService(db).employee_summary(actor)

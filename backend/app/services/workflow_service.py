@@ -34,6 +34,18 @@ ATTENDANCE_ACTION_TYPES = {"notify_user", "notify_manager", "add_note"}
 LEAVE_CONDITION_FIELDS = {"status", "request_type", "leave_type_id", "day_count", "is_half_day"}
 LEAVE_ACTION_TYPES = {"notify_user", "notify_manager", "add_note"}
 
+# Shift-entity variants (event-driven; fired on shift assignment)
+SHIFT_CONDITION_FIELDS = {"shift_id"}
+SHIFT_ACTION_TYPES = {"notify_user", "notify_manager"}
+
+# Performance-entity variants (event-driven; fired when a goal is achieved)
+PERFORMANCE_CONDITION_FIELDS = {"kpi_id", "attainment"}
+PERFORMANCE_ACTION_TYPES = {"notify_user", "notify_manager"}
+
+# Approval-entity variants (event-driven; fired on final decision)
+APPROVAL_CONDITION_FIELDS = {"request_type", "amount", "status"}
+APPROVAL_ACTION_TYPES = {"notify_user", "notify_manager"}
+
 # Which field/action sets & entity apply per trigger
 # call_logged fires when a Call activity is created against a lead (dialer,
 # inbound webhook, or Communication Center); call_disposition fires when a
@@ -46,6 +58,9 @@ _TRIGGER_ENTITY = {
     "sms_received": "lead", "whatsapp_received": "lead", "email_received": "lead",
     "attendance_marked": "attendance", "late_login": "attendance",
     "leave_applied": "leave", "leave_approved": "leave",
+    "shift_assigned": "shift",
+    "goal_achieved": "performance",
+    "approval_approved": "approval", "approval_rejected": "approval",
 }
 
 
@@ -58,6 +73,12 @@ def _fields_for(entity_type: str) -> set:
         return ATTENDANCE_CONDITION_FIELDS
     if entity_type == "leave":
         return LEAVE_CONDITION_FIELDS
+    if entity_type == "shift":
+        return SHIFT_CONDITION_FIELDS
+    if entity_type == "performance":
+        return PERFORMANCE_CONDITION_FIELDS
+    if entity_type == "approval":
+        return APPROVAL_CONDITION_FIELDS
     return CONDITION_FIELDS
 
 
@@ -70,6 +91,12 @@ def _actions_for(entity_type: str) -> set:
         return ATTENDANCE_ACTION_TYPES
     if entity_type == "leave":
         return LEAVE_ACTION_TYPES
+    if entity_type == "shift":
+        return SHIFT_ACTION_TYPES
+    if entity_type == "performance":
+        return PERFORMANCE_ACTION_TYPES
+    if entity_type == "approval":
+        return APPROVAL_ACTION_TYPES
     return ACTION_TYPES
 
 
@@ -117,7 +144,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -216,6 +243,12 @@ class WorkflowService:
                     desc = await self._apply_attendance_action(entity, action, actor, rule)
                 elif entity_type == "leave":
                     desc = await self._apply_leave_action(entity, action, actor, rule)
+                elif entity_type == "shift":
+                    desc = await self._apply_shift_action(entity, action, actor, rule)
+                elif entity_type == "performance":
+                    desc = await self._apply_performance_action(entity, action, actor, rule)
+                elif entity_type == "approval":
+                    desc = await self._apply_approval_action(entity, action, actor, rule)
                 else:
                     desc = await self._apply_action(entity, action, actor, rule)
                 if desc:
@@ -233,8 +266,13 @@ class WorkflowService:
                     action_metadata={"rule": rule.name, "trigger": trigger_event, "actions": rule_applied},
                 )
         if applied:
-            self.db.add(entity)
-            await self.db.flush()
+            # Persist mutated fields for real ORM entities. Some entity types
+            # (e.g. the lightweight shift-assignment event) aren't mapped rows
+            # and must not be added to the session.
+            from app.models.base import Base as _Base
+            if isinstance(entity, _Base):
+                self.db.add(entity)
+                await self.db.flush()
         return applied
 
     async def _apply_task_action(self, task, action: dict, actor: User, rule: WorkflowRule) -> str | None:
@@ -339,6 +377,82 @@ class WorkflowService:
                     action_metadata={"request_id": str(req.id), "rule_id": str(rule.id)},
                 )
                 return atype
+        return None
+
+    async def _apply_shift_action(self, event, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        """Shift rules fire when a shift (direct or rotation) is assigned to a
+        user. `event` carries organization_id, user_id and shift_id."""
+        atype = action.get("type")
+        if atype not in SHIFT_ACTION_TYPES:
+            return None
+        from app.services.notification_service import NotificationService
+        if atype == "notify_manager":
+            target_id = (await self.db.execute(
+                select(User.reporting_to_id).filter(User.id == event.user_id))).scalar()
+        else:
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else event.user_id
+            except ValueError:
+                target_id = event.user_id
+        if target_id:
+            await NotificationService(self.db).create_notification(
+                organization_id=event.organization_id, user_id=target_id, category="shift",
+                title=f"Workflow: {rule.name}",
+                body=str(action.get("message") or f'Rule "{rule.name}" fired on a shift assignment.'),
+                link_url="/shifts", action_metadata={"user_id": str(event.user_id), "rule_id": str(rule.id)})
+            return atype
+        return None
+
+    async def _apply_performance_action(self, event, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        """Performance rules fire when a user achieves a goal. `event` carries
+        organization_id, user_id, kpi_id and attainment."""
+        atype = action.get("type")
+        if atype not in PERFORMANCE_ACTION_TYPES:
+            return None
+        from app.services.notification_service import NotificationService
+        if atype == "notify_manager":
+            target_id = (await self.db.execute(
+                select(User.reporting_to_id).filter(User.id == event.user_id))).scalar()
+        else:
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else event.user_id
+            except ValueError:
+                target_id = event.user_id
+        if target_id:
+            await NotificationService(self.db).create_notification(
+                organization_id=event.organization_id, user_id=target_id, category="performance",
+                title=f"Workflow: {rule.name}",
+                body=str(action.get("message") or f'Rule "{rule.name}" fired on a performance goal.'),
+                link_url="/performance", action_metadata={"user_id": str(event.user_id), "rule_id": str(rule.id)})
+            return atype
+        return None
+
+    async def _apply_approval_action(self, event, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        """Approval rules fire on a final decision (approval_approved/rejected).
+        `event` carries organization_id, id, user_id (requester), request_type,
+        amount and status."""
+        atype = action.get("type")
+        if atype not in APPROVAL_ACTION_TYPES:
+            return None
+        from app.services.notification_service import NotificationService
+        if atype == "notify_manager":
+            target_id = (await self.db.execute(
+                select(User.reporting_to_id).filter(User.id == event.user_id))).scalar()
+        else:
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else event.user_id
+            except ValueError:
+                target_id = event.user_id
+        if target_id:
+            await NotificationService(self.db).create_notification(
+                organization_id=event.organization_id, user_id=target_id, category="approval",
+                title=f"Workflow: {rule.name}",
+                body=str(action.get("message") or f'Rule "{rule.name}" fired on a {event.request_type} approval.'),
+                link_url="/approvals", action_metadata={"request_id": str(event.id), "rule_id": str(rule.id)})
+            return atype
         return None
 
     async def _apply_contact_action(self, contact, action: dict, actor: User, rule: WorkflowRule) -> str | None:

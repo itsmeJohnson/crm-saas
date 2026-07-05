@@ -42,6 +42,11 @@ import { RolesPermissionsPage } from './pages/RolesPermissionsPage';
 import { BranchTerritoryPage } from './pages/BranchTerritoryPage';
 import { AttendancePage } from './pages/AttendancePage';
 import { LeavePage } from './pages/LeavePage';
+import { ShiftManagementPage } from './pages/ShiftManagementPage';
+import { PerformancePage } from './pages/PerformancePage';
+import { TargetsPage } from './pages/TargetsPage';
+import { ApprovalsPage } from './pages/ApprovalsPage';
+import { OrganizationAnalyticsPage } from './pages/OrganizationAnalyticsPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -124,6 +129,18 @@ export const App: React.FC = () => {
                 <Route path="/attendance" element={<AttendancePage />} />
                 {/* Leave: all authenticated roles (self apply; managers approve) */}
                 <Route path="/leaves" element={<LeavePage />} />
+                {/* Shifts: all authenticated roles (view own schedule; admin manages) */}
+                <Route path="/shifts" element={<ShiftManagementPage />} />
+                {/* Performance: all authenticated roles (own scorecard; managers set goals) */}
+                <Route path="/performance" element={<PerformancePage />} />
+                {/* Targets: unified cross-scope view (all roles; managers create) */}
+                <Route path="/targets" element={<TargetsPage />} />
+                {/* Approvals: generic multi-level approval workflow (all roles) */}
+                <Route path="/approvals" element={<ApprovalsPage />} />
+                {/* Organization Analytics: management-level (OrgAdmin/Manager) */}
+                <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
+                  <Route path="/org-analytics" element={<OrganizationAnalyticsPage />} />
+                </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                   <Route path="/roles" element={<RolesPermissionsPage />} />
                 </Route>

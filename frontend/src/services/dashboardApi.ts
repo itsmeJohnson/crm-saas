@@ -75,4 +75,20 @@ export const dashboardApi = {
     const response = await api.get<TeamStatusMember[]>('/dashboard/team-status');
     return response.data;
   },
+
+  getEmployeeSummary: async () => {
+    const response = await api.get<EmployeeSummary>('/dashboard/employee');
+    return response.data;
+  },
 };
+
+export interface EmployeeSummary {
+  my_leads_total: number;
+  my_leads_converted: number;
+  my_leads_by_status: { status: string; count: number }[];
+  today_calls: number;
+  today_meetings_count: number;
+  today_meetings: { id: string; title: string; event_type: string; start_at: string | null; status: string }[];
+  open_tasks: number;
+  overdue_tasks: number;
+}

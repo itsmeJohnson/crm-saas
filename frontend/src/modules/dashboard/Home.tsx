@@ -25,8 +25,15 @@ import { TeamsWidget } from '../../components/dashboard/TeamsWidget';
 import { BranchesWidget } from '../../components/dashboard/BranchesWidget';
 import { AttendanceWidget } from '../../components/dashboard/AttendanceWidget';
 import { LeaveWidget } from '../../components/dashboard/LeaveWidget';
+import { ShiftsWidget } from '../../components/dashboard/ShiftsWidget';
+import { PerformanceWidget } from '../../components/dashboard/PerformanceWidget';
+import { TargetsWidget } from '../../components/dashboard/TargetsWidget';
+import { ApprovalsWidget } from '../../components/dashboard/ApprovalsWidget';
+import { AnnouncementsWidget } from '../../components/dashboard/AnnouncementsWidget';
+import { OrgHealthWidget } from '../../components/dashboard/OrgHealthWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
+import { EmployeeDashboard } from './EmployeeDashboard';
 import { Sparkles, Building, RefreshCw } from 'lucide-react';
 
 export const Home: React.FC = () => {
@@ -50,11 +57,22 @@ export const Home: React.FC = () => {
     await Promise.all([fetchSummary(), fetchRecentActivities(), fetchDashboardMetrics()]);
   };
 
+  // Role-based dashboard: individual contributors (base role Employee) get the
+  // focused personal EmployeeDashboard — EXCEPT telecallers, who keep the dialer
+  // cockpit below. Managers/OrgAdmins keep the org-wide operations overview.
+  // (A plain Employee gets no analytics role from the 403-guarded endpoint, so
+  // key off the base role and only exclude the Telecaller case.)
+  const isEmployeeView = user?.role === 'Employee' && dashboardData?.role !== 'Telecaller';
+
   useEffect(() => {
     fetchSummary();
     fetchRecentActivities();
     fetchDashboardMetrics();
   }, []);
+
+  if (isEmployeeView) {
+    return <EmployeeDashboard />;
+  }
 
   return (
     <div className="space-y-8">
@@ -171,6 +189,12 @@ export const Home: React.FC = () => {
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <BranchesWidget />}
         <AttendanceWidget />
         <LeaveWidget />
+        <ShiftsWidget />
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <PerformanceWidget />}
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <TargetsWidget />}
+        <ApprovalsWidget />
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AnnouncementsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OrgHealthWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

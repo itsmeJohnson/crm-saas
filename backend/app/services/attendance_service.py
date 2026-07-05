@@ -224,15 +224,10 @@ class AttendanceService:
         return {"assigned": len(users)}
 
     async def _active_shift(self, org_id: uuid.UUID, user_id: uuid.UUID, on: date) -> Shift | None:
-        row = (await self.db.execute(select(ShiftAssignment).filter(
-            ShiftAssignment.organization_id == org_id, ShiftAssignment.user_id == user_id,
-            ShiftAssignment.is_deleted == False, ShiftAssignment.start_date <= on,
-            or_(ShiftAssignment.end_date.is_(None), ShiftAssignment.end_date >= on))
-            .order_by(ShiftAssignment.start_date.desc()))).scalars().first()
-        if not row:
-            return None
-        return (await self.db.execute(select(Shift).filter(
-            Shift.id == row.shift_id, Shift.is_deleted == False))).scalars().first()
+        # Delegate to the Shift Management resolver so clock-in/out honour both
+        # direct assignments (unchanged behaviour) and rotations.
+        from app.services.shift_service import ShiftService
+        return await ShiftService(self.db).resolve_shift_for_user(org_id, user_id, on)
 
     async def user_assignments(self, actor: User, user_id: uuid.UUID) -> list[dict]:
         await self._assert_can_view_user(actor, user_id)
@@ -281,12 +276,14 @@ class AttendanceService:
         rec.late_minutes = 0
         if shift:
             rec.shift_id = shift.id
-            start_utc, _ = self._bounds(tz, work_date, shift)
-            allowed = start_utc + timedelta(minutes=shift.grace_minutes)
-            if now > allowed:
-                rec.is_late = True
-                rec.late_minutes = int((now - start_utc).total_seconds() // 60)
-                rec.status = "late"
+            # Flexible (flexi-time) shifts have no fixed start, so late never applies.
+            if not shift.is_flexible:
+                start_utc, _ = self._bounds(tz, work_date, shift)
+                allowed = start_utc + timedelta(minutes=shift.grace_minutes)
+                if now > allowed:
+                    rec.is_late = True
+                    rec.late_minutes = int((now - start_utc).total_seconds() // 60)
+                    rec.status = "late"
         self.db.add(rec)
         await self.db.flush()
         await self.db.refresh(rec)
@@ -327,7 +324,8 @@ class AttendanceService:
         rec.worked_minutes = max(0, gross - rec.break_minutes)
         shift = await self._active_shift(actor.organization_id, user_id, work_date) if rec.shift_id is None else \
             (await self.db.execute(select(Shift).filter(Shift.id == rec.shift_id))).scalars().first()
-        if shift:
+        if shift and not shift.is_flexible:
+            # Flexible shifts have no fixed end, so early-logout / half-day don't apply.
             _, end_utc = self._bounds(tz, work_date, shift)
             if now < end_utc:
                 rec.is_early_logout = True

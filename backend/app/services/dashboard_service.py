@@ -244,6 +244,54 @@ class DashboardService:
 
         return summary
 
+    async def employee_summary(self, actor: User) -> Dict[str, Any]:
+        """Personal snapshot for the Employee Dashboard: my leads, today's calls
+        and meetings, and my task counts. Everything is scoped to the actor."""
+        from app.models.task import Task
+        from app.models.calendar_event import CalendarEvent
+        org = actor.organization_id
+        today = date.today()
+        start = datetime.combine(today, time.min).replace(tzinfo=timezone.utc)
+        end = datetime.combine(today, time.max).replace(tzinfo=timezone.utc)
+
+        # My leads (assigned to me), with a small status breakdown
+        lead_rows = (await self.db.execute(select(Lead.status, func.count(Lead.id)).filter(
+            Lead.organization_id == org, Lead.is_deleted == False, Lead.assigned_user_id == actor.id,
+            Lead.is_archived == False).group_by(Lead.status))).all()
+        by_status = {s: n for s, n in lead_rows}
+        my_leads_total = sum(by_status.values())
+        converted = sum(n for s, n in by_status.items() if s in ("Won", "Converted", "Customer"))
+
+        # Today's calls (Call activities I logged/own today)
+        today_calls = (await self.db.execute(select(func.count(Activity.id)).filter(
+            Activity.organization_id == org, Activity.is_deleted == False,
+            Activity.assigned_user_id == actor.id, Activity.activity_type == "Call",
+            Activity.created_at >= start, Activity.created_at <= end))).scalar() or 0
+
+        # Today's meetings (calendar events assigned to me overlapping today)
+        meetings = list((await self.db.execute(select(CalendarEvent).filter(
+            CalendarEvent.organization_id == org, CalendarEvent.is_deleted == False,
+            CalendarEvent.assigned_user_id == actor.id, CalendarEvent.start_at <= end,
+            CalendarEvent.end_at >= start).order_by(CalendarEvent.start_at.asc()))).scalars().all())
+        today_meetings = [{"id": str(m.id), "title": m.title, "event_type": m.event_type,
+                           "start_at": m.start_at.isoformat() if m.start_at else None,
+                           "status": m.status} for m in meetings]
+
+        # My tasks
+        open_tasks = (await self.db.execute(select(func.count(Task.id)).filter(
+            Task.organization_id == org, Task.is_deleted == False, Task.assigned_user_id == actor.id,
+            Task.status.in_(["Todo", "InProgress"])))).scalar() or 0
+        overdue_tasks = (await self.db.execute(select(func.count(Task.id)).filter(
+            Task.organization_id == org, Task.is_deleted == False, Task.assigned_user_id == actor.id,
+            Task.status.in_(["Todo", "InProgress"]), Task.due_date.isnot(None), Task.due_date < end))).scalar() or 0
+
+        return {
+            "my_leads_total": my_leads_total, "my_leads_converted": converted,
+            "my_leads_by_status": [{"status": s, "count": n} for s, n in by_status.items()],
+            "today_calls": today_calls, "today_meetings_count": len(today_meetings),
+            "today_meetings": today_meetings, "open_tasks": open_tasks, "overdue_tasks": overdue_tasks,
+        }
+
     async def get_team_status(self, actor: User) -> List[Dict[str, Any]]:
         """Live agent-state snapshot (IDLE / ACTIVE_CALLING / BREAK) for the
         actor's downline — Manager/TeamLeader/OrgAdmin only. Reuses the same

@@ -39,6 +39,12 @@ from app.api.v1.branches import router as branches_router
 from app.api.v1.territories import router as territories_router
 from app.api.v1.attendance import router as attendance_router
 from app.api.v1.leaves import router as leaves_router
+from app.api.v1.shifts import router as shifts_router
+from app.api.v1.performance import router as performance_router
+from app.api.v1.targets import router as targets_router
+from app.api.v1.approvals import router as approvals_router
+from app.api.v1.announcements import router as announcements_router
+from app.api.v1.org_analytics import router as org_analytics_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -219,6 +225,12 @@ app.include_router(branches_router,        prefix=f"{settings.API_V1_STR}/branch
 app.include_router(territories_router,     prefix=f"{settings.API_V1_STR}/territories",     tags=["territories"], dependencies=_rbac("territories"))
 app.include_router(attendance_router,      prefix=f"{settings.API_V1_STR}/attendance",      tags=["attendance"], dependencies=_rbac("attendance"))
 app.include_router(leaves_router,          prefix=f"{settings.API_V1_STR}/leaves",          tags=["leaves"], dependencies=_rbac("leave"))
+app.include_router(shifts_router,          prefix=f"{settings.API_V1_STR}/shifts",          tags=["shifts"], dependencies=_rbac("shifts"))
+app.include_router(performance_router,     prefix=f"{settings.API_V1_STR}/performance",     tags=["performance"], dependencies=_rbac("performance"))
+app.include_router(targets_router,         prefix=f"{settings.API_V1_STR}/targets",         tags=["targets"], dependencies=_rbac("targets"))
+app.include_router(approvals_router,       prefix=f"{settings.API_V1_STR}/approvals",       tags=["approvals"], dependencies=_rbac("approvals"))
+app.include_router(announcements_router,   prefix=f"{settings.API_V1_STR}/announcements",   tags=["announcements"], dependencies=_rbac("announcements"))
+app.include_router(org_analytics_router,   prefix=f"{settings.API_V1_STR}/org-analytics",   tags=["org-analytics"], dependencies=_rbac("analytics"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

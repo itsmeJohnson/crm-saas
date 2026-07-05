@@ -57,6 +57,12 @@ from app.models.attendance import (
     Shift, ShiftAssignment, AttendanceRecord, AttendanceBreak, AttendanceCorrection,
 )
 from app.models.leave import LeaveType, LeaveBalance, LeaveRequest
+from app.models.shift_rotation import ShiftRotation, ShiftRotationMember
+from app.models.performance import PerformanceKPI, PerformanceGoal, PerformanceAchievement
+from app.models.approval import (
+    ApprovalChain, ApprovalRequest, ApprovalAction, ApprovalDelegation,
+)
+from app.models.announcement import Announcement
 
 __all__ = [
     "Base", 
@@ -143,5 +149,15 @@ __all__ = [
     "AttendanceCorrection",
     "LeaveType",
     "LeaveBalance",
-    "LeaveRequest"
+    "LeaveRequest",
+    "ShiftRotation",
+    "ShiftRotationMember",
+    "PerformanceKPI",
+    "PerformanceGoal",
+    "PerformanceAchievement",
+    "ApprovalChain",
+    "ApprovalRequest",
+    "ApprovalAction",
+    "ApprovalDelegation",
+    "Announcement"
 ]
