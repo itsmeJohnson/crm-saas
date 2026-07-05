@@ -191,6 +191,10 @@ class TaskService:
                 checklist=[{**c, "done": False} for c in (task.checklist or [])] or None,
             )
             self.db.add(nxt)
+        # Fire the task_completed trigger (legacy engine + orchestration workflows).
+        await self.db.flush()
+        from app.services.workflow_service import WorkflowService
+        await WorkflowService(self.db).run("task_completed", task, actor, entity_type="task")
 
     async def complete_task(self, actor: User, task_id: uuid.UUID) -> Task:
         task = await self._get(actor, task_id)

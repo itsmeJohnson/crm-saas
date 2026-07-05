@@ -195,6 +195,9 @@ class CustomerService:
                                    action="CUSTOMER_INVOICE_CREATED", resource_type="customer_invoice", resource_id=str(invoice.id),
                                    action_metadata={"total": float(total)})
         await self.db.refresh(invoice)
+        # Orchestration workflows subscribed to invoice_created.
+        from app.services.workflow_engine_service import WorkflowEngineService
+        await WorkflowEngineService(self.db).dispatch("invoice_created", invoice, actor, "customer")
         return invoice
 
     async def create_invoice_from_order(self, actor: User, order_id: uuid.UUID, due_date=None) -> CustomerInvoice:
@@ -328,6 +331,9 @@ class CustomerService:
                 action_metadata={"invoice_id": str(invoice.id)},
             )
         await self.db.refresh(payment)
+        # Orchestration workflows subscribed to payment_received.
+        from app.services.workflow_engine_service import WorkflowEngineService
+        await WorkflowEngineService(self.db).dispatch("payment_received", payment, actor, "customer")
         return payment
 
     async def list_payments(self, actor: User, invoice_id: uuid.UUID | None = None, company_id: uuid.UUID | None = None) -> list[CustomerPayment]:

@@ -31,6 +31,7 @@ import { TargetsWidget } from '../../components/dashboard/TargetsWidget';
 import { ApprovalsWidget } from '../../components/dashboard/ApprovalsWidget';
 import { AnnouncementsWidget } from '../../components/dashboard/AnnouncementsWidget';
 import { OrgHealthWidget } from '../../components/dashboard/OrgHealthWidget';
+import { WorkflowsWidget } from '../../components/dashboard/WorkflowsWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -195,6 +196,7 @@ export const Home: React.FC = () => {
         <ApprovalsWidget />
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AnnouncementsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OrgHealthWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowsWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

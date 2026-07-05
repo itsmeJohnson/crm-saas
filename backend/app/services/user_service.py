@@ -216,7 +216,14 @@ class UserService:
             resource_id=str(user.id),
             action_metadata={"email": user.email, "role": user.role, "seat_number": assigned_seat}
         )
-        
+
+        # Orchestration workflows subscribed to user_created.
+        try:
+            from app.services.workflow_engine_service import WorkflowEngineService
+            await WorkflowEngineService(self.db).dispatch("user_created", user, actor, "user")
+        except Exception:
+            pass
+
         return user
 
     async def update_user(self, actor: User, user_id: uuid.UUID, update_data: dict) -> User:

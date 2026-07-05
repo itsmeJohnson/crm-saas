@@ -273,6 +273,14 @@ class WorkflowService:
             if isinstance(entity, _Base):
                 self.db.add(entity)
                 await self.db.flush()
+        # Orchestration layer: additionally run any published multi-step
+        # Workflows subscribed to this trigger. Best-effort and self-contained —
+        # it must never affect the legacy rule result or the originating action.
+        try:
+            from app.services.workflow_engine_service import WorkflowEngineService
+            await WorkflowEngineService(self.db).dispatch(trigger_event, entity, actor, entity_type)
+        except Exception:
+            pass
         return applied
 
     async def _apply_task_action(self, task, action: dict, actor: User, rule: WorkflowRule) -> str | None:

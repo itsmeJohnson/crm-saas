@@ -45,6 +45,7 @@ from app.api.v1.targets import router as targets_router
 from app.api.v1.approvals import router as approvals_router
 from app.api.v1.announcements import router as announcements_router
 from app.api.v1.org_analytics import router as org_analytics_router
+from app.api.v1.workflows import router as workflows_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -231,6 +232,7 @@ app.include_router(targets_router,         prefix=f"{settings.API_V1_STR}/target
 app.include_router(approvals_router,       prefix=f"{settings.API_V1_STR}/approvals",       tags=["approvals"], dependencies=_rbac("approvals"))
 app.include_router(announcements_router,   prefix=f"{settings.API_V1_STR}/announcements",   tags=["announcements"], dependencies=_rbac("announcements"))
 app.include_router(org_analytics_router,   prefix=f"{settings.API_V1_STR}/org-analytics",   tags=["org-analytics"], dependencies=_rbac("analytics"))
+app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

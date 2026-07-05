@@ -63,6 +63,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Targets',           path: '/targets',           icon: Target,            roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
     { name: 'Approvals',         path: '/approvals',         icon: CheckCircle2,      roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
     { name: 'Org Analytics',     path: '/org-analytics',     icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Workflows',         path: '/workflows',         icon: Workflow,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Roles & Permissions', path: '/roles',           icon: Shield,            roles: ['OrgAdmin'], section: 'workspace' },
     { name: 'Branches',          path: '/branches',          icon: MapPin,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Departments',       path: '/departments',       icon: Building2,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },

@@ -63,6 +63,9 @@ from app.models.approval import (
     ApprovalChain, ApprovalRequest, ApprovalAction, ApprovalDelegation,
 )
 from app.models.announcement import Announcement
+from app.models.workflow import (
+    Workflow, WorkflowVersion, WorkflowExecution, WorkflowExecutionStep,
+)
 
 __all__ = [
     "Base", 
@@ -159,5 +162,9 @@ __all__ = [
     "ApprovalRequest",
     "ApprovalAction",
     "ApprovalDelegation",
-    "Announcement"
+    "Announcement",
+    "Workflow",
+    "WorkflowVersion",
+    "WorkflowExecution",
+    "WorkflowExecutionStep"
 ]

@@ -451,6 +451,10 @@ class LeadService:
             action="LEAD_CONVERTED", resource_type="lead", resource_id=str(lead_id),
             action_metadata={"contact_id": str(contact.id), "company_id": str(company_id) if company_id else None},
         )
+        # Fire the lead_converted trigger (legacy engine + orchestration workflows).
+        from app.services.workflow_service import WorkflowService
+        await WorkflowService(self.db).run("lead_converted", lead, actor)
+
         await DashboardService.invalidate_cache(actor.organization_id)
         return {"contact_id": contact.id, "company_id": company_id, "lead_id": lead.id}
 
