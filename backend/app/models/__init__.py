@@ -71,6 +71,8 @@ from app.models.automation import (
     AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
 )
 from app.models.event import Event, EventSubscription, EventDelivery
+from app.models.queue import QueueJob, QueueWorker
+from app.models.scheduler import Schedule, ScheduleRun
 
 __all__ = [
     "Base", 
@@ -181,5 +183,9 @@ __all__ = [
     "ScheduledReport",
     "Event",
     "EventSubscription",
-    "EventDelivery"
+    "EventDelivery",
+    "QueueJob",
+    "QueueWorker",
+    "Schedule",
+    "ScheduleRun"
 ]

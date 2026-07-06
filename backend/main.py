@@ -49,6 +49,8 @@ from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
 from app.api.v1.events import router as events_router
+from app.api.v1.queue import router as queue_router
+from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -129,6 +131,47 @@ async def subscription_cron_scheduler():
             await asyncio.sleep(60)
 
 
+# ── Background Queue worker ───────────────────────────────────────────────────
+async def queue_worker_loop():
+    """Drives the durable background queue. Single active drainer via a redis
+    lock; if another instance holds it, this one idles and retries."""
+    logger = logging.getLogger("app.cron.queue")
+    from app.core.redis import redis_client
+    from app.cron.queue_worker import run_queue_worker
+    while True:
+        try:
+            async with redis_client.lock("cron_lock:queue_worker", lease_time=30, acquire_timeout=2.0) as locked:
+                if locked:
+                    await run_queue_worker(async_session_maker)  # long-running until cancelled
+                else:
+                    await asyncio.sleep(15)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("queue_worker_loop error: %s", e)
+            await asyncio.sleep(15)
+
+
+# ── Scheduler tick ────────────────────────────────────────────────────────────
+async def scheduler_tick_loop():
+    """Minute-granularity driver for the configurable Scheduler. Single active
+    ticker via a redis lock; runs due schedules then sleeps ~60s."""
+    logger = logging.getLogger("app.cron.scheduler")
+    from app.core.redis import redis_client
+    from app.cron.scheduler_tick import run_scheduler_tick
+    while True:
+        try:
+            async with redis_client.lock("cron_lock:scheduler_tick", lease_time=55, acquire_timeout=2.0) as locked:
+                if locked:
+                    await run_scheduler_tick(async_session_maker)
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("scheduler_tick_loop error: %s", e)
+            await asyncio.sleep(60)
+
+
 # ── App lifespan ──────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -150,12 +193,16 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
 
     cron_task = asyncio.create_task(subscription_cron_scheduler())
+    queue_task = asyncio.create_task(queue_worker_loop())
+    scheduler_task = asyncio.create_task(scheduler_tick_loop())
     yield
-    cron_task.cancel()
-    try:
-        await cron_task
-    except asyncio.CancelledError:
-        pass
+    for t in (cron_task, queue_task, scheduler_task):
+        t.cancel()
+    for t in (cron_task, queue_task, scheduler_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 # ── FastAPI application ────────────────────────────────────────────────────────
@@ -242,6 +289,8 @@ app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workfl
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))
 app.include_router(events_router,          prefix=f"{settings.API_V1_STR}/events",          tags=["events"], dependencies=_rbac("events"))
+app.include_router(queue_router,           prefix=f"{settings.API_V1_STR}/queue",           tags=["queue"], dependencies=_rbac("queue"))
+app.include_router(scheduler_router,       prefix=f"{settings.API_V1_STR}/scheduler",       tags=["scheduler"], dependencies=_rbac("scheduler"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])
