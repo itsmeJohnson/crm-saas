@@ -50,6 +50,7 @@ import { OrganizationAnalyticsPage } from './pages/OrganizationAnalyticsPage';
 import { AutomationAnalyticsPage } from './pages/AutomationAnalyticsPage';
 import { ExecutiveDashboardPage } from './pages/ExecutiveDashboardPage';
 import { ReportBuilderPage } from './pages/ReportBuilderPage';
+import { SalesAnalyticsPage } from './pages/SalesAnalyticsPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
 import { RulesPage } from './pages/RulesPage';
 import { AutomationPage } from './pages/AutomationPage';
@@ -154,6 +155,7 @@ export const App: React.FC = () => {
                   <Route path="/org-analytics" element={<OrganizationAnalyticsPage />} />
                   <Route path="/executive-dashboard" element={<ExecutiveDashboardPage />} />
                   <Route path="/report-builder" element={<ReportBuilderPage />} />
+                  <Route path="/sales-analytics" element={<SalesAnalyticsPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
                   <Route path="/rules" element={<RulesPage />} />

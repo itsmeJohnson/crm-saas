@@ -17,6 +17,8 @@ class Lead(BaseModel):
     company_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="New", nullable=False)
+    # Why a lead was marked Lost — powers Sales Analytics' lost-reason analysis.
+    lost_reason: Mapped[str | None] = mapped_column(String(150), nullable=True)
     source: Mapped[str | None] = mapped_column(String(100), nullable=True)
     value: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="Medium", nullable=False, index=True)  # "Low", "Medium", "High", "Urgent"

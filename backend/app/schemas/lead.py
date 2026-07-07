@@ -32,6 +32,7 @@ class LeadUpdate(BaseModel):
     company_name: str | None = Field(None, max_length=255)
     title: str | None = Field(None, max_length=255)
     status: str | None = Field(None, max_length=50)
+    lost_reason: str | None = Field(None, max_length=150)
     source: str | None = Field(None, max_length=100)
     city: str | None = Field(None, max_length=100)
     value: Decimal | None = None
@@ -128,6 +129,7 @@ class LeadResponse(LeadBase):
     attachments: list | None = None
     converted_contact_id: uuid.UUID | None = None
     converted_at: datetime | None = None
+    lost_reason: str | None = None
     company_id: uuid.UUID | None = None
     stage: PipelineStageResponse | None = None
 
