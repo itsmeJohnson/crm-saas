@@ -7,8 +7,8 @@ Create Date: 2026-07-06 10:00:00.000000
 import sqlalchemy as sa
 from alembic import op
 
-revision = 'e5f6a7b8c9d0'
-down_revision = 'd4e5f6a7b8c9'
+revision = 'scheduler_0001'
+down_revision = 'bg_queue_0001'
 branch_labels = None
 depends_on = None
 

@@ -77,6 +77,16 @@ class SLAPolicy(BaseModel):
     breach_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
+    # ---- SLA Management extensions (full module; nullable → automation path unaffected) ----
+    priority_field: Mapped[str] = mapped_column(String(40), default="priority", nullable=False)
+    priorities: Mapped[list | None] = mapped_column(JSON, nullable=True)  # [{level,response_hours,resolution_hours}]
+    response_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resolution_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    business_hours_only: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    skip_holidays: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    escalate_after_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    escalate_to_role: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
 
 class SLABreach(BaseModel):
     """A recorded SLA breach for an entity+policy — dedups repeat alerts and

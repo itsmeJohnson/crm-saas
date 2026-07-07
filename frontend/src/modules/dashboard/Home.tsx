@@ -37,6 +37,9 @@ import { AutomationWidget } from '../../components/dashboard/AutomationWidget';
 import { EventBusWidget } from '../../components/dashboard/EventBusWidget';
 import { QueueWidget } from '../../components/dashboard/QueueWidget';
 import { SchedulerWidget } from '../../components/dashboard/SchedulerWidget';
+import { NotificationAutomationWidget } from '../../components/dashboard/NotificationAutomationWidget';
+import { SLAWidget } from '../../components/dashboard/SLAWidget';
+import { EscalationWidget } from '../../components/dashboard/EscalationWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -207,6 +210,9 @@ export const Home: React.FC = () => {
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EventBusWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <QueueWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SchedulerWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <NotificationAutomationWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SLAWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EscalationWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

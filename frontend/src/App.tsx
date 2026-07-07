@@ -53,6 +53,9 @@ import { AutomationPage } from './pages/AutomationPage';
 import { EventsPage } from './pages/EventsPage';
 import { QueuePage } from './pages/QueuePage';
 import { SchedulerPage } from './pages/SchedulerPage';
+import { NotificationAutomationPage } from './pages/NotificationAutomationPage';
+import { SLAPage } from './pages/SLAPage';
+import { EscalationPage } from './pages/EscalationPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
@@ -152,6 +155,9 @@ export const App: React.FC = () => {
                   <Route path="/events" element={<EventsPage />} />
                   <Route path="/queue" element={<QueuePage />} />
                   <Route path="/scheduler" element={<SchedulerPage />} />
+                  <Route path="/notification-automation" element={<NotificationAutomationPage />} />
+                  <Route path="/sla" element={<SLAPage />} />
+                  <Route path="/escalation" element={<EscalationPage />} />
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin']} />}>
                   <Route path="/roles" element={<RolesPermissionsPage />} />

@@ -118,6 +118,13 @@ class LeadService:
         from app.services.workflow_service import WorkflowService
         await WorkflowService(self.db).run("lead_created", lead, actor)
 
+        # Open SLA clocks for any matching policy (best-effort, additive).
+        try:
+            from app.services.sla_service import SLAService
+            await SLAService(self.db).start_tracking(lead, "lead", actor.organization_id)
+        except Exception:
+            pass
+
         await DashboardService.invalidate_cache(actor.organization_id)
         return await self.lead_repo.get_lead_by_id(actor.organization_id, lead.id)
 
@@ -454,6 +461,13 @@ class LeadService:
         # Fire the lead_converted trigger (legacy engine + orchestration workflows).
         from app.services.workflow_service import WorkflowService
         await WorkflowService(self.db).run("lead_converted", lead, actor)
+
+        # Conversion resolves the lead's SLA (best-effort, additive).
+        try:
+            from app.services.sla_service import SLAService
+            await SLAService(self.db).record_resolution("lead", lead.id, actor.organization_id)
+        except Exception:
+            pass
 
         await DashboardService.invalidate_cache(actor.organization_id)
         return {"contact_id": contact.id, "company_id": company_id, "lead_id": lead.id}

@@ -49,6 +49,8 @@ EVENT_TYPES = {
     "user": ["user.created"],
     "shift": ["shift.assigned"],
     "performance": ["performance.goal_achieved"],
+    "sla": ["sla.breached"],
+    "escalation": ["escalation.triggered"],
     "custom": ["custom.*"],
 }
 ALL_EVENT_TYPES = [t for group in EVENT_TYPES.values() for t in group]
@@ -69,6 +71,7 @@ TRIGGER_EVENT_MAP = {
     "user_created": "user.created", "shift_assigned": "shift.assigned",
     "goal_achieved": "performance.goal_achieved",
     "contact_created": "contact.created", "contact_updated": "contact.updated",
+    "sla_breached": "sla.breached", "escalation_triggered": "escalation.triggered",
 }
 SUBSCRIBER_TYPES = ("webhook", "log")
 
@@ -142,6 +145,16 @@ class EventBus:
                 ok = await self._deliver_workflow_engine(ev, trigger, live_entity, actor, entity_type)
                 delivered += 1 if ok else 0
                 failed += 0 if ok else 1
+
+            # 1b) notification automation: fire notification rules for this event.
+            # Best-effort and reentrancy-guarded (create_notification won't re-emit).
+            try:
+                from app.services.notification_automation_service import NotificationAutomationService
+                if org_id is not None:
+                    await NotificationAutomationService(self.db).handle_event(
+                        event_type, live_entity, actor, payload, org_id)
+            except Exception:
+                pass
 
             # 2) configured subscribers (webhook / log) matched by pattern
             rows = (await self.db.execute(select(EventSubscription).filter(

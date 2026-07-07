@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -69,6 +69,9 @@ export const AppLayout: React.FC = () => {
     { name: 'Event Bus',         path: '/events',            icon: Radio,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Background Queue',  path: '/queue',             icon: Layers,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Scheduler',         path: '/scheduler',         icon: CalendarClock,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Notification Rules', path: '/notification-automation', icon: BellRing,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'SLA Management',     path: '/sla',               icon: Gauge,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Escalation',        path: '/escalation',        icon: TrendingUp,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Roles & Permissions', path: '/roles',           icon: Shield,            roles: ['OrgAdmin'], section: 'workspace' },
     { name: 'Branches',          path: '/branches',          icon: MapPin,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Departments',       path: '/departments',       icon: Building2,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },

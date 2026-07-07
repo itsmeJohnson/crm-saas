@@ -25,7 +25,8 @@ from app.models.scheduler import Schedule, ScheduleRun
 from app.models.calendar_event import Holiday, WorkingHoursConfig
 from app.services import cron_utils
 
-TASK_TYPES = ("run_automation_job", "enqueue_queue_job", "run_report", "event_publish", "webhook", "noop")
+TASK_TYPES = ("run_automation_job", "enqueue_queue_job", "run_report", "event_publish", "webhook",
+              "notification_digest", "noop")
 SCHEDULE_KINDS = ("cron", "interval", "hourly", "daily", "weekly", "monthly")
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]  # index 0=Mon .. 6=Sun
 
@@ -359,6 +360,10 @@ class SchedulerService:
                 cfg.get("event_type") or "custom.scheduled", organization_id=s.organization_id,
                 source="system", payload=cfg.get("payload") or {"schedule": s.name})
             return {"event": str(ev.id), "type": ev.event_type}
+        if tt == "notification_digest":
+            from app.services.notification_automation_service import NotificationAutomationService
+            sent = await NotificationAutomationService(self.db).flush_digests(s.organization_id)
+            return {"digests_sent": sent}
         if tt == "webhook":
             url = cfg.get("url")
             if not url:

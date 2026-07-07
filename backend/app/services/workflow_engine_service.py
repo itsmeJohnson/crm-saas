@@ -41,7 +41,8 @@ TRIGGER_ENTITY = {
     "leave_applied": "leave", "leave_approved": "leave",
     "shift_assigned": "shift", "goal_achieved": "performance",
     "approval_approved": "approval", "approval_rejected": "approval",
-    "user_created": "user", "manual": "generic",
+    "user_created": "user", "sla_breached": "lead", "escalation_triggered": "generic",
+    "manual": "generic",
 }
 TRIGGERS = tuple(TRIGGER_ENTITY.keys())
 # Action node action-types the engine can execute.

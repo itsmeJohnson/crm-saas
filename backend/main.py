@@ -51,6 +51,9 @@ from app.api.v1.automation import router as automation_router
 from app.api.v1.events import router as events_router
 from app.api.v1.queue import router as queue_router
 from app.api.v1.scheduler import router as scheduler_router
+from app.api.v1.notification_automation import router as notification_automation_router
+from app.api.v1.sla import router as sla_router
+from app.api.v1.escalation import router as escalation_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
@@ -70,6 +73,8 @@ from app.cron.sms_cron import run_sms_retry_check
 from app.cron.email_cron import run_email_sync
 from app.cron.campaign_cron import run_campaign_check
 from app.cron.automation_cron import run_automation_cycle
+from app.cron.sla_cron import run_sla_scan_all
+from app.cron.escalation_cron import run_escalation_engine
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -122,6 +127,10 @@ async def subscription_cron_scheduler():
                     await run_campaign_check(async_session_maker)
                     # Automation Engine: SLA scan + scheduled reports (tracked, per-org)
                     await run_automation_cycle(async_session_maker)
+                    # SLA Management: business-hours-aware tracker breach scan
+                    await run_sla_scan_all(async_session_maker)
+                    # Escalation Engine: multi-level rule-based escalation scan
+                    await run_escalation_engine(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -291,6 +300,9 @@ app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automa
 app.include_router(events_router,          prefix=f"{settings.API_V1_STR}/events",          tags=["events"], dependencies=_rbac("events"))
 app.include_router(queue_router,           prefix=f"{settings.API_V1_STR}/queue",           tags=["queue"], dependencies=_rbac("queue"))
 app.include_router(scheduler_router,       prefix=f"{settings.API_V1_STR}/scheduler",       tags=["scheduler"], dependencies=_rbac("scheduler"))
+app.include_router(notification_automation_router, prefix=f"{settings.API_V1_STR}/notification-automation", tags=["notification-automation"], dependencies=_rbac("notifications"))
+app.include_router(sla_router,             prefix=f"{settings.API_V1_STR}/sla",             tags=["sla"], dependencies=_rbac("sla"))
+app.include_router(escalation_router,      prefix=f"{settings.API_V1_STR}/escalation",      tags=["escalation"], dependencies=_rbac("escalation"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])

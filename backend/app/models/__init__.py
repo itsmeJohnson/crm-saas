@@ -73,6 +73,11 @@ from app.models.automation import (
 from app.models.event import Event, EventSubscription, EventDelivery
 from app.models.queue import QueueJob, QueueWorker
 from app.models.scheduler import Schedule, ScheduleRun
+from app.models.notification_automation import (
+    NotificationRule, NotificationDelivery, NotificationDigestItem,
+)
+from app.models.sla import SLATracker, SLAPause
+from app.models.escalation import EscalationRule, EscalationEvent
 
 __all__ = [
     "Base", 
@@ -187,5 +192,12 @@ __all__ = [
     "QueueJob",
     "QueueWorker",
     "Schedule",
-    "ScheduleRun"
+    "ScheduleRun",
+    "NotificationRule",
+    "NotificationDelivery",
+    "NotificationDigestItem",
+    "SLATracker",
+    "SLAPause",
+    "EscalationRule",
+    "EscalationEvent"
 ]
