@@ -48,6 +48,8 @@ import { TargetsPage } from './pages/TargetsPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 import { OrganizationAnalyticsPage } from './pages/OrganizationAnalyticsPage';
 import { AutomationAnalyticsPage } from './pages/AutomationAnalyticsPage';
+import { ExecutiveDashboardPage } from './pages/ExecutiveDashboardPage';
+import { ReportBuilderPage } from './pages/ReportBuilderPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
 import { RulesPage } from './pages/RulesPage';
 import { AutomationPage } from './pages/AutomationPage';
@@ -150,6 +152,8 @@ export const App: React.FC = () => {
                 {/* Organization Analytics: management-level (OrgAdmin/Manager) */}
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                   <Route path="/org-analytics" element={<OrganizationAnalyticsPage />} />
+                  <Route path="/executive-dashboard" element={<ExecutiveDashboardPage />} />
+                  <Route path="/report-builder" element={<ReportBuilderPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
                   <Route path="/rules" element={<RulesPage />} />

@@ -68,6 +68,8 @@ from app.models.workflow import (
 )
 from app.models.rule import Rule, RuleEvaluation
 from app.models.rule_designer import RuleComponent, RuleVariable, RuleVersion
+from app.models.dashboard_view import DashboardView
+from app.models.report_builder import ReportDefinition, ReportVersion
 from app.models.automation import (
     AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
 )
@@ -185,6 +187,9 @@ __all__ = [
     "RuleComponent",
     "RuleVariable",
     "RuleVersion",
+    "DashboardView",
+    "ReportDefinition",
+    "ReportVersion",
     "AutomationJob",
     "AutomationRun",
     "SLAPolicy",
