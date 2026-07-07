@@ -9,6 +9,7 @@ class RuleCreate(BaseModel):
     category: str | None = Field(None, max_length=80)
     entity_type: str = "lead"
     definition: dict = {}
+    actions: list[dict] | None = None
     priority: int = 100
     conflict_strategy: str = "highest_priority"
     is_active: bool = True
@@ -21,6 +22,7 @@ class RuleUpdate(BaseModel):
     category: str | None = Field(None, max_length=80)
     entity_type: str | None = None
     definition: dict | None = None
+    actions: list[dict] | None = None
     priority: int | None = None
     conflict_strategy: str | None = None
     is_active: bool | None = None
@@ -35,11 +37,13 @@ class RuleResponse(BaseModel):
     category: str | None = None
     entity_type: str
     definition: dict
+    actions: list[dict] = []
     priority: int
     conflict_strategy: str
     is_active: bool
     is_template: bool
     condition_count: int
+    action_count: int = 0
     match_count: int
     eval_count: int
     last_evaluated_at: str | None = None
@@ -115,3 +119,91 @@ class RuleDashboard(BaseModel):
 
 class SimpleResult(BaseModel):
     created: int = 0
+
+
+# ---------- Business Rule Designer ----------
+class ComponentCreate(BaseModel):
+    name: str = Field(..., max_length=150)
+    description: str | None = None
+    entity_type: str = "lead"
+    definition: dict = {}
+    is_active: bool = True
+
+
+class ComponentUpdate(BaseModel):
+    name: str | None = Field(None, max_length=150)
+    description: str | None = None
+    entity_type: str | None = None
+    definition: dict | None = None
+    is_active: bool | None = None
+
+
+class ComponentResponse(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    entity_type: str
+    definition: dict
+    is_active: bool
+    created_at: str | None = None
+
+
+class VariableCreate(BaseModel):
+    name: str = Field(..., max_length=80)
+    description: str | None = None
+    value_type: str = "string"
+    value: Any | None = None
+
+
+class VariableUpdate(BaseModel):
+    description: str | None = None
+    value_type: str | None = None
+    value: Any | None = None
+
+
+class VariableResponse(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    value_type: str
+    value: str | None = None
+    resolved: Any | None = None
+    created_at: str | None = None
+
+
+class VersionRow(BaseModel):
+    id: str
+    version_no: int
+    note: str | None = None
+    snapshot: dict
+    created_at: str | None = None
+
+
+class RestoreRequest(BaseModel):
+    version_no: int
+
+
+class SimulateRequest(BaseModel):
+    limit: int = Field(50, ge=1, le=200)
+    execute: bool = False
+
+
+class SimulateResult(BaseModel):
+    rule_id: str
+    name: str
+    entity_type: str
+    evaluated: int
+    matched: int
+    executed: int
+    action_count: int
+    samples: list[dict]
+
+
+class AuditRow(BaseModel):
+    id: str
+    action: str
+    resource_type: str
+    resource_id: str | None = None
+    actor_name: str | None = None
+    metadata: dict | None = None
+    created_at: str | None = None

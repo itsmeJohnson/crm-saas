@@ -217,6 +217,146 @@ async def test_pending_box_escalation_dashboard_and_workflow(client: AsyncClient
 
 
 @pytest.mark.asyncio
+async def test_dynamic_chain_conditions_and_auto_approve_reject(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    # dynamic routing: a conditional chain (payload.category == travel) beats the generic one
+    await _chain(client, data["h_admin"], name="Travel", request_type="expense",
+                 conditions={"field": "category", "op": "eq", "value": "travel"},
+                 steps=[{"approver_role": "Manager"}, {"approver_role": "OrgAdmin"}])
+    await _chain(client, data["h_admin"], name="General", request_type="expense",
+                 steps=[{"approver_role": "Manager"}],
+                 auto_approve_conditions={"field": "amount", "op": "lt", "value": 100},
+                 auto_reject_conditions={"field": "amount", "op": "gt", "value": 100000})
+    travel = (await client.post("/api/v1/approvals", json={
+        "request_type": "expense", "title": "Flight", "amount": 500,
+        "payload": {"category": "travel"}}, headers=data["h_emp"])).json()
+    assert travel["total_levels"] == 2  # routed to the conditional Travel chain
+    other = (await client.post("/api/v1/approvals", json={
+        "request_type": "expense", "title": "Chair", "amount": 500,
+        "payload": {"category": "office"}}, headers=data["h_emp"])).json()
+    assert other["total_levels"] == 1 and other["status"] == "pending"  # generic chain
+    # auto-approve: tiny amount decided instantly, no approver involved
+    small = (await client.post("/api/v1/approvals", json={
+        "request_type": "expense", "title": "Pens", "amount": 50}, headers=data["h_emp"])).json()
+    assert small["status"] == "approved"
+    hist = (await client.get(f"/api/v1/approvals/{small['id']}/history", headers=data["h_emp"])).json()
+    assert any(h["action"] == "auto_approved" for h in hist)
+    # auto-reject: absurd amount rejected instantly + requester notified
+    huge = (await client.post("/api/v1/approvals", json={
+        "request_type": "expense", "title": "Yacht", "amount": 5000000}, headers=data["h_emp"])).json()
+    assert huge["status"] == "rejected"
+    assert (await db.execute(select(Notification).filter(
+        Notification.user_id == data["emp"].id, Notification.title == "Request rejected"))).scalars().first() is not None
+
+
+@pytest.mark.asyncio
+async def test_parallel_all_mode_level(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    from app.repositories.user_repository import UserRepository
+    admin2 = await UserRepository(db).create_user(data["org"].id, {
+        "email": "admin2@ap.com", "hashed_password": get_password_hash("password123"),
+        "first_name": "Admin", "last_name": "Two", "role": "OrgAdmin", "is_active": True})
+    await db.commit()
+    h_admin2 = {"Authorization": f"Bearer {create_access_token(admin2.id)}"}
+    # one parallel level: EVERY OrgAdmin must approve
+    await _chain(client, data["h_admin"], name="Quote", request_type="quotation",
+                 steps=[{"approver_role": "OrgAdmin", "mode": "all"}])
+    req = (await client.post("/api/v1/approvals", json={
+        "request_type": "quotation", "title": "Q-42", "amount": 900}, headers=data["h_emp"])).json()
+    # first admin approves → level not complete, still pending
+    r = await client.post(f"/api/v1/approvals/{req['id']}/act", json={"approve": True}, headers=data["h_admin"])
+    assert r.status_code == 200 and r.json()["status"] == "pending"
+    # same admin cannot approve the level twice
+    assert (await client.post(f"/api/v1/approvals/{req['id']}/act", json={"approve": True}, headers=data["h_admin"])).status_code == 409
+    # second admin completes the parallel level → approved
+    r = await client.post(f"/api/v1/approvals/{req['id']}/act", json={"approve": True}, headers=h_admin2)
+    assert r.status_code == 200 and r.json()["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_conditional_step_skip(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    # level 2 only applies to amounts >= 1000
+    await _chain(client, data["h_admin"], name="Disc", request_type="discount",
+                 steps=[{"approver_role": "Manager"},
+                        {"approver_role": "OrgAdmin", "conditions": {"field": "amount", "op": "gte", "value": 1000}}])
+    low = (await client.post("/api/v1/approvals", json={
+        "request_type": "discount", "title": "small", "amount": 200}, headers=data["h_emp"])).json()
+    # manager approves L1 → L2 skipped by conditions → fully approved
+    r = await client.post(f"/api/v1/approvals/{low['id']}/act", json={"approve": True}, headers=data["h_mgr"])
+    assert r.status_code == 200 and r.json()["status"] == "approved"
+    high = (await client.post("/api/v1/approvals", json={
+        "request_type": "discount", "title": "big", "amount": 5000}, headers=data["h_emp"])).json()
+    r = await client.post(f"/api/v1/approvals/{high['id']}/act", json={"approve": True}, headers=data["h_mgr"])
+    assert r.status_code == 200 and r.json()["status"] == "pending" and r.json()["current_level"] == 2
+    # a request whose FIRST level is skipped starts at the next active level
+    await _chain(client, data["h_admin"], name="Tgt", request_type="target",
+                 steps=[{"approver_role": "Manager", "conditions": {"field": "amount", "op": "gte", "value": 1000}},
+                        {"approver_role": "OrgAdmin"}])
+    skip1 = (await client.post("/api/v1/approvals", json={
+        "request_type": "target", "title": "t", "amount": 10}, headers=data["h_emp"])).json()
+    assert skip1["current_level"] == 2 and skip1["status"] == "pending"
+
+
+async def _backdate(db: AsyncSession, request_id: str, hours: int):
+    old = datetime.now(timezone.utc) - timedelta(hours=hours)
+    req = (await db.execute(select(ApprovalRequest).filter(ApprovalRequest.id == uuid.UUID(request_id)))).scalars().first()
+    req.created_at = old
+    acts = list((await db.execute(select(ApprovalAction).filter(
+        ApprovalAction.request_id == uuid.UUID(request_id)))).scalars().all())
+    for a in acts:
+        a.created_at = old
+    await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_timeouts_and_requested_workflow_trigger(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    # a workflow rule on the new approval_requested trigger fires on submit
+    r = await client.post("/api/v1/leads/workflows", json={
+        "name": "New appr", "trigger_event": "approval_requested", "conditions": [],
+        "actions": [{"type": "notify_manager", "message": "Look at this"}]}, headers=data["h_admin"])
+    assert r.status_code in (200, 201), r.text
+
+    await _chain(client, data["h_admin"], name="ExpTO", request_type="expense",
+                 steps=[{"approver_role": "Manager"}], timeout_hours=1, timeout_action="auto_reject")
+    await _chain(client, data["h_admin"], name="QuoteTO", request_type="quotation",
+                 steps=[{"approver_role": "Manager"}], timeout_hours=1, timeout_action="escalate")
+    await _chain(client, data["h_admin"], name="DiscTO", request_type="discount",
+                 steps=[{"approver_role": "Manager"}], timeout_hours=1, timeout_action="auto_approve")
+
+    exp = (await client.post("/api/v1/approvals", json={
+        "request_type": "expense", "title": "Stuck expense", "amount": 300}, headers=data["h_emp"])).json()
+    # the approval_requested workflow notified the requester's manager
+    assert (await db.execute(select(Notification).filter(
+        Notification.user_id == data["mgr"].id, Notification.title == "Workflow: New appr"))).scalars().first() is not None
+    quo = (await client.post("/api/v1/approvals", json={
+        "request_type": "quotation", "title": "Stuck quote", "amount": 300}, headers=data["h_emp"])).json()
+    dis = (await client.post("/api/v1/approvals", json={
+        "request_type": "discount", "title": "Stuck discount", "amount": 300}, headers=data["h_emp"])).json()
+
+    for rid in (exp["id"], quo["id"], dis["id"]):
+        await _backdate(db, rid, 3)
+    # employees cannot run it; admin can
+    assert (await client.post("/api/v1/approvals/process-timeouts", json={}, headers=data["h_emp"])).status_code == 403
+    out = (await client.post("/api/v1/approvals/process-timeouts", json={}, headers=data["h_admin"])).json()
+    assert out["processed"] == 3 and out["auto_rejected"] == 1 and out["escalated"] == 1 and out["auto_approved"] == 1
+
+    exp2 = (await client.get("/api/v1/approvals", params={"box": "mine", "status": "rejected"}, headers=data["h_emp"])).json()
+    assert any(x["id"] == exp["id"] for x in exp2["items"])
+    dis2 = (await client.get("/api/v1/approvals", params={"box": "mine", "status": "approved"}, headers=data["h_emp"])).json()
+    assert any(x["id"] == dis["id"] for x in dis2["items"])
+    quo_row = (await db.execute(select(ApprovalRequest).filter(ApprovalRequest.id == uuid.UUID(quo["id"])))).scalars().first()
+    assert quo_row.escalated is True and quo_row.status == "pending"
+    # escalation notified the admins
+    assert (await db.execute(select(Notification).filter(
+        Notification.user_id == data["admin"].id, Notification.title == "Approval escalated"))).scalars().first() is not None
+    # running again is idempotent (escalated flag dedups; decided ones are gone)
+    out2 = (await client.post("/api/v1/approvals/process-timeouts", json={}, headers=data["h_admin"])).json()
+    assert out2["processed"] == 0
+
+
+@pytest.mark.asyncio
 async def test_no_chain_routes_to_admin_and_cancel(client: AsyncClient, setup: dict, db: AsyncSession):
     data = setup
     # no chain configured for 'generic' → routes straight to OrgAdmin, 1 level

@@ -8,6 +8,8 @@ from app.models.user import User
 from app.schemas.rule import (
     RuleCreate, RuleUpdate, RuleResponse, PriorityRequest, TestRequest, TestResult,
     ResolveRequest, ImportRequest, EvaluationRow, RuleReport, RuleDashboard, SimpleResult,
+    ComponentCreate, ComponentUpdate, ComponentResponse, VariableCreate, VariableUpdate,
+    VariableResponse, VersionRow, RestoreRequest, SimulateRequest, SimulateResult, AuditRow,
 )
 from app.services.rule_service import RuleService
 from app.middleware.permissions import require_active_user
@@ -29,6 +31,55 @@ async def dashboard(actor: Annotated[User, Depends(require_active_user)], db: An
 @router.get("/report", response_model=RuleReport)
 async def report(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await RuleService(db).report(actor)
+
+
+@router.get("/audit", response_model=List[AuditRow])
+async def audit_logs(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)],
+                     limit: int = Query(50, ge=1, le=200)):
+    return await RuleService(db).audit_logs(actor, limit=limit)
+
+
+# ---------- Reusable components ----------
+@router.get("/components", response_model=List[ComponentResponse])
+async def list_components(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)],
+                         entity_type: str | None = Query(None)):
+    return await RuleService(db).list_components(actor, entity_type=entity_type)
+
+
+@router.post("/components", response_model=ComponentResponse, status_code=status.HTTP_201_CREATED)
+async def create_component(req: ComponentCreate, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).create_component(actor, req.model_dump())
+
+
+@router.patch("/components/{comp_id}", response_model=ComponentResponse)
+async def update_component(comp_id: uuid.UUID, req: ComponentUpdate, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).update_component(actor, comp_id, req.model_dump(exclude_unset=True))
+
+
+@router.delete("/components/{comp_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_component(comp_id: uuid.UUID, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    await RuleService(db).delete_component(actor, comp_id)
+
+
+# ---------- User-defined variables ----------
+@router.get("/variables", response_model=List[VariableResponse])
+async def list_variables(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).list_variables(actor)
+
+
+@router.post("/variables", response_model=VariableResponse, status_code=status.HTTP_201_CREATED)
+async def create_variable(req: VariableCreate, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).create_variable(actor, req.model_dump())
+
+
+@router.patch("/variables/{var_id}", response_model=VariableResponse)
+async def update_variable(var_id: uuid.UUID, req: VariableUpdate, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).update_variable(actor, var_id, req.model_dump(exclude_unset=True))
+
+
+@router.delete("/variables/{var_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_variable(var_id: uuid.UUID, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    await RuleService(db).delete_variable(actor, var_id)
 
 
 # ---------- Templates ----------
@@ -107,3 +158,18 @@ async def set_priority(rule_id: uuid.UUID, req: PriorityRequest, actor: Annotate
 @router.post("/{rule_id}/test", response_model=TestResult)
 async def test_rule(rule_id: uuid.UUID, req: TestRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await RuleService(db).test(actor, rule_id, sample=req.sample, entity_id=req.entity_id)
+
+
+@router.get("/{rule_id}/versions", response_model=List[VersionRow])
+async def list_versions(rule_id: uuid.UUID, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).list_versions(actor, rule_id)
+
+
+@router.post("/{rule_id}/versions/restore", response_model=RuleResponse)
+async def restore_version(rule_id: uuid.UUID, req: RestoreRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).restore_version(actor, rule_id, req.version_no)
+
+
+@router.post("/{rule_id}/simulate", response_model=SimulateResult)
+async def simulate(rule_id: uuid.UUID, req: SimulateRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await RuleService(db).simulate(actor, rule_id, limit=req.limit, execute=req.execute)

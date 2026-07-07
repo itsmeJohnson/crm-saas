@@ -222,3 +222,113 @@ async def test_workflow_engine_consumes_rule_group_conditions(client: AsyncClien
     assert svc._match_conditions(e2, grp) is False
     # flat legacy format still works unchanged
     assert svc._match_conditions(e, [{"field": "status", "op": "eq", "value": "New"}]) is True
+
+
+# ---------------- Business Rule Designer ----------------
+@pytest.mark.asyncio
+async def test_user_variables_used_in_expression(client: AsyncClient, setup: dict):
+    d = setup
+    cat = (await client.get("/api/v1/rules/catalog", headers=d["h_admin"])).json()
+    assert "notify_owner" in cat["action_types"] and "number" in cat["variable_value_types"]
+    # employee cannot create a variable
+    assert (await client.post("/api/v1/rules/variables", json={"name": "min_value", "value_type": "number", "value": 50000}, headers=d["h_emp"])).status_code == 403
+    v = (await client.post("/api/v1/rules/variables", json={
+        "name": "min_value", "value_type": "number", "value": 50000}, headers=d["h_admin"])).json()
+    assert v["resolved"] == 50000
+    # duplicate name rejected
+    assert (await client.post("/api/v1/rules/variables", json={"name": "min_value", "value_type": "number", "value": 1}, headers=d["h_admin"])).status_code == 409
+    # a rule that references the org variable
+    r = (await client.post("/api/v1/rules", json={"name": "Big deal", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [
+            {"type": "condition", "field": "value", "op": "gte", "value_type": "variable", "variable": "min_value"}]}},
+        headers=d["h_admin"])).json()
+    assert (await client.post(f"/api/v1/rules/{r['id']}/test", json={"sample": {"value": 60000}}, headers=d["h_admin"])).json()["matched"] is True
+    assert (await client.post(f"/api/v1/rules/{r['id']}/test", json={"sample": {"value": 100}}, headers=d["h_admin"])).json()["matched"] is False
+    # an unknown variable is rejected at validation
+    bad = await client.post("/api/v1/rules", json={"name": "bad", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [
+            {"type": "condition", "field": "value", "op": "gte", "value_type": "variable", "variable": "ghost"}]}},
+        headers=d["h_admin"])
+    assert bad.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_reusable_components_expand_and_cycle_guard(client: AsyncClient, setup: dict):
+    d = setup
+    comp = (await client.post("/api/v1/rules/components", json={
+        "name": "Is New", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [
+            {"type": "condition", "field": "status", "op": "eq", "value": "New"}]}}, headers=d["h_admin"])).json()
+    # a rule that references the component alongside its own condition
+    r = (await client.post("/api/v1/rules", json={"name": "New & big", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [
+            {"type": "ref", "ref_id": comp["id"]},
+            {"type": "condition", "field": "value", "op": "gte", "value": 1000}]}}, headers=d["h_admin"])).json()
+    assert (await client.post(f"/api/v1/rules/{r['id']}/test", json={"sample": {"status": "New", "value": 5000}}, headers=d["h_admin"])).json()["matched"] is True
+    assert (await client.post(f"/api/v1/rules/{r['id']}/test", json={"sample": {"status": "Lost", "value": 5000}}, headers=d["h_admin"])).json()["matched"] is False
+    # referencing a missing component fails
+    bad = await client.post("/api/v1/rules", json={"name": "bad", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [
+            {"type": "ref", "ref_id": str(uuid.uuid4())}]}}, headers=d["h_admin"])
+    assert bad.status_code == 400
+    # form a latent cycle between two components (B→A, then A→B) and prove the
+    # guard trips when a rule tries to expand the cycle.
+    comp_b = (await client.post("/api/v1/rules/components", json={
+        "name": "Wraps New", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [{"type": "ref", "ref_id": comp["id"]}]}},
+        headers=d["h_admin"])).json()
+    assert (await client.patch(f"/api/v1/rules/components/{comp['id']}", json={
+        "definition": {"type": "group", "logic": "and", "children": [{"type": "ref", "ref_id": comp_b["id"]}]}},
+        headers=d["h_admin"])).status_code == 200
+    cyc = await client.post("/api/v1/rules", json={"name": "cyclic", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": [{"type": "ref", "ref_id": comp["id"]}]}},
+        headers=d["h_admin"])
+    assert cyc.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_rule_actions_and_simulation(client: AsyncClient, setup: dict, db: AsyncSession):
+    from app.models.notification import Notification
+    d = setup
+    # invalid action type rejected
+    assert (await client.post("/api/v1/rules", json={"name": "bad", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": []},
+        "actions": [{"type": "delete_everything"}]}, headers=d["h_admin"])).status_code == 400
+    # a rule that matches every lead and notifies the Employee role
+    r = (await client.post("/api/v1/rules", json={"name": "Touch all", "entity_type": "lead",
+        "definition": {"type": "group", "logic": "and", "children": []},
+        "actions": [{"type": "notify_role", "role": "Employee", "message": "A lead matched"}]}, headers=d["h_admin"])).json()
+    assert r["action_count"] == 1
+    lead = Lead(organization_id=d["org"].id, last_name="X", title="Deal", status="New", value=10,
+                created_by=d["admin"].id, stage_id=d["stage"].id)
+    db.add(lead); await db.commit()
+    # dry-run simulation: matches but fires nothing
+    dry = (await client.post(f"/api/v1/rules/{r['id']}/simulate", json={"limit": 50, "execute": False}, headers=d["h_admin"])).json()
+    assert dry["evaluated"] >= 1 and dry["matched"] >= 1 and dry["executed"] == 0
+    assert (await db.execute(select(Notification).filter(Notification.user_id == d["emp"].id, Notification.category == "rule"))).scalars().first() is None
+    # execute=true fires the action → the employee is notified
+    run = (await client.post(f"/api/v1/rules/{r['id']}/simulate", json={"limit": 50, "execute": True}, headers=d["h_admin"])).json()
+    assert run["executed"] >= 1
+    assert (await db.execute(select(Notification).filter(Notification.user_id == d["emp"].id, Notification.category == "rule"))).scalars().first() is not None
+    # employees cannot simulate
+    assert (await client.post(f"/api/v1/rules/{r['id']}/simulate", json={"execute": True}, headers=d["h_emp"])).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_versioning_restore_and_audit(client: AsyncClient, setup: dict):
+    d = setup
+    r = (await client.post("/api/v1/rules", json={"name": "Verd", "entity_type": "lead", "priority": 100,
+        "definition": _hot_lead_def()}, headers=d["h_admin"])).json()
+    # a structural update snapshots the prior state
+    await client.patch(f"/api/v1/rules/{r['id']}", json={"priority": 300}, headers=d["h_admin"])
+    versions = (await client.get(f"/api/v1/rules/{r['id']}/versions", headers=d["h_admin"])).json()
+    assert len(versions) >= 2
+    v1 = min(versions, key=lambda v: v["version_no"])
+    assert v1["snapshot"]["priority"] == 100
+    # restore the original priority
+    restored = (await client.post(f"/api/v1/rules/{r['id']}/versions/restore", json={"version_no": v1["version_no"]}, headers=d["h_admin"])).json()
+    assert restored["priority"] == 100
+    # audit log surfaces the rule lifecycle events
+    audit = (await client.get("/api/v1/rules/audit", headers=d["h_admin"])).json()
+    actions = {a["action"] for a in audit}
+    assert "RULE_CREATED" in actions and "RULE_UPDATED" in actions and "RULE_RESTORED" in actions

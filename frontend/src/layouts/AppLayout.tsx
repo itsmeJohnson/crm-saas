@@ -66,6 +66,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Workflows',         path: '/workflows',         icon: Workflow,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Rule Engine',       path: '/rules',             icon: Filter,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Automation',        path: '/automation',        icon: Cog,               roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Automation Analytics', path: '/automation-analytics', icon: Activity,      roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Event Bus',         path: '/events',            icon: Radio,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Background Queue',  path: '/queue',             icon: Layers,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Scheduler',         path: '/scheduler',         icon: CalendarClock,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },

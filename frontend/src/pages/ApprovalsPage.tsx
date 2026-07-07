@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   approvalApi, Chain, ApprovalRequest, HistoryRow, Delegation, ApprovalDashboard, ApprovalReport,
-  APPROVAL_TYPES, APPROVER_ROLES,
+  APPROVAL_TYPES, APPROVER_ROLES, TIMEOUT_ACTIONS,
 } from '../services/approvalApi';
 import { userApi } from '../services/userApi';
 import { useAuthStore } from '../store/authStore';
@@ -58,14 +58,29 @@ const RequestModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({ 
 };
 
 /* ── Chain modal (multi-level) ── */
+const jsonOrNull = (s: string) => { const t = (s || '').trim(); if (!t) return null; return JSON.parse(t); };
+const jsonStr = (v: any) => (v ? JSON.stringify(v) : '');
+
 const ChainModal: React.FC<{ initial?: Chain | null; users: any[]; onClose: () => void; onSaved: () => void }> = ({ initial, users, onClose, onSaved }) => {
   const [f, setF] = useState<any>(initial
-    ? { name: initial.name, request_type: initial.request_type, min_amount: initial.min_amount, escalation_hours: initial.escalation_hours || '', is_active: initial.is_active, steps: initial.steps.map((s) => ({ approver_role: s.approver_role || '', approver_user_id: s.approver_user_id || '' })) }
-    : { name: '', request_type: 'expense', min_amount: 0, escalation_hours: '', is_active: true, steps: [{ approver_role: 'Manager', approver_user_id: '' }] });
+    ? {
+      name: initial.name, request_type: initial.request_type, min_amount: initial.min_amount,
+      escalation_hours: initial.escalation_hours || '', timeout_hours: initial.timeout_hours || '',
+      timeout_action: initial.timeout_action || '', conditions: jsonStr(initial.conditions),
+      auto_approve_conditions: jsonStr(initial.auto_approve_conditions), auto_reject_conditions: jsonStr(initial.auto_reject_conditions),
+      is_active: initial.is_active,
+      steps: initial.steps.map((s) => ({ approver_role: s.approver_role || '', approver_user_id: s.approver_user_id || '', mode: s.mode || 'any', conditions: jsonStr(s.conditions) })),
+    }
+    : {
+      name: '', request_type: 'expense', min_amount: 0, escalation_hours: '', timeout_hours: '', timeout_action: '',
+      conditions: '', auto_approve_conditions: '', auto_reject_conditions: '', is_active: true,
+      steps: [{ approver_role: 'Manager', approver_user_id: '', mode: 'any', conditions: '' }],
+    });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [advanced, setAdvanced] = useState(!!(initial && (initial.conditions || initial.auto_approve_conditions || initial.auto_reject_conditions)));
   const setStep = (i: number, patch: any) => setF({ ...f, steps: f.steps.map((s: any, j: number) => j === i ? { ...s, ...patch } : s) });
-  const addStep = () => setF({ ...f, steps: [...f.steps, { approver_role: 'OrgAdmin', approver_user_id: '' }] });
+  const addStep = () => setF({ ...f, steps: [...f.steps, { approver_role: 'OrgAdmin', approver_user_id: '', mode: 'any', conditions: '' }] });
   const rmStep = (i: number) => setF({ ...f, steps: f.steps.filter((_: any, j: number) => j !== i) });
   const save = async () => {
     if (!f.name.trim()) { setError('Name is required'); return; }
@@ -74,12 +89,22 @@ const ChainModal: React.FC<{ initial?: Chain | null; users: any[]; onClose: () =
       const payload = {
         name: f.name, request_type: f.request_type, min_amount: Number(f.min_amount) || 0,
         escalation_hours: f.escalation_hours ? Number(f.escalation_hours) : undefined, is_active: !!f.is_active,
-        steps: f.steps.map((s: any) => ({ approver_role: s.approver_user_id ? null : (s.approver_role || null), approver_user_id: s.approver_user_id || null })),
+        timeout_hours: f.timeout_hours ? Number(f.timeout_hours) : undefined,
+        timeout_action: f.timeout_action || undefined,
+        conditions: jsonOrNull(f.conditions), auto_approve_conditions: jsonOrNull(f.auto_approve_conditions),
+        auto_reject_conditions: jsonOrNull(f.auto_reject_conditions),
+        steps: f.steps.map((s: any) => ({
+          approver_role: s.approver_user_id ? null : (s.approver_role || null), approver_user_id: s.approver_user_id || null,
+          mode: s.mode || 'any', conditions: jsonOrNull(s.conditions),
+        })),
       };
       if (initial) await approvalApi.updateChain(initial.id, payload);
       else await approvalApi.createChain(payload);
       onSaved();
-    } catch (e: any) { setError(extractErrorMessage(e, 'Failed to save')); } finally { setBusy(false); }
+    } catch (e: any) {
+      if (e instanceof SyntaxError) setError('A conditions field is not valid JSON');
+      else setError(extractErrorMessage(e, 'Failed to save'));
+    } finally { setBusy(false); }
   };
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -100,28 +125,62 @@ const ChainModal: React.FC<{ initial?: Chain | null; users: any[]; onClose: () =
             <label className="text-xs text-slate-400">Min amount (tier)<input type="number" value={f.min_amount} onChange={(e) => setF({ ...f, min_amount: e.target.value })} className={F} /></label>
             <label className="text-xs text-slate-400">Escalate after (h)<input type="number" value={f.escalation_hours} onChange={(e) => setF({ ...f, escalation_hours: e.target.value })} className={F} /></label>
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs text-slate-400">Timeout (h)<input type="number" value={f.timeout_hours} onChange={(e) => setF({ ...f, timeout_hours: e.target.value })} className={F} /></label>
+            <label className="text-xs text-slate-400">On timeout
+              <select value={f.timeout_action} onChange={(e) => setF({ ...f, timeout_action: e.target.value })} className={F}>
+                <option value="">— no action —</option>
+                {TIMEOUT_ACTIONS.map((a) => <option key={a} value={a}>{a.replace('_', ' ')}</option>)}
+              </select>
+            </label>
+          </div>
           <div>
             <p className="text-xs text-slate-400 mb-1">Approval levels (in order)</p>
             <div className="space-y-2">
               {f.steps.map((s: any, i: number) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-500 w-8">L{i + 1}</span>
-                  <select value={s.approver_role} onChange={(e) => setStep(i, { approver_role: e.target.value, approver_user_id: '' })} className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-1.5 px-2 rounded-lg text-xs">
-                    <option value="">— specific user —</option>
-                    {APPROVER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  {!s.approver_role && (
-                    <select value={s.approver_user_id} onChange={(e) => setStep(i, { approver_user_id: e.target.value })} className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-1.5 px-2 rounded-lg text-xs">
-                      <option value="">Pick user…</option>
-                      {users.map((u) => <option key={u.id} value={u.id}>{`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email}</option>)}
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 w-8">L{i + 1}</span>
+                    <select value={s.approver_role} onChange={(e) => setStep(i, { approver_role: e.target.value, approver_user_id: '' })} className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-1.5 px-2 rounded-lg text-xs">
+                      <option value="">— specific user —</option>
+                      {APPROVER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
+                    {!s.approver_role && (
+                      <select value={s.approver_user_id} onChange={(e) => setStep(i, { approver_user_id: e.target.value })} className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-1.5 px-2 rounded-lg text-xs">
+                        <option value="">Pick user…</option>
+                        {users.map((u) => <option key={u.id} value={u.id}>{`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email}</option>)}
+                      </select>
+                    )}
+                    <select value={s.mode} title="Parallel: all eligible approvers must approve" onChange={(e) => setStep(i, { mode: e.target.value })} className="bg-slate-800/70 border border-slate-700/70 text-slate-200 py-1.5 px-2 rounded-lg text-xs">
+                      <option value="any">Any one</option>
+                      <option value="all">All (parallel)</option>
+                    </select>
+                    {f.steps.length > 1 && <button onClick={() => rmStep(i)} className="text-slate-600 hover:text-red-400 cursor-pointer"><X className="w-3.5 h-3.5" /></button>}
+                  </div>
+                  {advanced && (
+                    <input value={s.conditions} onChange={(e) => setStep(i, { conditions: e.target.value })}
+                      placeholder={'Level conditions JSON (skip level unless matched), e.g. {"field":"amount","op":"gte","value":1000}'}
+                      className="w-full ml-8 bg-slate-800/50 border border-slate-700/50 text-slate-300 py-1 px-2 rounded-lg text-[11px] font-mono" style={{ width: 'calc(100% - 2rem)' }} />
                   )}
-                  {f.steps.length > 1 && <button onClick={() => rmStep(i)} className="text-slate-600 hover:text-red-400 cursor-pointer"><X className="w-3.5 h-3.5" /></button>}
                 </div>
               ))}
             </div>
             <button onClick={addStep} className="mt-2 text-xs text-brand-400 cursor-pointer inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add level</button>
           </div>
+          <button onClick={() => setAdvanced(!advanced)} className="text-xs text-slate-500 hover:text-slate-300 cursor-pointer">{advanced ? '▾' : '▸'} Automation rules (conditions / auto-approve / auto-reject)</button>
+          {advanced && (
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400 block">Chain selection conditions (rule tree JSON — dynamic routing)
+                <textarea value={f.conditions} onChange={(e) => setF({ ...f, conditions: e.target.value })} rows={2} placeholder='e.g. {"field":"category","op":"eq","value":"travel"}' className={`${F} font-mono text-[11px]`} />
+              </label>
+              <label className="text-xs text-slate-400 block">Auto-approve when (rule tree JSON)
+                <textarea value={f.auto_approve_conditions} onChange={(e) => setF({ ...f, auto_approve_conditions: e.target.value })} rows={2} placeholder='e.g. {"field":"amount","op":"lt","value":100}' className={`${F} font-mono text-[11px]`} />
+              </label>
+              <label className="text-xs text-slate-400 block">Auto-reject when (rule tree JSON)
+                <textarea value={f.auto_reject_conditions} onChange={(e) => setF({ ...f, auto_reject_conditions: e.target.value })} rows={2} placeholder='e.g. {"field":"amount","op":"gt","value":100000}' className={`${F} font-mono text-[11px]`} />
+              </label>
+            </div>
+          )}
           <button onClick={save} disabled={busy} className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-brand-500 to-indigo-500 text-white font-medium py-2 px-4 rounded-lg text-sm disabled:opacity-40 cursor-pointer">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {initial ? 'Save' : 'Create'}
           </button>
@@ -225,6 +284,13 @@ export const ApprovalsPage: React.FC = () => {
     try { const r = await approvalApi.escalateOverdue(); window.alert(`${r.escalated} request(s) escalated.`); loadTab(); }
     catch (e: any) { setError(extractErrorMessage(e, 'Failed')); }
   };
+  const runTimeouts = async () => {
+    try {
+      const r = await approvalApi.processTimeouts();
+      window.alert(`${r.processed} timed out — ${r.auto_approved} auto-approved, ${r.auto_rejected} auto-rejected, ${r.escalated} escalated.`);
+      loadTab(); loadDash();
+    } catch (e: any) { setError(extractErrorMessage(e, 'Failed')); }
+  };
 
   const RequestCard: React.FC<{ r: ApprovalRequest; actions?: React.ReactNode }> = ({ r, actions }) => (
     <div className="p-3 rounded-xl border border-slate-800/85 bg-slate-950/30">
@@ -318,13 +384,18 @@ export const ApprovalsPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button onClick={() => setChainModal('new')} className="inline-flex items-center gap-1.5 bg-gradient-to-r from-brand-500 to-indigo-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer"><Plus className="w-3.5 h-3.5" /> New chain</button>
             <button onClick={escalate} className="inline-flex items-center gap-1.5 border border-slate-800 text-slate-300 text-xs py-1.5 px-3 rounded-lg cursor-pointer"><AlertTriangle className="w-3.5 h-3.5" /> Escalate overdue</button>
+            <button onClick={runTimeouts} className="inline-flex items-center gap-1.5 border border-slate-800 text-slate-300 text-xs py-1.5 px-3 rounded-lg cursor-pointer"><Clock className="w-3.5 h-3.5" /> Process timeouts</button>
           </div>
           <div className="space-y-2">
             {chains.map((c) => (
               <div key={c.id} className="p-3 rounded-xl border border-slate-800/85 bg-slate-950/30 flex items-center justify-between gap-2">
                 <div>
                   <p className="text-sm text-slate-200 font-medium capitalize">{c.name} <span className="text-[10px] text-slate-600">{c.request_type}{c.min_amount ? ` ≥ ₹${c.min_amount}` : ''}</span></p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{c.steps.map((s, i) => `L${i + 1}:${s.approver_role || 'user'}`).join(' → ')}{c.escalation_hours ? ` · escalate ${c.escalation_hours}h` : ''}{c.is_active ? '' : ' · inactive'}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {c.steps.map((s, i) => `L${i + 1}:${s.approver_role || 'user'}${s.mode === 'all' ? ' (all)' : ''}${s.conditions ? '*' : ''}`).join(' → ')}
+                    {c.conditions ? ' · conditional' : ''}{c.auto_approve_conditions ? ' · auto-approve' : ''}{c.auto_reject_conditions ? ' · auto-reject' : ''}
+                    {c.escalation_hours ? ` · escalate ${c.escalation_hours}h` : ''}{c.timeout_hours ? ` · timeout ${c.timeout_hours}h → ${c.timeout_action?.replace('_', ' ')}` : ''}{c.is_active ? '' : ' · inactive'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setChainModal(c)} className="p-1.5 text-slate-500 hover:text-slate-300 cursor-pointer"><GitBranch className="w-4 h-4" /></button>

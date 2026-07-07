@@ -61,6 +61,7 @@ _TRIGGER_ENTITY = {
     "shift_assigned": "shift",
     "goal_achieved": "performance",
     "approval_approved": "approval", "approval_rejected": "approval",
+    "approval_requested": "approval", "approval_escalated": "approval",
 }
 
 
@@ -144,7 +145,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected", "approval_requested", "approval_escalated"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status

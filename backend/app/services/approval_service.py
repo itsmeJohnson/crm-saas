@@ -23,8 +23,11 @@ from app.models.approval import (
 )
 from app.services.audit_service import AuditService
 from app.services.notification_service import NotificationService
+from app.services import rule_evaluator
 
 ROLE_APPROVERS = ("Manager", "OrgAdmin", "SuperAdmin")
+STEP_MODES = ("any", "all")  # "all" = parallel level: every eligible approver must approve
+TIMEOUT_ACTIONS = ("escalate", "auto_approve", "auto_reject")
 
 
 def _now() -> datetime:
@@ -68,23 +71,42 @@ class ApprovalService:
         for i, s in enumerate(steps, start=1):
             role = s.get("approver_role")
             uid = s.get("approver_user_id")
+            mode = s.get("mode") or "any"
             if not role and not uid:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                     detail=f"Level {i} needs an approver_role or approver_user_id.")
             if role and role not in ROLE_APPROVERS:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                     detail=f"approver_role must be one of {list(ROLE_APPROVERS)}")
-            out.append({"level": i, "approver_role": role, "approver_user_id": str(uid) if uid else None})
+            if mode not in STEP_MODES:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"step mode must be one of {list(STEP_MODES)}")
+            out.append({"level": i, "approver_role": role, "approver_user_id": str(uid) if uid else None,
+                        "mode": mode, "conditions": s.get("conditions") or None})
         return out
+
+    def _validate_timeout(self, data: dict) -> None:
+        ta = data.get("timeout_action")
+        if ta and ta not in TIMEOUT_ACTIONS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"timeout_action must be one of {list(TIMEOUT_ACTIONS)}")
+        if ta and not data.get("timeout_hours"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="timeout_action needs timeout_hours.")
 
     async def create_chain(self, actor: User, data: dict) -> dict:
         self._require_admin(actor)
         if data["request_type"] not in APPROVAL_TYPES:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"request_type must be one of {list(APPROVAL_TYPES)}")
         steps = self._validate_steps(data["steps"])
+        self._validate_timeout(data)
         c = ApprovalChain(organization_id=actor.organization_id, name=data["name"],
                           request_type=data["request_type"], min_amount=_d(data.get("min_amount", 0)),
                           steps=steps, escalation_hours=data.get("escalation_hours"),
+                          conditions=data.get("conditions"),
+                          auto_approve_conditions=data.get("auto_approve_conditions"),
+                          auto_reject_conditions=data.get("auto_reject_conditions"),
+                          timeout_hours=data.get("timeout_hours"), timeout_action=data.get("timeout_action"),
                           is_active=bool(data.get("is_active", True)), created_by=actor.id)
         self.db.add(c)
         await self.db.flush()
@@ -96,9 +118,11 @@ class ApprovalService:
         c = await self._get_chain(actor, chain_id)
         if "steps" in data and data["steps"] is not None:
             c.steps = self._validate_steps(data["steps"])
-        for f in ("name", "escalation_hours", "is_active"):
+        for f in ("name", "escalation_hours", "is_active", "conditions", "auto_approve_conditions",
+                  "auto_reject_conditions", "timeout_hours", "timeout_action"):
             if f in data and data[f] is not None:
                 setattr(c, f, data[f])
+        self._validate_timeout({"timeout_action": c.timeout_action, "timeout_hours": c.timeout_hours})
         if "min_amount" in data and data["min_amount"] is not None:
             c.min_amount = _d(data["min_amount"])
         self.db.add(c)
@@ -128,13 +152,48 @@ class ApprovalService:
                                                       ApprovalChain.min_amount.asc()))).scalars().all())
         return [self._serialize_chain(c) for c in rows]
 
-    async def _resolve_chain(self, org_id, request_type: str, amount: float) -> ApprovalChain | None:
-        """Active chain for the type with the highest min_amount <= amount."""
+    async def _resolve_chain(self, org_id, request_type: str, amount: float,
+                             facts: dict | None = None) -> ApprovalChain | None:
+        """Active chain for the type with the highest min_amount <= amount whose
+        chain-level `conditions` rule tree (if any) matches the request facts —
+        dynamic approval rules."""
         rows = list((await self.db.execute(select(ApprovalChain).filter(
             ApprovalChain.organization_id == org_id, ApprovalChain.is_deleted == False,
             ApprovalChain.is_active == True, ApprovalChain.request_type == request_type,
             ApprovalChain.min_amount <= _d(amount)).order_by(ApprovalChain.min_amount.desc()))).scalars().all())
-        return rows[0] if rows else None
+        # at the same amount tier, a conditional (more specific) chain wins over a generic one
+        rows.sort(key=lambda c: (-float(c.min_amount), 0 if c.conditions else 1))
+        for c in rows:
+            if not c.conditions or rule_evaluator.evaluate(c.conditions, facts or {}):
+                return c
+        return None
+
+    @staticmethod
+    def _request_facts(*, request_type: str, amount, title: str | None = None,
+                       payload: dict | None = None, status_val: str = "pending",
+                       current_level: int = 1) -> dict:
+        facts = dict(payload) if isinstance(payload, dict) else {}
+        facts.update({"request_type": request_type, "amount": float(amount or 0),
+                      "title": title, "status": status_val, "current_level": current_level})
+        return facts
+
+    def _facts_for(self, req: ApprovalRequest) -> dict:
+        return self._request_facts(request_type=req.request_type, amount=req.amount, title=req.title,
+                                   payload=req.payload, status_val=req.status, current_level=req.current_level)
+
+    def _next_active_level(self, chain: ApprovalChain | None, after_level: int, facts: dict) -> int | None:
+        """The next chain level after `after_level` whose per-step conditions match
+        (conditional approval — non-matching levels are skipped). None = no level
+        left, the request is fully approved."""
+        if not chain:
+            return 1 if after_level < 1 else None
+        for s in sorted(chain.steps, key=lambda x: x.get("level") or 0):
+            lvl = s.get("level") or 0
+            if lvl <= after_level:
+                continue
+            if not s.get("conditions") or rule_evaluator.evaluate(s.get("conditions"), facts):
+                return lvl
+        return None
 
     # ================= Requests =================
     async def create_request(self, actor: User, data: dict) -> dict:
@@ -142,14 +201,17 @@ class ApprovalService:
         if request_type not in APPROVAL_TYPES:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"request_type must be one of {list(APPROVAL_TYPES)}")
         amount = float(data.get("amount") or 0)
-        chain = await self._resolve_chain(actor.organization_id, request_type, amount)
+        facts = self._request_facts(request_type=request_type, amount=amount, title=data["title"],
+                                    payload=data.get("payload"))
+        chain = await self._resolve_chain(actor.organization_id, request_type, amount, facts)
         total_levels = len(chain.steps) if chain else 1
+        first_level = self._next_active_level(chain, 0, facts)
         req = ApprovalRequest(organization_id=actor.organization_id, request_type=request_type,
                               title=data["title"], description=data.get("description"),
                               amount=_d(data["amount"]) if data.get("amount") is not None else None,
                               reference_type=data.get("reference_type"), reference_id=data.get("reference_id"),
                               payload=data.get("payload"), chain_id=chain.id if chain else None,
-                              current_level=1, total_levels=total_levels, status="pending",
+                              current_level=first_level or 1, total_levels=total_levels, status="pending",
                               requested_by=actor.id, created_by=actor.id)
         self.db.add(req)
         await self.db.flush()
@@ -157,11 +219,40 @@ class ApprovalService:
         self.db.add(ApprovalAction(organization_id=actor.organization_id, request_id=req.id, level=0,
                                    actor_id=actor.id, action="submitted", note=data.get("description")))
         await self.db.flush()
-        await self._notify_level_approvers(req, chain)
         await self.audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
                                    action="APPROVAL_REQUESTED", resource_type="approval", resource_id=str(req.id),
                                    action_metadata={"type": request_type, "amount": amount})
+        # auto-reject / auto-approve rules of the resolved chain decide on submit
+        if chain and chain.auto_reject_conditions and rule_evaluator.evaluate(chain.auto_reject_conditions, facts):
+            await self._decide(req, actor, approved=False, system_note="Auto-rejected by chain rules",
+                               action_name="auto_rejected")
+            return await self._serialize_request(req)
+        if chain and chain.auto_approve_conditions and rule_evaluator.evaluate(chain.auto_approve_conditions, facts):
+            await self._decide(req, actor, approved=True, system_note="Auto-approved by chain rules",
+                               action_name="auto_approved")
+            return await self._serialize_request(req)
+        if chain and first_level is None:
+            # every level's conditions skipped this request → nothing to approve
+            await self._decide(req, actor, approved=True, system_note="All levels skipped by conditions",
+                               action_name="auto_approved")
+            return await self._serialize_request(req)
+        await self._notify_level_approvers(req, chain)
+        await self._run_workflow(req, actor, "approval_requested")
         return await self._serialize_request(req)
+
+    async def _decide(self, req: ApprovalRequest, actor: User, *, approved: bool,
+                      system_note: str | None = None, action_name: str | None = None) -> None:
+        """Finalize a request (shared by manual, auto and timeout decisions)."""
+        req.status = "approved" if approved else "rejected"
+        req.decided_at = _now()
+        self.db.add(req)
+        if action_name:
+            self.db.add(ApprovalAction(organization_id=req.organization_id, request_id=req.id,
+                                       level=req.current_level, actor_id=None,
+                                       action=action_name, note=system_note))
+        await self.db.flush()
+        await self._notify_requester(req, req.status)
+        await self._run_workflow(req, actor, f"approval_{req.status}")
 
     async def _step_for_level(self, chain: ApprovalChain | None, level: int) -> dict | None:
         if not chain:
@@ -223,6 +314,7 @@ class ApprovalService:
             chain = (await self.db.execute(select(ApprovalChain).filter(ApprovalChain.id == req.chain_id))).scalars().first()
         eligible = await self._eligible_approver_ids(req, chain)
         on_behalf = None
+        admin_override = False
         if actor.id not in eligible:
             # maybe the actor is a delegate for one of the eligible approvers
             delegators = await self._active_delegators_for(actor, req.request_type)
@@ -230,33 +322,39 @@ class ApprovalService:
             if match:
                 on_behalf = next(iter(match))
             elif self._can_admin(actor):
-                on_behalf = None  # OrgAdmin can always act
+                admin_override = True  # OrgAdmin can always act (and settles a parallel level)
             else:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                     detail="You are not an approver for this request at its current level.")
+        step = await self._step_for_level(chain, req.current_level)
+        parallel = bool(step and (step.get("mode") or "any") == "all")
+        if approve and parallel:
+            already = await self._approved_ids_at_level(req)
+            if (on_behalf or actor.id) in already:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                    detail="You have already approved this level.")
         self.db.add(ApprovalAction(organization_id=actor.organization_id, request_id=req.id, level=req.current_level,
                                    actor_id=actor.id, on_behalf_of=on_behalf,
                                    action="approved" if approve else "rejected", note=note))
         if not approve:
-            req.status = "rejected"
-            req.decided_at = _now()
-            self.db.add(req)
-            await self.db.flush()
-            await self._notify_requester(req, "rejected")
-            await self._run_workflow(req, actor, "approval_rejected")
+            await self._decide(req, actor, approved=False)  # any rejection vetoes the request
         else:
-            if req.current_level < req.total_levels:
-                req.current_level += 1
-                self.db.add(req)
+            level_done = True
+            if parallel and not admin_override:
                 await self.db.flush()
-                await self._notify_level_approvers(req, chain)  # advance to next level (multi-level)
+                approved_ids = await self._approved_ids_at_level(req)
+                level_done = eligible.issubset(approved_ids)  # parallel: ALL eligible approvers must approve
+            if not level_done:
+                await self.db.flush()
             else:
-                req.status = "approved"
-                req.decided_at = _now()
-                self.db.add(req)
-                await self.db.flush()
-                await self._notify_requester(req, "approved")
-                await self._run_workflow(req, actor, "approval_approved")
+                nxt = self._next_active_level(chain, req.current_level, self._facts_for(req))
+                if nxt is not None:
+                    req.current_level = nxt
+                    self.db.add(req)
+                    await self.db.flush()
+                    await self._notify_level_approvers(req, chain)  # advance to next level (multi-level)
+                else:
+                    await self._decide(req, actor, approved=True)
         await self.audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
                                    action=f"APPROVAL_{'APPROVED' if approve else 'REJECTED'}",
                                    resource_type="approval", resource_id=str(req.id),
@@ -310,9 +408,89 @@ class ApprovalService:
                     organization_id=actor.organization_id, user_id=aid, category="approval",
                     title="Approval escalated", body=f'"{req.title}" has been pending too long.',
                     link_url="/approvals", priority="high", action_metadata={"request_id": str(req.id)})
+            await self._run_workflow(req, actor, "approval_escalated")
             escalated += 1
         await self.db.flush()
         return {"escalated": escalated}
+
+    async def _approved_ids_at_level(self, req: ApprovalRequest) -> set[uuid.UUID]:
+        """Effective approvers (delegator when a delegate acted) who already
+        approved the request's current level — drives parallel 'all' levels."""
+        rows = list((await self.db.execute(select(ApprovalAction).filter(
+            ApprovalAction.request_id == req.id, ApprovalAction.is_deleted == False,
+            ApprovalAction.level == req.current_level, ApprovalAction.action == "approved"))).scalars().all())
+        return {(a.on_behalf_of or a.actor_id) for a in rows if (a.on_behalf_of or a.actor_id)}
+
+    async def process_timeouts(self, org_id: uuid.UUID) -> dict:
+        """Apply each chain's timeout_action to pending requests stuck at a level
+        longer than timeout_hours (measured from the last recorded action, so a
+        multi-level request gets a fresh clock per level). Safe to run repeatedly
+        — cron-driven and also exposed to admins on demand."""
+        now = _now()
+        reqs = list((await self.db.execute(select(ApprovalRequest).filter(
+            ApprovalRequest.organization_id == org_id, ApprovalRequest.is_deleted == False,
+            ApprovalRequest.status == "pending", ApprovalRequest.chain_id.isnot(None)))).scalars().all())
+        chains = {c.id: c for c in (await self.db.execute(select(ApprovalChain).filter(
+            ApprovalChain.organization_id == org_id, ApprovalChain.is_deleted == False))).scalars().all()}
+        out = {"processed": 0, "auto_approved": 0, "auto_rejected": 0, "escalated": 0}
+        for req in reqs:
+            chain = chains.get(req.chain_id)
+            if not chain or not chain.timeout_hours or not chain.timeout_action:
+                continue
+            last_action_at = (await self.db.execute(select(func.max(ApprovalAction.created_at)).filter(
+                ApprovalAction.request_id == req.id, ApprovalAction.is_deleted == False))).scalar()
+            reference = last_action_at or req.created_at
+            if not reference:
+                continue
+            elapsed_h = (now - self._aware(reference)).total_seconds() / 3600
+            if elapsed_h < chain.timeout_hours:
+                continue
+            requester = (await self.db.execute(select(User).filter(User.id == req.requested_by))).scalars().first()
+            note = f"Timed out after {chain.timeout_hours}h at level {req.current_level}"
+            if chain.timeout_action == "auto_reject":
+                await self._decide(req, requester, approved=False, system_note=note, action_name="auto_rejected")
+                out["auto_rejected"] += 1
+            elif chain.timeout_action == "auto_approve":
+                # the timeout settles the whole level (incl. parallel), then advances
+                self.db.add(ApprovalAction(organization_id=req.organization_id, request_id=req.id,
+                                           level=req.current_level, actor_id=None, action="auto_approved", note=note))
+                nxt = self._next_active_level(chain, req.current_level, self._facts_for(req))
+                if nxt is not None:
+                    req.current_level = nxt
+                    self.db.add(req)
+                    await self.db.flush()
+                    await self._notify_level_approvers(req, chain)
+                else:
+                    await self._decide(req, requester, approved=True)
+                out["auto_approved"] += 1
+            else:  # escalate
+                if req.escalated:
+                    continue
+                req.escalated = True
+                self.db.add(req)
+                self.db.add(ApprovalAction(organization_id=req.organization_id, request_id=req.id,
+                                           level=req.current_level, actor_id=None, action="escalated", note=note))
+                admins = (await self.db.execute(select(User.id).filter(
+                    User.organization_id == org_id, User.is_deleted == False,
+                    User.role.in_(["OrgAdmin", "SuperAdmin"])))).scalars().all()
+                for aid in admins:
+                    await self.notifier.create_notification(
+                        organization_id=org_id, user_id=aid, category="approval",
+                        title="Approval escalated", body=f'"{req.title}" timed out at level {req.current_level}.',
+                        link_url="/approvals", priority="high", action_metadata={"request_id": str(req.id)})
+                await self.db.flush()
+                await self._run_workflow(req, requester, "approval_escalated")
+                out["escalated"] += 1
+            await self.audit.log_event(organization_id=org_id, actor_user_id=None,
+                                       action="APPROVAL_TIMEOUT", resource_type="approval", resource_id=str(req.id),
+                                       action_metadata={"action": chain.timeout_action, "hours": chain.timeout_hours})
+            out["processed"] += 1
+        await self.db.flush()
+        return out
+
+    async def process_timeouts_for(self, actor: User) -> dict:
+        self._require_admin(actor)
+        return await self.process_timeouts(actor.organization_id)
 
     # ================= Delegation =================
     async def create_delegation(self, actor: User, data: dict) -> dict:
@@ -499,6 +677,9 @@ class ApprovalService:
     def _serialize_chain(self, c: ApprovalChain) -> dict:
         return {"id": str(c.id), "name": c.name, "request_type": c.request_type,
                 "min_amount": float(c.min_amount), "steps": c.steps,
+                "conditions": c.conditions, "auto_approve_conditions": c.auto_approve_conditions,
+                "auto_reject_conditions": c.auto_reject_conditions,
+                "timeout_hours": c.timeout_hours, "timeout_action": c.timeout_action,
                 "escalation_hours": c.escalation_hours, "is_active": c.is_active, "created_at": c.created_at}
 
     def _serialize_delegation(self, d: ApprovalDelegation) -> dict:

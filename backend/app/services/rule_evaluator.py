@@ -59,7 +59,11 @@ def _now(ctx: dict | None) -> datetime:
 
 
 def resolve_variable(name: str, ctx: dict | None = None):
-    """Resolve a dynamic variable name to a concrete value."""
+    """Resolve a dynamic variable name to a concrete value. Org-defined named
+    variables (passed in ctx['user_vars']) take precedence over the built-ins."""
+    user_vars = (ctx or {}).get("user_vars")
+    if user_vars and name in user_vars:
+        return user_vars[name]
     now = _now(ctx)
     today = now.date()
     if name == "today":

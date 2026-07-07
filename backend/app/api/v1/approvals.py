@@ -8,7 +8,7 @@ from app.models.user import User
 from app.schemas.approval import (
     ChainCreate, ChainUpdate, ChainResponse, RequestCreate, ActRequest, RequestResponse, RequestList,
     HistoryRow, DelegationCreate, DelegationResponse, ApprovalDashboardResponse, ApprovalReportResponse,
-    EscalateResult,
+    EscalateResult, TimeoutResult,
 )
 from app.services.approval_service import ApprovalService
 from app.middleware.permissions import require_active_user
@@ -16,12 +16,17 @@ from app.middleware.permissions import require_active_user
 router = APIRouter()
 
 
+def _steps(steps: list) -> list:
+    return [{"approver_role": s.get("approver_role"),
+             "approver_user_id": str(s["approver_user_id"]) if s.get("approver_user_id") else None,
+             "mode": s.get("mode"), "conditions": s.get("conditions")}
+            for s in steps]
+
+
 def _chain_payload(model) -> dict:
     d = model.model_dump(exclude_unset=True)
     if d.get("steps") is not None:
-        d["steps"] = [{"approver_role": s.get("approver_role"),
-                       "approver_user_id": str(s["approver_user_id"]) if s.get("approver_user_id") else None}
-                      for s in d["steps"]]
+        d["steps"] = _steps(d["steps"])
     return d
 
 
@@ -42,6 +47,11 @@ async def escalate_overdue(actor: Annotated[User, Depends(require_active_user)],
     return await ApprovalService(db).escalate_overdue(actor)
 
 
+@router.post("/process-timeouts", response_model=TimeoutResult)
+async def process_timeouts(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await ApprovalService(db).process_timeouts_for(actor)
+
+
 # ---------- Chains ----------
 @router.get("/chains", response_model=List[ChainResponse])
 async def list_chains(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)],
@@ -52,9 +62,7 @@ async def list_chains(actor: Annotated[User, Depends(require_active_user)], db: 
 @router.post("/chains", response_model=ChainResponse, status_code=status.HTTP_201_CREATED)
 async def create_chain(req: ChainCreate, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
     payload = req.model_dump()
-    payload["steps"] = [{"approver_role": s.get("approver_role"),
-                         "approver_user_id": str(s["approver_user_id"]) if s.get("approver_user_id") else None}
-                        for s in payload["steps"]]
+    payload["steps"] = _steps(payload["steps"])
     return await ApprovalService(db).create_chain(actor, payload)
 
 

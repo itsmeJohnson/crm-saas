@@ -3,7 +3,15 @@ import { api } from './api';
 export const APPROVAL_TYPES = ['leave', 'expense', 'discount', 'quotation', 'target', 'user', 'role', 'generic'] as const;
 export const APPROVER_ROLES = ['Manager', 'OrgAdmin', 'SuperAdmin'] as const;
 
-export interface ChainStep { level?: number; approver_role: string | null; approver_user_id: string | null; }
+export const TIMEOUT_ACTIONS = ['escalate', 'auto_approve', 'auto_reject'] as const;
+
+export interface ChainStep {
+  level?: number;
+  approver_role: string | null;
+  approver_user_id: string | null;
+  mode?: string | null; // 'all' = parallel level (every eligible approver must approve)
+  conditions?: any | null; // rule tree; unmatched → level skipped
+}
 
 export interface Chain {
   id: string;
@@ -11,10 +19,17 @@ export interface Chain {
   request_type: string;
   min_amount: number;
   steps: ChainStep[];
+  conditions: any | null;
+  auto_approve_conditions: any | null;
+  auto_reject_conditions: any | null;
   escalation_hours: number | null;
+  timeout_hours: number | null;
+  timeout_action: string | null;
   is_active: boolean;
   created_at: string;
 }
+
+export interface TimeoutResult { processed: number; auto_approved: number; auto_rejected: number; escalated: number; }
 
 export interface ApprovalRequest {
   id: string;
@@ -73,6 +88,7 @@ export const approvalApi = {
   dashboard: async () => (await api.get<ApprovalDashboard>('/approvals/dashboard')).data,
   report: async (params: { request_type?: string } = {}) => (await api.get<ApprovalReport>('/approvals/report', { params })).data,
   escalateOverdue: async () => (await api.post<{ escalated: number }>('/approvals/escalate-overdue', {})).data,
+  processTimeouts: async () => (await api.post<TimeoutResult>('/approvals/process-timeouts', {})).data,
 
   listChains: async (params: { request_type?: string } = {}) => (await api.get<Chain[]>('/approvals/chains', { params })).data,
   createChain: async (payload: any) => (await api.post<Chain>('/approvals/chains', payload)).data,

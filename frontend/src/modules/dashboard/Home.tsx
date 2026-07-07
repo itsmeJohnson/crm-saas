@@ -40,6 +40,7 @@ import { SchedulerWidget } from '../../components/dashboard/SchedulerWidget';
 import { NotificationAutomationWidget } from '../../components/dashboard/NotificationAutomationWidget';
 import { SLAWidget } from '../../components/dashboard/SLAWidget';
 import { EscalationWidget } from '../../components/dashboard/EscalationWidget';
+import { AutomationAnalyticsWidget } from '../../components/dashboard/AutomationAnalyticsWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -213,6 +214,7 @@ export const Home: React.FC = () => {
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <NotificationAutomationWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SLAWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EscalationWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AutomationAnalyticsWidget />}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (

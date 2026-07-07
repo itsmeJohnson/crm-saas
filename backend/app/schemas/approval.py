@@ -9,6 +9,8 @@ class ChainStep(BaseModel):
     level: int | None = None
     approver_role: str | None = Field(None, pattern="^(Manager|OrgAdmin|SuperAdmin)$")
     approver_user_id: uuid.UUID | None = None
+    mode: str | None = Field(None, pattern="^(any|all)$")  # "all" = parallel level
+    conditions: Any | None = None  # rule tree; unmatched → level skipped
 
 
 class ChainCreate(BaseModel):
@@ -16,7 +18,12 @@ class ChainCreate(BaseModel):
     request_type: str
     min_amount: float = Field(0, ge=0)
     steps: list[ChainStep] = Field(..., min_length=1)
+    conditions: Any | None = None  # dynamic chain selection rule tree
+    auto_approve_conditions: Any | None = None
+    auto_reject_conditions: Any | None = None
     escalation_hours: int | None = Field(None, ge=1)
+    timeout_hours: int | None = Field(None, ge=1)
+    timeout_action: str | None = Field(None, pattern="^(escalate|auto_approve|auto_reject)$")
     is_active: bool = True
 
 
@@ -24,7 +31,12 @@ class ChainUpdate(BaseModel):
     name: str | None = Field(None, max_length=150)
     min_amount: float | None = Field(None, ge=0)
     steps: list[ChainStep] | None = None
+    conditions: Any | None = None
+    auto_approve_conditions: Any | None = None
+    auto_reject_conditions: Any | None = None
     escalation_hours: int | None = Field(None, ge=1)
+    timeout_hours: int | None = Field(None, ge=1)
+    timeout_action: str | None = Field(None, pattern="^(escalate|auto_approve|auto_reject)$")
     is_active: bool | None = None
 
 
@@ -34,7 +46,12 @@ class ChainResponse(BaseModel):
     request_type: str
     min_amount: float
     steps: list[dict]
+    conditions: Any | None = None
+    auto_approve_conditions: Any | None = None
+    auto_reject_conditions: Any | None = None
     escalation_hours: int | None = None
+    timeout_hours: int | None = None
+    timeout_action: str | None = None
     is_active: bool
     created_at: datetime
 
@@ -123,4 +140,11 @@ class ApprovalReportResponse(BaseModel):
 
 
 class EscalateResult(BaseModel):
+    escalated: int
+
+
+class TimeoutResult(BaseModel):
+    processed: int
+    auto_approved: int
+    auto_rejected: int
     escalated: int

@@ -13,18 +13,26 @@ APPROVAL_TYPES = ("leave", "expense", "discount", "quotation", "target", "user",
 
 class ApprovalChain(BaseModel):
     """A configurable multi-level approval chain for a request type. `steps` is
-    an ordered JSON list [{level, approver_role, approver_user_id}]. `min_amount`
-    lets a type have tiered chains (e.g. discount > 5000 needs a 2-level chain);
-    the engine picks the active chain for the type with the highest min_amount
-    that is <= the request amount."""
+    an ordered JSON list [{level, approver_role, approver_user_id, mode, conditions}]
+    — `mode` "all" makes the level parallel (every eligible approver must approve;
+    default "any"), and per-step `conditions` (rule_evaluator tree) skip the level
+    when they don't match the request. `min_amount` lets a type have tiered chains
+    (e.g. discount > 5000 needs a 2-level chain); the engine picks the active chain
+    for the type with the highest min_amount that is <= the request amount, gated
+    by the chain-level `conditions` rule tree (dynamic approval rules)."""
     __tablename__ = "approval_chains"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     request_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)  # one of APPROVAL_TYPES
     min_amount: Mapped[float] = mapped_column(Numeric(14, 2), default=0, nullable=False)
-    steps: Mapped[list] = mapped_column(JSON, nullable=False)  # [{level, approver_role, approver_user_id}]
+    steps: Mapped[list] = mapped_column(JSON, nullable=False)  # [{level, approver_role, approver_user_id, mode, conditions}]
+    conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # rule tree gating chain selection
+    auto_approve_conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # match on submit → approved
+    auto_reject_conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # match on submit → rejected
     escalation_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)  # auto-escalate if pending longer
+    timeout_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)  # per-level timeout
+    timeout_action: Mapped[str | None] = mapped_column(String(16), nullable=True)  # escalate|auto_approve|auto_reject
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 

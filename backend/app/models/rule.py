@@ -25,6 +25,9 @@ class Rule(BaseModel):
     category: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     entity_type: Mapped[str] = mapped_column(String(40), nullable=False, default="lead", index=True)
     definition: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    # Business Rule Designer: actions run when the rule matches (if-this-then-that).
+    # A list of {type, ...}; empty ⇒ an evaluation-only rule (backward compatible).
+    actions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False, index=True)
     conflict_strategy: Mapped[str] = mapped_column(String(30), default="highest_priority", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
