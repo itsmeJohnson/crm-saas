@@ -41,6 +41,8 @@ import { NotificationAutomationWidget } from '../../components/dashboard/Notific
 import { SLAWidget } from '../../components/dashboard/SLAWidget';
 import { EscalationWidget } from '../../components/dashboard/EscalationWidget';
 import { AutomationAnalyticsWidget } from '../../components/dashboard/AutomationAnalyticsWidget';
+import { ExecutiveDashboardWidget } from '../../components/dashboard/ExecutiveDashboardWidget';
+import { ReportBuilderWidget } from '../../components/dashboard/ReportBuilderWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -205,6 +207,8 @@ export const Home: React.FC = () => {
         <ApprovalsWidget />
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AnnouncementsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OrgHealthWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ExecutiveDashboardWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ReportBuilderWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <RulesWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AutomationWidget />}
