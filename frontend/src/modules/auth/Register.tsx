@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { api } from '../../services/api';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 
 const registerSchema = z.object({
   company_name: z.string().min(2, 'Company name must be at least 2 characters'),
@@ -19,6 +20,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
+  const { setAuth } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -45,11 +47,22 @@ export const Register: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await api.post('/auth/register', data);
+      const regRes = await api.post('/auth/public-register', data);
+      const { access_token, refresh_token } = regRes.data;
+
+      // Fetch user profile using the new access token
+      const meRes = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${access_token}` }
+      });
+      const { user, organization, features } = meRes.data;
+
+      // Store in auth store
+      setAuth(user, organization, features || [], access_token, refresh_token);
+
       setSuccess(true);
       setTimeout(() => {
-        navigate('/login');
-      }, 2500);
+        navigate('/');
+      }, 1500);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed. Please check details and try again.');
     } finally {

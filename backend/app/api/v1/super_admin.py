@@ -26,7 +26,8 @@ from app.schemas.super_admin import (
     SubscriptionUpdateRequest, TenantResponse, TenantUserResponse,
     TenantInvoiceResponse, InvoiceCreateRequest,
     PlanCreate, PlanUpdate, PlanResponse, FeatureResponse, PlanFeatureResponse,
-    PlanFeatureToggle, PlanFeatureClone, SystemSettingRequest, SystemSettingResponse
+    PlanFeatureToggle, PlanFeatureClone, SystemSettingRequest, SystemSettingResponse,
+    TenantUsageUpdateRequest
 )
 from app.services.auth_service import AuthService
 from app.schemas.auth import RegisterTenantRequest
@@ -40,6 +41,7 @@ async def list_tenants(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List all tenant organizations in the system with user and invoice counts."""
+    from sqlalchemy.orm import selectinload
     # Subquery for user count
     user_sub = select(
         User.organization_id, 
@@ -60,7 +62,7 @@ async def list_tenants(
         user_sub, Organization.id == user_sub.c.organization_id
     ).outerjoin(
         inv_sub, Organization.id == inv_sub.c.organization_id
-    ).where(Organization.is_deleted == False)
+    ).where(Organization.is_deleted == False).options(selectinload(Organization.subscription))
 
     res = await db.execute(query)
     results = []
@@ -76,7 +78,8 @@ async def list_tenants(
                 subscription_status=org.subscription_status,
                 max_users=org.max_users,
                 user_count=u_cnt,
-                invoice_count=i_cnt
+                invoice_count=i_cnt,
+                call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0
             )
         )
     return results
@@ -133,8 +136,11 @@ async def update_tenant_subscription(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update tenant organization's plan, status, user limits, and expiration date."""
-    org = await db.get(Organization, org_id)
-    if not org or org.is_deleted:
+    from sqlalchemy.orm import selectinload
+    stmt = select(Organization).where(Organization.id == org_id, Organization.is_deleted == False).options(selectinload(Organization.subscription))
+    res = await db.execute(stmt)
+    org = res.scalar_one_or_none()
+    if not org:
         raise HTTPException(status_code=404, detail="Tenant organization not found")
     
     org.subscription_plan = payload.subscription_plan
@@ -169,7 +175,50 @@ async def update_tenant_subscription(
         subscription_status=org.subscription_status,
         max_users=org.max_users,
         user_count=u_res.scalar() or 0,
-        invoice_count=i_res.scalar() or 0
+        invoice_count=i_res.scalar() or 0,
+        call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0
+    )
+
+@router.put("/tenants/{org_id}/usage", response_model=TenantResponse)
+async def update_tenant_usage(
+    org_id: uuid.UUID,
+    payload: TenantUsageUpdateRequest,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Update a tenant's logged calling usage minutes."""
+    from sqlalchemy.orm import selectinload
+    stmt = select(Organization).where(Organization.id == org_id, Organization.is_deleted == False).options(selectinload(Organization.subscription))
+    res = await db.execute(stmt)
+    org = res.scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Tenant organization not found")
+        
+    if not org.subscription:
+        raise HTTPException(status_code=400, detail="Tenant has no active subscription record")
+        
+    org.subscription.call_recording_usage = payload.call_recording_usage
+    await db.commit()
+    
+    # Get counts
+    user_count_query = select(func.count(User.id)).where(User.organization_id == org_id, User.is_deleted == False)
+    invoice_count_query = select(func.count(Invoice.id)).where(Invoice.organization_id == org_id)
+    
+    u_res = await db.execute(user_count_query)
+    i_res = await db.execute(invoice_count_query)
+    
+    return TenantResponse(
+        id=org.id,
+        name=org.name,
+        slug=org.slug,
+        is_active=org.is_active,
+        subscription_plan=org.subscription_plan,
+        subscription_expires_at=org.subscription_expires_at,
+        subscription_status=org.subscription_status,
+        max_users=org.max_users,
+        user_count=u_res.scalar() or 0,
+        invoice_count=i_res.scalar() or 0,
+        call_recording_usage=org.subscription.call_recording_usage
     )
 
 @router.get("/tenants/{org_id}/invoices", response_model=List[TenantInvoiceResponse])

@@ -1,6 +1,7 @@
 import uuid
 import json
 import asyncio
+from datetime import datetime, date, time, timezone
 from typing import Dict, Any, List, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
@@ -11,6 +12,7 @@ from app.models.lead import Lead
 from app.models.contact import Contact
 from app.models.company import Company
 from app.models.activity import Activity
+from app.models.pipeline import PipelineStage
 from app.core.redis import redis_client
 
 class DashboardService:
@@ -55,7 +57,7 @@ class DashboardService:
             Activity.is_deleted == False
         )
         leads_by_status_query = select(
-            Lead.status, 
+            Lead.status,
             func.count(Lead.id)
         ).filter(
             Lead.organization_id == org_id,
@@ -77,6 +79,63 @@ class DashboardService:
             .group_by(Lead.assigned_user_id, User.first_name, User.last_name)
         )
 
+        # Lead sources — reuses the existing (already-populated) Lead.source field.
+        leads_by_source_query = select(
+            Lead.source,
+            func.count(Lead.id)
+        ).filter(
+            Lead.organization_id == org_id,
+            Lead.is_deleted == False
+        ).group_by(Lead.source)
+
+        # Pipeline by stage — reuses the org's actual configured pipeline stages
+        # (Pipeline Settings), ordered the same way the Pipeline module orders them.
+        leads_by_stage_query = (
+            select(PipelineStage.id, PipelineStage.name, PipelineStage.order_position, func.count(Lead.id))
+            .outerjoin(Lead, (Lead.stage_id == PipelineStage.id) & (Lead.is_deleted == False))
+            .filter(PipelineStage.organization_id == org_id, PipelineStage.is_deleted == False)
+            .group_by(PipelineStage.id, PipelineStage.name, PipelineStage.order_position)
+            .order_by(PipelineStage.order_position)
+        )
+
+        # "Today" scoping (server timezone = UTC, matching every other date-scoped
+        # query in this codebase, e.g. AnalyticsService.get_telecaller_metrics).
+        today = date.today()
+        today_start = datetime.combine(today, time.min).replace(tzinfo=timezone.utc)
+        today_end = datetime.combine(today, time.max).replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+
+        leads_today_query = select(func.count(Lead.id)).filter(
+            Lead.organization_id == org_id,
+            Lead.is_deleted == False,
+            Lead.created_at >= today_start,
+            Lead.created_at <= today_end
+        )
+        meetings_today_query = select(func.count(Activity.id)).filter(
+            Activity.organization_id == org_id,
+            Activity.is_deleted == False,
+            Activity.activity_type == "Meeting",
+            Activity.due_date >= today_start,
+            Activity.due_date <= today_end
+        )
+        tasks_today_query = select(func.count(Activity.id)).filter(
+            Activity.organization_id == org_id,
+            Activity.is_deleted == False,
+            Activity.activity_type == "Task",
+            Activity.due_date >= today_start,
+            Activity.due_date <= today_end
+        )
+        # Follow-ups due = anything not yet completed whose due date has arrived
+        # (today or earlier) — the same "overdue-or-due-today" definition already
+        # implied by Activity.status's own "Overdue" value.
+        followups_due_query = select(func.count(Activity.id)).filter(
+            Activity.organization_id == org_id,
+            Activity.is_deleted == False,
+            Activity.status.in_(["Planned", "Overdue"]),
+            Activity.due_date.isnot(None),
+            Activity.due_date <= today_end
+        )
+
         # Run queries in parallel
         db_results = await asyncio.gather(
             self.db.execute(total_leads_query),
@@ -85,7 +144,13 @@ class DashboardService:
             self.db.execute(user_count_query),
             self.db.execute(activities_count_query),
             self.db.execute(leads_by_status_query),
-            self.db.execute(assigned_leads_query)
+            self.db.execute(assigned_leads_query),
+            self.db.execute(leads_by_source_query),
+            self.db.execute(leads_by_stage_query),
+            self.db.execute(leads_today_query),
+            self.db.execute(meetings_today_query),
+            self.db.execute(tasks_today_query),
+            self.db.execute(followups_due_query),
         )
 
         total_leads = db_results[0].scalar_one()
@@ -123,6 +188,35 @@ class DashboardService:
                     "lead_count": count
                 })
 
+        leads_by_source = {}
+        for source_row in db_results[7].all():
+            source_name = source_row[0] or "Unknown"
+            leads_by_source[source_name] = leads_by_source.get(source_name, 0) + source_row[1]
+
+        converted_stage_name = None
+        leads_by_stage = []
+        for stage_row in db_results[8].all():
+            stage_name = stage_row[1]
+            stage_count = stage_row[3]
+            leads_by_stage.append({
+                "stage_id": str(stage_row[0]),
+                "stage_name": stage_name,
+                "count": stage_count,
+            })
+            if stage_name == "Converted":
+                converted_stage_name = stage_name
+
+        # None (not 0.0) when the org has no stage literally named "Converted" —
+        # matches AnalyticsService.get_converted_stage_id()'s existing convention
+        # (already relied on by the Telecaller/Team-Leader conversion cards).
+        # Distinguishing "not configured" from "configured but genuinely 0%" avoids
+        # showing a misleading number for orgs whose pipeline uses different naming
+        # (e.g. this demo org's stage is named "Won", not "Converted").
+        conversion_rate = None
+        if converted_stage_name and total_leads > 0:
+            converted_count = next((s["count"] for s in leads_by_stage if s["stage_name"] == "Converted"), 0)
+            conversion_rate = round((converted_count / total_leads) * 100, 1)
+
         summary = {
             "total_leads": total_leads,
             "contacts_count": contacts_count,
@@ -130,7 +224,16 @@ class DashboardService:
             "user_count": user_count,
             "activities_count": activities_count,
             "leads_by_status": leads_by_status,
-            "assigned_leads_breakdown": assigned_leads_breakdown
+            "assigned_leads_breakdown": assigned_leads_breakdown,
+            "leads_by_source": leads_by_source,
+            "leads_by_stage": leads_by_stage,
+            "conversion_rate": conversion_rate,
+            "today": {
+                "leads_created": db_results[9].scalar_one() or 0,
+                "meetings_due": db_results[10].scalar_one() or 0,
+                "tasks_due": db_results[11].scalar_one() or 0,
+                "follow_ups_due": db_results[12].scalar_one() or 0,
+            },
         }
 
         # Cache results for 5 minutes
@@ -140,6 +243,98 @@ class DashboardService:
             pass
 
         return summary
+
+    async def employee_summary(self, actor: User) -> Dict[str, Any]:
+        """Personal snapshot for the Employee Dashboard: my leads, today's calls
+        and meetings, and my task counts. Everything is scoped to the actor."""
+        from app.models.task import Task
+        from app.models.calendar_event import CalendarEvent
+        org = actor.organization_id
+        today = date.today()
+        start = datetime.combine(today, time.min).replace(tzinfo=timezone.utc)
+        end = datetime.combine(today, time.max).replace(tzinfo=timezone.utc)
+
+        # My leads (assigned to me), with a small status breakdown
+        lead_rows = (await self.db.execute(select(Lead.status, func.count(Lead.id)).filter(
+            Lead.organization_id == org, Lead.is_deleted == False, Lead.assigned_user_id == actor.id,
+            Lead.is_archived == False).group_by(Lead.status))).all()
+        by_status = {s: n for s, n in lead_rows}
+        my_leads_total = sum(by_status.values())
+        converted = sum(n for s, n in by_status.items() if s in ("Won", "Converted", "Customer"))
+
+        # Today's calls (Call activities I logged/own today)
+        today_calls = (await self.db.execute(select(func.count(Activity.id)).filter(
+            Activity.organization_id == org, Activity.is_deleted == False,
+            Activity.assigned_user_id == actor.id, Activity.activity_type == "Call",
+            Activity.created_at >= start, Activity.created_at <= end))).scalar() or 0
+
+        # Today's meetings (calendar events assigned to me overlapping today)
+        meetings = list((await self.db.execute(select(CalendarEvent).filter(
+            CalendarEvent.organization_id == org, CalendarEvent.is_deleted == False,
+            CalendarEvent.assigned_user_id == actor.id, CalendarEvent.start_at <= end,
+            CalendarEvent.end_at >= start).order_by(CalendarEvent.start_at.asc()))).scalars().all())
+        today_meetings = [{"id": str(m.id), "title": m.title, "event_type": m.event_type,
+                           "start_at": m.start_at.isoformat() if m.start_at else None,
+                           "status": m.status} for m in meetings]
+
+        # My tasks
+        open_tasks = (await self.db.execute(select(func.count(Task.id)).filter(
+            Task.organization_id == org, Task.is_deleted == False, Task.assigned_user_id == actor.id,
+            Task.status.in_(["Todo", "InProgress"])))).scalar() or 0
+        overdue_tasks = (await self.db.execute(select(func.count(Task.id)).filter(
+            Task.organization_id == org, Task.is_deleted == False, Task.assigned_user_id == actor.id,
+            Task.status.in_(["Todo", "InProgress"]), Task.due_date.isnot(None), Task.due_date < end))).scalar() or 0
+
+        return {
+            "my_leads_total": my_leads_total, "my_leads_converted": converted,
+            "my_leads_by_status": [{"status": s, "count": n} for s, n in by_status.items()],
+            "today_calls": today_calls, "today_meetings_count": len(today_meetings),
+            "today_meetings": today_meetings, "open_tasks": open_tasks, "overdue_tasks": overdue_tasks,
+        }
+
+    async def get_team_status(self, actor: User) -> List[Dict[str, Any]]:
+        """Live agent-state snapshot (IDLE / ACTIVE_CALLING / BREAK) for the
+        actor's downline — Manager/TeamLeader/OrgAdmin only. Reuses the same
+        Redis-backed AgentStateService the dialer console itself reads/writes,
+        so this is always exactly in sync with what an agent's own console shows."""
+        from app.services.user_service import UserService
+        from app.services.agent_state_service import AgentStateService
+        from app.middleware.permissions import check_is_team_leader
+
+        if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager") and not await check_is_team_leader(actor, self.db):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view team status.")
+
+        user_service = UserService(self.db)
+        agent_state_service = AgentStateService()
+
+        downline_ids = await user_service.get_downline_user_ids(actor)
+        if not downline_ids:
+            return []
+
+        users_query = select(User.id, User.first_name, User.last_name, User.role).where(
+            User.id.in_(downline_ids),
+            User.organization_id == actor.organization_id,
+            User.is_active == True,
+            User.is_deleted == False,
+        )
+        res = await self.db.execute(users_query)
+        team_members = res.all()
+
+        states = await asyncio.gather(*[
+            agent_state_service.get_agent_state(actor.organization_id, member_id)
+            for member_id, _, _, _ in team_members
+        ])
+
+        return [
+            {
+                "user_id": str(member_id),
+                "user_name": f"{first_name or ''} {last_name or ''}".strip() or "Unnamed User",
+                "role": role,
+                "state": state_data.get("state", "IDLE"),
+                "since": state_data.get("timestamp"),
+            }
+            for (member_id, first_name, last_name, role), state_data in zip(team_members, states)
+        ]
 
     async def get_recent_activities(
         self, actor: User, page: int = 1, limit: int = 10

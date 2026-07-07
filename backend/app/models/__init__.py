@@ -29,6 +29,56 @@ from app.models.tax_config import TaxConfig
 from app.models.payment_gateway import PaymentGateway
 from app.models.notification_template import NotificationTemplate
 from app.models.coupon import Coupon
+from app.models.notification import Notification, NotificationPreference, PushSubscription
+from app.models.saved_filter import SavedFilter
+from app.models.lead_reminder import LeadReminder
+from app.models.escalation_config import EscalationConfig
+from app.models.workflow_rule import WorkflowRule
+from app.models.custom_field_definition import CustomFieldDefinition
+from app.models.contact_relationship import ContactRelationship
+from app.models.customer_order import CustomerOrder
+from app.models.customer_invoice import CustomerInvoice
+from app.models.customer_payment import CustomerPayment
+from app.models.contract import Contract
+from app.models.task import Task
+from app.models.task_comment import TaskComment
+from app.models.task_dependency import TaskDependency
+from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
+from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
+from app.models.sms_settings import SmsSettings
+from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
+from app.models.email_settings import EmailSettings
+from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment
+from app.models.department import Department, DepartmentTarget
+from app.models.custom_role import CustomRole, RolePermission, FieldPermission
+from app.models.team import Team, TeamMember, TeamTarget
+from app.models.branch import Territory, Branch, TerritoryPincode
+from app.models.attendance import (
+    Shift, ShiftAssignment, AttendanceRecord, AttendanceBreak, AttendanceCorrection,
+)
+from app.models.leave import LeaveType, LeaveBalance, LeaveRequest
+from app.models.shift_rotation import ShiftRotation, ShiftRotationMember
+from app.models.performance import PerformanceKPI, PerformanceGoal, PerformanceAchievement
+from app.models.approval import (
+    ApprovalChain, ApprovalRequest, ApprovalAction, ApprovalDelegation,
+)
+from app.models.announcement import Announcement
+from app.models.workflow import (
+    Workflow, WorkflowVersion, WorkflowExecution, WorkflowExecutionStep,
+)
+from app.models.rule import Rule, RuleEvaluation
+from app.models.rule_designer import RuleComponent, RuleVariable, RuleVersion
+from app.models.automation import (
+    AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
+)
+from app.models.event import Event, EventSubscription, EventDelivery
+from app.models.queue import QueueJob, QueueWorker
+from app.models.scheduler import Schedule, ScheduleRun
+from app.models.notification_automation import (
+    NotificationRule, NotificationDelivery, NotificationDigestItem,
+)
+from app.models.sla import SLATracker, SLAPause
+from app.models.escalation import EscalationRule, EscalationEvent
 
 __all__ = [
     "Base", 
@@ -66,5 +116,92 @@ __all__ = [
     "TaxConfig",
     "PaymentGateway",
     "NotificationTemplate",
-    "Coupon"
+    "Coupon",
+    "Notification",
+    "SavedFilter",
+    "LeadReminder",
+    "EscalationConfig",
+    "WorkflowRule",
+    "CustomFieldDefinition",
+    "ContactRelationship",
+    "CustomerOrder",
+    "CustomerInvoice",
+    "CustomerPayment",
+    "Contract",
+    "Task",
+    "TaskComment",
+    "TaskDependency",
+    "CalendarEvent",
+    "Holiday",
+    "WorkingHoursConfig",
+    "CommunicationTemplate",
+    "CommunicationFlag",
+    "CommunicationTemplateVersion",
+    "SmsSettings",
+    "WhatsAppSettings",
+    "WhatsAppConversation",
+    "WhatsAppQuickReply",
+    "EmailSettings",
+    "Campaign",
+    "CampaignRecipient",
+    "CampaignSegment",
+    "NotificationPreference",
+    "PushSubscription",
+    "Department",
+    "DepartmentTarget",
+    "CustomRole",
+    "RolePermission",
+    "FieldPermission",
+    "Team",
+    "TeamMember",
+    "TeamTarget",
+    "Territory",
+    "Branch",
+    "TerritoryPincode",
+    "Shift",
+    "ShiftAssignment",
+    "AttendanceRecord",
+    "AttendanceBreak",
+    "AttendanceCorrection",
+    "LeaveType",
+    "LeaveBalance",
+    "LeaveRequest",
+    "ShiftRotation",
+    "ShiftRotationMember",
+    "PerformanceKPI",
+    "PerformanceGoal",
+    "PerformanceAchievement",
+    "ApprovalChain",
+    "ApprovalRequest",
+    "ApprovalAction",
+    "ApprovalDelegation",
+    "Announcement",
+    "Workflow",
+    "WorkflowVersion",
+    "WorkflowExecution",
+    "WorkflowExecutionStep",
+    "Rule",
+    "RuleEvaluation",
+    "RuleComponent",
+    "RuleVariable",
+    "RuleVersion",
+    "AutomationJob",
+    "AutomationRun",
+    "SLAPolicy",
+    "SLABreach",
+    "ScheduledReport",
+    "Event",
+    "EventSubscription",
+    "EventDelivery",
+    "QueueJob",
+    "QueueWorker",
+    "Schedule",
+    "ScheduleRun",
+    "NotificationRule",
+    "NotificationDelivery",
+    "NotificationDigestItem",
+    "SLATracker",
+    "SLAPause",
+    "EscalationRule",
+    "EscalationEvent"
 ]

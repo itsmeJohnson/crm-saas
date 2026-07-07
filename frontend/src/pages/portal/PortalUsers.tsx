@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { userApi, UserResponse, SeatUtilizationResponse, SeatHistoryResponse } from '../../services/userApi';
 import { extractErrorMessage } from '../../utils/errors';
+import { BuySeatsButton } from '../../components/portal/BuySeatsButton';
 import {
   Users, UserPlus, Search, ShieldAlert, Loader2, CheckCircle2,
   AlertTriangle, ToggleLeft, ToggleRight, RefreshCw, History,
@@ -117,7 +118,7 @@ export const PortalUsers: React.FC = () => {
     if (!seatUtilization) return;
 
     if (seatUtilization.available_new_seats <= 0) {
-      setError("No new seats available. Please purchase additional seats or use the Replace Employee functionality.");
+      setError("No new seats available. Use \"Buy More Seats\" above to purchase additional seats, or the Replace Employee functionality.");
       return;
     }
 
@@ -229,7 +230,10 @@ export const PortalUsers: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          
+
+          {/* Buy more licensed seats, then allocate users into them */}
+          <BuySeatsButton onPurchased={fetchData} label="Buy More Seats" />
+
           {seatUtilization && seatUtilization.available_new_seats > 0 ? (
             <button
               onClick={() => {
@@ -690,6 +694,8 @@ export const PortalUsers: React.FC = () => {
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Phone Number</label>
                   <input
                     type="tel"
+                    inputMode="tel"
+                    maxLength={20}
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-slate-700"
@@ -823,6 +829,8 @@ export const PortalUsers: React.FC = () => {
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Phone Number</label>
                   <input
                     type="tel"
+                    inputMode="tel"
+                    maxLength={20}
                     value={replaceFormData.phone}
                     onChange={(e) => setReplaceFormData({ ...replaceFormData, phone: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-slate-700"

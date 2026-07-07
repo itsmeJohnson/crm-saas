@@ -7,8 +7,12 @@ import { Filters } from '../components/crm/Filters';
 import { Pagination } from '../components/crm/Pagination';
 import { ActivityTimeline } from '../components/crm/ActivityTimeline';
 import { NotesPanel } from '../components/crm/NotesPanel';
+import { LeadAttachments } from '../components/crm/LeadAttachments';
+import { LeadReminders } from '../components/crm/LeadReminders';
+import { SavedFilters } from '../components/crm/SavedFilters';
+import { leadApi } from '../services/leadApi';
 import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { ImportModal } from '../components/leads/ImportModal';
 import { AssignmentSettings } from '../components/leads/AssignmentSettings';
@@ -35,8 +39,61 @@ export const LeadsPage: React.FC = () => {
     setFilters,
     resetFilters,
     pagination,
-    setPagination
+    setPagination,
+    exportLeads,
+    bulkUpdate,
+    archiveLead,
+    restoreLead,
   } = useLeadStore();
+
+  const handleConvert = async (lead: LeadResponse) => {
+    if (lead.is_archived && lead.status === 'Converted') return;
+    if (!window.confirm(`Convert "${lead.title}" into a contact? The lead will be archived.`)) return;
+    try {
+      await leadApi.convertLead(lead.id, true);
+      setIsDetailOpen(false);
+      setDetailLead(null);
+      fetchLeads();
+    } catch (e: any) {
+      alert(e.response?.data?.detail || 'Conversion failed');
+    }
+  };
+
+  const handleArchiveToggle = async (lead: LeadResponse) => {
+    try {
+      if (lead.is_archived) {
+        await restoreLead(lead.id);
+      } else {
+        await archiveLead(lead.id);
+      }
+      setIsDetailOpen(false);
+      setDetailLead(null);
+    } catch (e: any) {
+      alert(e.message || 'Operation failed');
+    }
+  };
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async (format: 'csv' | 'xlsx') => {
+    setIsExporting(true);
+    try {
+      await exportLeads(format);
+    } catch (e: any) {
+      alert(e.message || 'Export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleBulkPriority = async (priority: string) => {
+    try {
+      await bulkUpdate({ lead_ids: selectedLeadIds, fields: { priority } });
+      setSelectedLeadIds([]);
+    } catch (e: any) {
+      alert(e.message || 'Bulk update failed');
+    }
+  };
 
   const { users, fetchUsers } = useUserStore();
   const activeUsers = users.filter(u => u.is_active);
@@ -117,6 +174,25 @@ export const LeadsPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           {isPrivileged && <AssignmentSettings />}
 
+          <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
+            <button
+              onClick={() => handleExport('csv')}
+              disabled={isExporting}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-300 transition-all cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+            <button
+              onClick={() => handleExport('xlsx')}
+              disabled={isExporting}
+              className="px-3 py-2.5 bg-slate-900 border-l border-slate-800 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+              title="Export as Excel"
+            >
+              XLSX
+            </button>
+          </div>
+
           {isPrivileged && (
             <button
               onClick={() => setIsImportOpen(true)}
@@ -178,6 +254,46 @@ export const LeadsPage: React.FC = () => {
               ))}
             </select>
           </div>
+
+          {/* Priority filter dropdown */}
+          <div className="w-full sm:w-40">
+            <select
+              value={filters.priority}
+              onChange={(e) => setFilters({ priority: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+            >
+              <option value="All">All Priorities</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Urgent">Urgent</option>
+            </select>
+          </div>
+
+          {/* Source filter */}
+          <div className="w-full sm:w-40">
+            <input
+              type="text"
+              value={filters.source}
+              onChange={(e) => setFilters({ source: e.target.value })}
+              placeholder="Source"
+              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+            />
+          </div>
+
+          {/* Include archived toggle */}
+          <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer select-none shrink-0">
+            <input
+              type="checkbox"
+              checked={filters.include_archived}
+              onChange={(e) => setFilters({ include_archived: e.target.checked })}
+              className="accent-brand-500"
+            />
+            Show archived
+          </label>
+
+          {/* Saved filters */}
+          <SavedFilters currentFilters={filters} onApply={(def) => setFilters(def as any)} />
         </Filters>
 
         <LeadTable 
@@ -254,6 +370,18 @@ export const LeadsPage: React.FC = () => {
               <ArrowRightLeft className="w-3.5 h-3.5" />
               Transfer Selected
             </button>
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) handleBulkPriority(e.target.value); }}
+              className="px-3 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer focus:outline-none"
+              title="Set priority for selected leads"
+            >
+              <option value="">Set Priority…</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Urgent">Urgent</option>
+            </select>
             <button
               onClick={() => setSelectedLeadIds([])}
               className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
@@ -308,12 +436,30 @@ export const LeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => setIsDetailOpen(false)}
-                className="p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-950/50 text-slate-400 hover:text-slate-200 rounded-xl transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {isPrivileged && !detailLead.converted_contact_id && (
+                  <button
+                    onClick={() => handleConvert(detailLead)}
+                    className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-300 rounded-xl transition-all cursor-pointer"
+                  >
+                    Convert
+                  </button>
+                )}
+                {isPrivileged && (
+                  <button
+                    onClick={() => handleArchiveToggle(detailLead)}
+                    className="px-3 py-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-950/50 text-xs font-semibold text-slate-300 hover:text-slate-100 rounded-xl transition-all cursor-pointer"
+                  >
+                    {detailLead.is_archived ? 'Restore' : 'Archive'}
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsDetailOpen(false)}
+                  className="p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-950/50 text-slate-400 hover:text-slate-200 rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable details view */}
@@ -337,6 +483,21 @@ export const LeadsPage: React.FC = () => {
                   <span className="inline-flex mt-1.5 text-xs font-semibold text-brand-300">
                     {detailLead.status}
                   </span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Priority</p>
+                  <p className="text-sm font-semibold mt-0.5 flex items-center gap-1.5">
+                    <Flame className={`w-3.5 h-3.5 ${
+                      detailLead.priority === 'Urgent' ? 'text-red-400'
+                      : detailLead.priority === 'High' ? 'text-amber-400'
+                      : detailLead.priority === 'Low' ? 'text-slate-500' : 'text-slate-400'
+                    }`} />
+                    <span className="text-slate-200">{detailLead.priority}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Lead Score</p>
+                  <p className="text-sm font-semibold text-slate-200 mt-0.5">{detailLead.score}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Lead Source</p>
@@ -389,6 +550,16 @@ export const LeadsPage: React.FC = () => {
                 {/* Activities timeline */}
                 <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
                   <ActivityTimeline leadId={detailLead.id} />
+                </div>
+              </div>
+
+              {/* Reminders + Attachments */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                  <LeadReminders leadId={detailLead.id} />
+                </div>
+                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                  <LeadAttachments leadId={detailLead.id} />
                 </div>
               </div>
             </div>

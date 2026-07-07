@@ -116,8 +116,8 @@ async def test_lead_import_upload_validation(client: AsyncClient):
         "first_name": "Leads",
         "last_name": "Tester"
     }
-    response = await client.post("/api/v1/auth/register", json=reg_payload)
-    assert response.status_code == 200
+    response = await client.post("/api/v1/auth/public-register", json=reg_payload)
+    assert response.status_code == 201
     
     # Login to get access token
     login_payload = {

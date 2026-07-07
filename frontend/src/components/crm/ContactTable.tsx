@@ -8,13 +8,26 @@ import { Edit3, Trash2, Mail, Building2, Loader2, AlertCircle } from 'lucide-rea
 interface ContactTableProps {
   onEditClick: (contact: ContactResponse) => void;
   onRowClick: (contact: ContactResponse) => void;
+  selectedIds?: string[];
+  onSelect?: (ids: string[]) => void;
 }
 
 export const ContactTable: React.FC<ContactTableProps> = ({
   onEditClick,
-  onRowClick
+  onRowClick,
+  selectedIds,
+  onSelect,
 }) => {
   const { contacts, isLoading, error, deleteContact } = useContactStore();
+  const showCheckboxes = !!onSelect;
+  const selected = selectedIds || [];
+  const allSelected = contacts.length > 0 && contacts.every((c) => selected.includes(c.id));
+  const toggleAll = () => onSelect && onSelect(allSelected ? [] : contacts.map((c) => c.id));
+  const toggleOne = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!onSelect) return;
+    onSelect(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  };
   const { companies, fetchCompanies } = useCompanyStore();
   const { users, fetchUsers } = useUserStore();
 
@@ -65,6 +78,11 @@ export const ContactTable: React.FC<ContactTableProps> = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-800/80 bg-slate-900/40">
+              {showCheckboxes && (
+                <th className="pl-6 pr-2 py-4.5 w-10">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-brand-500" />
+                </th>
+              )}
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Contact</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Company</th>
               <th className="px-6 py-4.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Owner</th>
@@ -74,7 +92,7 @@ export const ContactTable: React.FC<ContactTableProps> = ({
           <tbody className="divide-y divide-slate-800/65 bg-slate-950/20">
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-500">
+                <td colSpan={showCheckboxes ? 5 : 4} className="px-6 py-12 text-center text-sm text-slate-500">
                   No contacts found. Add a contact to get started.
                 </td>
               </tr>
@@ -95,6 +113,11 @@ export const ContactTable: React.FC<ContactTableProps> = ({
                     onClick={() => onRowClick(contact)}
                     className="hover:bg-slate-900/30 transition-colors cursor-pointer"
                   >
+                    {showCheckboxes && (
+                      <td className="pl-6 pr-2 py-4" onClick={(e) => toggleOne(e, contact.id)}>
+                        <input type="checkbox" checked={selected.includes(contact.id)} readOnly className="accent-brand-500 pointer-events-none" />
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/25 flex items-center justify-center font-bold text-brand-300 text-sm">

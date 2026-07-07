@@ -7,7 +7,7 @@ class SubscriptionUpdateRequest(BaseModel):
     subscription_plan: str
     subscription_expires_at: datetime | None = None
     subscription_status: str
-    max_users: int
+    max_users: int = Field(..., ge=1, le=1000, description="Licensed seat limit (max 1000).")
 
 class TenantUserResponse(BaseModel):
     id: uuid.UUID
@@ -36,6 +36,10 @@ class TenantResponse(BaseModel):
     max_users: int
     user_count: int
     invoice_count: int
+    call_recording_usage: int = 0
+
+class TenantUsageUpdateRequest(BaseModel):
+    call_recording_usage: int
 
 class InvoiceCreateRequest(BaseModel):
     amount: float

@@ -30,6 +30,12 @@ def mock_redis(monkeypatch):
     monkeypatch.setattr(redis_client, "get", mock_get)
     monkeypatch.setattr(redis_client, "set", mock_set)
     monkeypatch.setattr(redis_client, "delete", mock_delete)
+
+    from app.dependencies import feature_guard
+    async def mock_get_active_features(*args, **kwargs) -> list[str]:
+        return ["OUTBOUND_CALLING", "INBOUND_CALLING", "CLICK_TO_CALL", "CALL_RECORDING", "CALL_DISPOSITION"]
+    monkeypatch.setattr(feature_guard, "get_active_features", mock_get_active_features)
+
     return storage
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { DialerConsole } from '../DialerConsole';
 import { useDialerStore } from '../../../store/dialerStore';
 import { usePipelineStore } from '../../../store/pipelineStore';
@@ -233,6 +233,97 @@ describe('DialerConsole Component', () => {
       status: 'Picked',
       remarks: 'Good conversation',
       custom_pipeline_stage_id: 'stage-2',
+    });
+  });
+
+  describe('Power dialer', () => {
+    const mockLead = {
+      id: 'lead-1',
+      first_name: 'Jane',
+      last_name: 'Doe',
+      title: 'VP of Sales',
+      company_name: 'Acme Inc',
+      phone: '+91********12',
+    } as any;
+
+    const storeState = (agentState: string, currentLead: any) => ({
+      agentState,
+      currentLead,
+      breakReason: null,
+      callDuration: 0,
+      isLoading: false,
+      error: null,
+      fetchCurrentState: mockFetchCurrentState,
+      startCalling: mockStartCalling,
+      submitDisposition: mockSubmitDisposition,
+      goOnBreak: mockGoOnBreak,
+      endBreak: mockEndBreak,
+    });
+
+    it('shows a cancellable countdown after disposition and auto-dials at zero', async () => {
+      vi.useFakeTimers();
+      localStorage.setItem('crm_auto_dial', 'true');
+      localStorage.setItem('crm_power_dialer_delay', '5');
+      (useDialerStore as any).mockReturnValue(storeState('ACTIVE_CALLING', mockLead));
+      (useDialerStore as any).getState = vi.fn(() => ({ agentState: 'IDLE' }));
+
+      const { rerender } = render(<DialerConsole />);
+
+      fireEvent.click(screen.getByText('Busy'));
+      fireEvent.change(screen.getByPlaceholderText(/Enter mandatory call notes/i), {
+        target: { value: 'no answer' },
+      });
+      // submitDisposition resolves → countdown scheduled (flush the async handler)
+      await act(async () => {
+        fireEvent.click(screen.getByText('Submit Disposition Outcome'));
+        await Promise.resolve();
+      });
+      expect(mockSubmitDisposition).toHaveBeenCalled();
+
+      // disposition done: store transitions to IDLE
+      (useDialerStore as any).mockReturnValue(storeState('IDLE', null));
+      rerender(<DialerConsole />);
+
+      expect(screen.getByText(/Power dialer: next call in 5s/i)).toBeDefined();
+
+      // tick the full delay: the next call fires
+      for (let i = 0; i < 6; i++) {
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      expect(mockStartCalling).toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it('Stop cancels the pending auto-dial', async () => {
+      vi.useFakeTimers();
+      localStorage.setItem('crm_auto_dial', 'true');
+      localStorage.setItem('crm_power_dialer_delay', '5');
+      (useDialerStore as any).mockReturnValue(storeState('ACTIVE_CALLING', mockLead));
+      (useDialerStore as any).getState = vi.fn(() => ({ agentState: 'IDLE' }));
+
+      const { rerender } = render(<DialerConsole />);
+
+      fireEvent.click(screen.getByText('Busy'));
+      fireEvent.change(screen.getByPlaceholderText(/Enter mandatory call notes/i), {
+        target: { value: 'no answer' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Submit Disposition Outcome'));
+        await Promise.resolve();
+      });
+      expect(mockSubmitDisposition).toHaveBeenCalled();
+
+      (useDialerStore as any).mockReturnValue(storeState('IDLE', null));
+      rerender(<DialerConsole />);
+
+      fireEvent.click(screen.getByText('Stop'));
+      expect(screen.queryByText(/Power dialer: next call/i)).toBeNull();
+
+      for (let i = 0; i < 6; i++) {
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      expect(mockStartCalling).not.toHaveBeenCalled();
+      vi.useRealTimers();
     });
   });
 });

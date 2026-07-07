@@ -44,20 +44,38 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if path.startswith("/health") or path.startswith("/api/v1/health") or path in ["/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "unknown-ip"
+        # Behind the nginx proxy the real client IP is in X-Forwarded-For (first hop);
+        # fall back to the direct peer when there's no proxy.
+        fwd = request.headers.get("x-forwarded-for")
+        if fwd:
+            client_ip = fwd.split(",")[0].strip()
+        else:
+            client_ip = request.client.host if request.client else "unknown-ip"
         current_time = time.time()
-        
+
+        # Sensitive auth endpoints get a much tighter per-IP budget to blunt
+        # brute-force / credential-stuffing and signup abuse.
+        auth_sensitive = path in (
+            "/api/v1/auth/login",
+            "/api/v1/auth/public-register",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password",
+            "/api/v1/auth/mfa/verify",
+        )
+        effective_limit = 10 if auth_sensitive else self.limit_per_minute
+        bucket = "auth" if auth_sensitive else "gen"
+
         is_allowed = True
-        
+
         # Try Redis first if available — fail-closed on outage (prevents per-instance bypass)
         if self.redis_client:
             try:
-                key = f"rate_limit:{client_ip}:{int(current_time) // 60}"
+                key = f"rate_limit:{bucket}:{client_ip}:{int(current_time) // 60}"
                 pipe = self.redis_client.pipeline()
                 pipe.incr(key)
                 pipe.expire(key, 60)
                 request_count, _ = pipe.execute()
-                if request_count > self.limit_per_minute:
+                if request_count > effective_limit:
                     is_allowed = False
             except Exception as e:
                 logger.error(f"Redis rate limiting unavailable: {e}. Returning 503 to prevent bypass.")
@@ -67,7 +85,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 )
         else:
             # No Redis configured — in-memory fallback (dev/single-instance only)
-            is_allowed = self._check_memory_limit(client_ip, current_time)
+            is_allowed = self._check_memory_limit(f"{bucket}:{client_ip}", current_time, effective_limit)
 
         if not is_allowed:
             return JSONResponse(
@@ -77,11 +95,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-    def _check_memory_limit(self, client_ip: str, current_time: float) -> bool:
+    def _check_memory_limit(self, client_ip: str, current_time: float, limit: int | None = None) -> bool:
+        limit = limit if limit is not None else self.limit_per_minute
         with self.lock:
             # Clean old requests (older than 60s)
             self.memory_store[client_ip] = [t for t in self.memory_store[client_ip] if current_time - t < 60]
-            if len(self.memory_store[client_ip]) >= self.limit_per_minute:
+            if len(self.memory_store[client_ip]) >= limit:
                 return False
             self.memory_store[client_ip].append(current_time)
             return True

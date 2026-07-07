@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
 import {
   Shield, Check, AlertTriangle,
   RotateCcw, Loader2, CheckCircle2, ShieldAlert, Users, X
@@ -51,17 +52,32 @@ export const PortalSubscription: React.FC = () => {
       setRenewing(true);
       setError(null);
       setSuccess(null);
-      
-      // 1. Trigger subscription renewal (simulated immediate extension)
-      await portalApi.payInvoice(data.subscription.id, {
-        gateway: 'UPI',
-        transaction_id: `TXN-RENEW-${Math.random().toString(36).substring(2, 12).toUpperCase()}`
+
+      const sub = data?.subscription;
+      if (!sub?.plan_id) {
+        setError("No active subscription found to renew.");
+        return;
+      }
+
+      // Renewal = a fresh invoice for the plan + cycle the tenant should be on next
+      // (their pending scheduled switch, if any, otherwise their current plan).
+      // Paying it extends the subscription for another period (handled by the
+      // upgrade_plan action on the backend). Verified & charged through Cashfree.
+      const result = await portalApi.upgradePlan({
+        plan_id: sub.pending_plan_id || sub.plan_id,
+        billing_cycle: sub.pending_billing_cycle || sub.billing_cycle || 'monthly',
+        gateway: 'Cashfree'
       });
-      
-      setSuccess("Subscription extended successfully!");
+
+      if (result.scheduled_change) {
+        setSuccess(result.scheduled_change.message);
+      } else if (result.invoice) {
+        await payInvoiceViaCashfree(result.invoice.id);
+        setSuccess("Subscription renewed successfully! Your billing period has been extended.");
+      }
       fetchSubscription();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to renew subscription.");
+      setError(err.response?.data?.detail || err?.message || "Failed to renew subscription.");
     } finally {
       setRenewing(false);
     }
@@ -175,6 +191,13 @@ export const PortalSubscription: React.FC = () => {
                   <p className="text-slate-200 font-semibold">{new Date(sub.end_date).toLocaleDateString()}</p>
                 </div>
               </div>
+
+              {sub.pending_plan_id && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-[11px] text-amber-300">
+                  Scheduled switch to <strong>{sub.pending_plan?.display_name || sub.pending_plan?.name}</strong> on {new Date(sub.end_date).toLocaleDateString()} — no charge until then. Manage this on the{' '}
+                  <a href="/portal/plans" className="underline">Plans</a> page.
+                </div>
+              )}
             </div>
 
             {/* Limits Card */}

@@ -42,6 +42,43 @@ async def register(
         organization=OrganizationResponse.model_validate(org)
     )
 
+
+@router.post("/public-register", response_model=Token, status_code=201)
+async def public_register(
+    request: RegisterTenantRequest,
+    http_request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Public self-serve signup. Always provisions a free trial (no payment taken),
+    creates the OrgAdmin, and returns a session so the user is logged in immediately.
+    Rate-limited by the auth-sensitive bucket in RateLimiterMiddleware.
+    """
+    # Force trial regardless of what the client sends — a public signup can never
+    # self-provision a paid/active subscription without going through billing.
+    request.is_trial = True
+
+    auth_service = AuthService(db)
+    from app.services.audit_service import AuditService
+    audit = AuditService(db)
+
+    user, org = await auth_service.register_tenant(request)
+
+    ip_address = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
+    tokens = await auth_service.create_user_session(
+        user_id=user.id, ip_address=ip_address, user_agent=user_agent
+    )
+    await audit.log_event(
+        actor_id=user.id,
+        organization_id=org.id,
+        event_type="AUTH_PUBLIC_SIGNUP",
+        description=f"Public self-serve signup ({org.slug}) from {ip_address}",
+        ip_address=ip_address,
+        browser_info=user_agent,
+    )
+    return tokens
+
 @router.post("/login", response_model=Token)
 async def login(
     request_data: LoginRequest,

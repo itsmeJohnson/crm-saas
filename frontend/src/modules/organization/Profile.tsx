@@ -68,8 +68,8 @@ export const Profile: React.FC = () => {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Organization Settings</h1>
-          <p className="text-slate-400 text-sm">View or modify your tenant details, company settings, and pipelines.</p>
+          <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight">Organization Settings</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">View or modify your tenant details, company settings, and pipelines.</p>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ export const Profile: React.FC = () => {
           className={`pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'profile'
               ? 'border-brand-500 text-brand-400 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-450 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200'
           }`}
         >
           Company Profile
@@ -90,7 +90,7 @@ export const Profile: React.FC = () => {
           className={`pb-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'pipeline'
               ? 'border-brand-500 text-brand-400 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-450 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200'
           }`}
         >
           Pipeline Settings
@@ -102,8 +102,8 @@ export const Profile: React.FC = () => {
           <div className="flex items-center gap-4 p-4 bg-slate-900/40 border border-slate-800 rounded-xl">
             <Building className="w-10 h-10 text-brand-400" />
             <div>
-              <h3 className="font-bold text-white text-lg">{org?.name}</h3>
-              <p className="text-slate-400 text-sm">Unique identifier slug: <span className="text-brand-300 font-mono">/{org?.slug}</span></p>
+              <h3 className="font-bold text-slate-100 text-lg">{org?.name}</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Unique identifier slug: <span className="text-brand-650 dark:text-brand-300 font-mono">/{org?.slug}</span></p>
             </div>
           </div>
 

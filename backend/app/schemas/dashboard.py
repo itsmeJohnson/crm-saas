@@ -58,6 +58,13 @@ class SuperAdminDashboardResponse(BaseModel):
 
 # ── CRM Tenant Dashboard schemas (used by app/api/v1/dashboard.py) ────────────
 
+class TodayAgenda(BaseModel):
+    leads_created: int = 0
+    meetings_due: int = 0
+    tasks_due: int = 0
+    follow_ups_due: int = 0
+
+
 class DashboardSummaryResponse(BaseModel):
     total_leads: int = 0
     contacts_count: int = 0
@@ -66,6 +73,18 @@ class DashboardSummaryResponse(BaseModel):
     activities_count: int = 0
     leads_by_status: Dict[str, int] = {}
     assigned_leads_breakdown: List[Dict[str, Any]] = []
+    leads_by_source: Dict[str, int] = {}
+    leads_by_stage: List[Dict[str, Any]] = []
+    conversion_rate: Optional[float] = None  # None = org has no stage named "Converted" (not yet configured)
+    today: TodayAgenda = TodayAgenda()
+
+
+class TeamStatusMember(BaseModel):
+    user_id: str
+    user_name: str
+    role: str
+    state: str
+    since: Optional[str] = None
 
 
 class RecentActivityItem(BaseModel):

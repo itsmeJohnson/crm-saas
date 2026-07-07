@@ -3,10 +3,13 @@ import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import {
-  LayoutDashboard, LogOut, Building, Users, FolderKanban,
-  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight
+  LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
+  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
+  Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -21,13 +24,75 @@ export const AppLayout: React.FC = () => {
   };
 
   const allNavItems = [
-    { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard },
-    { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'] },
-    { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT' },
-    { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE' },
-    { name: 'Users',             path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
-    { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'] },
-    { name: 'Subscription',      path: '/portal/dashboard',  icon: CreditCard,        roles: ['OrgAdmin'] },
+    // ── Workspace ──────────────────────────────────────────────────────────
+    { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard,  section: 'workspace' },
+    { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace' },
+    { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
+    { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },
+    { name: 'Communications',    path: '/communications',    icon: MessagesSquare,    section: 'workspace' },
+    { name: 'Notifications',     path: '/notifications',     icon: Bell,              section: 'workspace' },
+    { name: 'Templates',         path: '/templates',         icon: LayoutTemplate,    section: 'workspace' },
+    { name: 'Campaigns',         path: '/campaigns',         icon: Megaphone,         featureCode: 'CAMPAIGN_MANAGEMENT', section: 'workspace' },
+    { name: 'Comm Analytics',    path: '/communication-analytics', icon: BarChart3,   roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Calling',           path: '/calling',           icon: PhoneCall,         section: 'workspace' },
+    { name: 'Call Reports',      path: '/calling/reports',   icon: BarChart3,         section: 'workspace' },
+    { name: 'SMS',               path: '/sms',               icon: MessageSquare,     featureCode: 'SMS_MESSAGING', section: 'workspace' },
+    { name: 'SMS Reports',       path: '/sms/reports',       icon: BarChart3,         featureCode: 'SMS_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp',          path: '/whatsapp',          icon: MessageCircle,     featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp Reports',  path: '/whatsapp/reports',  icon: BarChart3,         featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp Settings', path: '/whatsapp/settings', icon: Settings,          roles: ['OrgAdmin'], featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'Email',             path: '/email',             icon: Mail,              featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Email Reports',     path: '/email/reports',     icon: BarChart3,         featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Email Settings',    path: '/email/settings',    icon: Settings,          roles: ['OrgAdmin'], featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Lead Reports',      path: '/leads/reports',     icon: BarChart3,         featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Lead Automation',   path: '/leads/automation',  icon: Zap,               roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Companies',         path: '/companies',         icon: Building2,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Company Reports',   path: '/companies/reports', icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Contacts',          path: '/contacts',          icon: Contact,           roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Customers',         path: '/customers',         icon: HeartHandshake,    roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Customer Reports',  path: '/customers/reports', icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Contact Reports',   path: '/contacts/reports',  icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE', section: 'workspace' },
+    { name: 'Team Members',      path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS', section: 'workspace' },
+    { name: 'Teams',             path: '/teams',             icon: UsersRound,        roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Attendance',        path: '/attendance',        icon: Clock,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Leave',             path: '/leaves',            icon: Plane,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Shifts',            path: '/shifts',            icon: Clock,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Performance',       path: '/performance',       icon: Trophy,            roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Targets',           path: '/targets',           icon: Target,            roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Approvals',         path: '/approvals',         icon: CheckCircle2,      roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Org Analytics',     path: '/org-analytics',     icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Workflows',         path: '/workflows',         icon: Workflow,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Rule Engine',       path: '/rules',             icon: Filter,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Automation',        path: '/automation',        icon: Cog,               roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Automation Analytics', path: '/automation-analytics', icon: Activity,      roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Event Bus',         path: '/events',            icon: Radio,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Background Queue',  path: '/queue',             icon: Layers,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Scheduler',         path: '/scheduler',         icon: CalendarClock,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Notification Rules', path: '/notification-automation', icon: BellRing,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'SLA Management',     path: '/sla',               icon: Gauge,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Escalation',        path: '/escalation',        icon: TrendingUp,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Roles & Permissions', path: '/roles',           icon: Shield,            roles: ['OrgAdmin'], section: 'workspace' },
+    { name: 'Branches',          path: '/branches',          icon: MapPin,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Departments',       path: '/departments',       icon: Building2,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'], section: 'workspace' },
+
+    // ── Billing & Account (OrgAdmin only) ─────────────────────────────────
+    { name: 'Billing Overview',  path: '/portal/dashboard',  icon: Gauge,             roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Subscription',      path: '/portal/subscription', icon: CreditCard,      roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Plans',             path: '/portal/plans',      icon: Sparkles,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Invoices',          path: '/portal/invoices',   icon: FileText,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Payments',          path: '/portal/payments',   icon: Receipt,           roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Usage',             path: '/portal/usage',      icon: BarChart3,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Storage',           path: '/portal/storage',    icon: HardDrive,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Call Recordings',   path: '/portal/recordings', icon: PhoneCall,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Seat Licensing',    path: '/portal/users',      icon: UserCog,           roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Company Profile',   path: '/portal/profile',    icon: User,              roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Billing Details',   path: '/portal/billing',    icon: Landmark,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Preferences',       path: '/portal/settings',   icon: Settings,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Support',           path: '/portal/support',    icon: LifeBuoy,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Activity Logs',     path: '/portal/activity',   icon: Activity,          roles: ['OrgAdmin'], section: 'billing' },
   ];
 
   const features = useAuthStore((state) => state.features);
@@ -37,7 +102,7 @@ export const AppLayout: React.FC = () => {
 
     if (item.roles) {
       const hasRole = item.roles.includes(user.role);
-      const isTeamLeaderUsers = item.name === 'Users' && user.role === 'Employee' && user.is_team_leader;
+      const isTeamLeaderUsers = item.name === 'Team Members' && user.role === 'Employee' && user.is_team_leader;
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
 
@@ -47,6 +112,9 @@ export const AppLayout: React.FC = () => {
 
     return true;
   });
+
+  const workspaceItems = navItems.filter((item) => item.section === 'workspace');
+  const billingItems = navItems.filter((item) => item.section === 'billing');
 
   /* ── Avatar initials ── */
   const initials = [user?.first_name?.[0], user?.last_name?.[0]]
@@ -91,7 +159,7 @@ export const AppLayout: React.FC = () => {
 
       {/* ── Navigation ── */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
+        {workspaceItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path ||
             (item.path !== '/' && location.pathname.startsWith(item.path));
@@ -110,6 +178,33 @@ export const AppLayout: React.FC = () => {
             </Link>
           );
         })}
+
+        {billingItems.length > 0 && (
+          <>
+            <p className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Billing &amp; Account
+            </p>
+            {billingItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path ||
+                (item.path !== '/' && location.pathname.startsWith(item.path));
+              return (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{item.name}</span>
+                  {isActive && (
+                    <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
+                  )}
+                </Link>
+              );
+            })}
+          </>
+        )}
       </nav>
 
       {/* ── User Profile & Footer ── */}
@@ -193,12 +288,20 @@ export const AppLayout: React.FC = () => {
             </div>
             <span className="font-semibold text-sm text-slate-100">CRM Enterprise</span>
           </div>
-          <button
-            onClick={() => setIsMobileOpen(true)}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => setIsMobileOpen(true)}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Persistent Top Bar (desktop only — mobile gets the bell in its own top bar above) */}
+        <header className="hidden md:flex items-center justify-end px-6 py-2.5 border-b border-slate-800/60 z-20" style={{ backgroundColor: 'var(--bg-surface)' }}>
+          <NotificationBell />
         </header>
 
         {/* Main Content */}

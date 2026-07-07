@@ -44,6 +44,20 @@ export interface PortalInvoiceResponse {
   pdf_file_path: string | null;
 }
 
+export interface ScheduledPlanChangeResponse {
+  scheduled: boolean;
+  plan_id: string;
+  plan_name: string;
+  billing_cycle: string;
+  effective_date: string;
+  message: string;
+}
+
+export interface UpgradeSubscriptionResult {
+  invoice: PortalInvoiceResponse | null;
+  scheduled_change: ScheduledPlanChangeResponse | null;
+}
+
 export interface PortalPaymentResponse {
   id: string;
   amount: number;
@@ -129,11 +143,21 @@ export const portalApi = {
   },
 
   getExtraSeatPricing: async () => {
-    const res = await api.get<{ unit_price: number; gst_percentage: number; gst_inclusive: boolean; plan_name: string | null }>('/portal/subscription/extra-seat-pricing');
+    const res = await api.get<{
+      unit_price: number;
+      cycle_prices: { monthly: number; quarterly: number; annual: number };
+      gst_percentage: number;
+      gst_inclusive: boolean;
+      plan_name: string | null;
+      minimum_users: number;
+      users_purchased: number;
+      can_add_extra: boolean;
+      subscription_status: string;
+    }>('/portal/subscription/extra-seat-pricing');
     return res.data;
   },
 
-  buyExtraSeats: async (payload: { user_count: number; gateway: string }) => {
+  buyExtraSeats: async (payload: { user_count: number; gateway: string; billing_cycle: string }) => {
     const res = await api.post<PortalInvoiceResponse>('/portal/subscription/add-users', payload);
     return res.data;
   },
@@ -149,12 +173,17 @@ export const portalApi = {
   },
 
   upgradePlan: async (payload: { plan_id: string; billing_cycle: string; gateway: string }) => {
-    const res = await api.post<PortalInvoiceResponse>('/portal/subscription/upgrade', payload);
+    const res = await api.post<UpgradeSubscriptionResult>('/portal/subscription/upgrade', payload);
     return res.data;
   },
 
   reduceSeats: async (payload: { new_seat_count: number }) => {
     const res = await api.post<any>('/portal/subscription/reduce-seats', payload);
+    return res.data;
+  },
+
+  cancelPendingPlanChange: async () => {
+    const res = await api.post<any>('/portal/subscription/cancel-pending-change');
     return res.data;
   },
 
@@ -172,6 +201,18 @@ export const portalApi = {
 
   payInvoice: async (invoiceId: string, payload: { gateway: string; transaction_id?: string }) => {
     const res = await api.post<PortalInvoiceResponse>(`/portal/invoices/${invoiceId}/pay`, payload);
+    return res.data;
+  },
+
+  createCashfreeCheckout: async (invoiceId: string) => {
+    const res = await api.post<{
+      cf_order_id: string;
+      order_id: string;
+      payment_session_id: string;
+      order_amount: number;
+      order_currency: string;
+      env: 'sandbox' | 'production';
+    }>(`/portal/invoices/${invoiceId}/cashfree-checkout`);
     return res.data;
   },
 

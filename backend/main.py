@@ -14,6 +14,10 @@ from app.api.v1.organization import router as org_router
 from app.api.v1.users import router as users_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.contacts import router as contacts_router
+from app.api.v1.customers import router as customers_router
+from app.api.v1.tasks import router as tasks_router
+from app.api.v1.calendar import router as calendar_router
+from app.api.v1.communications import router as communications_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.activities import router as activities_router
 from app.api.v1.notes import router as notes_router
@@ -21,17 +25,58 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.health import router as active_health_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.dialer import router as dialer_router
+from app.api.v1.calling import router as calling_router
+from app.api.v1.sms import router as sms_router
+from app.api.v1.whatsapp import router as whatsapp_router
+from app.api.v1.email import router as email_router
+from app.api.v1.templates import router as templates_router
+from app.api.v1.campaigns import router as campaigns_router
+from app.api.v1.communication_analytics import router as comm_analytics_router
+from app.api.v1.departments import router as departments_router
+from app.api.v1.roles import router as roles_router
+from app.api.v1.teams import router as teams_router
+from app.api.v1.branches import router as branches_router
+from app.api.v1.territories import router as territories_router
+from app.api.v1.attendance import router as attendance_router
+from app.api.v1.leaves import router as leaves_router
+from app.api.v1.shifts import router as shifts_router
+from app.api.v1.performance import router as performance_router
+from app.api.v1.targets import router as targets_router
+from app.api.v1.approvals import router as approvals_router
+from app.api.v1.announcements import router as announcements_router
+from app.api.v1.org_analytics import router as org_analytics_router
+from app.api.v1.automation_analytics import router as automation_analytics_router
+from app.api.v1.workflows import router as workflows_router
+from app.api.v1.rules import router as rules_router
+from app.api.v1.automation import router as automation_router
+from app.api.v1.events import router as events_router
+from app.api.v1.queue import router as queue_router
+from app.api.v1.scheduler import router as scheduler_router
+from app.api.v1.notification_automation import router as notification_automation_router
+from app.api.v1.sla import router as sla_router
+from app.api.v1.escalation import router as escalation_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
 from app.api.v1.telephony import router as telephony_router
 from app.api.v1.portal import router as portal_router
 from app.api.v1.billing_webhook import router as billing_webhook_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.monitoring import router as monitoring_router, record_http_request
 from app.middleware.correlation import correlation_id_middleware
 from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.core.database import async_session_maker
 from app.cron.subscription_cron import run_daily_subscription_check
+from app.cron.lead_cron import run_lead_automation_check
+from app.cron.customer_cron import run_customer_dunning_check
+from app.cron.calling_cron import run_missed_call_check
+from app.cron.sms_cron import run_sms_retry_check
+from app.cron.email_cron import run_email_sync
+from app.cron.campaign_cron import run_campaign_check
+from app.cron.automation_cron import run_automation_cycle
+from app.cron.sla_cron import run_sla_scan_all
+from app.cron.escalation_cron import run_escalation_engine
+from app.cron.approval_cron import run_approval_timeouts
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -76,12 +121,67 @@ async def subscription_cron_scheduler():
                 if locked:
                     logger.info("Acquired daily cron lock. Running daily subscription check.")
                     await run_daily_subscription_check(async_session_maker)
+                    await run_lead_automation_check(async_session_maker)
+                    await run_customer_dunning_check(async_session_maker)
+                    await run_missed_call_check(async_session_maker)
+                    await run_sms_retry_check(async_session_maker)
+                    await run_email_sync(async_session_maker)
+                    await run_campaign_check(async_session_maker)
+                    # Automation Engine: SLA scan + scheduled reports (tracked, per-org)
+                    await run_automation_cycle(async_session_maker)
+                    # SLA Management: business-hours-aware tracker breach scan
+                    await run_sla_scan_all(async_session_maker)
+                    # Escalation Engine: multi-level rule-based escalation scan
+                    await run_escalation_engine(async_session_maker)
+                    # Approval Automation: chain timeout actions (escalate/auto-approve/auto-reject)
+                    await run_approval_timeouts(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
             break
         except Exception as e:
             logger.error("Error in subscription_cron_scheduler loop: %s", e)
+            await asyncio.sleep(60)
+
+
+# ── Background Queue worker ───────────────────────────────────────────────────
+async def queue_worker_loop():
+    """Drives the durable background queue. Single active drainer via a redis
+    lock; if another instance holds it, this one idles and retries."""
+    logger = logging.getLogger("app.cron.queue")
+    from app.core.redis import redis_client
+    from app.cron.queue_worker import run_queue_worker
+    while True:
+        try:
+            async with redis_client.lock("cron_lock:queue_worker", lease_time=30, acquire_timeout=2.0) as locked:
+                if locked:
+                    await run_queue_worker(async_session_maker)  # long-running until cancelled
+                else:
+                    await asyncio.sleep(15)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("queue_worker_loop error: %s", e)
+            await asyncio.sleep(15)
+
+
+# ── Scheduler tick ────────────────────────────────────────────────────────────
+async def scheduler_tick_loop():
+    """Minute-granularity driver for the configurable Scheduler. Single active
+    ticker via a redis lock; runs due schedules then sleeps ~60s."""
+    logger = logging.getLogger("app.cron.scheduler")
+    from app.core.redis import redis_client
+    from app.cron.scheduler_tick import run_scheduler_tick
+    while True:
+        try:
+            async with redis_client.lock("cron_lock:scheduler_tick", lease_time=55, acquire_timeout=2.0) as locked:
+                if locked:
+                    await run_scheduler_tick(async_session_maker)
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("scheduler_tick_loop error: %s", e)
             await asyncio.sleep(60)
 
 
@@ -106,12 +206,16 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
 
     cron_task = asyncio.create_task(subscription_cron_scheduler())
+    queue_task = asyncio.create_task(queue_worker_loop())
+    scheduler_task = asyncio.create_task(scheduler_tick_loop())
     yield
-    cron_task.cancel()
-    try:
-        await cron_task
-    except asyncio.CancelledError:
-        pass
+    for t in (cron_task, queue_task, scheduler_task):
+        t.cancel()
+    for t in (cron_task, queue_task, scheduler_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 # ── FastAPI application ────────────────────────────────────────────────────────
@@ -149,24 +253,68 @@ os.makedirs("uploads/branding", exist_ok=True)
 app.mount("/api/v1/uploads/branding", StaticFiles(directory="uploads/branding"), name="branding")
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+# Custom-role matrix enforcement (no-op for users without a custom role). Only
+# attached to routers whose routes are ALL authenticated — never to routers
+# with public endpoints (users/invitations/accept, email tracking, webhooks).
+from fastapi import Depends as _Depends
+from app.middleware.permissions import enforce_resource as _enforce
+
+def _rbac(resource: str):
+    return [_Depends(_enforce(resource))]
+
 app.include_router(auth_router,            prefix=f"{settings.API_V1_STR}/auth",            tags=["auth"])
 app.include_router(org_router,             prefix=f"{settings.API_V1_STR}/organizations",   tags=["organizations"])
 app.include_router(users_router,           prefix=f"{settings.API_V1_STR}/users",           tags=["users"])
-app.include_router(companies_router,       prefix=f"{settings.API_V1_STR}/companies",       tags=["companies"])
-app.include_router(contacts_router,        prefix=f"{settings.API_V1_STR}/contacts",        tags=["contacts"])
-app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"])
+app.include_router(companies_router,       prefix=f"{settings.API_V1_STR}/companies",       tags=["companies"], dependencies=_rbac("companies"))
+app.include_router(contacts_router,        prefix=f"{settings.API_V1_STR}/contacts",        tags=["contacts"], dependencies=_rbac("contacts"))
+app.include_router(customers_router,       prefix=f"{settings.API_V1_STR}/customers",       tags=["customers"], dependencies=_rbac("customers"))
+app.include_router(tasks_router,           prefix=f"{settings.API_V1_STR}/tasks",           tags=["tasks"], dependencies=_rbac("tasks"))
+app.include_router(calendar_router,        prefix=f"{settings.API_V1_STR}/calendar",        tags=["calendar"])
+app.include_router(communications_router,  prefix=f"{settings.API_V1_STR}/communications",  tags=["communications"])
+app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"], dependencies=_rbac("leads"))
 app.include_router(activities_router,      prefix=f"{settings.API_V1_STR}/activities",      tags=["activities"])
 app.include_router(notes_router,           prefix=f"{settings.API_V1_STR}/notes",           tags=["notes"])
 app.include_router(dashboard_router,       prefix=f"{settings.API_V1_STR}/dashboard",       tags=["dashboard"])
 app.include_router(active_health_router,   prefix=f"{settings.API_V1_STR}/health",          tags=["health"])
 app.include_router(pipelines_router,       prefix=f"{settings.API_V1_STR}/pipelines",       tags=["pipelines"])
 app.include_router(dialer_router,          prefix=f"{settings.API_V1_STR}/dialer",          tags=["dialer"])
+app.include_router(calling_router,         prefix=f"{settings.API_V1_STR}/calling",         tags=["calling"])
+app.include_router(sms_router,             prefix=f"{settings.API_V1_STR}/sms",             tags=["sms"])
+app.include_router(whatsapp_router,        prefix=f"{settings.API_V1_STR}/whatsapp",        tags=["whatsapp"])
+app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email",           tags=["email"])
+app.include_router(templates_router,       prefix=f"{settings.API_V1_STR}/templates",       tags=["templates"])
+app.include_router(campaigns_router,       prefix=f"{settings.API_V1_STR}/campaigns",       tags=["campaigns"])
+app.include_router(comm_analytics_router,  prefix=f"{settings.API_V1_STR}/comm-analytics",  tags=["comm-analytics"])
+app.include_router(departments_router,     prefix=f"{settings.API_V1_STR}/departments",     tags=["departments"], dependencies=_rbac("departments"))
+app.include_router(roles_router,           prefix=f"{settings.API_V1_STR}/roles",           tags=["roles"])
+app.include_router(teams_router,           prefix=f"{settings.API_V1_STR}/teams",           tags=["teams"], dependencies=_rbac("teams"))
+app.include_router(branches_router,        prefix=f"{settings.API_V1_STR}/branches",        tags=["branches"], dependencies=_rbac("branches"))
+app.include_router(territories_router,     prefix=f"{settings.API_V1_STR}/territories",     tags=["territories"], dependencies=_rbac("territories"))
+app.include_router(attendance_router,      prefix=f"{settings.API_V1_STR}/attendance",      tags=["attendance"], dependencies=_rbac("attendance"))
+app.include_router(leaves_router,          prefix=f"{settings.API_V1_STR}/leaves",          tags=["leaves"], dependencies=_rbac("leave"))
+app.include_router(shifts_router,          prefix=f"{settings.API_V1_STR}/shifts",          tags=["shifts"], dependencies=_rbac("shifts"))
+app.include_router(performance_router,     prefix=f"{settings.API_V1_STR}/performance",     tags=["performance"], dependencies=_rbac("performance"))
+app.include_router(targets_router,         prefix=f"{settings.API_V1_STR}/targets",         tags=["targets"], dependencies=_rbac("targets"))
+app.include_router(approvals_router,       prefix=f"{settings.API_V1_STR}/approvals",       tags=["approvals"], dependencies=_rbac("approvals"))
+app.include_router(announcements_router,   prefix=f"{settings.API_V1_STR}/announcements",   tags=["announcements"], dependencies=_rbac("announcements"))
+app.include_router(org_analytics_router,   prefix=f"{settings.API_V1_STR}/org-analytics",   tags=["org-analytics"], dependencies=_rbac("analytics"))
+app.include_router(automation_analytics_router, prefix=f"{settings.API_V1_STR}/automation-analytics", tags=["automation-analytics"], dependencies=_rbac("analytics"))
+app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
+app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
+app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))
+app.include_router(events_router,          prefix=f"{settings.API_V1_STR}/events",          tags=["events"], dependencies=_rbac("events"))
+app.include_router(queue_router,           prefix=f"{settings.API_V1_STR}/queue",           tags=["queue"], dependencies=_rbac("queue"))
+app.include_router(scheduler_router,       prefix=f"{settings.API_V1_STR}/scheduler",       tags=["scheduler"], dependencies=_rbac("scheduler"))
+app.include_router(notification_automation_router, prefix=f"{settings.API_V1_STR}/notification-automation", tags=["notification-automation"], dependencies=_rbac("notifications"))
+app.include_router(sla_router,             prefix=f"{settings.API_V1_STR}/sla",             tags=["sla"], dependencies=_rbac("sla"))
+app.include_router(escalation_router,      prefix=f"{settings.API_V1_STR}/escalation",      tags=["escalation"], dependencies=_rbac("escalation"))
 app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analytics",       tags=["analytics"])
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])
 app.include_router(telephony_router,       prefix=f"{settings.API_V1_STR}/telephony",       tags=["telephony"])
 app.include_router(portal_router,          prefix=f"{settings.API_V1_STR}/portal",          tags=["portal"])
 app.include_router(billing_webhook_router, prefix=f"{settings.API_V1_STR}/billing/webhook", tags=["billing-webhook"])
+app.include_router(notifications_router,   prefix=f"{settings.API_V1_STR}/notifications",   tags=["notifications"])
 app.include_router(monitoring_router)
 
 @app.get("/health")

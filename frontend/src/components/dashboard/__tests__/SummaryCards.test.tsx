@@ -16,7 +16,11 @@ describe('SummaryCards Component', () => {
     activities_count: 78,
     user_count: 5,
     leads_by_status: {},
-    assigned_leads_breakdown: []
+    assigned_leads_breakdown: [],
+    leads_by_source: {},
+    leads_by_stage: [],
+    conversion_rate: null,
+    today: { leads_created: 0, meetings_due: 0, tasks_due: 0, follow_ups_due: 0 }
   };
 
   it('renders summary counts correctly', () => {
@@ -24,6 +28,12 @@ describe('SummaryCards Component', () => {
 
     expect(screen.getByText('Total Leads')).toBeDefined();
     expect(screen.getByText('12')).toBeDefined();
+
+    expect(screen.getByText('Contacts')).toBeDefined();
+    expect(screen.getByText('34')).toBeDefined();
+
+    expect(screen.getByText('Companies')).toBeDefined();
+    expect(screen.getByText('56')).toBeDefined();
 
     expect(screen.getByText('Activities')).toBeDefined();
     expect(screen.getByText('78')).toBeDefined();
@@ -34,8 +44,8 @@ describe('SummaryCards Component', () => {
 
   it('renders skeletons when loading', () => {
     const { container } = render(<SummaryCards summary={null} isLoading={true} />);
-    
+
     const pulses = container.getElementsByClassName('animate-pulse');
-    expect(pulses.length).toBe(3);
+    expect(pulses.length).toBe(5);
   });
 });

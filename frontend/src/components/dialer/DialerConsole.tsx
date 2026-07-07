@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
+import { useAuthStore } from '../../store/authStore';
 import { MaskedField } from '../common/MaskedField';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
@@ -36,6 +37,9 @@ export const DialerConsole: React.FC = () => {
   } = useDialerStore();
 
   const { stages, fetchStages } = usePipelineStore();
+  // Integrated click-to-call is a paid feature; without it the cockpit runs in
+  // manual mode (fetch lead → agent calls on own phone → log disposition).
+  const callingEnabled = useAuthStore((s) => s.features.includes('OUTBOUND_CALLING'));
 
   // Local state for break countdown (15 minutes = 900 seconds)
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(900);
@@ -63,7 +67,15 @@ export const DialerConsole: React.FC = () => {
     return true;
   });
   const [showSettings, setShowSettings] = useState(false);
-  const [autoDialTimeoutId, setAutoDialTimeoutId] = useState<any>(null);
+  // Power dialer: seconds until the next auto-dial fires (null = no pending call)
+  const [nextCallCountdown, setNextCallCountdown] = useState<number | null>(null);
+  const [powerDelay, setPowerDelay] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = parseInt(localStorage.getItem('crm_power_dialer_delay') || '', 10);
+      if (!isNaN(saved) && saved > 0) return saved;
+    }
+    return 5;
+  });
   const [pendingBreakReason, setPendingBreakReason] = useState<string | null>(null);
   const [showActiveBreakMenu, setShowActiveBreakMenu] = useState(false);
 
@@ -92,12 +104,26 @@ export const DialerConsole: React.FC = () => {
   }, [autoDial]);
 
   useEffect(() => {
-    return () => {
-      if (autoDialTimeoutId) {
-        clearTimeout(autoDialTimeoutId);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_power_dialer_delay', String(powerDelay));
+    }
+  }, [powerDelay]);
+
+  // Power-dialer countdown: tick down each second, fire the next call at zero.
+  useEffect(() => {
+    if (nextCallCountdown === null) return;
+    if (nextCallCountdown <= 0) {
+      setNextCallCountdown(null);
+      if (useDialerStore.getState().agentState === 'IDLE') {
+        handleStartDialing();
       }
-    };
-  }, [autoDialTimeoutId]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setNextCallCountdown((c) => (c === null ? null : c - 1));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [nextCallCountdown]);
 
   // Fetch initial dialer and pipeline stage details on mount
   useEffect(() => {
@@ -147,8 +173,9 @@ export const DialerConsole: React.FC = () => {
   };
 
   const handleStartDialing = async () => {
+    setNextCallCountdown(null);
     try {
-      if (knowlarityApiKey && agentPhoneNumber) {
+      if (callingEnabled && knowlarityApiKey && agentPhoneNumber) {
         await startCalling(
           collectivePooling,
           knowlarityApiKey,
@@ -162,6 +189,7 @@ export const DialerConsole: React.FC = () => {
   };
 
   const handleRequestBreak = async (reason: string) => {
+    setNextCallCountdown(null);
     try {
       await goOnBreak(reason);
       setShowBreakMenu(false);
@@ -200,10 +228,8 @@ export const DialerConsole: React.FC = () => {
         setPendingBreakReason(null);
         await goOnBreak(breakReasonToApply);
       } else if (autoDial) {
-        const timeoutId = setTimeout(async () => {
-          await handleStartDialing();
-        }, 1500);
-        setAutoDialTimeoutId(timeoutId);
+        // Power dialer: visible countdown to the next call instead of an instant redial
+        setNextCallCountdown(powerDelay);
       }
     } catch (err) {}
   };
@@ -249,6 +275,22 @@ export const DialerConsole: React.FC = () => {
             {/* Layout based on Agent State */}
             {agentState === 'IDLE' && (
               <div className="space-y-6 py-4">
+                {/* Power-dialer countdown to the next auto-dialed call */}
+                {nextCallCountdown !== null && (
+                  <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl animate-fade-in">
+                    <span className="text-sm font-semibold flex items-center gap-2">
+                      <Phone className="w-4 h-4 animate-pulse" />
+                      Power dialer: next call in {nextCallCountdown}s
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setNextCallCountdown(null)}
+                      className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Stop
+                    </button>
+                  </div>
+                )}
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800/60">
                     <input
@@ -271,9 +313,22 @@ export const DialerConsole: React.FC = () => {
                       onChange={(e) => setAutoDial(e.target.checked)}
                       className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
                     />
-                    <label htmlFor="auto-dial" className="text-sm text-slate-300 font-medium cursor-pointer select-none">
-                      Auto-Dial Next Lead
+                    <label htmlFor="auto-dial" className="text-sm text-slate-300 font-medium cursor-pointer select-none flex-1">
+                      Power Dialer (auto-dial next lead)
                     </label>
+                    {autoDial && (
+                      <select
+                        aria-label="Power dialer delay"
+                        value={powerDelay}
+                        onChange={(e) => setPowerDelay(parseInt(e.target.value, 10))}
+                        className="bg-slate-800 border border-slate-700 text-slate-300 text-xs py-1.5 px-2 rounded-lg focus:outline-none"
+                      >
+                        <option value={3}>3s gap</option>
+                        <option value={5}>5s gap</option>
+                        <option value={10}>10s gap</option>
+                        <option value={15}>15s gap</option>
+                      </select>
+                    )}
                   </div>
                 </div>
 
@@ -403,7 +458,8 @@ export const DialerConsole: React.FC = () => {
             )}
           </div>
 
-          {/* Outbound Telephony Settings */}
+          {/* Outbound Telephony Settings — only for plans with integrated calling */}
+          {callingEnabled && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <button
               type="button"
@@ -465,6 +521,7 @@ export const DialerConsole: React.FC = () => {
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* RIGHT CONTEXT PANEL (Cols 6-12) */}
