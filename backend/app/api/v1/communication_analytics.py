@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.communication_analytics import (
     OverviewResponse, ChannelBreakdown, AgentPerformance, ResponseTime, TalkTime,
     MissedResponse, ConversionResponse, EngagementItem, HeatmapResponse, Bucket,
+    CallQuality, TrendsResponse,
 )
 from app.services.communication_analytics_service import CommunicationAnalyticsService
 from app.services.campaign_service import CampaignService
@@ -86,6 +87,17 @@ async def heatmap(f: Filters, actor: Annotated[User, Depends(require_active_user
 @router.get("/trend", response_model=List[Bucket])
 async def trend(f: Filters, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await CommunicationAnalyticsService(db).trend(actor, **f)
+
+
+@router.get("/call-quality", response_model=CallQuality)
+async def call_quality(f: Filters, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await CommunicationAnalyticsService(db).call_quality(actor, **f)
+
+
+@router.get("/trends", response_model=TrendsResponse)
+async def trends(f: Filters, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)],
+                 granularity: str = Query("daily")):
+    return await CommunicationAnalyticsService(db).trends(actor, granularity=granularity, **f)
 
 
 @router.get("/campaigns", response_model=CampaignDashboard)

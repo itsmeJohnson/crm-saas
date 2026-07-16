@@ -70,6 +70,8 @@ from app.models.rule import Rule, RuleEvaluation
 from app.models.rule_designer import RuleComponent, RuleVariable, RuleVersion
 from app.models.dashboard_view import DashboardView
 from app.models.report_builder import ReportDefinition, ReportVersion
+from app.models.employee_training import EmployeeTraining
+from app.models.expense import Expense
 from app.models.automation import (
     AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
 )
@@ -190,6 +192,8 @@ __all__ = [
     "DashboardView",
     "ReportDefinition",
     "ReportVersion",
+    "EmployeeTraining",
+    "Expense",
     "AutomationJob",
     "AutomationRun",
     "SLAPolicy",

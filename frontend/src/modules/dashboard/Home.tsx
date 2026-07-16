@@ -44,6 +44,9 @@ import { AutomationAnalyticsWidget } from '../../components/dashboard/Automation
 import { ExecutiveDashboardWidget } from '../../components/dashboard/ExecutiveDashboardWidget';
 import { ReportBuilderWidget } from '../../components/dashboard/ReportBuilderWidget';
 import { SalesAnalyticsWidget } from '../../components/dashboard/SalesAnalyticsWidget';
+import { EmployeeAnalyticsWidget } from '../../components/dashboard/EmployeeAnalyticsWidget';
+import { FinancialAnalyticsWidget } from '../../components/dashboard/FinancialAnalyticsWidget';
+import { ForecastingWidget } from '../../components/dashboard/ForecastingWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -209,6 +212,9 @@ export const Home: React.FC = () => {
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AnnouncementsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OrgHealthWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SalesAnalyticsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EmployeeAnalyticsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <FinancialAnalyticsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ForecastingWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ExecutiveDashboardWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ReportBuilderWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowsWidget />}

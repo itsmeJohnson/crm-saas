@@ -51,6 +51,18 @@ export interface EngagementItem {
 }
 export interface Heatmap { grid: number[][]; peak: { weekday: number; hour: number; count: number }; total: number; }
 
+export interface CallQuality {
+  total_calls: number; connected: number; missed: number; inbound: number; outbound: number;
+  connect_rate: number; missed_rate: number; avg_duration: number; median_duration: number;
+  total_talk_time: number; short_calls: number; short_call_rate: number; long_calls: number;
+  recorded: number; recording_coverage: number; quality_score: number; by_disposition: Bucket[];
+}
+export interface TrendPoint {
+  bucket: string; total: number; inbound: number; outbound: number;
+  Call: number; SMS: number; WhatsApp: number; Email: number;
+}
+export interface Trends { granularity: string; channels: string[]; series: TrendPoint[]; }
+
 export interface CommFilters {
   channel?: string;
   direction?: string;
@@ -72,6 +84,8 @@ export const commAnalyticsApi = {
   engagement: async (f: CommFilters = {}) => (await api.get<EngagementItem[]>('/comm-analytics/engagement', q(f))).data,
   heatmap: async (f: CommFilters = {}) => (await api.get<Heatmap>('/comm-analytics/heatmap', q(f))).data,
   trend: async (f: CommFilters = {}) => (await api.get<Bucket[]>('/comm-analytics/trend', q(f))).data,
+  callQuality: async (f: CommFilters = {}) => (await api.get<CallQuality>('/comm-analytics/call-quality', q(f))).data,
+  trends: async (f: CommFilters & { granularity?: string } = {}) => (await api.get<Trends>('/comm-analytics/trends', { params: f })).data,
   exportCsv: async (f: CommFilters = {}) => {
     const res = await api.get('/comm-analytics/export', { params: f, responseType: 'blob' });
     return res.data as Blob;

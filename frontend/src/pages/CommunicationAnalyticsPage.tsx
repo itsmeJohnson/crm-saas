@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   commAnalyticsApi, CommFilters, Overview, ChannelBreakdown, AgentPerformance,
-  ResponseTime, TalkTime, Missed, Conversion, EngagementItem, Heatmap,
+  ResponseTime, TalkTime, Missed, Conversion, EngagementItem, Heatmap, CallQuality, Trends,
 } from '../services/commAnalyticsApi';
 
 const CHANNEL_ICON: Record<string, any> = { Call: PhoneCall, SMS: MessageSquare, WhatsApp: MessageCircle, Email: Mail };
@@ -67,6 +67,9 @@ export const CommunicationAnalyticsPage: React.FC = () => {
   const [conv, setConv] = useState<Conversion | null>(null);
   const [engagement, setEngagement] = useState<EngagementItem[]>([]);
   const [heatmap, setHeatmap] = useState<Heatmap | null>(null);
+  const [quality, setQuality] = useState<CallQuality | null>(null);
+  const [trends, setTrends] = useState<Trends | null>(null);
+  const [granularity, setGranularity] = useState('daily');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,15 +77,16 @@ export const CommunicationAnalyticsPage: React.FC = () => {
     const f: CommFilters = { ...filters };
     if (days) f.date_from = new Date(Date.now() - days * 864e5).toISOString();
     try {
-      const [ov, ch, ag, rt, tt, ms, cv, en, hm] = await Promise.all([
+      const [ov, ch, ag, rt, tt, ms, cv, en, hm, cq, tr] = await Promise.all([
         commAnalyticsApi.overview(f), commAnalyticsApi.byChannel(f), commAnalyticsApi.agents(f),
         commAnalyticsApi.responseTime(f), commAnalyticsApi.talkTime(f), commAnalyticsApi.missed(f),
         commAnalyticsApi.conversion(f), commAnalyticsApi.engagement(f), commAnalyticsApi.heatmap(f),
+        commAnalyticsApi.callQuality(f), commAnalyticsApi.trends({ ...f, granularity }),
       ]);
       setOverview(ov); setChannels(ch); setAgents(ag); setResp(rt); setTalk(tt);
-      setMissed(ms); setConv(cv); setEngagement(en); setHeatmap(hm);
+      setMissed(ms); setConv(cv); setEngagement(en); setHeatmap(hm); setQuality(cq); setTrends(tr);
     } finally { setLoading(false); }
-  }, [filters, range]);
+  }, [filters, range, granularity]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -203,6 +207,87 @@ export const CommunicationAnalyticsPage: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* Call quality */}
+          {quality && (
+            <div className="glass-panel border border-slate-800/85 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2"><PhoneCall className="w-4 h-4 text-emerald-400" /> Call quality</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Quality score</span>
+                  <span className={`text-lg font-bold ${quality.quality_score >= 70 ? 'text-emerald-400' : quality.quality_score >= 40 ? 'text-amber-400' : 'text-red-400'}`}>{quality.quality_score}</span>
+                </div>
+              </div>
+              {quality.total_calls === 0 ? <p className="text-xs text-slate-500">No calls in range.</p> : (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                    {[
+                      ['Connect rate', `${quality.connect_rate}%`, 'text-emerald-400'],
+                      ['Missed rate', `${quality.missed_rate}%`, quality.missed_rate ? 'text-red-400' : 'text-slate-100'],
+                      ['Avg / median', `${fmtDur(quality.avg_duration)} / ${fmtDur(quality.median_duration)}`, 'text-slate-100'],
+                      ['Short calls', `${quality.short_calls} (${quality.short_call_rate}%)`, quality.short_call_rate > 30 ? 'text-amber-400' : 'text-slate-100'],
+                      ['Connected', String(quality.connected), 'text-slate-100'],
+                      ['Recording coverage', `${quality.recording_coverage}%`, 'text-slate-100'],
+                      ['Inbound / outbound', `${quality.inbound} / ${quality.outbound}`, 'text-slate-100'],
+                      ['Total talk time', fmtDur(quality.total_talk_time), 'text-indigo-400'],
+                    ].map(([label, value, tone]) => (
+                      <div key={label} className="p-2.5 bg-slate-950/40 border border-slate-800/60 rounded-lg">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{label}</p>
+                        <p className={`text-base font-bold mt-0.5 ${tone}`}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {quality.by_disposition.length > 0 && (
+                    <div className="space-y-1.5">
+                      {quality.by_disposition.map((d) => {
+                        const max = Math.max(1, ...quality.by_disposition.map((x) => x.count));
+                        return (
+                          <div key={d.label} className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-400 w-40 truncate">{d.label}</span>
+                            <div className="flex-1 h-2.5 bg-slate-800/60 rounded"><div className="h-2.5 rounded bg-emerald-500/60" style={{ width: `${(d.count / max) * 100}%` }} /></div>
+                            <span className="text-[11px] text-slate-300 w-8 text-right">{d.count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Communication trends (per channel) */}
+          {trends && (
+            <div className="glass-panel border border-slate-800/85 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-brand-400" /> Communication trends</h3>
+                <select value={granularity} onChange={(e) => setGranularity(e.target.value)} className="bg-slate-800/70 border border-slate-700/70 text-slate-300 py-1.5 px-2 rounded-lg text-xs">
+                  {['daily', 'weekly', 'monthly'].map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              {trends.series.length === 0 ? <p className="text-xs text-slate-500">No activity in range.</p> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-slate-500"><tr>
+                      <th className="text-left py-1 pr-3">Period</th><th className="text-right px-2">Total</th>
+                      {trends.channels.map((c) => <th key={c} className="text-right px-2">{c}</th>)}
+                      <th className="text-right px-2">In</th><th className="text-right px-2">Out</th>
+                    </tr></thead>
+                    <tbody>
+                      {trends.series.map((b) => (
+                        <tr key={b.bucket} className="border-t border-slate-800/60 text-slate-300">
+                          <td className="py-1.5 pr-3">{b.bucket}</td><td className="text-right px-2 font-semibold">{b.total}</td>
+                          <td className="text-right px-2">{b.Call}</td><td className="text-right px-2">{b.SMS}</td>
+                          <td className="text-right px-2">{b.WhatsApp}</td><td className="text-right px-2">{b.Email}</td>
+                          <td className="text-right px-2 text-sky-400">{b.inbound}</td><td className="text-right px-2 text-slate-400">{b.outbound}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {heatmap && <HeatGrid data={heatmap} />}
 
