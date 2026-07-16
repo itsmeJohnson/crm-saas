@@ -49,6 +49,9 @@ from app.api.v1.automation_analytics import router as automation_analytics_route
 from app.api.v1.executive_dashboard import router as executive_dashboard_router
 from app.api.v1.report_builder import router as report_builder_router
 from app.api.v1.sales_analytics import router as sales_analytics_router
+from app.api.v1.employee_analytics import router as employee_analytics_router
+from app.api.v1.financial_analytics import router as financial_analytics_router
+from app.api.v1.forecasting import router as forecasting_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -308,6 +311,9 @@ app.include_router(automation_analytics_router, prefix=f"{settings.API_V1_STR}/a
 app.include_router(executive_dashboard_router, prefix=f"{settings.API_V1_STR}/executive-dashboard", tags=["executive-dashboard"], dependencies=_rbac("analytics"))
 app.include_router(report_builder_router,  prefix=f"{settings.API_V1_STR}/report-builder",   tags=["report-builder"], dependencies=_rbac("analytics"))
 app.include_router(sales_analytics_router, prefix=f"{settings.API_V1_STR}/sales-analytics",   tags=["sales-analytics"], dependencies=_rbac("analytics"))
+app.include_router(employee_analytics_router, prefix=f"{settings.API_V1_STR}/employee-analytics", tags=["employee-analytics"], dependencies=_rbac("analytics"))
+app.include_router(financial_analytics_router, prefix=f"{settings.API_V1_STR}/financial-analytics", tags=["financial-analytics"], dependencies=_rbac("analytics"))
+app.include_router(forecasting_router,     prefix=f"{settings.API_V1_STR}/forecasting",      tags=["forecasting"], dependencies=_rbac("analytics"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))

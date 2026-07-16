@@ -94,3 +94,40 @@ class HeatmapResponse(BaseModel):
     grid: List[List[int]]
     peak: HeatmapPeak
     total: int
+
+
+class CallQuality(BaseModel):
+    total_calls: int
+    connected: int
+    missed: int
+    inbound: int
+    outbound: int
+    connect_rate: float
+    missed_rate: float
+    avg_duration: int
+    median_duration: int
+    total_talk_time: int
+    short_calls: int
+    short_call_rate: float
+    long_calls: int
+    recorded: int
+    recording_coverage: float
+    quality_score: float
+    by_disposition: List[Bucket]
+
+
+class TrendPoint(BaseModel):
+    bucket: str
+    total: int
+    inbound: int
+    outbound: int
+    Call: int = 0
+    SMS: int = 0
+    WhatsApp: int = 0
+    Email: int = 0
+
+
+class TrendsResponse(BaseModel):
+    granularity: str
+    channels: List[str]
+    series: List[TrendPoint]

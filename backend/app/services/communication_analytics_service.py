@@ -10,6 +10,7 @@ communications they sent or own.
 from __future__ import annotations
 import csv
 import io
+import statistics
 import uuid
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func, or_, and_
@@ -21,6 +22,7 @@ from app.models.contact import Contact
 from app.models.activity import Activity
 
 CHANNELS = ("Call", "SMS", "WhatsApp", "Email")
+GRANULARITIES = ("daily", "weekly", "monthly")
 CONVERTED_LEAD_STATUSES = {"Won", "Converted", "Customer"}
 CONNECTED_CALL_DISPOSITIONS = {
     "Picked", "Answered / Resolved", "Callback Requested", "Interested", "Not Interested", "Spam / Junk",
@@ -327,6 +329,82 @@ class CommunicationAnalyticsService:
             day = _naive(a.created_at).date().isoformat()
             by_day[day] = by_day.get(day, 0) + 1
         return [{"label": d, "count": c} for d, c in sorted(by_day.items())]
+
+    # ---------- Communication trends (per-channel, granular) ----------
+    async def trends(self, actor, granularity: str = "daily", **f) -> dict:
+        """Time-bucketed communication volume with a per-channel and per-direction
+        breakdown — the richer companion to `trend`."""
+        if granularity not in GRANULARITIES:
+            from fastapi import HTTPException, status
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"granularity must be one of {list(GRANULARITIES)}")
+        acts = await self._load(actor, **f)
+
+        def bucket_key(dt: datetime) -> str:
+            d = _naive(dt).date()
+            if granularity == "daily":
+                return d.isoformat()
+            if granularity == "weekly":
+                return (d - timedelta(days=d.weekday())).isoformat()
+            return d.replace(day=1).isoformat()
+
+        buckets: dict = {}
+        for a in acts:
+            key = bucket_key(a.created_at)
+            b = buckets.setdefault(key, {"bucket": key, "total": 0, "inbound": 0, "outbound": 0,
+                                         **{c: 0 for c in CHANNELS}})
+            b["total"] += 1
+            if (a.call_direction or "OUTBOUND") == "INBOUND":
+                b["inbound"] += 1
+            else:
+                b["outbound"] += 1
+            if a.activity_type in CHANNELS:
+                b[a.activity_type] += 1
+        series = [buckets[k] for k in sorted(buckets)]
+        return {"granularity": granularity, "channels": list(CHANNELS), "series": series}
+
+    # ---------- Call quality ----------
+    async def call_quality(self, actor, **f) -> dict:
+        """Quality signals for voice calls: connect/missed rates, duration profile,
+        short-call and recording coverage, disposition mix, plus a 0-100 composite
+        quality score."""
+        f = {**f, "channel": "Call"}
+        calls = await self._load(actor, **f)
+        total = len(calls)
+        connected = [c for c in calls if c.call_disposition in CONNECTED_CALL_DISPOSITIONS]
+        missed = [c for c in calls if c.status == "Missed"]
+        inbound = [c for c in calls if (c.call_direction or "OUTBOUND") == "INBOUND"]
+        durations = [c.call_duration for c in connected if c.call_duration]
+        short = [d for d in durations if d < 30]
+        long_ = [d for d in durations if d >= 300]
+        recorded = [c for c in connected if c.recording_url]
+
+        def rate(part, whole):
+            return round(part * 100 / whole, 1) if whole else 0.0
+
+        connect_rate = rate(len(connected), total)
+        missed_rate = rate(len(missed), total)
+        short_rate = rate(len(short), len(durations))
+        recording_coverage = rate(len(recorded), len(connected))
+        avg_dur = round(sum(durations) / len(durations)) if durations else 0
+        median_dur = round(statistics.median(durations)) if durations else 0
+        # composite quality: reward connects, penalise missed & short calls, credit recordings
+        quality_score = round(connect_rate * 0.40 + (100 - missed_rate) * 0.25
+                              + (100 - short_rate) * 0.20 + recording_coverage * 0.15, 1)
+        by_disposition: dict = {}
+        for c in calls:
+            key = c.call_disposition or "Unspecified"
+            by_disposition[key] = by_disposition.get(key, 0) + 1
+        return {
+            "total_calls": total, "connected": len(connected), "missed": len(missed),
+            "inbound": len(inbound), "outbound": total - len(inbound),
+            "connect_rate": connect_rate, "missed_rate": missed_rate,
+            "avg_duration": avg_dur, "median_duration": median_dur,
+            "total_talk_time": sum(durations), "short_calls": len(short), "short_call_rate": short_rate,
+            "long_calls": len(long_), "recorded": len(recorded), "recording_coverage": recording_coverage,
+            "quality_score": quality_score,
+            "by_disposition": [{"label": k, "count": v} for k, v in sorted(by_disposition.items(), key=lambda kv: -kv[1])],
+        }
 
     # ---------- CSV export ----------
     async def export_csv(self, actor, **f) -> str:

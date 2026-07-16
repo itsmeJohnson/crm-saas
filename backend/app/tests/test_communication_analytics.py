@@ -216,3 +216,36 @@ async def test_csv_export(client: AsyncClient, setup: dict):
     lines = [l for l in r.text.strip().splitlines() if l]
     assert lines[0].startswith("created_at,channel,direction")
     assert len(lines) == 7  # header + 6 rows
+
+
+@pytest.mark.asyncio
+async def test_call_quality(client: AsyncClient, setup: dict):
+    data = setup
+    r = await client.get("/api/v1/comm-analytics/call-quality", headers=data["h_admin"])
+    assert r.status_code == 200
+    q = r.json()
+    # 2 calls: 1 connected (Picked, 120s), 1 missed inbound
+    assert q["total_calls"] == 2 and q["connected"] == 1 and q["missed"] == 1
+    assert q["connect_rate"] == 50.0 and q["missed_rate"] == 50.0
+    assert q["avg_duration"] == 120 and q["median_duration"] == 120 and q["total_talk_time"] == 120
+    assert q["short_calls"] == 0 and q["recording_coverage"] == 0.0
+    # composite: 50*.4 + 50*.25 + 100*.2 + 0*.15 = 52.5
+    assert q["quality_score"] == 52.5
+    assert any(d["label"] == "Picked" for d in q["by_disposition"])
+
+
+@pytest.mark.asyncio
+async def test_trends_granularity_and_channels(client: AsyncClient, setup: dict):
+    data = setup
+    r = await client.get("/api/v1/comm-analytics/trends", params={"granularity": "daily"}, headers=data["h_admin"])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["granularity"] == "daily" and set(body["channels"]) == {"Call", "SMS", "WhatsApp", "Email"}
+    # all 6 activities are on the same day → one bucket
+    total = sum(b["total"] for b in body["series"])
+    assert total == 6
+    b0 = body["series"][0]
+    assert b0["Call"] == 2 and b0["SMS"] == 2 and b0["WhatsApp"] == 1 and b0["Email"] == 1
+    assert b0["inbound"] == 2 and b0["outbound"] == 4
+    # invalid granularity rejected
+    assert (await client.get("/api/v1/comm-analytics/trends", params={"granularity": "yearly"}, headers=data["h_admin"])).status_code == 400
