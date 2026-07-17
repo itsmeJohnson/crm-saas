@@ -58,6 +58,9 @@ from app.api.v1.visualizations import router as visualizations_router
 from app.api.v1.scheduled_reports import router as scheduled_reports_router
 from app.api.v1.bi_export import router as bi_export_router, feed_router as bi_feed_router
 from app.api.v1.historical_analytics import router as historical_analytics_router
+from app.api.v1.compliance import router as compliance_router
+from app.api.v1.predictive import router as predictive_router
+from app.api.v1.ai_platform import router as ai_platform_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -343,6 +346,9 @@ app.include_router(scheduled_reports_router, prefix=f"{settings.API_V1_STR}/sche
 app.include_router(bi_feed_router,          prefix=f"{settings.API_V1_STR}/bi/feed",          tags=["bi-feed"])
 app.include_router(bi_export_router,        prefix=f"{settings.API_V1_STR}/bi",               tags=["bi"], dependencies=_rbac("analytics"))
 app.include_router(historical_analytics_router, prefix=f"{settings.API_V1_STR}/historical-analytics", tags=["historical-analytics"], dependencies=_rbac("analytics"))
+app.include_router(compliance_router,       prefix=f"{settings.API_V1_STR}/compliance",       tags=["compliance"], dependencies=_rbac("analytics"))
+app.include_router(predictive_router,       prefix=f"{settings.API_V1_STR}/predictive",       tags=["predictive"], dependencies=_rbac("analytics"))
+app.include_router(ai_platform_router,      prefix=f"{settings.API_V1_STR}/ai",               tags=["ai"], dependencies=_rbac("ai"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))

@@ -60,6 +60,9 @@ import { VisualizationPage } from './pages/VisualizationPage';
 import { ScheduledReportsPage } from './pages/ScheduledReportsPage';
 import { BiExportPage } from './pages/BiExportPage';
 import { HistoricalAnalyticsPage } from './pages/HistoricalAnalyticsPage';
+import { CompliancePage } from './pages/CompliancePage';
+import { PredictivePage } from './pages/PredictivePage';
+import { AiPlatformPage } from './pages/AiPlatformPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
 import { RulesPage } from './pages/RulesPage';
 import { AutomationPage } from './pages/AutomationPage';
@@ -174,6 +177,9 @@ export const App: React.FC = () => {
                   <Route path="/scheduled-reports" element={<ScheduledReportsPage />} />
                   <Route path="/bi" element={<BiExportPage />} />
                   <Route path="/historical-analytics" element={<HistoricalAnalyticsPage />} />
+                  <Route path="/compliance" element={<CompliancePage />} />
+                  <Route path="/predictive" element={<PredictivePage />} />
+                  <Route path="/ai" element={<AiPlatformPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
                   <Route path="/rules" element={<RulesPage />} />
