@@ -78,6 +78,8 @@ from app.models.visualization import Visualization
 from app.models.scheduled_report import ReportSchedule, ReportDeliveryLog
 from app.models.bi_export import BIToken, BISetting, ExportJob, BISyncConfig
 from app.models.history import MetricSnapshot, HistorySetting
+from app.models.ai_platform import (AISettings, AIProviderConfig, AIPromptTemplate,
+                                    AIConversation, AIMessage, AIUsageLog, AICacheEntry)
 from app.models.automation import (
     AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
 )

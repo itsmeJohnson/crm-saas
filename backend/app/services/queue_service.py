@@ -150,9 +150,12 @@ class QueueService:
         if jt == "always_fail":
             raise RuntimeError(p.get("reason") or "intentional failure")
         if jt == "ai_task":
-            # Mock AI seam — a real provider (Claude) plugs in here later.
-            prompt = str(p.get("prompt") or "")
-            return {"model": "mock-ai", "completion": f"[AI mock] {prompt[:200]}", "tokens": len(prompt.split())}
+            # Routed through the AI Platform gateway (provider abstraction,
+            # fallback chain, cost tracking, usage logs). With no provider
+            # configured the gateway's Mock provider answers — same dev/CI
+            # behavior as the original mock seam.
+            from app.services.ai_gateway_service import AIGatewayService
+            return await AIGatewayService(self.db).run_automation_task(job.organization_id, p)
         if jt == "generate_report":
             from app.services.automation_service import AutomationService
             data = await AutomationService(self.db)._generate_report(
