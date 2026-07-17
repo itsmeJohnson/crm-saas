@@ -52,6 +52,12 @@ from app.api.v1.sales_analytics import router as sales_analytics_router
 from app.api.v1.employee_analytics import router as employee_analytics_router
 from app.api.v1.financial_analytics import router as financial_analytics_router
 from app.api.v1.forecasting import router as forecasting_router
+from app.api.v1.kpi import router as kpi_router
+from app.api.v1.okr import router as okr_router
+from app.api.v1.visualizations import router as visualizations_router
+from app.api.v1.scheduled_reports import router as scheduled_reports_router
+from app.api.v1.bi_export import router as bi_export_router, feed_router as bi_feed_router
+from app.api.v1.historical_analytics import router as historical_analytics_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -84,6 +90,11 @@ from app.cron.sla_cron import run_sla_scan_all
 from app.cron.escalation_cron import run_escalation_engine
 from app.cron.approval_cron import run_approval_timeouts
 from app.cron.report_cron import run_scheduled_report_builder
+from app.cron.kpi_cron import run_kpi_evaluation
+from app.cron.okr_cron import run_okr_scan
+from app.cron.scheduled_report_cron import run_report_schedule_delivery
+from app.cron.bi_sync_cron import run_bi_data_sync
+from app.cron.history_cron import run_history_capture
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -144,6 +155,16 @@ async def subscription_cron_scheduler():
                     await run_approval_timeouts(async_session_maker)
                     # Custom Report Builder: deliver due scheduled report definitions
                     await run_scheduled_report_builder(async_session_maker)
+                    # KPI Engine: evaluate KPIs, raise/resolve threshold alerts
+                    await run_kpi_evaluation(async_session_maker)
+                    # Goal & OKR Management: auto-complete achieved objectives, at-risk nudges
+                    await run_okr_scan(async_session_maker)
+                    # Scheduled Reports: deliver due report schedules (CSV/Excel/PDF, multi-channel)
+                    await run_report_schedule_delivery(async_session_maker)
+                    # Export & BI Integration: run due data syncs (webhook / cloud storage)
+                    await run_bi_data_sync(async_session_maker)
+                    # Historical Analytics: capture daily metric snapshots + apply retention
+                    await run_history_capture(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -314,6 +335,14 @@ app.include_router(sales_analytics_router, prefix=f"{settings.API_V1_STR}/sales-
 app.include_router(employee_analytics_router, prefix=f"{settings.API_V1_STR}/employee-analytics", tags=["employee-analytics"], dependencies=_rbac("analytics"))
 app.include_router(financial_analytics_router, prefix=f"{settings.API_V1_STR}/financial-analytics", tags=["financial-analytics"], dependencies=_rbac("analytics"))
 app.include_router(forecasting_router,     prefix=f"{settings.API_V1_STR}/forecasting",      tags=["forecasting"], dependencies=_rbac("analytics"))
+app.include_router(kpi_router,              prefix=f"{settings.API_V1_STR}/kpi",              tags=["kpi"], dependencies=_rbac("analytics"))
+app.include_router(okr_router,              prefix=f"{settings.API_V1_STR}/okr",              tags=["okr"], dependencies=_rbac("targets"))
+app.include_router(visualizations_router,   prefix=f"{settings.API_V1_STR}/visualizations",   tags=["visualizations"], dependencies=_rbac("analytics"))
+app.include_router(scheduled_reports_router, prefix=f"{settings.API_V1_STR}/scheduled-reports", tags=["scheduled-reports"], dependencies=_rbac("analytics"))
+# BI feed is token-authenticated (external BI tools can't do the JWT flow) — mounted WITHOUT bearer RBAC, like the calendar .ics feed.
+app.include_router(bi_feed_router,          prefix=f"{settings.API_V1_STR}/bi/feed",          tags=["bi-feed"])
+app.include_router(bi_export_router,        prefix=f"{settings.API_V1_STR}/bi",               tags=["bi"], dependencies=_rbac("analytics"))
+app.include_router(historical_analytics_router, prefix=f"{settings.API_V1_STR}/historical-analytics", tags=["historical-analytics"], dependencies=_rbac("analytics"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))

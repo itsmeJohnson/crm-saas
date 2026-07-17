@@ -54,6 +54,12 @@ import { SalesAnalyticsPage } from './pages/SalesAnalyticsPage';
 import { EmployeeAnalyticsPage } from './pages/EmployeeAnalyticsPage';
 import { FinancialAnalyticsPage } from './pages/FinancialAnalyticsPage';
 import { ForecastingPage } from './pages/ForecastingPage';
+import { KpiPage } from './pages/KpiPage';
+import { OkrPage } from './pages/OkrPage';
+import { VisualizationPage } from './pages/VisualizationPage';
+import { ScheduledReportsPage } from './pages/ScheduledReportsPage';
+import { BiExportPage } from './pages/BiExportPage';
+import { HistoricalAnalyticsPage } from './pages/HistoricalAnalyticsPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
 import { RulesPage } from './pages/RulesPage';
 import { AutomationPage } from './pages/AutomationPage';
@@ -162,6 +168,12 @@ export const App: React.FC = () => {
                   <Route path="/employee-analytics" element={<EmployeeAnalyticsPage />} />
                   <Route path="/financial-analytics" element={<FinancialAnalyticsPage />} />
                   <Route path="/forecasting" element={<ForecastingPage />} />
+                  <Route path="/kpi" element={<KpiPage />} />
+                  <Route path="/okr" element={<OkrPage />} />
+                  <Route path="/visualizations" element={<VisualizationPage />} />
+                  <Route path="/scheduled-reports" element={<ScheduledReportsPage />} />
+                  <Route path="/bi" element={<BiExportPage />} />
+                  <Route path="/historical-analytics" element={<HistoricalAnalyticsPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
                   <Route path="/rules" element={<RulesPage />} />

@@ -71,6 +71,7 @@ TRIGGER_EVENT_MAP = {
     "invoice_created": "invoice.created", "payment_received": "payment.received",
     "user_created": "user.created", "shift_assigned": "shift.assigned",
     "goal_achieved": "performance.goal_achieved",
+    "okr_objective_completed": "okr.objective_completed", "okr_objective_at_risk": "okr.objective_at_risk",
     "contact_created": "contact.created", "contact_updated": "contact.updated",
     "sla_breached": "sla.breached", "escalation_triggered": "escalation.triggered",
 }
