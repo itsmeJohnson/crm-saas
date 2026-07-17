@@ -47,6 +47,12 @@ import { SalesAnalyticsWidget } from '../../components/dashboard/SalesAnalyticsW
 import { EmployeeAnalyticsWidget } from '../../components/dashboard/EmployeeAnalyticsWidget';
 import { FinancialAnalyticsWidget } from '../../components/dashboard/FinancialAnalyticsWidget';
 import { ForecastingWidget } from '../../components/dashboard/ForecastingWidget';
+import { KpiWidget } from '../../components/dashboard/KpiWidget';
+import { OkrWidget } from '../../components/dashboard/OkrWidget';
+import { VizWidget } from '../../components/dashboard/VizWidget';
+import { ScheduledReportsWidget } from '../../components/dashboard/ScheduledReportsWidget';
+import { BiExportWidget } from '../../components/dashboard/BiExportWidget';
+import { HistoryWidget } from '../../components/dashboard/HistoryWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -215,6 +221,12 @@ export const Home: React.FC = () => {
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EmployeeAnalyticsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <FinancialAnalyticsWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ForecastingWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <KpiWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OkrWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <VizWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ScheduledReportsWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <BiExportWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <HistoryWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ExecutiveDashboardWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ReportBuilderWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowsWidget />}

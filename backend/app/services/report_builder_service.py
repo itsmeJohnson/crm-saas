@@ -40,6 +40,7 @@ DATASET_CATALOG: dict[str, dict] = {
             {"field": "status", "type": "string"}, {"field": "source", "type": "string"},
             {"field": "priority", "type": "string"}, {"field": "value", "type": "number"},
             {"field": "score", "type": "number"}, {"field": "city", "type": "string"},
+            {"field": "pin_code", "type": "string"},
             {"field": "company_name", "type": "string"}, {"field": "email", "type": "string"},
             {"field": "created_at", "type": "date"}, {"field": "converted_at", "type": "date"},
         ],
@@ -104,6 +105,17 @@ DATASET_CATALOG: dict[str, dict] = {
             "owner": _rel("app.models.user.User", "assigned_user_id",
                           [{"field": "first_name", "type": "string"}, {"field": "role", "type": "string"}]),
         },
+    },
+    # Historical Analytics warehouse — daily/monthly metric snapshots. Read-only
+    # history feed for reports, visualizations, scheduled reports and BI tools.
+    "metric_history": {
+        "model": "app.models.history.MetricSnapshot", "label": "Metric history", "owner_field": None,
+        "columns": [
+            {"field": "metric", "type": "string"}, {"field": "value", "type": "number"},
+            {"field": "granularity", "type": "string"}, {"field": "snapshot_date", "type": "date"},
+            {"field": "created_at", "type": "date"},
+        ],
+        "relations": {},
     },
     "invoices": {
         "model": "app.models.customer_invoice.CustomerInvoice", "label": "Invoices", "owner_field": None,

@@ -90,6 +90,21 @@ class SmtpEmailTransport:
             msg["In-Reply-To"] = in_reply_to
             msg["References"] = in_reply_to
         msg.attach(MIMEText(html_body, "html"))
+        # File attachments: dicts with base64 content ({filename, content_b64, mime})
+        # are attached as real MIME parts; legacy URL/metadata attachments are ignored
+        # here (they only annotate the Activity record).
+        for att in (attachments or []):
+            if not isinstance(att, dict) or not att.get("content_b64"):
+                continue
+            try:
+                from email.mime.application import MIMEApplication
+                import base64 as _b64
+                part = MIMEApplication(_b64.b64decode(att["content_b64"]))
+                part.add_header("Content-Disposition", "attachment",
+                                filename=str(att.get("filename") or "attachment"))
+                msg.attach(part)
+            except Exception as e:
+                logger.warning("Skipping bad email attachment %r: %s", att.get("filename"), e)
         recipients = list(to_addrs) + list(cc_addrs or [])
         try:
             if self.use_tls and self.port == 465:

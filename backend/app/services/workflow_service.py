@@ -42,6 +42,10 @@ SHIFT_ACTION_TYPES = {"notify_user", "notify_manager"}
 PERFORMANCE_CONDITION_FIELDS = {"kpi_id", "attainment"}
 PERFORMANCE_ACTION_TYPES = {"notify_user", "notify_manager"}
 
+# OKR-entity variants (event-driven; fired when an objective completes or turns at-risk)
+OKR_CONDITION_FIELDS = {"level", "cycle_type", "progress"}
+OKR_ACTION_TYPES = {"notify_user", "notify_manager"}
+
 # Approval-entity variants (event-driven; fired on final decision)
 APPROVAL_CONDITION_FIELDS = {"request_type", "amount", "status"}
 APPROVAL_ACTION_TYPES = {"notify_user", "notify_manager"}
@@ -62,6 +66,7 @@ _TRIGGER_ENTITY = {
     "goal_achieved": "performance",
     "approval_approved": "approval", "approval_rejected": "approval",
     "approval_requested": "approval", "approval_escalated": "approval",
+    "okr_objective_completed": "okr", "okr_objective_at_risk": "okr",
 }
 
 
@@ -80,6 +85,8 @@ def _fields_for(entity_type: str) -> set:
         return PERFORMANCE_CONDITION_FIELDS
     if entity_type == "approval":
         return APPROVAL_CONDITION_FIELDS
+    if entity_type == "okr":
+        return OKR_CONDITION_FIELDS
     return CONDITION_FIELDS
 
 
@@ -98,6 +105,8 @@ def _actions_for(entity_type: str) -> set:
         return PERFORMANCE_ACTION_TYPES
     if entity_type == "approval":
         return APPROVAL_ACTION_TYPES
+    if entity_type == "okr":
+        return OKR_ACTION_TYPES
     return ACTION_TYPES
 
 
@@ -145,7 +154,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected", "approval_requested", "approval_escalated"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected", "approval_requested", "approval_escalated", "okr_objective_completed", "okr_objective_at_risk"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -250,6 +259,8 @@ class WorkflowService:
                     desc = await self._apply_performance_action(entity, action, actor, rule)
                 elif entity_type == "approval":
                     desc = await self._apply_approval_action(entity, action, actor, rule)
+                elif entity_type == "okr":
+                    desc = await self._apply_okr_action(entity, action, actor, rule)
                 else:
                     desc = await self._apply_action(entity, action, actor, rule)
                 if desc:
@@ -437,6 +448,31 @@ class WorkflowService:
                 title=f"Workflow: {rule.name}",
                 body=str(action.get("message") or f'Rule "{rule.name}" fired on a performance goal.'),
                 link_url="/performance", action_metadata={"user_id": str(event.user_id), "rule_id": str(rule.id)})
+            return atype
+        return None
+
+    async def _apply_okr_action(self, event, action: dict, actor: User, rule: WorkflowRule) -> str | None:
+        """OKR rules fire when an objective completes or turns at-risk. `event`
+        carries organization_id, id, user_id (owner), level, cycle_type, progress."""
+        atype = action.get("type")
+        if atype not in OKR_ACTION_TYPES:
+            return None
+        from app.services.notification_service import NotificationService
+        if atype == "notify_manager":
+            target_id = (await self.db.execute(
+                select(User.reporting_to_id).filter(User.id == event.user_id))).scalar()
+        else:
+            target = action.get("user_id")
+            try:
+                target_id = uuid.UUID(str(target)) if target else event.user_id
+            except ValueError:
+                target_id = event.user_id
+        if target_id:
+            await NotificationService(self.db).create_notification(
+                organization_id=event.organization_id, user_id=target_id, category="okr",
+                title=f"Workflow: {rule.name}",
+                body=str(action.get("message") or f'Rule "{rule.name}" fired on an objective.'),
+                link_url="/okr", action_metadata={"objective_id": str(event.id), "rule_id": str(rule.id)})
             return atype
         return None
 
