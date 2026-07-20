@@ -61,6 +61,10 @@ from app.api.v1.historical_analytics import router as historical_analytics_route
 from app.api.v1.compliance import router as compliance_router
 from app.api.v1.predictive import router as predictive_router
 from app.api.v1.ai_platform import router as ai_platform_router
+from app.api.v1.copilot import router as copilot_router
+from app.api.v1.lead_intelligence import router as lead_intelligence_router
+from app.api.v1.comm_intelligence import router as comm_intelligence_router
+from app.api.v1.sales_intelligence import router as sales_intelligence_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -349,6 +353,11 @@ app.include_router(historical_analytics_router, prefix=f"{settings.API_V1_STR}/h
 app.include_router(compliance_router,       prefix=f"{settings.API_V1_STR}/compliance",       tags=["compliance"], dependencies=_rbac("analytics"))
 app.include_router(predictive_router,       prefix=f"{settings.API_V1_STR}/predictive",       tags=["predictive"], dependencies=_rbac("analytics"))
 app.include_router(ai_platform_router,      prefix=f"{settings.API_V1_STR}/ai",               tags=["ai"], dependencies=_rbac("ai"))
+app.include_router(copilot_router,          prefix=f"{settings.API_V1_STR}/copilot",          tags=["copilot"], dependencies=_rbac("ai"))
+app.include_router(lead_intelligence_router, prefix=f"{settings.API_V1_STR}/lead-intelligence", tags=["lead-intelligence"], dependencies=_rbac("leads"))
+# Communication Intelligence is open to all active users (scoped internally to own comms for reps), like Communication Analytics.
+app.include_router(comm_intelligence_router, prefix=f"{settings.API_V1_STR}/comm-intelligence", tags=["comm-intelligence"])
+app.include_router(sales_intelligence_router, prefix=f"{settings.API_V1_STR}/sales-intelligence", tags=["sales-intelligence"], dependencies=_rbac("analytics"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))
