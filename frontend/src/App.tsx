@@ -67,6 +67,9 @@ import { CopilotPage } from './pages/CopilotPage';
 import { LeadIntelligencePage } from './pages/LeadIntelligencePage';
 import { CommIntelligencePage } from './pages/CommIntelligencePage';
 import { SalesIntelligencePage } from './pages/SalesIntelligencePage';
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
+import { DocumentIntelligencePage } from './pages/DocumentIntelligencePage';
+import { WorkflowAssistantPage } from './pages/WorkflowAssistantPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
 import { RulesPage } from './pages/RulesPage';
 import { AutomationPage } from './pages/AutomationPage';
@@ -188,6 +191,9 @@ export const App: React.FC = () => {
                   <Route path="/lead-intelligence" element={<LeadIntelligencePage />} />
                   <Route path="/comm-intelligence" element={<CommIntelligencePage />} />
                   <Route path="/sales-intelligence" element={<SalesIntelligencePage />} />
+                  <Route path="/knowledge" element={<KnowledgeBasePage />} />
+                  <Route path="/document-intelligence" element={<DocumentIntelligencePage />} />
+                  <Route path="/workflow-assistant" element={<WorkflowAssistantPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
                   <Route path="/rules" element={<RulesPage />} />

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp, Briefcase
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp, Briefcase, BookOpen, ScanText, Wand2
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -81,6 +81,9 @@ export const AppLayout: React.FC = () => {
     { name: 'Lead Intelligence', path: '/lead-intelligence', icon: Sparkles,          roles: ['OrgAdmin', 'Manager', 'Employee'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
     { name: 'Comm Intelligence', path: '/comm-intelligence', icon: MessagesSquare,    roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
     { name: 'Sales Intelligence', path: '/sales-intelligence', icon: Briefcase,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Knowledge Base',    path: '/knowledge',         icon: BookOpen,          roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Document Intelligence', path: '/document-intelligence', icon: ScanText,  roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Workflow Assistant', path: '/workflow-assistant', icon: Wand2,           roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Org Analytics',     path: '/org-analytics',     icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Workflows',         path: '/workflows',         icon: Workflow,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Rule Engine',       path: '/rules',             icon: Filter,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },

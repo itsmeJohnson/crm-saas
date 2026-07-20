@@ -633,21 +633,25 @@ class AIGatewayService:
                                    variables={"channel": a.activity_type, "thread": "\n".join(lines)[:5000]})
 
     async def kb_answer(self, actor: User, question: str) -> dict:
-        """Knowledge Base integration: grounds the answer in notes + communication
-        templates matching the question keywords."""
+        """Knowledge Base integration: grounds the answer in published Knowledge
+        Base articles (semantic retrieval) when any match, then falls back to
+        notes + communication templates matching the question keywords."""
         from app.models.note import Note
         from app.models.communication import CommunicationTemplate
+        from app.services.knowledge_base_service import retrieve_kb_snippets
         words = [w for w in re.findall(r"[a-zA-Z0-9]{3,}", question.lower())][:6]
-        snippets: list[str] = []
-        notes = (await self.db.execute(select(Note).filter(
-            Note.organization_id == actor.organization_id, Note.is_deleted == False)
-            .order_by(Note.created_at.desc()).limit(300))).scalars().all()
-        for n in notes:
-            body = (getattr(n, "content", None) or getattr(n, "body", None) or "")
-            if any(w in body.lower() for w in words):
-                snippets.append(f"[note] {body[:400]}")
-            if len(snippets) >= 6:
-                break
+        snippets: list[str] = [f"[kb:{s['title']}] {s['content'][:400]}"
+                               for s in await retrieve_kb_snippets(self.db, actor, question, limit=6)]
+        if len(snippets) < 6:
+            notes = (await self.db.execute(select(Note).filter(
+                Note.organization_id == actor.organization_id, Note.is_deleted == False)
+                .order_by(Note.created_at.desc()).limit(300))).scalars().all()
+            for n in notes:
+                body = (getattr(n, "content", None) or getattr(n, "body", None) or "")
+                if any(w in body.lower() for w in words):
+                    snippets.append(f"[note] {body[:400]}")
+                if len(snippets) >= 6:
+                    break
         if len(snippets) < 6:
             tpls = (await self.db.execute(select(CommunicationTemplate).filter(
                 CommunicationTemplate.organization_id == actor.organization_id,

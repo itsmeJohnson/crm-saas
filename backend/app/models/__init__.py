@@ -91,6 +91,10 @@ from app.models.notification_automation import (
 )
 from app.models.sla import SLATracker, SLAPause
 from app.models.escalation import EscalationRule, EscalationEvent
+from app.models.knowledge_base import (
+    KBCategory, KBArticle, KBArticleVersion, KBChunk, KBEvent,
+)
+from app.models.document_intelligence import DIDocument
 
 __all__ = [
     "Base", 
@@ -222,5 +226,11 @@ __all__ = [
     "SLATracker",
     "SLAPause",
     "EscalationRule",
-    "EscalationEvent"
+    "EscalationEvent",
+    "KBCategory",
+    "KBArticle",
+    "KBArticleVersion",
+    "KBChunk",
+    "KBEvent",
+    "DIDocument",
 ]
