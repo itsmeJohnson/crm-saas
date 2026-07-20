@@ -56,6 +56,10 @@ import { HistoryWidget } from '../../components/dashboard/HistoryWidget';
 import { ComplianceWidget } from '../../components/dashboard/ComplianceWidget';
 import { PredictiveWidget } from '../../components/dashboard/PredictiveWidget';
 import { AiPlatformWidget } from '../../components/dashboard/AiPlatformWidget';
+import { CopilotWidget } from '../../components/dashboard/CopilotWidget';
+import { LeadIntelligenceWidget } from '../../components/dashboard/LeadIntelligenceWidget';
+import { CommIntelligenceWidget } from '../../components/dashboard/CommIntelligenceWidget';
+import { SalesIntelligenceWidget } from '../../components/dashboard/SalesIntelligenceWidget';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
 import { EmployeeDashboard } from './EmployeeDashboard';
@@ -233,6 +237,10 @@ export const Home: React.FC = () => {
         {user?.role === 'OrgAdmin' && <ComplianceWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <PredictiveWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AiPlatformWidget />}
+        <CopilotWidget />
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LeadIntelligenceWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <CommIntelligenceWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SalesIntelligenceWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ExecutiveDashboardWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ReportBuilderWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowsWidget />}
