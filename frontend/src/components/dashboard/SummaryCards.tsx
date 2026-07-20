@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderKanban, CalendarRange, UserCheck } from 'lucide-react';
+import { FolderKanban, CalendarRange, UserCheck, Contact, Building2 } from 'lucide-react';
 import { DashboardSummaryResponse } from '../../services/dashboardApi';
 
 interface SummaryCardsProps {
@@ -15,6 +15,20 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, isLoading }
       icon: FolderKanban,
       gradient: 'from-brand-500/10 to-brand-500/5 border-brand-500/20 text-brand-400',
       description: 'Active opportunities'
+    },
+    {
+      title: 'Contacts',
+      value: summary?.contacts_count ?? 0,
+      icon: Contact,
+      gradient: 'from-violet-500/10 to-violet-500/5 border-violet-500/20 text-violet-400',
+      description: 'Customer contacts on file'
+    },
+    {
+      title: 'Companies',
+      value: summary?.companies_count ?? 0,
+      icon: Building2,
+      gradient: 'from-orange-500/10 to-orange-500/5 border-orange-500/20 text-orange-400',
+      description: 'Accounts on file'
     },
     {
       title: 'Activities',
@@ -34,8 +48,8 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, isLoading }
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="glass-panel p-5 rounded-2xl border border-slate-800/80 animate-pulse h-28 flex flex-col justify-between bg-slate-950/20">
             <div className="h-4 bg-slate-800 rounded w-2/3"></div>
             <div className="h-8 bg-slate-800 rounded w-1/3 mt-2"></div>
@@ -47,7 +61,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, isLoading }
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         return (

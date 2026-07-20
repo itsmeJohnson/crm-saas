@@ -163,7 +163,8 @@ async def test_subscription_service_renewal_fallbacks(setup_super_admin_commerci
         start_date=now - timedelta(days=35),
         end_date=now - timedelta(days=5),  # expired
         status="expired",
-        auto_renew=False
+        auto_renew=False,
+        users_purchased=1
     )
     db.add(sub)
     await db.commit()

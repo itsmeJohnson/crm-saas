@@ -7,10 +7,12 @@ from fastapi import HTTPException, status
 
 from app.models.support_ticket import SupportTicket
 from app.schemas.support_ticket import SupportTicketCreate, SupportTicketUpdate
+from app.services.notification_service import NotificationService
 
 class SupportTicketService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.notification_service = NotificationService(db)
 
     async def create_ticket(
         self, organization_id: uuid.UUID, user_id: uuid.UUID, actor_name: str, payload: SupportTicketCreate
@@ -65,11 +67,11 @@ class SupportTicketService:
         return ticket
 
     async def add_comment(
-        self, organization_id: uuid.UUID, ticket_id: uuid.UUID, actor_name: str, content: str
+        self, organization_id: uuid.UUID, ticket_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, content: str
     ) -> SupportTicket:
         ticket = await self.get_ticket(organization_id, ticket_id)
         now = datetime.now(timezone.utc)
-        
+
         # In SQLAlchemy, modifying a mutable JSON directly might not trigger the dirty flag.
         # We make a copy and assign it back to trigger updates.
         comments = list(ticket.comments or [])
@@ -80,7 +82,21 @@ class SupportTicketService:
         })
         ticket.comments = comments
         ticket.updated_at = now
-        
+
+        # Notify the ticket creator and (if different) the assignee — skip whichever
+        # of the two is the person who just commented, so nobody is notified of their own comment.
+        notify_user_ids = {ticket.created_by_id, ticket.assigned_to_id} - {actor_user_id, None}
+        for recipient_id in notify_user_ids:
+            await self.notification_service.create_notification(
+                organization_id=organization_id,
+                user_id=recipient_id,
+                category="support",
+                title=f"New reply on ticket {ticket.ticket_number}",
+                body=f"{actor_name} commented: {content[:140]}",
+                link_url=f"/portal/support/{ticket.id}",
+                action_metadata={"ticket_id": str(ticket.id)},
+            )
+
         await self.db.commit()
         await self.db.refresh(ticket)
         return ticket

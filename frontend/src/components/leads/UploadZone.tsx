@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { FileSpreadsheet, Link2, Download } from 'lucide-react';
+import { leadImportApi, BusinessTemplateType } from '../../services/leadImportApi';
 
 interface UploadZoneProps {
   sourceType: 'file' | 'google_sheets';
@@ -10,6 +11,8 @@ interface UploadZoneProps {
   setSheetsUrl: (url: string) => void;
   onDownloadTemplate: (format: 'csv' | 'xlsx') => void;
   setErrorMsg: (msg: string | null) => void;
+  templateVertical: string;
+  setTemplateVertical: (vertical: string) => void;
 }
 
 export const UploadZone: React.FC<UploadZoneProps> = ({
@@ -21,9 +24,18 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
   setSheetsUrl,
   onDownloadTemplate,
   setErrorMsg,
+  templateVertical,
+  setTemplateVertical,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [businessTypes, setBusinessTypes] = useState<BusinessTemplateType[]>([]);
+
+  useEffect(() => {
+    leadImportApi.getBusinessTemplateTypes()
+      .then(setBusinessTypes)
+      .catch(() => setBusinessTypes([]));
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -150,13 +162,26 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       )}
 
       {/* Template Downloads */}
-      <div className="p-4 bg-slate-950/20 border border-slate-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h4 className="text-sm font-semibold text-slate-300">Need a baseline layout?</h4>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Download our standardized leads template with correct headers.
-          </p>
+      <div className="p-4 bg-slate-950/20 border border-slate-800/80 rounded-2xl flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-300">Need a baseline layout?</h4>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Pick your business type for a template pre-filled with sample leads you can edit and re-upload -
+              or download the generic layout below.
+            </p>
+          </div>
         </div>
+        <select
+          value={templateVertical}
+          onChange={(e) => setTemplateVertical(e.target.value)}
+          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+        >
+          <option value="">Generic Template (no business type)</option>
+          {businessTypes.map((bt) => (
+            <option key={bt.key} value={bt.key}>{bt.label}</option>
+          ))}
+        </select>
         <div className="flex gap-2">
           <button
             type="button"

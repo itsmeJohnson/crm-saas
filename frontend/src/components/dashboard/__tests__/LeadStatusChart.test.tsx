@@ -32,7 +32,11 @@ describe('LeadStatusChart Component', () => {
       Qualified: 4,
       Lost: 1
     },
-    assigned_leads_breakdown: []
+    assigned_leads_breakdown: [],
+    leads_by_source: {},
+    leads_by_stage: [],
+    conversion_rate: null,
+    today: { leads_created: 0, meetings_due: 0, tasks_due: 0, follow_ups_due: 0 }
   };
 
   it('renders lead status distribution chart correctly', () => {

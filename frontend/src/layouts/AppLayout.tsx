@@ -2,8 +2,14 @@ import React, { useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
-import { LayoutDashboard, LogOut, Building, Users, FolderKanban, Workflow, Sun, Moon, Menu, X, CreditCard } from 'lucide-react';
+import {
+  LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
+  Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
+  Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp, Briefcase, BookOpen, ScanText, Wand2
+} from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -18,28 +24,110 @@ export const AppLayout: React.FC = () => {
   };
 
   const allNavItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Tenants', path: '/tenants', icon: Building, roles: ['SuperAdmin'] },
-    { name: 'Leads', path: '/leads', icon: FolderKanban, featureCode: 'LEAD_MANAGEMENT' },
-    { name: 'Pipelines', path: '/pipelines', icon: Workflow, roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE' },
-    { name: 'Users', path: '/users', icon: Users, roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
-    { name: 'Organization', path: '/organization', icon: Building, roles: ['OrgAdmin'] },
-    { name: 'Subscription Portal', path: '/portal/dashboard', icon: CreditCard, roles: ['OrgAdmin'] },
+    // ── Workspace ──────────────────────────────────────────────────────────
+    { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard,  section: 'workspace' },
+    { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace' },
+    { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
+    { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },
+    { name: 'Communications',    path: '/communications',    icon: MessagesSquare,    section: 'workspace' },
+    { name: 'Notifications',     path: '/notifications',     icon: Bell,              section: 'workspace' },
+    { name: 'Templates',         path: '/templates',         icon: LayoutTemplate,    section: 'workspace' },
+    { name: 'Campaigns',         path: '/campaigns',         icon: Megaphone,         featureCode: 'CAMPAIGN_MANAGEMENT', section: 'workspace' },
+    { name: 'Comm Analytics',    path: '/communication-analytics', icon: BarChart3,   roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Calling',           path: '/calling',           icon: PhoneCall,         section: 'workspace' },
+    { name: 'Call Reports',      path: '/calling/reports',   icon: BarChart3,         section: 'workspace' },
+    { name: 'SMS',               path: '/sms',               icon: MessageSquare,     featureCode: 'SMS_MESSAGING', section: 'workspace' },
+    { name: 'SMS Reports',       path: '/sms/reports',       icon: BarChart3,         featureCode: 'SMS_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp',          path: '/whatsapp',          icon: MessageCircle,     featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp Reports',  path: '/whatsapp/reports',  icon: BarChart3,         featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'WhatsApp Settings', path: '/whatsapp/settings', icon: Settings,          roles: ['OrgAdmin'], featureCode: 'WHATSAPP_MESSAGING', section: 'workspace' },
+    { name: 'Email',             path: '/email',             icon: Mail,              featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Email Reports',     path: '/email/reports',     icon: BarChart3,         featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Email Settings',    path: '/email/settings',    icon: Settings,          roles: ['OrgAdmin'], featureCode: 'EMAIL_MESSAGING', section: 'workspace' },
+    { name: 'Leads',             path: '/leads',             icon: FolderKanban,     featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Lead Reports',      path: '/leads/reports',     icon: BarChart3,         featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Lead Automation',   path: '/leads/automation',  icon: Zap,               roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Companies',         path: '/companies',         icon: Building2,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Company Reports',   path: '/companies/reports', icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Contacts',          path: '/contacts',          icon: Contact,           roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Customers',         path: '/customers',         icon: HeartHandshake,    roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Customer Reports',  path: '/customers/reports', icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Contact Reports',   path: '/contacts/reports',  icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Pipelines',         path: '/pipelines',         icon: Workflow,          roles: ['OrgAdmin'],  featureCode: 'SALES_PIPELINE', section: 'workspace' },
+    { name: 'Team Members',      path: '/users',             icon: Users,             roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS', section: 'workspace' },
+    { name: 'Teams',             path: '/teams',             icon: UsersRound,        roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Attendance',        path: '/attendance',        icon: Clock,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Leave',             path: '/leaves',            icon: Plane,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Shifts',            path: '/shifts',            icon: Clock,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Performance',       path: '/performance',       icon: Trophy,            roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Targets',           path: '/targets',           icon: Target,            roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Goals & OKRs',      path: '/okr',               icon: Target,            roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Approvals',         path: '/approvals',         icon: CheckCircle2,      roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Executive Dashboard', path: '/executive-dashboard', icon: Gauge,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Report Builder',    path: '/report-builder',    icon: FileText,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Sales Analytics',   path: '/sales-analytics',   icon: TrendingUp,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Employee Analytics', path: '/employee-analytics', icon: UserCog,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Financial Analytics', path: '/financial-analytics', icon: Landmark,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Forecasting',       path: '/forecasting',       icon: TrendingUp,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'KPI Engine',        path: '/kpi',               icon: Gauge,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Visualizations',    path: '/visualizations',    icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Scheduled Reports', path: '/scheduled-reports', icon: CalendarClock,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Export & BI',       path: '/bi',                icon: HardDrive,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Historical Analytics', path: '/historical-analytics', icon: Clock,       roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Audit & Compliance', path: '/compliance',        icon: Shield,            roles: ['OrgAdmin'], section: 'workspace' },
+    { name: 'Predictive Analytics', path: '/predictive',      icon: Sparkles,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'AI Platform',       path: '/ai',                icon: Zap,               roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'CRM Copilot',       path: '/copilot',           icon: Sparkles,          roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Lead Intelligence', path: '/lead-intelligence', icon: Sparkles,          roles: ['OrgAdmin', 'Manager', 'Employee'], featureCode: 'LEAD_MANAGEMENT', section: 'workspace' },
+    { name: 'Comm Intelligence', path: '/comm-intelligence', icon: MessagesSquare,    roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Sales Intelligence', path: '/sales-intelligence', icon: Briefcase,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Knowledge Base',    path: '/knowledge',         icon: BookOpen,          roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Document Intelligence', path: '/document-intelligence', icon: ScanText,  roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
+    { name: 'Workflow Assistant', path: '/workflow-assistant', icon: Wand2,           roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Org Analytics',     path: '/org-analytics',     icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Workflows',         path: '/workflows',         icon: Workflow,          roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Rule Engine',       path: '/rules',             icon: Filter,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Automation',        path: '/automation',        icon: Cog,               roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Automation Analytics', path: '/automation-analytics', icon: Activity,      roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Event Bus',         path: '/events',            icon: Radio,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Background Queue',  path: '/queue',             icon: Layers,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Scheduler',         path: '/scheduler',         icon: CalendarClock,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Notification Rules', path: '/notification-automation', icon: BellRing,     roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'SLA Management',     path: '/sla',               icon: Gauge,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Escalation',        path: '/escalation',        icon: TrendingUp,        roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Roles & Permissions', path: '/roles',           icon: Shield,            roles: ['OrgAdmin'], section: 'workspace' },
+    { name: 'Branches',          path: '/branches',          icon: MapPin,            roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Departments',       path: '/departments',       icon: Building2,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Organization',      path: '/organization',      icon: Building,          roles: ['OrgAdmin'], section: 'workspace' },
+
+    // ── Billing & Account (OrgAdmin only) ─────────────────────────────────
+    { name: 'Billing Overview',  path: '/portal/dashboard',  icon: Gauge,             roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Subscription',      path: '/portal/subscription', icon: CreditCard,      roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Plans',             path: '/portal/plans',      icon: Sparkles,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Invoices',          path: '/portal/invoices',   icon: FileText,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Payments',          path: '/portal/payments',   icon: Receipt,           roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Usage',             path: '/portal/usage',      icon: BarChart3,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Storage',           path: '/portal/storage',    icon: HardDrive,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Call Recordings',   path: '/portal/recordings', icon: PhoneCall,         roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Seat Licensing',    path: '/portal/users',      icon: UserCog,           roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Company Profile',   path: '/portal/profile',    icon: User,              roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Billing Details',   path: '/portal/billing',    icon: Landmark,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Preferences',       path: '/portal/settings',   icon: Settings,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Support',           path: '/portal/support',    icon: LifeBuoy,          roles: ['OrgAdmin'], section: 'billing' },
+    { name: 'Activity Logs',     path: '/portal/activity',   icon: Activity,          roles: ['OrgAdmin'], section: 'billing' },
   ];
 
   const features = useAuthStore((state) => state.features);
 
   const navItems = allNavItems.filter((item) => {
     if (!user) return false;
-    
-    // 1. Role Check
+
     if (item.roles) {
       const hasRole = item.roles.includes(user.role);
-      const isTeamLeaderUsers = item.name === 'Users' && user.role === 'Employee' && user.is_team_leader;
+      const isTeamLeaderUsers = item.name === 'Team Members' && user.role === 'Employee' && user.is_team_leader;
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
 
-    // 2. Feature Check (SuperAdmin has full override bypass)
     if (item.featureCode && user.role !== 'SuperAdmin') {
       if (!features.includes(item.featureCode)) return false;
     }
@@ -47,89 +135,143 @@ export const AppLayout: React.FC = () => {
     return true;
   });
 
+  const workspaceItems = navItems.filter((item) => item.section === 'workspace');
+  const billingItems = navItems.filter((item) => item.section === 'billing');
+
+  /* ── Avatar initials ── */
+  const initials = [user?.first_name?.[0], user?.last_name?.[0]]
+    .filter(Boolean)
+    .join('')
+    .toUpperCase() || '?';
+
+  /* ── Role display label ── */
+  const roleLabel: Record<string, string> = {
+    SuperAdmin: 'Super Admin',
+    OrgAdmin: 'Admin',
+    Manager: 'Manager',
+    Employee: user?.is_team_leader ? 'Team Leader' : 'Employee',
+  };
+  const displayRole = roleLabel[user?.role ?? ''] ?? user?.role ?? '';
+
   const sidebarContent = (
-    <div className="flex flex-col justify-between h-full">
-      <div>
-        {/* Logo and close button */}
-        <div className="p-6 flex items-center justify-between border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-tr from-brand-500 to-indigo-500 rounded-lg flex items-center justify-center font-bold text-white shadow">
-              C
-            </div>
-            <span className="font-semibold text-lg tracking-tight text-slate-100">CRM Enterprise</span>
+    <div className="flex flex-col h-full">
+
+      {/* ── Logo ── */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-indigo-500 rounded-lg flex items-center justify-center font-bold text-white text-sm shadow-md shadow-brand-500/30 flex-shrink-0">
+            C
           </div>
-          <button
-            onClick={() => setIsMobileOpen(false)}
-            className="md:hidden p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Org Display */}
-        <div className="mx-4 my-4 p-3 bg-slate-900/50 border border-slate-800 rounded-xl flex items-center gap-2">
-          <Building className="w-4 h-4 text-brand-400" />
-          <div className="overflow-hidden">
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Tenant</p>
-            <p className="text-sm font-medium text-slate-200 truncate">{organization?.name}</p>
-          </div>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="px-4 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 ${
-                  isActive
-                    ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
-                    : 'text-slate-400 hover:bg-slate-900/80 hover:text-slate-100'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                {item.name}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* User Profile, Theme Switcher & Logout */}
-      <div className="p-4 border-t border-slate-800/80 space-y-4">
-        <div className="flex items-center justify-between px-2">
-          <div className="overflow-hidden max-w-[150px]">
-            <p className="text-sm font-semibold text-slate-200 truncate">
-              {user?.first_name} {user?.last_name}
-            </p>
-            <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-            <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-semibold bg-brand-500/20 text-brand-300 rounded border border-brand-500/30">
-              {user?.role}
+          <div>
+            <span className="font-semibold text-sm tracking-tight text-slate-100 block leading-tight">
+              CRM Enterprise
+            </span>
+            <span className="text-[10px] text-slate-500 font-medium tracking-wide">
+              {organization?.name ?? 'Workspace'}
             </span>
           </div>
+        </div>
+        <button
+          onClick={() => setIsMobileOpen(false)}
+          className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-          {/* Theme switcher */}
+      {/* ── Navigation ── */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        {workspaceItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path ||
+            (item.path !== '/' && location.pathname.startsWith(item.path));
+          return (
+            <Link
+              key={item.name}
+              to={item.path}
+              onClick={() => setIsMobileOpen(false)}
+              className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span>{item.name}</span>
+              {isActive && (
+                <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
+              )}
+            </Link>
+          );
+        })}
+
+        {billingItems.length > 0 && (
+          <>
+            <p className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Billing &amp; Account
+            </p>
+            {billingItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path ||
+                (item.path !== '/' && location.pathname.startsWith(item.path));
+              return (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{item.name}</span>
+                  {isActive && (
+                    <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
+                  )}
+                </Link>
+              );
+            })}
+          </>
+        )}
+      </nav>
+
+      {/* ── User Profile & Footer ── */}
+      <div className="px-3 py-4 border-t border-slate-800/60 space-y-2">
+        {/* Theme toggle row */}
+        <div className="flex items-center justify-between px-1 mb-3">
+          <span className="text-xs text-slate-500">Appearance</span>
           <button
             onClick={toggleTheme}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-            className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer bg-slate-950/20"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer border border-slate-800/60"
           >
             {theme === 'dark' ? (
-              <Sun className="w-4.5 h-4.5 text-amber-400" />
+              <><Sun className="w-3.5 h-3.5 text-amber-400" /><span>Light</span></>
             ) : (
-              <Moon className="w-4.5 h-4.5 text-indigo-400" />
+              <><Moon className="w-3.5 h-3.5 text-indigo-400" /><span>Dark</span></>
             )}
           </button>
         </div>
+
+        {/* User card */}
+        <div className="flex items-center gap-3 px-2 py-2.5 rounded-xl bg-slate-900/50 border border-slate-800/60">
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500/80 to-indigo-500/80 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {initials}
+          </div>
+          <div className="overflow-hidden flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-200 truncate leading-tight">
+              {user?.first_name} {user?.last_name}
+            </p>
+            <p className="text-[11px] text-slate-500 truncate leading-tight mt-0.5">
+              {user?.email}
+            </p>
+          </div>
+          <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-brand-500/15 text-brand-400 border border-brand-500/25">
+            {displayRole}
+          </span>
+        </div>
+
+        {/* Sign out */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-red-400 hover:bg-red-500/8 transition-all cursor-pointer border border-transparent hover:border-red-500/15"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-3.5 h-3.5" />
           Sign Out
         </button>
       </div>
@@ -137,51 +279,56 @@ export const AppLayout: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden flex-col md:flex-row">
+    <div className="flex h-screen overflow-hidden flex-col md:flex-row" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       <InboundCallPopup />
-      {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex md:w-64 glass-panel border-r border-slate-800 flex-col justify-between z-25">
+
+      {/* ── Desktop Sidebar ── */}
+      <aside className="hidden md:flex md:w-56 crm-sidebar flex-col z-20 flex-shrink-0">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Drawer Navigation */}
+      {/* ── Mobile Drawer ── */}
       {isMobileOpen && (
         <div className="fixed inset-0 z-30 md:hidden flex">
-          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity duration-200"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setIsMobileOpen(false)}
-          ></div>
-
-          {/* Slide Drawer */}
-          <aside className="relative w-64 max-w-xs bg-slate-950 border-r border-slate-800/80 shadow-2xl flex flex-col justify-between h-full z-10 animate-slide-in">
+          />
+          <aside className="relative w-56 max-w-xs crm-sidebar shadow-2xl flex flex-col h-full z-10">
             {sidebarContent}
           </aside>
         </div>
       )}
 
-      {/* Main Workspace Wrapper */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Top Bar Header */}
-        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-slate-900/60 border-b border-slate-800/80 z-20">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-tr from-brand-500 to-indigo-500 rounded-lg flex items-center justify-center font-bold text-white shadow">
+      {/* ── Main Workspace ── */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Mobile Top Bar */}
+        <header className="md:hidden flex items-center justify-between px-5 py-3.5 border-b border-slate-800/60 z-20" style={{ backgroundColor: 'var(--bg-surface)' }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-gradient-to-br from-brand-500 to-indigo-500 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow">
               C
             </div>
-            <span className="font-semibold text-base tracking-tight text-slate-100">CRM Enterprise</span>
+            <span className="font-semibold text-sm text-slate-100">CRM Enterprise</span>
           </div>
-          <button
-            onClick={() => setIsMobileOpen(true)}
-            className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => setIsMobileOpen(true)}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-brand-500/5 rounded-full blur-[100px] pointer-events-none"></div>
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
+        {/* Persistent Top Bar (desktop only — mobile gets the bell in its own top bar above) */}
+        <header className="hidden md:flex items-center justify-end px-6 py-2.5 border-b border-slate-800/60 z-20" style={{ backgroundColor: 'var(--bg-surface)' }}>
+          <NotificationBell />
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-app)' }}>
+          <div className="p-4 md:p-6 min-h-full">
             <Outlet />
           </div>
         </main>

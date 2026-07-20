@@ -14,7 +14,7 @@ class AssignmentConfig(Base):
 
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), primary_key=True, index=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    last_assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     assignment_strategy: Mapped[AssignmentStrategy] = mapped_column(Enum(AssignmentStrategy, native_enum=False), default=AssignmentStrategy.ROUND_ROBIN, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

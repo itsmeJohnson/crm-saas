@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { portalApi } from '../../services/portalApi';
 import {
-  Activity, Search, Shield, ChevronDown, ChevronUp,
-  AlertTriangle, Loader2, Calendar, HardDrive
+  Search, ChevronDown, ChevronUp,
+  AlertTriangle, Loader2, 
 } from 'lucide-react';
 
 export const PortalActivityLogs: React.FC = () => {

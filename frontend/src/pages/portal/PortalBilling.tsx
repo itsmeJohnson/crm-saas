@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 export const PortalBilling: React.FC = () => {
-  const [profile, setProfile] = useState<OrgProfileDetails | null>(null);
+  const [_profile, setProfile] = useState<OrgProfileDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

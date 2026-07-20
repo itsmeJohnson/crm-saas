@@ -9,6 +9,7 @@ describe('UploadZone Component', () => {
   const mockSetSheetsUrl = vi.fn();
   const mockOnDownloadTemplate = vi.fn();
   const mockSetErrorMsg = vi.fn();
+  const mockSetTemplateVertical = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,6 +30,8 @@ describe('UploadZone Component', () => {
         setSheetsUrl={mockSetSheetsUrl}
         onDownloadTemplate={mockOnDownloadTemplate}
         setErrorMsg={mockSetErrorMsg}
+        templateVertical=""
+        setTemplateVertical={mockSetTemplateVertical}
       />
     );
 
@@ -50,6 +53,8 @@ describe('UploadZone Component', () => {
         setSheetsUrl={mockSetSheetsUrl}
         onDownloadTemplate={mockOnDownloadTemplate}
         setErrorMsg={mockSetErrorMsg}
+        templateVertical=""
+        setTemplateVertical={mockSetTemplateVertical}
       />
     );
 
@@ -69,6 +74,8 @@ describe('UploadZone Component', () => {
         setSheetsUrl={mockSetSheetsUrl}
         onDownloadTemplate={mockOnDownloadTemplate}
         setErrorMsg={mockSetErrorMsg}
+        templateVertical=""
+        setTemplateVertical={mockSetTemplateVertical}
       />
     );
 
@@ -88,6 +95,8 @@ describe('UploadZone Component', () => {
         setSheetsUrl={mockSetSheetsUrl}
         onDownloadTemplate={mockOnDownloadTemplate}
         setErrorMsg={mockSetErrorMsg}
+        templateVertical=""
+        setTemplateVertical={mockSetTemplateVertical}
       />
     );
 

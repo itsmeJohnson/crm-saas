@@ -16,6 +16,10 @@ export interface Organization {
   name: string;
   slug: string;
   is_active: boolean;
+  subscription_plan?: string | null;
+  subscription_status?: string | null;
+  subscription_expires_at?: string | null;
+  max_users?: number | null;
 }
 
 interface AuthState {

@@ -1,14 +1,19 @@
 version: '3.8'
 
+# ── Production Docker Compose ────────────────────────────────────────────────
+# REQUIRED: Copy .env.example to .env and set ALL variables before deploying.
+# Variables marked with :? will cause a hard startup failure if not set.
+# Run: cp .env.example .env && nano .env
+
 services:
   db:
     image: postgres:15-alpine
     container_name: crm-postgres-prod
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prod_secure_password_123}
-      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      POSTGRES_USER:     ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB:       ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,17 +21,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # Do NOT expose port 5432 to the host in production
+    networks:
+      - backend_net
 
   redis:
     image: redis:7-alpine
     container_name: crm-redis-prod
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     restart: always
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend_net
 
   backend:
     build:
@@ -36,11 +46,21 @@ services:
     restart: always
     environment:
       - POSTGRES_SERVER=db
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-prod_secure_password_123}
-      - POSTGRES_DB=${POSTGRES_DB:-crm}
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB must be set in .env}
       - REDIS_HOST=redis
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-prod_super_secret_key_rotation_987}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SPACES_KEY=${SPACES_KEY:-}
+      - SPACES_SECRET=${SPACES_SECRET:-}
+      - SPACES_BUCKET=${SPACES_BUCKET:-}
+      - SPACES_ENDPOINT=${SPACES_ENDPOINT:-}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-https://localhost}
+      - LOG_JSON=true
     depends_on:
       db:
         condition: service_healthy
@@ -51,6 +71,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+    networks:
+      - backend_net
 
   web:
     build:
@@ -60,9 +82,20 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Mount TLS certificates (from Let's Encrypt / certbot or your CA)
+      - ${TLS_CERT_PATH:?TLS_CERT_PATH must be set in .env}:/etc/nginx/certs/fullchain.pem:ro
+      - ${TLS_KEY_PATH:?TLS_KEY_PATH must be set in .env}:/etc/nginx/certs/privkey.pem:ro
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - backend_net
+
+networks:
+  backend_net:
+    driver: bridge
 
 volumes:
   postgres_prod_data:

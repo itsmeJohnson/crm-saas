@@ -52,7 +52,32 @@ class ConnectionManager:
 ws_manager = ConnectionManager()
 
 @router.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        await websocket.accept()
+        await websocket.close(code=1008, reason="Invalid User ID format")
+        return
+
+    from app.models.user import User
+    res = await db.execute(select(User).where(User.id == user_uuid, User.is_active == True, User.is_deleted == False))
+    user = res.scalar_one_or_none()
+    if not user:
+        await websocket.accept()
+        await websocket.close(code=1008, reason="User not active")
+        return
+
+    from app.dependencies.feature_guard import tenant_has_feature
+    if not await tenant_has_feature(db, user, "INBOUND_CALLING"):
+        await websocket.accept()
+        await websocket.close(code=1008, reason="Inbound calling feature not available")
+        return
+
     await ws_manager.connect(user_id, websocket)
     try:
         while True:
@@ -143,6 +168,17 @@ async def inbound_call_trigger(
         call_direction="INBOUND"
     )
     db.add(new_call_activity)
+
+    # Fire call_logged workflow rules; webhook has no authenticated actor, so act
+    # as the lead's assigned agent (or its creator) for note attribution.
+    workflow_actor_id = assigned_user_id or created_by_user_id
+    if workflow_actor_id:
+        actor_res = await db.execute(select(User).filter(User.id == workflow_actor_id))
+        workflow_actor = actor_res.scalars().first()
+        if workflow_actor:
+            from app.services.workflow_service import WorkflowService
+            await WorkflowService(db).run("call_logged", lead, workflow_actor)
+
     await db.commit()
     await db.refresh(new_call_activity)
     

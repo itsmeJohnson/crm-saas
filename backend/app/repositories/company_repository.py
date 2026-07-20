@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Sequence, Tuple
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.company import Company
 from app.repositories.base import BaseRepository
@@ -25,17 +25,33 @@ class CompanyRepository(BaseRepository[Company]):
         return result.scalars().first()
 
     async def paginate_companies(
-        self, 
-        organization_id: uuid.UUID, 
-        skip: int = 0, 
-        limit: int = 100, 
-        search_query: str | None = None
+        self,
+        organization_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search_query: str | None = None,
+        industry: str | None = None,
+        company_type: str | None = None,
+        source: str | None = None,
+        assigned_user_id: uuid.UUID | None = None,
+        tag: str | None = None,
     ) -> Tuple[Sequence[Company], int]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,
             self.model.is_deleted == False
         )
-        
+
+        if industry:
+            query = query.filter(self.model.industry == industry)
+        if company_type:
+            query = query.filter(self.model.company_type == company_type)
+        if source:
+            query = query.filter(self.model.source == source)
+        if assigned_user_id:
+            query = query.filter(self.model.assigned_user_id == assigned_user_id)
+        if tag:
+            query = query.filter(func.lower(func.cast(self.model.tags, String)).like(f'%"{tag.lower()}"%'))
+
         if search_query:
             search_filter = f"%{search_query}%"
             query = query.filter(
@@ -45,7 +61,7 @@ class CompanyRepository(BaseRepository[Company]):
                     self.model.industry.ilike(search_filter)
                 )
             )
-        
+
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         count_result = await self.db.execute(count_query)

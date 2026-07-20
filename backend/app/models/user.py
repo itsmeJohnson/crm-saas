@@ -23,6 +23,25 @@ class User(BaseModel):
     reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reset_token_expires: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # Seat Licensing Extensions
+    seat_number: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    inactive_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Department membership (nullable — orthogonal to the reporting hierarchy;
+    # existing users default to NULL, preserving backward compatibility). use_alter
+    # breaks the users↔departments FK cycle for metadata create/drop ordering.
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("departments.id", use_alter=True, name="fk_users_department"), nullable=True, index=True)
+    # Optional custom-role overlay (nullable — legacy role checks stay authoritative
+    # when NULL). use_alter breaks the users↔custom_roles FK cycle like departments.
+    custom_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("custom_roles.id", use_alter=True, name="fk_users_custom_role"), nullable=True, index=True)
+
+    # MFA / TOTP
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_backup_codes: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # JSON list
+    calendar_feed_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # secret for .ics subscribe URL
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")

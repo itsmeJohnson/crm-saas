@@ -1,0 +1,134 @@
+import React, { useEffect, useState } from 'react';
+import { companyApi, CompanyReport, CompanyReportBucket } from '../services/companyApi';
+import { Building2, DollarSign, Users2, Trophy, Loader2 } from 'lucide-react';
+
+const currency = (n: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+
+const BreakdownCard: React.FC<{ title: string; buckets: CompanyReportBucket[]; showRevenue?: boolean }> = ({ title, buckets, showRevenue }) => {
+  const max = Math.max(1, ...buckets.map((b) => b.count));
+  const sorted = [...buckets].sort((a, b) => b.count - a.count);
+  return (
+    <div className="glass-panel border border-slate-800/85 rounded-2xl p-5">
+      <h3 className="text-sm font-semibold text-slate-200 mb-4">{title}</h3>
+      {sorted.length === 0 ? (
+        <p className="text-xs text-slate-500">No data.</p>
+      ) : (
+        <ul className="space-y-3">
+          {sorted.map((b) => (
+            <li key={b.label}>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-slate-300 truncate">{b.label}</span>
+                <span className="text-slate-400 shrink-0 ml-2">{b.count}{showRevenue ? ` · ${currency(b.revenue)}` : ''}</span>
+              </div>
+              <div className="h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-brand-500 to-indigo-500 rounded-full" style={{ width: `${(b.count / max) * 100}%` }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+export const CompanyReportsPage: React.FC = () => {
+  const [report, setReport] = useState<CompanyReport | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const load = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: { date_from?: string; date_to?: string } = {};
+      if (dateFrom) params.date_from = new Date(dateFrom).toISOString();
+      if (dateTo) params.date_to = new Date(dateTo + 'T23:59:59').toISOString();
+      setReport(await companyApi.getReport(params));
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'Failed to load report');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stats = report
+    ? [
+        { label: 'Companies', value: String(report.total_companies), icon: Building2, color: 'text-brand-400' },
+        { label: 'Total Revenue', value: currency(report.total_revenue), icon: DollarSign, color: 'text-emerald-400' },
+        { label: 'Customers', value: String(report.customers), icon: Trophy, color: 'text-amber-400' },
+        { label: 'Total Employees', value: String(report.total_employees), icon: Users2, color: 'text-indigo-400' },
+      ]
+    : [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/60 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+            Company Reports
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">Account revenue, lifecycle mix, and industry distribution.</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">From</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">To</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50" />
+          </div>
+          <button onClick={load} className="px-5 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer">Apply</button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24 text-slate-400"><Loader2 className="w-6 h-6 animate-spin" /></div>
+      ) : error ? (
+        <div className="py-24 text-center text-red-400">{error}</div>
+      ) : report ? (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.map((s) => (
+              <div key={s.label} className="glass-panel border border-slate-800/85 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <s.icon className={`w-4 h-4 ${s.color}`} />
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{s.label}</span>
+                </div>
+                <p className="text-2xl font-bold text-slate-100">{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {report.top_by_revenue.length > 0 && (
+            <div className="glass-panel border border-slate-800/85 rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Top Accounts by Revenue</h3>
+              <ul className="space-y-2">
+                {report.top_by_revenue.map((t) => (
+                  <li key={t.name} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 truncate">{t.name}</span>
+                    <span className="text-emerald-300 font-semibold shrink-0 ml-2">{currency(t.revenue)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BreakdownCard title="By Industry" buckets={report.by_industry} showRevenue />
+            <BreakdownCard title="By Type" buckets={report.by_type} />
+          </div>
+          <BreakdownCard title="By Source" buckets={report.by_source} />
+        </>
+      ) : null}
+    </div>
+  );
+};

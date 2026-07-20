@@ -376,8 +376,8 @@ async def test_analytics_api_endpoints(client: AsyncClient, setup_analytics_data
     assert res_list.status_code == status.HTTP_200_OK
     assert len(res_list.json()) == 1
 
-    # Super admin metrics rollup route
-    res_rollup = await client.get("/api/v1/analytics/super-admin", headers=data["headers_super"])
+    # Org-admin metrics rollup route
+    res_rollup = await client.get("/api/v1/analytics/org-admin", headers=data["headers_super"])
     assert res_rollup.status_code == status.HTTP_200_OK
     assert len(res_rollup.json()["targets_progress"]) == 1
     assert res_rollup.json()["targets_progress"][0]["target_value"] == 50

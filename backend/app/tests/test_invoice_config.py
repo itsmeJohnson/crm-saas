@@ -105,7 +105,7 @@ async def test_upload_delete_branding_files(client: AsyncClient, setup_super_adm
     org_id = setup_super_admin["org"].id
 
     # 1. Upload company logo file
-    logo_file = ("test_logo.png", b"fake_png_data", "image/png")
+    logo_file = ("test_logo.png", b"\x89PNG\r\n\x1a\nfake_png_data", "image/png")
     response_logo = await client.post(
         "/api/v1/super-admin/invoice-config/upload-logo",
         files={"file": logo_file},
@@ -113,7 +113,8 @@ async def test_upload_delete_branding_files(client: AsyncClient, setup_super_adm
     )
     assert response_logo.status_code == 200
     res_logo = response_logo.json()
-    assert "/api/v1/uploads/branding/logo_" in res_logo["company_logo_url"]
+    assert "/api/v1/uploads/branding/" in res_logo["company_logo_url"]
+    assert res_logo["company_logo_url"].endswith(".png")
 
     # Verify audit log for logo upload
     res_audit_logo = await db.execute(
@@ -122,7 +123,7 @@ async def test_upload_delete_branding_files(client: AsyncClient, setup_super_adm
     assert res_audit_logo.scalar() is not None
 
     # 2. Upload payment QR code file
-    qr_file = ("test_qr.jpg", b"fake_jpg_data", "image/jpeg")
+    qr_file = ("test_qr.jpg", b"\xff\xd8\xfffake_jpg_data", "image/jpeg")
     response_qr = await client.post(
         "/api/v1/super-admin/invoice-config/upload-qr",
         files={"file": qr_file},
@@ -130,7 +131,8 @@ async def test_upload_delete_branding_files(client: AsyncClient, setup_super_adm
     )
     assert response_qr.status_code == 200
     res_qr = response_qr.json()
-    assert "/api/v1/uploads/branding/qr_" in res_qr["qr_code_url"]
+    assert "/api/v1/uploads/branding/" in res_qr["qr_code_url"]
+    assert res_qr["qr_code_url"].endswith(".jpg") or res_qr["qr_code_url"].endswith(".jpeg")
 
     # Verify audit log for QR upload
     res_audit_qr = await db.execute(

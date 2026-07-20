@@ -40,6 +40,15 @@ class UserRepository(BaseRepository[User]):
         result = await self.db.execute(query)
         return result.scalars().first()
 
+    async def get_by_phone_in_org(self, organization_id: uuid.UUID, phone: str) -> User | None:
+        query = select(self.model).filter(
+            self.model.phone == phone,
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
     async def list_users(self, organization_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Sequence[User]:
         query = select(self.model).filter(
             self.model.organization_id == organization_id,
@@ -77,7 +86,14 @@ class UserRepository(BaseRepository[User]):
             self.model.is_deleted == False
         )
         if reporting_to_id is not None:
-            query = query.filter(self.model.reporting_to_id == reporting_to_id)
+            # Include the manager/TL themselves alongside their direct reports,
+            # so callers can resolve "assigned to me" without a separate lookup.
+            query = query.filter(
+                or_(
+                    self.model.reporting_to_id == reporting_to_id,
+                    self.model.id == reporting_to_id
+                )
+            )
         if role:
             query = query.filter(self.model.role == role)
         if is_active is not None:

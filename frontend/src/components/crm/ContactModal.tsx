@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ContactResponse } from '../../services/contactApi';
+import { ContactResponse, contactApi, CustomFieldDefinition } from '../../services/contactApi';
 import { useContactStore } from '../../store/contactStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useUserStore } from '../../store/userStore';
@@ -36,6 +36,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const { users, fetchUsers } = useUserStore();
   const activeUsers = users.filter(u => u.is_active);
 
+  const [tagsInput, setTagsInput] = useState('');
+  const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
+
   const {
     register,
     handleSubmit,
@@ -58,11 +62,14 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     if (isOpen) {
       if (companies.length === 0) fetchCompanies();
       if (users.length === 0) fetchUsers();
+      contactApi.listCustomFields().then((d) => setDefinitions(d.filter((f) => f.is_active))).catch(() => {});
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (contact) {
+      setTagsInput((contact.tags || []).join(', '));
+      setCustomValues(contact.custom_fields || {});
       reset({
         first_name: contact.first_name,
         last_name: contact.last_name,
@@ -73,6 +80,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         assigned_user_id: contact.assigned_user_id || '',
       });
     } else {
+      setTagsInput('');
+      setCustomValues({});
       reset({
         first_name: '',
         last_name: '',
@@ -89,6 +98,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   const onSubmit = async (values: ContactFormValues) => {
     try {
+      const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
+      const cleanedCustom: Record<string, any> = {};
+      for (const def of definitions) {
+        const v = customValues[def.key];
+        if (v !== undefined && v !== '') cleanedCustom[def.key] = v;
+      }
       const payload = {
         first_name: values.first_name,
         last_name: values.last_name,
@@ -97,6 +112,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         job_title: values.job_title || null,
         company_id: values.company_id || null,
         assigned_user_id: values.assigned_user_id || null,
+        tags: tags.length ? tags : null,
+        custom_fields: Object.keys(cleanedCustom).length ? cleanedCustom : null,
       };
 
       if (contact) {
@@ -163,6 +180,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Phone</label>
               <input
                 type="text"
+                inputMode="tel"
+                maxLength={20}
                 {...register('phone')}
                 placeholder="e.g. +1 555-0100"
                 className="w-full px-4 py-3 rounded-xl glass-input"
@@ -208,6 +227,54 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tags</label>
+            <input
+              type="text"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="Comma-separated, e.g. vip, newsletter"
+              className="w-full px-4 py-3 rounded-xl glass-input"
+            />
+          </div>
+
+          {definitions.length > 0 && (
+            <div className="space-y-4 pt-2 border-t border-slate-800/60">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Custom Fields</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {definitions.map((def) => (
+                  <div key={def.id}>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">{def.label}</label>
+                    {def.field_type === 'select' && def.options ? (
+                      <select
+                        value={customValues[def.key] ?? ''}
+                        onChange={(e) => setCustomValues((p) => ({ ...p, [def.key]: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                      >
+                        <option value="">—</option>
+                        {def.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : def.field_type === 'checkbox' ? (
+                      <input
+                        type="checkbox"
+                        checked={!!customValues[def.key]}
+                        onChange={(e) => setCustomValues((p) => ({ ...p, [def.key]: e.target.checked }))}
+                        className="accent-brand-500 w-5 h-5"
+                      />
+                    ) : (
+                      <input
+                        type={def.field_type === 'number' ? 'number' : def.field_type === 'date' ? 'date' : 'text'}
+                        value={customValues[def.key] ?? ''}
+                        onChange={(e) => setCustomValues((p) => ({ ...p, [def.key]: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-xl glass-input"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button

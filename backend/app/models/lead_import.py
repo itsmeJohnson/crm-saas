@@ -24,7 +24,7 @@ class LeadImport(BaseModel):
     mapping_confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     error_summary: Mapped[list | None] = mapped_column(JSON, nullable=True)
     failed_rows_file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization")

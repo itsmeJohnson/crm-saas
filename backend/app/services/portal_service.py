@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -140,13 +141,35 @@ class PortalService:
             "recent_activities": recent_activities
         }
 
-    async def buy_extra_seats(
-        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, user_count: int, gateway: str
-    ) -> Invoice:
-        if user_count < 1:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat count must be at least 1.")
+    # Number of months each billing cycle covers. Cycle prices on a plan are
+    # stored as per-seat PER-MONTH rates, so an extra seat's total for a cycle
+    # is the per-month rate x these months (matches PortalService.upgrade_subscription).
+    _CYCLE_MONTHS = {"monthly": 1, "quarterly": 3, "annual": 12}
 
-        # Load configurations
+    def _extra_seat_unit_price(self, plan: "Plan | None", comm_settings: CommercialSettings, billing_cycle: str) -> float:
+        """Per-user price for ONE extra seat across the whole billing cycle."""
+        months = self._CYCLE_MONTHS.get(billing_cycle, 1)
+
+        # Resolve the per-month rate for this cycle with graceful fallbacks.
+        per_month = 0.0
+        if plan:
+            if billing_cycle == "annual" and plan.annual_price:
+                per_month = float(plan.annual_price)
+            elif billing_cycle == "quarterly" and plan.quarterly_price:
+                per_month = float(plan.quarterly_price)
+            elif plan.monthly_price:
+                per_month = float(plan.monthly_price)
+            elif plan.extra_user_price:
+                per_month = float(plan.extra_user_price)
+        if per_month <= 0:
+            per_month = float(comm_settings.default_extra_user_price or 150.0)
+
+        return per_month * months
+
+    async def get_extra_seat_pricing(self, organization_id: uuid.UUID) -> dict:
+        """Resolves the effective per-seat price (per billing cycle) and GST
+        config for buying additional seats, plus whether the org is currently
+        eligible to purchase them."""
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
         comm_res = await self.db.execute(comm_stmt)
         comm_settings = comm_res.scalar_one_or_none()
@@ -168,12 +191,77 @@ class PortalService:
             plan_res = await self.db.execute(plan_stmt)
             plan = plan_res.scalar_one_or_none()
 
-        # Seat unit price
-        unit_price = 150.0
-        if plan and plan.extra_user_price:
-            unit_price = float(plan.extra_user_price)
-        elif comm_settings.default_extra_user_price:
-            unit_price = float(comm_settings.default_extra_user_price)
+        cycle_prices = {
+            cycle: self._extra_seat_unit_price(plan, comm_settings, cycle)
+            for cycle in self._CYCLE_MONTHS
+        }
+
+        minimum_users = plan.minimum_users if plan else 10
+        users_purchased = sub.users_purchased if sub else 0
+        allow_additional = plan.allow_additional_seats if plan else True
+        # Extra seats can only be bought on an active paid plan that has met its
+        # committed minimum — not while trialing or lapsed.
+        can_add_extra = bool(
+            sub
+            and sub.status == "active"
+            and allow_additional
+            and users_purchased >= minimum_users
+        )
+
+        return {
+            # Back-compat: monthly per-seat price.
+            "unit_price": cycle_prices["monthly"],
+            "cycle_prices": cycle_prices,
+            "gst_percentage": float(comm_settings.default_gst),
+            "gst_inclusive": comm_settings.gst_inclusive,
+            "plan_name": plan.name if plan else None,
+            "minimum_users": minimum_users,
+            "users_purchased": users_purchased,
+            "allow_additional_seats": allow_additional,
+            "can_add_extra": can_add_extra,
+            "subscription_status": sub.status if sub else "inactive",
+        }
+
+    async def buy_extra_seats(
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, user_count: int, gateway: str, billing_cycle: str = "monthly"
+    ) -> Invoice:
+        if user_count < 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat count must be at least 1.")
+        if user_count > 500:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can purchase at most 500 seats in a single transaction. Please contact sales for larger volumes.")
+        if billing_cycle not in self._CYCLE_MONTHS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid billing cycle.")
+
+        pricing = await self.get_extra_seat_pricing(organization_id)
+        # The "minimum reached" rule only gates the UI affordance; the API just
+        # requires an active plan that permits additional seats.
+        if pricing["subscription_status"] != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Additional seats can only be purchased on an active subscription. Please activate or renew your plan first."
+            )
+        if not pricing["allow_additional_seats"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your current plan does not allow purchasing additional seats."
+            )
+        unit_price = pricing["cycle_prices"].get(billing_cycle, pricing["unit_price"])
+
+        # Load configurations
+        comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
+        comm_res = await self.db.execute(comm_stmt)
+        comm_settings = comm_res.scalar_one_or_none()
+        if not comm_settings:
+            comm_settings = CommercialSettings(id="default")
+            self.db.add(comm_settings)
+            await self.db.flush()
+
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
 
         base_amount = unit_price * user_count
         gst_rate = float(comm_settings.default_gst)
@@ -207,8 +295,8 @@ class PortalService:
             invoice_number=invoice_num,
             amount=total_amount,
             status="Pending",
-            due_date=now + timedelta(days=comm_settings.grace_period_days),
-            plan_name=plan.name if plan else "Standard",
+            due_date=(now + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
+            plan_name=pricing["plan_name"] or "Standard",
             amount_inr=total_amount if comm_settings.default_currency == "INR" else 0.0,
             currency=comm_settings.default_currency,
             issue_date=now,
@@ -225,6 +313,8 @@ class PortalService:
         invoice.action_metadata = {
             "action_type": "buy_extra_seats",
             "user_count": user_count,
+            "billing_cycle": billing_cycle,
+            "unit_price": unit_price,
             "gateway": gateway
         }
         self.db.add(invoice)
@@ -299,7 +389,7 @@ class PortalService:
             invoice_number=invoice_num,
             amount=total_amount,
             status="Pending",
-            due_date=now + timedelta(days=comm_settings.grace_period_days),
+            due_date=(now + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
             plan_name=plan.name if plan else "Standard",
             amount_inr=total_amount if comm_settings.default_currency == "INR" else 0.0,
             currency=comm_settings.default_currency,
@@ -398,12 +488,20 @@ class PortalService:
         elif action_type == "upgrade_plan":
             plan_id = uuid.UUID(metadata.get("plan_id"))
             billing_cycle = metadata.get("billing_cycle", "monthly")
+            licensed_seats = metadata.get("licensed_seats")
             plan_stmt = select(Plan).where(Plan.id == plan_id)
             plan_res = await self.db.execute(plan_stmt)
             plan = plan_res.scalar_one_or_none()
             if plan and sub:
                 sub.plan_id = plan.id
                 sub.billing_cycle = billing_cycle
+                if licensed_seats:
+                    sub.users_purchased = int(licensed_seats)
+                else:
+                    sub.users_purchased = max(sub.users_purchased, plan.minimum_users)
+                # Any resolved scheduled tier switch is now applied — clear it.
+                sub.pending_plan_id = None
+                sub.pending_billing_cycle = None
                 days_to_add = 30
                 if billing_cycle == "quarterly":
                     days_to_add = 90
@@ -417,7 +515,7 @@ class PortalService:
                 
                 if org:
                     org.subscription_plan = plan.name
-                    org.max_users = plan.max_users
+                    org.max_users = sub.users_purchased
                     org.subscription_expires_at = sub.end_date
                     org.subscription_status = "active"
 
@@ -442,6 +540,11 @@ class PortalService:
                     org.subscription_status = "active"
 
         await self.db.commit()
+
+        # Invalidate features cache
+        from app.dependencies.feature_guard import invalidate_tenant_features
+        await invalidate_tenant_features(organization_id)
+
         await self.db.refresh(invoice)
 
         # 4. Log audit log
@@ -458,7 +561,11 @@ class PortalService:
 
     async def upgrade_subscription(
         self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, actor_name: str, plan_id: uuid.UUID, billing_cycle: str, gateway: str
-    ) -> Invoice:
+    ) -> dict:
+        """Returns {"invoice": Invoice} for an immediately-payable change, or
+        {"scheduled_change": {...}} when the tenant already holds an active,
+        unexpired subscription on a DIFFERENT plan — that switch is deferred to
+        take effect at end_date instead of cutting their paid period short."""
         # Load configurations
         comm_stmt = select(CommercialSettings).where(CommercialSettings.id == "default")
         comm_res = await self.db.execute(comm_stmt)
@@ -479,13 +586,76 @@ class PortalService:
             if not plan:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found.")
 
-        # Determine base amount based on cycle
+        # Fetch active sub if any
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+
+        licensed_seats = max(sub.users_purchased, plan.minimum_users) if sub else max(plan.minimum_users, 10)
+
+        # price_per_seat is the discounted per-seat PER-MONTH rate for the cycle.
+        # billing_months is how many months one invoice covers.
         if billing_cycle == "annual":
-            base_amount = float(plan.annual_price) if plan.annual_price > 0 else float(plan.monthly_price) * 12
+            price_per_seat = float(plan.annual_price) if plan.annual_price > 0 else float(plan.monthly_price)
+            billing_months = 12
         elif billing_cycle == "quarterly":
-            base_amount = float(plan.quarterly_price) if plan.quarterly_price > 0 else float(plan.monthly_price) * 3
+            price_per_seat = float(plan.quarterly_price) if plan.quarterly_price > 0 else float(plan.monthly_price)
+            billing_months = 3
         else:
-            base_amount = float(plan.monthly_price) if plan.monthly_price > 0 else float(plan.price_inr)
+            price_per_seat = float(plan.monthly_price) if plan.monthly_price > 0 else float(plan.price_inr)
+            billing_months = 1
+
+        # Enforce the plan's minimum contract length: the chosen billing cycle must
+        # cover at least minimum_contract_months (e.g. a 3-month-minimum plan can't
+        # be taken on a 1-month monthly cycle).
+        min_months = plan.minimum_contract_months or 1
+        if billing_months < min_months:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The {plan.display_name or plan.name} plan requires a minimum commitment of {min_months} months. Please choose a longer billing cycle."
+            )
+
+        # If the tenant already holds an active, unexpired subscription on a
+        # DIFFERENT plan, don't charge/switch now — that would cut their current
+        # paid commitment short. Schedule the switch to apply at end_date instead.
+        # (Renewing the SAME plan, or acting on a trial/expired/suspended sub,
+        # still goes through the immediate path below.)
+        now_check = datetime.now(timezone.utc)
+        sub_end_check = sub.end_date if sub else None
+        if sub_end_check and sub_end_check.tzinfo is None:
+            sub_end_check = sub_end_check.replace(tzinfo=timezone.utc)
+        if sub and sub.status == "active" and sub_end_check and sub_end_check > now_check and sub.plan_id != plan.id:
+            sub.pending_plan_id = plan.id
+            sub.pending_billing_cycle = billing_cycle
+            await self.db.commit()
+
+            await self.audit_service.log_event(
+                organization_id=organization_id,
+                actor_user_id=actor_user_id,
+                action="SCHEDULE_PLAN_CHANGE",
+                resource_type="SUBSCRIPTION",
+                resource_id=str(sub.id),
+                action_metadata={"pending_plan_id": str(plan.id), "pending_billing_cycle": billing_cycle, "effective_date": sub.end_date.isoformat()}
+            )
+
+            return {
+                "scheduled_change": {
+                    "plan_id": plan.id,
+                    "plan_name": plan.display_name or plan.name,
+                    "billing_cycle": billing_cycle,
+                    "effective_date": sub.end_date,
+                    "message": (
+                        f"You're currently on an active plan until {sub.end_date.strftime('%d %b %Y')}. "
+                        f"Your switch to {plan.display_name or plan.name} is scheduled and will take effect on that date — "
+                        f"no charge today."
+                    ),
+                }
+            }
+
+        base_amount = price_per_seat * licensed_seats * billing_months
 
         gst_rate = float(comm_settings.default_gst)
         if comm_settings.gst_inclusive:
@@ -510,20 +680,12 @@ class PortalService:
         now = datetime.now(timezone.utc)
         invoice_num = f"{prefix}-UPGR-{uuid.uuid4().hex[:6].upper()}-{int(now.timestamp())}"
 
-        # Fetch active sub if any
-        sub_stmt = select(TenantSubscription).where(
-            TenantSubscription.organization_id == organization_id,
-            TenantSubscription.is_deleted == False
-        )
-        sub_res = await self.db.execute(sub_stmt)
-        sub = sub_res.scalar_one_or_none()
-
         invoice = Invoice(
             organization_id=organization_id,
             invoice_number=invoice_num,
             amount=total_amount,
             status="Pending",
-            due_date=now + timedelta(days=comm_settings.grace_period_days),
+            due_date=(now + timedelta(days=comm_settings.grace_period_days)).replace(tzinfo=None),
             plan_name=plan.name,
             amount_inr=total_amount if comm_settings.default_currency == "INR" else 0.0,
             currency=comm_settings.default_currency,
@@ -541,7 +703,10 @@ class PortalService:
             "action_type": "upgrade_plan",
             "plan_id": str(plan_id),
             "billing_cycle": billing_cycle,
-            "gateway": gateway
+            "billing_months": billing_months,
+            "rate_per_seat_per_month": price_per_seat,
+            "gateway": gateway,
+            "licensed_seats": licensed_seats
         }
         self.db.add(invoice)
         await self.db.commit()
@@ -555,4 +720,94 @@ class PortalService:
             resource_id=str(invoice.id),
             action_metadata={"plan_name": plan.name, "billing_cycle": billing_cycle, "amount": total_amount}
         )
-        return invoice
+        return {"invoice": invoice}
+
+    async def cancel_pending_plan_change(
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID
+    ) -> TenantSubscription:
+        """Cancels a scheduled tier switch, keeping the tenant on their current plan."""
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        ).options(selectinload(TenantSubscription.plan), selectinload(TenantSubscription.pending_plan))
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found.")
+        if not sub.pending_plan_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No scheduled plan change to cancel.")
+
+        cancelled_plan_id = sub.pending_plan_id
+        sub.pending_plan_id = None
+        sub.pending_billing_cycle = None
+        await self.db.commit()
+        await self.db.refresh(sub)
+
+        await self.audit_service.log_event(
+            organization_id=organization_id,
+            actor_user_id=actor_user_id,
+            action="CANCEL_SCHEDULED_PLAN_CHANGE",
+            resource_type="SUBSCRIPTION",
+            resource_id=str(sub.id),
+            action_metadata={"cancelled_pending_plan_id": str(cancelled_plan_id)}
+        )
+        return sub
+
+    async def reduce_licensed_seats(
+        self, organization_id: uuid.UUID, actor_user_id: uuid.UUID, new_seat_count: int
+    ) -> TenantSubscription:
+        sub_stmt = select(TenantSubscription).where(
+            TenantSubscription.organization_id == organization_id,
+            TenantSubscription.is_deleted == False
+        )
+        sub_res = await self.db.execute(sub_stmt)
+        sub = sub_res.scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found.")
+
+        # Validation checks
+        if new_seat_count >= sub.users_purchased:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New seat count must be less than current purchased seats."
+            )
+        if new_seat_count < 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot reduce below the minimum initial purchase of 10 Licensed Seats."
+            )
+
+        # Count active users currently assigned seats
+        from app.models.user import User
+        from sqlalchemy import func
+        stmt = select(func.count(User.id)).where(
+            User.organization_id == organization_id,
+            User.is_active == True,
+            User.seat_number.isnot(None),
+            User.is_deleted == False
+        )
+        res = await self.db.execute(stmt)
+        active_count = res.scalar() or 0
+
+        if new_seat_count < active_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot reduce seats below the number of currently active users ({active_count}). Please deactivate some users first."
+            )
+
+        # Schedule the reduction
+        sub.users_purchased_next = new_seat_count
+        await self.db.commit()
+        await self.db.refresh(sub)
+
+        # Log audit event
+        await self.audit_service.log_event(
+            organization_id=organization_id,
+            actor_user_id=actor_user_id,
+            action="SCHEDULE_SEAT_REDUCTION",
+            resource_type="SUBSCRIPTION",
+            resource_id=str(sub.id),
+            action_metadata={"from_seats": sub.users_purchased, "to_seats": new_seat_count}
+        )
+
+        return sub

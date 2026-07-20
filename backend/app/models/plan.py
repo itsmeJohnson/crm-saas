@@ -10,15 +10,16 @@ class Plan(BaseModel):
     price_inr: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0.0)
     billing_cycle_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     max_users: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
-    max_admins: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    max_managers: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
-    max_team_leads: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
-    max_employees: Mapped[int] = mapped_column(Integer, default=42, nullable=False)
+    # Obsolete role limits - DEPRECATED (Do not use in business logic, kept for DB schema compatibility only)
+    max_admins: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # @deprecated
+    max_managers: Mapped[int] = mapped_column(Integer, default=2, nullable=False)  # @deprecated
+    max_team_leads: Mapped[int] = mapped_column(Integer, default=5, nullable=False)  # @deprecated
+    max_employees: Mapped[int] = mapped_column(Integer, default=42, nullable=False)  # @deprecated
     features: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     is_trial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     trial_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
+ 
     # Commercial Enterprise Extensions
     display_name: Mapped[str] = mapped_column(String(150), nullable=False, default="")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -32,13 +33,13 @@ class Plan(BaseModel):
     api_access: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     setup_charges: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
-    minimum_users: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    maximum_users: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)
-    minimum_contract_months: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    minimum_users: Mapped[int] = mapped_column(Integer, default=10, nullable=False)  # Minimum Initial Licensed Seats (default 10)
+    maximum_users: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)  # Maximum Supported Seats
+    minimum_contract_months: Mapped[int] = mapped_column(Integer, default=3, nullable=False)  # Minimum Initial Contract (default 3 months)
     promo_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     promo_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     promo_end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
+ 
     # Expanded Dynamic SaaS Settings
     extra_user_price: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
     discount_percentage: Mapped[float] = mapped_column(Numeric(5, 2), default=0.0, nullable=False)
@@ -50,8 +51,23 @@ class Plan(BaseModel):
     allow_upgrade: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_downgrade: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_trial: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    allow_additional_seats: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     plan_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+    # Phase 3 - Extended Plan Configuration
+    quarterly_discount: Mapped[float] = mapped_column(Numeric(5, 2), default=5.0, nullable=False)
+    annual_discount: Mapped[float] = mapped_column(Numeric(5, 2), default=15.0, nullable=False)
+    allow_seat_reduction: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    replace_employee_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    included_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ai_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    extra_storage_price: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    sla_hours: Mapped[int] = mapped_column(Integer, default=48, nullable=False)
+    dedicated_manager: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    base_currency: Mapped[str] = mapped_column(String(10), default="INR", nullable=False)
+    price_per_seat: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
 
     # Relationships
     plan_features: Mapped[list["PlanFeature"]] = relationship(

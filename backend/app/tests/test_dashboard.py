@@ -137,3 +137,99 @@ async def test_dashboard_recent_activities_pagination(client: AsyncClient, setup
     assert response.status_code == 200
     activities_p2 = response.json()
     assert len(activities_p2["items"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_dashboard_summary_extended_widgets(client: AsyncClient, setup_dashboard_data: dict):
+    """leads_by_source, leads_by_stage, conversion_rate, and today's agenda counts."""
+    data = setup_dashboard_data
+
+    lead_payload = {
+        "title": "Sourced Deal",
+        "last_name": "LeadA",
+        "status": "New",
+        "source": "Website",
+        "value": 5000.0,
+    }
+    response = await client.post("/api/v1/leads/", json=lead_payload, headers=data["headers_a"])
+    assert response.status_code == 201
+
+    response = await client.get("/api/v1/dashboard/summary", headers=data["headers_a"])
+    assert response.status_code == 200
+    summary = response.json()
+
+    assert summary["leads_by_source"]["Website"] == 1
+
+    # A freshly created org gets the system-default pipeline (OrganizationRepository
+    # seeds a "Converted" stage at position 5), so conversion_rate is a real number
+    # here — 0.0 because nothing has reached that stage yet, not None/unconfigured.
+    assert summary["conversion_rate"] == 0.0
+    assert isinstance(summary["leads_by_stage"], list)
+    assert any(s["stage_name"] == "Converted" for s in summary["leads_by_stage"])
+    assert sum(s["count"] for s in summary["leads_by_stage"]) == summary["total_leads"]
+
+    # The lead was just created "now", so it counts toward today's agenda.
+    assert summary["today"]["leads_created"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_team_status_permissions_and_tenant_isolation(client: AsyncClient, db: AsyncSession):
+    from app.repositories.organization import OrganizationRepository
+    from app.repositories.user_repository import UserRepository
+    from app.core.security import create_access_token, get_password_hash
+
+    org_repo = OrganizationRepository(db)
+    user_repo = UserRepository(db)
+
+    org = await org_repo.create({"name": "Status Org", "slug": "status-org"})
+    await db.commit()
+
+    manager = await user_repo.create_user(org.id, {
+        "email": "manager@status.com",
+        "hashed_password": get_password_hash("password123"),
+        "first_name": "Manager",
+        "last_name": "One",
+        "role": "Manager",
+        "is_active": True,
+    })
+    # Team Leader = Employee reporting to a Manager.
+    team_leader = await user_repo.create_user(org.id, {
+        "email": "tl@status.com",
+        "hashed_password": get_password_hash("password123"),
+        "first_name": "TL",
+        "last_name": "One",
+        "role": "Employee",
+        "is_active": True,
+        "reporting_to_id": manager.id,
+    })
+    # Telecaller = Employee reporting to another Employee (the Team Leader).
+    telecaller = await user_repo.create_user(org.id, {
+        "email": "tc@status.com",
+        "hashed_password": get_password_hash("password123"),
+        "first_name": "Telecaller",
+        "last_name": "One",
+        "role": "Employee",
+        "is_active": True,
+        "reporting_to_id": team_leader.id,
+    })
+    await db.commit()
+
+    headers_manager = {"Authorization": f"Bearer {create_access_token(manager.id)}"}
+    headers_tl = {"Authorization": f"Bearer {create_access_token(team_leader.id)}"}
+    headers_telecaller = {"Authorization": f"Bearer {create_access_token(telecaller.id)}"}
+
+    # Manager sees their full recursive downline's (default IDLE) live status.
+    res_manager = await client.get("/api/v1/dashboard/team-status", headers=headers_manager)
+    assert res_manager.status_code == 200
+    members = res_manager.json()
+    assert {m["user_id"] for m in members} == {str(team_leader.id), str(telecaller.id)}
+    assert all(m["state"] == "IDLE" for m in members)
+
+    # A Team Leader is also authorized (sees their own downline: the telecaller).
+    res_tl = await client.get("/api/v1/dashboard/team-status", headers=headers_tl)
+    assert res_tl.status_code == 200
+    assert [m["user_id"] for m in res_tl.json()] == [str(telecaller.id)]
+
+    # A plain Telecaller (bottom of the hierarchy) is not authorized.
+    res_telecaller = await client.get("/api/v1/dashboard/team-status", headers=headers_telecaller)
+    assert res_telecaller.status_code == 403

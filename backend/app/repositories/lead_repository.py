@@ -59,28 +59,63 @@ class LeadRepository(BaseRepository[Lead]):
         result = await self.db.execute(query)
         return result.scalars().first()
 
-    async def paginate_leads(
-        self, 
-        organization_id: uuid.UUID, 
-        skip: int = 0, 
-        limit: int = 100, 
+    def _apply_lead_filters(
+        self,
+        query,
+        organization_id: uuid.UUID,
         search_query: str | None = None,
         status: str | None = None,
         assigned_user_id: uuid.UUID | None = None,
         name: str | None = None,
-        city: str | None = None
-    ) -> Tuple[Sequence[Lead], int]:
-        query = select(self.model).filter(
+        city: str | None = None,
+        allowed_user_ids: set[uuid.UUID] | None = None,
+        source: str | None = None,
+        stage_id: uuid.UUID | None = None,
+        priority: str | None = None,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        include_archived: bool = False,
+    ):
+        """Apply the shared lead filter predicates. Used by both listing and export."""
+        query = query.filter(
             self.model.organization_id == organization_id,
             self.model.is_deleted == False
         )
+
+        if not include_archived:
+            query = query.filter(self.model.is_archived == False)
 
         if status:
             query = query.filter(self.model.status == status)
 
         if assigned_user_id:
             query = query.filter(self.model.assigned_user_id == assigned_user_id)
-        
+        elif allowed_user_ids is not None:
+            query = query.filter(self.model.assigned_user_id.in_(allowed_user_ids))
+
+        if source:
+            query = query.filter(self.model.source == source)
+
+        if stage_id:
+            query = query.filter(self.model.stage_id == stage_id)
+
+        if priority:
+            query = query.filter(self.model.priority == priority)
+
+        if min_value is not None:
+            query = query.filter(self.model.value >= min_value)
+
+        if max_value is not None:
+            query = query.filter(self.model.value <= max_value)
+
+        if created_from is not None:
+            query = query.filter(self.model.created_at >= created_from)
+
+        if created_to is not None:
+            query = query.filter(self.model.created_at <= created_to)
+
         if name:
             name_filter = f"%{name}%"
             query = query.filter(
@@ -108,7 +143,34 @@ class LeadRepository(BaseRepository[Lead]):
                     self.model.city.ilike(search_filter)
                 )
             )
-        
+        return query
+
+    async def paginate_leads(
+        self,
+        organization_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search_query: str | None = None,
+        status: str | None = None,
+        assigned_user_id: uuid.UUID | None = None,
+        name: str | None = None,
+        city: str | None = None,
+        allowed_user_ids: set[uuid.UUID] | None = None,
+        source: str | None = None,
+        stage_id: uuid.UUID | None = None,
+        priority: str | None = None,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        include_archived: bool = False,
+    ) -> Tuple[Sequence[Lead], int]:
+        query = self._apply_lead_filters(
+            select(self.model), organization_id, search_query, status, assigned_user_id,
+            name, city, allowed_user_ids, source, stage_id, priority, min_value, max_value,
+            created_from, created_to, include_archived
+        )
+
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         count_result = await self.db.execute(count_query)
@@ -121,6 +183,71 @@ class LeadRepository(BaseRepository[Lead]):
         records = records_result.scalars().all()
 
         return records, total
+
+    async def stream_leads_for_export(
+        self,
+        organization_id: uuid.UUID,
+        allowed_user_ids: set[uuid.UUID] | None = None,
+        max_rows: int = 50000,
+        **filters,
+    ) -> Sequence[Lead]:
+        """Fetch leads matching filters for export, capped at max_rows."""
+        from sqlalchemy.orm import selectinload
+        query = self._apply_lead_filters(
+            select(self.model), organization_id, allowed_user_ids=allowed_user_ids, **filters
+        )
+        query = query.options(selectinload(self.model.stage)).order_by(self.model.created_at.desc()).limit(max_rows)
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def find_duplicates(
+        self,
+        organization_id: uuid.UUID,
+        email: str | None = None,
+        phone: str | None = None,
+        exclude_lead_id: uuid.UUID | None = None,
+    ) -> Sequence[Lead]:
+        """Find non-deleted leads matching the same email or phone within the org."""
+        if not email and not phone:
+            return []
+        match_clauses = []
+        if email:
+            match_clauses.append(func.lower(self.model.email) == email.lower())
+        if phone:
+            match_clauses.append(self.model.phone == phone)
+
+        from sqlalchemy.orm import selectinload
+        query = select(self.model).options(selectinload(self.model.stage)).filter(
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False,
+            or_(*match_clauses)
+        )
+        if exclude_lead_id:
+            query = query.filter(self.model.id != exclude_lead_id)
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def get_leads_for_update(
+        self, organization_id: uuid.UUID, lead_ids: list[uuid.UUID]
+    ) -> Sequence[Lead]:
+        """Fetch a set of non-deleted leads by id with row locks for bulk mutation."""
+        query = select(self.model).filter(
+            self.model.id.in_(lead_ids),
+            self.model.organization_id == organization_id,
+            self.model.is_deleted == False
+        ).with_for_update().order_by(self.model.id)
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def get_lead_any_state(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
+        """Fetch a lead regardless of soft-delete/archived state (for restore flows)."""
+        from sqlalchemy.orm import selectinload
+        query = select(self.model).options(selectinload(self.model.stage)).filter(
+            self.model.id == lead_id,
+            self.model.organization_id == organization_id
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()
 
     async def update_lead(self, organization_id: uuid.UUID, lead_id: uuid.UUID, lead_data: dict) -> Lead | None:
         lead = await self.get_lead_by_id(organization_id, lead_id)

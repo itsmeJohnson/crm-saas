@@ -3,6 +3,10 @@ import { companyApi, CompanyResponse } from '../services/companyApi';
 
 interface Filters {
   search: string;
+  industry: string;
+  company_type: string;
+  assigned_user_id: string;
+  tag: string;
 }
 
 interface Pagination {
@@ -31,6 +35,10 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
   error: null,
   filters: {
     search: '',
+    industry: '',
+    company_type: 'All',
+    assigned_user_id: 'All',
+    tag: '',
   },
   pagination: {
     skip: 0,
@@ -54,7 +62,7 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
 
   resetFilters: () => {
     set({
-      filters: { search: '' },
+      filters: { search: '', industry: '', company_type: 'All', assigned_user_id: 'All', tag: '' },
       pagination: { skip: 0, limit: 20 },
     });
     get().fetchCompanies();
@@ -64,9 +72,16 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { skip, limit } = get().pagination;
-      const search = get().filters.search.trim() || undefined;
-
-      const data = await companyApi.getCompanies({ skip, limit, search });
+      const f = get().filters;
+      const data = await companyApi.getCompanies({
+        skip,
+        limit,
+        search: f.search.trim() || undefined,
+        industry: f.industry.trim() || undefined,
+        company_type: f.company_type === 'All' ? undefined : f.company_type,
+        assigned_user_id: f.assigned_user_id === 'All' ? undefined : f.assigned_user_id,
+        tag: f.tag.trim() || undefined,
+      });
       set({ companies: data, isLoading: false });
     } catch (err: any) {
       set({

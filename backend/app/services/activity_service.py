@@ -88,6 +88,14 @@ class ActivityService:
             resource_id=str(activity.id),
             action_metadata={"subject": activity.subject, "activity_type": activity.activity_type}
         )
+        # First activity on a lead counts as the SLA response (best-effort, additive).
+        if getattr(activity, "lead_id", None):
+            try:
+                from app.services.sla_service import SLAService
+                await SLAService(self.db).record_response("lead", activity.lead_id, actor.organization_id)
+            except Exception:
+                pass
+
         await DashboardService.invalidate_cache(actor.organization_id)
         return activity
 

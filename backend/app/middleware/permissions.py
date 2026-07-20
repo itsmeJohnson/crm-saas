@@ -1,5 +1,5 @@
 from typing import List, Annotated
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -58,6 +58,50 @@ async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
     parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
     parent_role = parent_res.scalar()
     return parent_role == "Manager"
+
+def require_permission(resource: str, action: str):
+    """Custom-role matrix check for a specific resource/action. No-ops for
+    users without a custom_role_id — legacy role checks stay authoritative."""
+    async def dependency(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        db: Annotated[AsyncSession, Depends(get_db)]
+    ) -> User:
+        from app.services.permission_service import PermissionService
+        await PermissionService(db).require(current_user, resource, action)
+        return current_user
+    return dependency
+
+
+_METHOD_ACTION = {"GET": "view", "POST": "create", "PATCH": "edit", "PUT": "edit", "DELETE": "delete"}
+
+
+def enforce_resource(resource: str):
+    """Router-level custom-role enforcement. Maps HTTP method (and well-known
+    path suffixes: export/import/bulk/assign) to a matrix action. Runs after
+    the endpoint's own legacy role dependency and only restricts users who
+    carry a custom role, so existing behavior is unchanged for everyone else.
+    Only attach to routers whose routes are all authenticated."""
+    async def dependency(
+        request: Request,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        db: Annotated[AsyncSession, Depends(get_db)]
+    ) -> None:
+        if not current_user.custom_role_id or current_user.role == "SuperAdmin":
+            return
+        path = request.url.path
+        action = _METHOD_ACTION.get(request.method, "view")
+        if "/export" in path:
+            action = "export"
+        elif "/import" in path:
+            action = "import"
+        elif "/bulk" in path:
+            action = "bulk"
+        elif "/assign" in path or "/transfer" in path:
+            action = "assign"
+        from app.services.permission_service import PermissionService
+        await PermissionService(db).require(current_user, resource, action)
+    return dependency
+
 
 async def require_tl_or_above(
     current_user: Annotated[User, Depends(require_active_user)],

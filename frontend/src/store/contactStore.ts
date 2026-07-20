@@ -4,12 +4,23 @@ import { contactApi, ContactResponse } from '../services/contactApi';
 interface Filters {
   search: string;
   company_id: string;
+  assigned_user_id: string;
+  tag: string;
+  has_email: string; // 'All' | 'yes' | 'no'
 }
 
 interface Pagination {
   skip: number;
   limit: number;
 }
+
+const buildParams = (f: Filters) => ({
+  search: f.search.trim() || undefined,
+  company_id: f.company_id === 'All' ? undefined : f.company_id,
+  assigned_user_id: f.assigned_user_id === 'All' ? undefined : f.assigned_user_id,
+  tag: f.tag.trim() || undefined,
+  has_email: f.has_email === 'All' ? undefined : f.has_email === 'yes',
+});
 
 interface ContactState {
   contacts: ContactResponse[];
@@ -24,6 +35,9 @@ interface ContactState {
   createContact: (payload: Parameters<typeof contactApi.createContact>[0]) => Promise<ContactResponse>;
   updateContact: (contactId: string, payload: Parameters<typeof contactApi.updateContact>[1]) => Promise<ContactResponse>;
   deleteContact: (contactId: string) => Promise<void>;
+  bulkUpdate: (payload: Parameters<typeof contactApi.bulkUpdate>[0]) => Promise<void>;
+  bulkDelete: (contactIds: string[]) => Promise<void>;
+  exportContacts: (format: 'csv' | 'xlsx') => Promise<void>;
 }
 
 export const useContactStore = create<ContactState>((set, get) => ({
@@ -33,6 +47,9 @@ export const useContactStore = create<ContactState>((set, get) => ({
   filters: {
     search: '',
     company_id: 'All',
+    assigned_user_id: 'All',
+    tag: '',
+    has_email: 'All',
   },
   pagination: {
     skip: 0,
@@ -56,7 +73,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
 
   resetFilters: () => {
     set({
-      filters: { search: '', company_id: 'All' },
+      filters: { search: '', company_id: 'All', assigned_user_id: 'All', tag: '', has_email: 'All' },
       pagination: { skip: 0, limit: 20 },
     });
     get().fetchContacts();
@@ -66,10 +83,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { skip, limit } = get().pagination;
-      const search = get().filters.search.trim() || undefined;
-      const company_id = get().filters.company_id === 'All' ? undefined : get().filters.company_id;
-
-      const data = await contactApi.getContacts({ skip, limit, search, company_id });
+      const data = await contactApi.getContacts({ skip, limit, ...buildParams(get().filters) });
       set({ contacts: data, isLoading: false });
     } catch (err: any) {
       set({
@@ -77,6 +91,44 @@ export const useContactStore = create<ContactState>((set, get) => ({
         isLoading: false,
       });
     }
+  },
+
+  bulkUpdate: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await contactApi.bulkUpdate(payload);
+      set({ isLoading: false });
+      await get().fetchContacts();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Bulk update failed';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  bulkDelete: async (contactIds) => {
+    set({ isLoading: true, error: null });
+    try {
+      await contactApi.bulkDelete(contactIds);
+      set({ isLoading: false });
+      await get().fetchContacts();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Bulk delete failed';
+      set({ error: errorMsg, isLoading: false });
+      throw new Error(errorMsg);
+    }
+  },
+
+  exportContacts: async (format) => {
+    const blob = await contactApi.exportContacts({ format, ...buildParams(get().filters) });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contacts_export.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   createContact: async (payload) => {

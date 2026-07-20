@@ -13,6 +13,10 @@ from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResp
 from app.services.agent_state_service import AgentStateService
 from app.services.disposition_service import DispositionService
 
+# The dialer cockpit (next-lead queue + manual disposition / pipeline updates) is
+# available to telecallers on ALL plans. Only the integrated Knowlarity click-to-call
+# is feature-gated (see the OUTBOUND_CALLING check inside get_next_lead), so entry
+# plans like Core CRM get a manual telecalling workflow without paid calling.
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,14 @@ async def get_next_lead(
     # 4.5. Trigger Knowlarity Click-to-Call if telephony credentials are provided
     call_sid = f"outbound-{uuid.uuid4()}"
     if payload.knowlarity_api_key and payload.agent_phone_number:
+        # Integrated calling is a paid feature — plans without it (e.g. Core CRM)
+        # can use the dialer console with their own phone but not trigger calls here.
+        from app.dependencies.feature_guard import tenant_has_feature
+        if not await tenant_has_feature(db, actor, "OUTBOUND_CALLING"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Integrated outbound calling is not included in your plan. Please upgrade to enable click-to-call."
+            )
         try:
             from app.services.knowlarity_service import trigger_knowlarity_call
             call_res = await trigger_knowlarity_call(
@@ -129,6 +141,10 @@ async def get_next_lead(
         call_direction="OUTBOUND"
     )
     db.add(new_call_activity)
+
+    # 4.6. Fire call_logged workflow rules against the lead
+    from app.services.workflow_service import WorkflowService
+    await WorkflowService(db).run("call_logged", lead, actor)
 
     # 5. Transition agent's Redis state to ACTIVE_CALLING
     await state_service.set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")

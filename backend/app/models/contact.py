@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, ForeignKey
+from sqlalchemy import String, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import BaseModel
 
@@ -14,4 +14,7 @@ class Contact(BaseModel):
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     job_title: Mapped[str | None] = mapped_column(String(100), nullable=True)
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    tags: Mapped[list | None] = mapped_column(JSON, nullable=True)  # list of strings
+    custom_fields: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {definition_key: value}
+    attachments: Mapped[list | None] = mapped_column(JSON, nullable=True)  # list of {filename, url, size, uploaded_by, uploaded_at}

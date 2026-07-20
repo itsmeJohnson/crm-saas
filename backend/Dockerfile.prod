@@ -1,4 +1,4 @@
-# Build stage
+# ── Build stage ───────────────────────────────────────────────────────────────
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Final production stage
+# ── Final production stage ────────────────────────────────────────────────────
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -36,8 +36,12 @@ RUN groupadd -g 1000 appgroup && \
 COPY --from=builder --chown=appuser:appgroup /root/.local /home/appuser/.local
 COPY --chown=appuser:appgroup . .
 
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint.sh
+
 USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# entrypoint.sh runs: alembic upgrade head && uvicorn main:app
+ENTRYPOINT ["/app/entrypoint.sh"]

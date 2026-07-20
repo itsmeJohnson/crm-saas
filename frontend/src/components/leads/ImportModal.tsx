@@ -35,6 +35,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
   const [sourceType, setSourceType] = useState<'file' | 'google_sheets'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sheetsUrl, setSheetsUrl] = useState('');
+  const [templateVertical, setTemplateVertical] = useState<string>('');
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -111,8 +112,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
 
   const downloadTemplateFile = async (format: 'csv' | 'xlsx') => {
     try {
-      const blob = await downloadTemplate(format);
-      const filename = `leads_template.${format}`;
+      const blob = await downloadTemplate(format, templateVertical || null);
+      const filename = templateVertical ? `leads_template_${templateVertical}.${format}` : `leads_template.${format}`;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -331,6 +332,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
               setSheetsUrl={setSheetsUrl}
               onDownloadTemplate={downloadTemplateFile}
               setErrorMsg={setErrorMsg}
+              templateVertical={templateVertical}
+              setTemplateVertical={setTemplateVertical}
             />
           )}
 

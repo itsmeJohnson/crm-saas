@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { portalApi, DashboardStatsResponse } from '../../services/portalApi';
+import { payInvoiceViaCashfree } from '../../services/cashfree';
+import { extractErrorMessage } from '../../utils/errors';
 import {
   Sparkles, CreditCard, Users, HardDrive, PhoneCall,
-  ArrowRight, Plus, Download, AlertTriangle, Loader2, CheckCircle2, ChevronRight
+  ArrowRight, Plus, AlertTriangle, Loader2, CheckCircle2, ChevronRight
 } from 'lucide-react';
 
 export const PortalDashboard: React.FC = () => {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,12 +16,19 @@ export const PortalDashboard: React.FC = () => {
   // Seat purchase state
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [seatCount, setSeatCount] = useState(1);
-  const [selectedGateway, setSelectedGateway] = useState('UPI');
+  const [selectedGateway, setSelectedGateway] = useState('Cashfree');
   const [buyingSeats, setBuyingSeats] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
+  const [extraSeatUnitPrice, setExtraSeatUnitPrice] = useState(0);
+  const [extraSeatGstPercent, setExtraSeatGstPercent] = useState(0);
+  const [extraSeatGstInclusive, setExtraSeatGstInclusive] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'quarterly' | 'annual'>('monthly');
+  const [cyclePrices, setCyclePrices] = useState<{ monthly: number; quarterly: number; annual: number }>({ monthly: 0, quarterly: 0, annual: 0 });
+  const [canAddExtra, setCanAddExtra] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchSeatPricing();
   }, []);
 
   const fetchStats = async () => {
@@ -29,10 +37,33 @@ export const PortalDashboard: React.FC = () => {
       const data = await portalApi.getStats();
       setStats(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load dashboard statistics.");
+      setError(extractErrorMessage(err, "Failed to load dashboard statistics."));
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchSeatPricing = async () => {
+    try {
+      const pricing = await portalApi.getExtraSeatPricing();
+      setExtraSeatUnitPrice(pricing.unit_price || 0);
+      setExtraSeatGstPercent(pricing.gst_percentage || 0);
+      setExtraSeatGstInclusive(pricing.gst_inclusive || false);
+      setCyclePrices(pricing.cycle_prices || { monthly: 0, quarterly: 0, annual: 0 });
+      setCanAddExtra(Boolean(pricing.can_add_extra));
+    } catch {
+      // Pricing display falls back to 0 if pricing details aren't available yet
+    }
+  };
+
+  // Mirrors the backend's exact billing math (PortalService.buy_extra_seats)
+  // so the preview total always matches what gets invoiced.
+  const calculateSeatTotal = () => {
+    const baseAmount = seatCount * (cyclePrices[billingCycle] || extraSeatUnitPrice);
+    if (extraSeatGstInclusive) {
+      return baseAmount;
+    }
+    return baseAmount * (1 + extraSeatGstPercent / 100);
   };
 
   const handleBuySeats = async () => {
@@ -42,18 +73,24 @@ export const PortalDashboard: React.FC = () => {
       // 1. Generate Invoice
       const invoice = await portalApi.buyExtraSeats({
         user_count: seatCount,
-        gateway: selectedGateway
-      });
-      // 2. Pay Invoice (Simulated immediately on checkout)
-      await portalApi.payInvoice(invoice.id, {
         gateway: selectedGateway,
-        transaction_id: `TXN-SEAT-${uuidFast()}`
+        billing_cycle: billingCycle
       });
+      // 2. Pay. Cashfree runs the real hosted checkout + server-side verification;
+      //    the other options are dev-only simulated payments (rejected in production).
+      if (selectedGateway === 'Cashfree') {
+        await payInvoiceViaCashfree(invoice.id);
+      } else {
+        await portalApi.payInvoice(invoice.id, {
+          gateway: selectedGateway,
+          transaction_id: `TXN-SEAT-${uuidFast()}`
+        });
+      }
       setPurchaseSuccess(`Successfully added ${seatCount} user seats! Your limits have been updated.`);
       setShowSeatModal(false);
       fetchStats();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to purchase additional seats.");
+      setError(extractErrorMessage(err, "Failed to purchase additional seats."));
     } finally {
       setBuyingSeats(false);
     }
@@ -91,16 +128,18 @@ export const PortalDashboard: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5" />
             Upgrade Plan
           </Link>
-          <button
-            onClick={() => {
-              setPurchaseSuccess(null);
-              setShowSeatModal(true);
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add User Seats
-          </button>
+          {canAddExtra && (
+            <button
+              onClick={() => {
+                setPurchaseSuccess(null);
+                setShowSeatModal(true);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add User Seats
+            </button>
+          )}
         </div>
       </div>
 
@@ -222,12 +261,14 @@ export const PortalDashboard: React.FC = () => {
               </div>
               <div className="flex justify-between items-center text-[10px] text-slate-500">
                 <span>{stats.users.percent}% Consumed</span>
-                <button
-                  onClick={() => setShowSeatModal(true)}
-                  className="text-brand-400 hover:text-brand-300 font-bold"
-                >
-                  Buy Seats
-                </button>
+                {canAddExtra && (
+                  <button
+                    onClick={() => setShowSeatModal(true)}
+                    className="text-brand-400 hover:text-brand-300 font-bold"
+                  >
+                    Buy Seats
+                  </button>
+                )}
               </div>
             </div>
 
@@ -332,12 +373,35 @@ export const PortalDashboard: React.FC = () => {
 
             <div className="space-y-4">
               <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Billing Cycle</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['monthly', 'quarterly', 'annual'] as const).map((cycle) => (
+                    <button
+                      key={cycle}
+                      type="button"
+                      onClick={() => setBillingCycle(cycle)}
+                      className={`px-2 py-2 rounded-xl text-xs font-bold capitalize border transition-all ${
+                        billingCycle === cycle
+                          ? 'bg-brand-500/15 border-brand-500/50 text-brand-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      {cycle}
+                      <span className="block text-[10px] font-mono font-normal text-slate-500 mt-0.5">
+                        ₹{(cyclePrices[cycle] || 0).toFixed(0)}/seat
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Number of Seats</label>
                 <input
                   type="number"
                   min="1"
+                  max="500"
                   value={seatCount}
-                  onChange={(e) => setSeatCount(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => setSeatCount(Math.min(500, Math.max(1, Math.floor(Number(e.target.value)) || 1)))}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 />
               </div>
@@ -349,22 +413,19 @@ export const PortalDashboard: React.FC = () => {
                   onChange={(e) => setSelectedGateway(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 >
-                  <option value="UPI">UPI / Instant QR</option>
-                  <option value="Stripe">Stripe Gateway</option>
-                  <option value="Razorpay">Razorpay Checkout</option>
-                  <option value="PhonePe">PhonePe Transfer</option>
-                  <option value="Bank">Direct Bank Transfer</option>
+                  <option value="Cashfree">Cashfree (Cards / UPI / Netbanking)</option>
+                  <option value="UPI">UPI / Instant (test only)</option>
                 </select>
               </div>
 
               <div className="p-4 bg-slate-900/50 rounded-xl space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Unit Price:</span>
-                  <span className="font-mono text-slate-300">₹150.00 / seat / month</span>
+                  <span className="text-slate-500">Unit Price ({stats?.plan_name || 'current plan'}):</span>
+                  <span className="font-mono text-slate-300">₹{(cyclePrices[billingCycle] || extraSeatUnitPrice).toFixed(2)} / seat / {billingCycle === 'monthly' ? 'month' : billingCycle === 'quarterly' ? 'quarter' : 'year'}</span>
                 </div>
                 <div className="flex justify-between border-t border-slate-800/80 pt-2 font-bold text-sm">
-                  <span className="text-slate-400">Total + Tax:</span>
-                  <span className="text-slate-100">₹{(seatCount * 150.0 * 1.18).toFixed(2)}</span>
+                  <span className="text-slate-400">Total + Tax ({extraSeatGstPercent}% GST{extraSeatGstInclusive ? ', inclusive' : ''}):</span>
+                  <span className="text-slate-100">₹{calculateSeatTotal().toFixed(2)}</span>
                 </div>
               </div>
             </div>

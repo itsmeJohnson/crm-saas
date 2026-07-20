@@ -1,0 +1,25 @@
+import uuid
+from sqlalchemy import String, ForeignKey, Boolean, Integer, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import BaseModel
+
+
+class SmsSettings(BaseModel):
+    """Per-organization SMS provider configuration (one row per org).
+
+    `provider='mock'` (the default) simulates sends in dev without credentials,
+    mirroring how email_service falls back to a mock when SMTP is unconfigured.
+    `webhook_token` is the shared secret that inbound + delivery-status webhooks
+    must present, since those callbacks are unauthenticated by the provider.
+    """
+    __tablename__ = "sms_settings"
+    __table_args__ = (UniqueConstraint("organization_id", name="uq_sms_settings_organization"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(30), default="mock", nullable=False)  # mock|twilio
+    account_sid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    auth_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sender_id: Mapped[str | None] = mapped_column(String(32), nullable=True)  # from-number / sender ID
+    webhook_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    daily_limit: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

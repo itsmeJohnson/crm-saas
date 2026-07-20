@@ -76,6 +76,104 @@ def suggest_mappings(headers: List[str]) -> Dict[str, Dict[str, Any]]:
             
     return suggestions
 
+# Per-business-type template presets: tailored column labels + sample rows so
+# the downloaded file reads like it was made for that business. Headers stay
+# close to MAPPING_ALIASES where possible so auto-mapping still picks them up;
+# a few business-specific labels (e.g. "Property Type") won't auto-map and
+# the user maps them manually in the wizard's column-mapping step, same as
+# any unrecognized header.
+BUSINESS_TEMPLATES: Dict[str, Dict[str, Any]] = {
+    "real_estate": {
+        "label": "Real Estate",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Builder / Developer", "Property Type", "Budget", "City", "Source"],
+        "rows": [
+            ["Rohan", "Verma", "rohan.verma@example.com", "9811122330", "Lodha Group", "3BHK Apartment Inquiry", "6500000", "Mumbai", "99acres"],
+            ["Sneha", "Kapoor", "sneha.kapoor@example.com", "9900112233", "Godrej Properties", "Villa Purchase Inquiry", "9000000", "Pune", "Site Walk-in"],
+        ],
+    },
+    "loan_recovery": {
+        "label": "Loan Recovery / Collections",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Lender / NBFC", "Loan Type / Default Reason", "Outstanding Amount", "City", "Source"],
+        "rows": [
+            ["Manoj", "Tiwari", "manoj.tiwari@example.com", "9012345678", "Bajaj Finserv", "Personal Loan EMI Default", "85000", "Delhi", "Bucket 2 (31-60 days)"],
+            ["Kavita", "Singh", "kavita.singh@example.com", "9123456780", "HDFC Bank", "Credit Card Overdue Payment", "42000", "Lucknow", "Bucket 1 (0-30 days)"],
+        ],
+    },
+    "telecalling_sales": {
+        "label": "General Telecalling Sales",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Company", "Title", "Deal Value", "City", "Source"],
+        "rows": [
+            ["Arjun", "Mehta", "arjun.mehta@example.com", "9876543210", "Zenith Technologies", "CRM Software Inquiry", "45000", "Bangalore", "Website Form"],
+            ["Priya", "Nair", "priya.nair@example.com", "9765432109", "Apex Enterprises", "Annual AMC Renewal Inquiry", "60000", "Chennai", "Referral"],
+        ],
+    },
+    "insurance_banking": {
+        "label": "Insurance & Banking",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Insurer / Bank", "Policy / Product Type", "Premium / Sum Insured", "City", "Source"],
+        "rows": [
+            ["Suresh", "Iyer", "suresh.iyer@example.com", "9012398765", "HDFC Life", "Term Insurance Inquiry", "12000", "Hyderabad", "Inbound IVR"],
+            ["Anita", "Desai", "anita.desai@example.com", "9123987654", "ICICI Lombard", "Car Insurance Renewal", "8000", "Ahmedabad", "Branch Walk-in"],
+        ],
+    },
+    "edtech": {
+        "label": "EdTech / Education",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Referred By / Parent", "Course Inquiry", "Course Fee", "City", "Source"],
+        "rows": [
+            ["Vivek", "Rao", "vivek.rao@example.com", "9988776655", "Self (Working Professional)", "Data Science Course Inquiry", "75000", "Pune", "Instagram Ads"],
+            ["Meena", "Joshi", "meena.joshi@example.com", "9877665544", "Parent Enquiry", "Class 10 Tuition Inquiry", "25000", "Nagpur", "Education Fair"],
+        ],
+    },
+    "healthcare": {
+        "label": "Healthcare / Diagnostics",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Referring Doctor / Employer", "Test / Package Inquiry", "Package Cost", "City", "Source"],
+        "rows": [
+            ["Ramesh", "Pillai", "ramesh.pillai@example.com", "9090909090", "Self / Individual", "Full Body Checkup Inquiry", "3500", "Kochi", "Hospital Website"],
+            ["Lata", "Bhat", "lata.bhat@example.com", "9080706050", "Infosys (Corporate Camp)", "Diabetes Profile Test Inquiry", "1200", "Bangalore", "Health Camp Walk-in"],
+        ],
+    },
+    "ecommerce_d2c": {
+        "label": "E-commerce / D2C",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Order Reference", "Inquiry Type", "Order Value", "City", "Source"],
+        "rows": [
+            ["Tanvi", "Shah", "tanvi.shah@example.com", "9001122334", "Self / Individual Buyer", "Cart Abandonment Follow-up", "2499", "Surat", "Website Cart Abandonment"],
+            ["Karan", "Malhotra", "karan.malhotra@example.com", "9002233445", "Reseller", "Bulk Order Inquiry", "18500", "Jaipur", "WhatsApp Catalog"],
+        ],
+    },
+    "marketing_agency": {
+        "label": "Digital Marketing Agency",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Company", "Service Inquiry", "Estimated Budget", "City", "Source"],
+        "rows": [
+            ["Aditi", "Saxena", "aditi.saxena@example.com", "9111222333", "Local Restaurant Chain", "Social Media Management Inquiry", "30000", "Indore", "Referral"],
+            ["Rahul", "Khanna", "rahul.khanna@example.com", "9222333444", "D2C Startup Founder", "Performance Marketing Inquiry", "120000", "Gurugram", "LinkedIn Outreach"],
+        ],
+    },
+    "recruitment": {
+        "label": "Recruitment Agency",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Client Company", "Role / Position", "Annual CTC Budget", "City", "Source"],
+        "rows": [
+            ["Nikhil", "Bhatt", "nikhil.bhatt@example.com", "9333444555", "Wipro Infotech", "Software Engineer Role Inquiry", "1200000", "Pune", "Naukri.com"],
+            ["Pooja", "Agarwal", "pooja.agarwal@example.com", "9444555666", "Reliance Retail", "Bulk Hiring - BPO Associates", "350000", "Mumbai", "Job Fair"],
+        ],
+    },
+    "automobile": {
+        "label": "Automobile Showroom",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Existing Vehicle / Fleet", "Vehicle Inquiry", "Budget", "City", "Source"],
+        "rows": [
+            ["Sandeep", "Yadav", "sandeep.yadav@example.com", "9555666777", "Self / First-time Buyer", "SUV Purchase Inquiry", "1500000", "Lucknow", "Showroom Walk-in"],
+            ["Divya", "Menon", "divya.menon@example.com", "9666777888", "Self / Upgrade Buyer", "Electric Vehicle Inquiry", "2000000", "Kochi", "CarDekho"],
+        ],
+    },
+    "logistics": {
+        "label": "Logistics",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Client Company", "Service Inquiry", "Estimated Contract Value", "City", "Source"],
+        "rows": [
+            ["Harish", "Chandra", "harish.chandra@example.com", "9777888999", "Local D2C Brand", "Last Mile Delivery Partnership", "200000", "Noida", "Website Quote Form"],
+            ["Shalini", "Reddy", "shalini.reddy@example.com", "9888999000", "Mahindra Logistics Client", "Warehousing Inquiry", "550000", "Hyderabad", "IndiaMART"],
+        ],
+    },
+}
+
+
 class LeadImportService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -86,25 +184,43 @@ class LeadImportService:
         self.audit_service = AuditService(db)
 
     @staticmethod
-    def generate_csv_template() -> str:
-        """Generate string of CSV template headers."""
-        headers = ["First Name", "Last Name", "Email", "Phone", "Company", "Title", "Deal Value", "Source"]
+    def generate_csv_template(vertical: str | None = None) -> str:
+        """Generate string of CSV template headers, optionally tailored to a
+        business vertical with sample rows so it reads as pre-customized."""
+        preset = BUSINESS_TEMPLATES.get(vertical)
+        if preset:
+            headers, rows = preset["headers"], preset["rows"]
+        else:
+            headers, rows = ["First Name", "Last Name", "Email", "Phone", "Company", "Title", "Deal Value", "Source"], []
         out = io.StringIO()
         writer = csv.writer(out)
         writer.writerow(headers)
+        for row in rows:
+            writer.writerow(row)
         return out.getvalue()
 
     @staticmethod
-    def generate_xlsx_template() -> bytes:
-        """Generate bytes of XLSX template workbook."""
+    def generate_xlsx_template(vertical: str | None = None) -> bytes:
+        """Generate bytes of XLSX template workbook, optionally tailored to a
+        business vertical with sample rows so it reads as pre-customized."""
+        preset = BUSINESS_TEMPLATES.get(vertical)
+        if preset:
+            headers, rows = preset["headers"], preset["rows"]
+        else:
+            headers, rows = ["First Name", "Last Name", "Email", "Phone", "Company", "Title", "Deal Value", "Source"], []
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Leads Template"
-        headers = ["First Name", "Last Name", "Email", "Phone", "Company", "Title", "Deal Value", "Source"]
         ws.append(headers)
+        for row in rows:
+            ws.append(row)
         out = io.BytesIO()
         wb.save(out)
         return out.getvalue()
+
+    @staticmethod
+    def list_business_templates() -> list[dict]:
+        return [{"key": key, "label": preset["label"]} for key, preset in BUSINESS_TEMPLATES.items()]
 
     @staticmethod
     def extract_google_sheets_csv_url(url: str) -> str:

@@ -1,6 +1,6 @@
 import os
 from typing import List, Union
-from pydantic import AnyHttpUrl, BeforeValidator, field_validator
+from pydantic import AnyHttpUrl, BeforeValidator, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Annotated
 
@@ -67,12 +67,59 @@ class Settings(BaseSettings):
         return f"redis://{host}:{port}/0"
 
     # SMTP / Emails
-    SMTP_TLS: bool = True
+    # Hostinger config: SMTP_HOST=smtp.hostinger.com, SMTP_PORT=465, SMTP_USE_TLS=true
+    # For port 465 (SMTP_SSL=True), use smtplib.SMTP_SSL
+    # For port 587 (SMTP_TLS=True), use STARTTLS
+    SMTP_TLS: bool = True       # STARTTLS on port 587
+    SMTP_SSL: bool = False      # Direct SSL on port 465 (Hostinger)
+    SMTP_USE_TLS: bool = False  # Alias: if True, sets SMTP_SSL=True and SMTP_PORT=465
     SMTP_PORT: int = 587
     SMTP_HOST: str | None = None
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
-    EMAILS_FROM_EMAIL: str = "info@telecrm-saas.com"
-    EMAILS_FROM_NAME: str = "TeleCRM Billing"
+    SMTP_FROM_EMAIL: str | None = None   # Overrides EMAILS_FROM_EMAIL if set
+    SMTP_FROM_NAME: str | None = None    # Overrides EMAILS_FROM_NAME if set
+    EMAILS_FROM_EMAIL: str = "contact@support.johnsonsoftwares.com"
+    EMAILS_FROM_NAME: str = "Johnson Softwares CRM"
+
+    # MFA
+    MFA_ISSUER: str = "Johnson Softwares CRM"
+
+    # DigitalOcean Spaces Storage
+    SPACES_KEY: str | None = None
+    SPACES_SECRET: str | None = None
+    SPACES_ENDPOINT: str | None = None
+    SPACES_BUCKET: str | None = None
+
+    # Razorpay Settings
+    RAZORPAY_KEY_ID: str | None = None
+    RAZORPAY_KEY_SECRET: str | None = None
+    RAZORPAY_WEBHOOK_SECRET: str | None = None
+
+    # Cashfree Settings
+    CASHFREE_APP_ID: str | None = None
+    CASHFREE_SECRET_KEY: str | None = None
+    CASHFREE_WEBHOOK_SECRET: str | None = None
+    CASHFREE_ENV: str = "sandbox"  # "sandbox" or "production"
+
+    # Profile Mode
+    ENVIRONMENT: str = "development"
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    @model_validator(mode="after")
+    def validate_production_config(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if self.JWT_SECRET_KEY == "supersecretkeychangeinproduction1234567890":
+                raise ValueError(
+                    "Default JWT_SECRET_KEY cannot be used in production environment."
+                )
+            if self.POSTGRES_PASSWORD == "postgres" or self.POSTGRES_USER == "postgres":
+                raise ValueError(
+                    "Default PostgreSQL credentials (postgres/postgres) cannot be used in production environment."
+                )
+        return self
 
 settings = Settings()

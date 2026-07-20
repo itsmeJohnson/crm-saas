@@ -138,12 +138,12 @@ async def test_import_upload_and_preview_flow(client: AsyncClient, setup_import_
 async def test_import_file_size_limits(client: AsyncClient, setup_import_routes_data: dict):
     data = setup_import_routes_data
 
-    # File exceeding 5MB size limit
-    large_content = b"a" * (5 * 1024 * 1024 + 10)
+    # File exceeding 2MB size limit
+    large_content = b"a" * (2 * 1024 * 1024 + 10)
     files = {"file": ("leads.csv", large_content, "text/csv")}
     resp = await client.post("/api/v1/leads/import/upload", files=files, headers=data["headers_admin_a"])
     assert resp.status_code == 400
-    assert "exceeds 5MB limit" in resp.json()["detail"]
+    assert "exceeds the limit of 2.0MB" in resp.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_invalid_google_sheets_url(client: AsyncClient, setup_import_routes_data: dict):

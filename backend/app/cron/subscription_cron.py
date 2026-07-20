@@ -7,19 +7,20 @@ from app.models.tenant_subscription import TenantSubscription
 from app.models.organization import Organization
 from app.models.user import User
 from app.services.subscription_service import SubscriptionService
+from app.services.notification_service import NotificationService
 from app.services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
-async def get_org_admin_email(db: AsyncSession, organization_id) -> str | None:
-    """Helper to fetch the email of the OrgAdmin for the organization."""
-    stmt = select(User.email).where(
+async def get_org_admin_user(db: AsyncSession, organization_id) -> User | None:
+    """Helper to fetch the OrgAdmin user for the organization (email + id)."""
+    stmt = select(User).where(
         User.organization_id == organization_id,
         User.role == "OrgAdmin",
         User.is_deleted == False
     )
     res = await db.execute(stmt)
-    return res.scalar_one_or_none()
+    return res.scalars().first()
 
 async def process_subscription_transitions(db: AsyncSession, reference_date: datetime) -> int:
     """
@@ -46,6 +47,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
     
     transition_count = 0
     service = SubscriptionService(db)
+    notification_service = NotificationService(db)
 
     for sub in subscriptions:
         org_stmt = select(Organization).where(Organization.id == sub.organization_id)
@@ -54,11 +56,23 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
         if not org or org.is_deleted:
             continue
 
-        admin_email = await get_org_admin_email(db, sub.organization_id)
+        admin_user = await get_org_admin_user(db, sub.organization_id)
+        admin_email = admin_user.email if admin_user else None
         if not admin_email:
             logger.warning("No OrgAdmin user found for tenant %s. Skipping notification.", org.name)
-            # We still transition the subscription but email won't be sent.
-        
+            # We still transition the subscription but email/in-app notification won't be sent.
+
+        async def _notify_admin(title: str, body: str) -> None:
+            if admin_user:
+                await notification_service.create_notification(
+                    organization_id=org.id,
+                    user_id=admin_user.id,
+                    category="billing",
+                    title=title,
+                    body=body,
+                    link_url="/portal/subscription",
+                )
+
         # 1. TRIAL transitions
         if sub.status == "trial":
             if sub.trial_end_date and sub.trial_end_date <= reference_date:
@@ -66,7 +80,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                 sub.status = "expired"
                 org.subscription_status = "expired"
                 transition_count += 1
-                
+
                 if admin_email:
                     subject = "Your Free Trial Has Ended"
                     custom_body = None
@@ -82,6 +96,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                             "custom_body": custom_body
                         }
                     )
+                await _notify_admin("Your free trial has ended", "Activate a subscription plan to continue using the CRM.")
             elif sub.trial_end_date and (sub.trial_end_date - reference_date) <= timedelta(days=comm_settings.trial_reminder_days):
                 # Alert trial ending soon
                 if sub.trial_end_date > reference_date:
@@ -103,6 +118,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                                 "custom_body": custom_body
                             }
                         )
+                    await _notify_admin("Your trial is ending soon", f"Only {days_left} day(s) left on your trial. Activate a plan to avoid interruption.")
 
         # 2. ACTIVE / EXPIRING_SOON transitions
         elif sub.status in ["active", "expiring_soon"]:
@@ -134,6 +150,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                                     "custom_body": custom_body
                                 }
                             )
+                        await _notify_admin("Your subscription has expired", "Auto-renewal failed. Please renew manually to restore access.")
                 else:
                     sub.status = "expired"
                     org.subscription_status = "expired"
@@ -151,13 +168,14 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                                 "custom_body": custom_body
                               }
                         )
+                    await _notify_admin("Your subscription has expired", "Renew your plan to continue using the CRM.")
             elif (sub.end_date - reference_date) <= timedelta(days=3):
                 # Transition status to expiring_soon if it was active
                 if sub.status == "active":
                     sub.status = "expiring_soon"
                     org.subscription_status = "expiring_soon"
                     transition_count += 1
-                    
+
                 if admin_email:
                     subject = "Subscription Renewal Reminder"
                     custom_body = None
@@ -175,6 +193,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                             "custom_body": custom_body
                         }
                     )
+                await _notify_admin("Subscription renewal reminder", f"Your plan renews on {sub.end_date.strftime('%B %d, %Y')}.")
 
         # 3. EXPIRED transitions -> SUSPENDED
         elif sub.status == "expired":
@@ -183,7 +202,7 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                 sub.status = "suspended"
                 org.subscription_status = "suspended"
                 transition_count += 1
-                
+
                 if admin_email:
                     send_email(
                         to_email=admin_email,
@@ -194,11 +213,15 @@ async def process_subscription_transitions(db: AsyncSession, reference_date: dat
                             "support_email": "support@telecrm-saas.com"
                         }
                     )
+                await _notify_admin("Your account has been suspended", "Your subscription's grace period has ended. Contact support to reactivate.")
 
+    # Always commit: reminder-only branches (trial-ending-soon, renewal-reminder)
+    # don't increment transition_count but do flush() in-app notifications above,
+    # which need this commit or they'd be silently dropped when the session closes.
+    await db.commit()
     if transition_count > 0:
-        await db.commit()
         logger.info("Completed subscription transitions: updated %d records.", transition_count)
-        
+
     return transition_count
 
 async def run_daily_subscription_check(db_session_maker) -> None:

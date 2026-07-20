@@ -31,6 +31,7 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
           role: 'OrgAdmin',
         },
         organization: { name: 'Demo Corp' },
+        features: ['LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS'],
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -41,8 +42,13 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     expect(screen.getByText('Dashboard')).toBeDefined();
     expect(screen.getByText('Leads')).toBeDefined();
     expect(screen.getByText('Pipelines')).toBeDefined();
-    expect(screen.getByText('Users')).toBeDefined();
+    expect(screen.getByText('Team Members')).toBeDefined();
     expect(screen.getByText('Organization')).toBeDefined();
+
+    // Billing & Account section is unified into the same sidebar for OrgAdmin.
+    expect(screen.getByText('Billing & Account')).toBeDefined();
+    expect(screen.getByText('Subscription')).toBeDefined();
+    expect(screen.getByText('Seat Licensing')).toBeDefined();
   });
 
   it('renders standard links and Users, but hides Organization setting for Manager role', () => {
@@ -55,6 +61,7 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
           role: 'Manager',
         },
         organization: { name: 'Demo Corp' },
+        features: ['LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS'],
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -64,9 +71,13 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
 
     expect(screen.getByText('Dashboard')).toBeDefined();
     expect(screen.getByText('Leads')).toBeDefined();
-    expect(screen.getByText('Users')).toBeDefined();
+    expect(screen.getByText('Team Members')).toBeDefined();
     expect(screen.queryByText('Pipelines')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
+
+    // Billing & Account is OrgAdmin-only — a Manager sees none of it.
+    expect(screen.queryByText('Billing & Account')).toBeNull();
+    expect(screen.queryByText('Subscription')).toBeNull();
   });
 
   it('renders only standard links, hiding both Users and Organization settings for Employee role', () => {
@@ -79,6 +90,7 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
           role: 'Employee',
         },
         organization: { name: 'Demo Corp' },
+        features: ['LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS'],
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -89,7 +101,8 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     expect(screen.getByText('Dashboard')).toBeDefined();
     expect(screen.getByText('Leads')).toBeDefined();
     expect(screen.queryByText('Pipelines')).toBeNull();
-    expect(screen.queryByText('Users')).toBeNull();
+    expect(screen.queryByText('Team Members')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
+    expect(screen.queryByText('Billing & Account')).toBeNull();
   });
 });
