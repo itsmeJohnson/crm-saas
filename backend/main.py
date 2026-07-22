@@ -68,6 +68,8 @@ from app.api.v1.sales_intelligence import router as sales_intelligence_router
 from app.api.v1.knowledge import router as knowledge_router
 from app.api.v1.document_intelligence import router as document_intelligence_router
 from app.api.v1.workflow_assistant import router as workflow_assistant_router
+from app.api.v1.prediction_engine import router as prediction_engine_router
+from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -364,6 +366,8 @@ app.include_router(sales_intelligence_router, prefix=f"{settings.API_V1_STR}/sal
 app.include_router(knowledge_router,        prefix=f"{settings.API_V1_STR}/knowledge",        tags=["knowledge"], dependencies=_rbac("ai"))
 app.include_router(document_intelligence_router, prefix=f"{settings.API_V1_STR}/document-intelligence", tags=["document-intelligence"], dependencies=_rbac("ai"))
 app.include_router(workflow_assistant_router,   prefix=f"{settings.API_V1_STR}/workflow-assistant", tags=["workflow-assistant"], dependencies=_rbac("workflows"))
+app.include_router(prediction_engine_router,    prefix=f"{settings.API_V1_STR}/prediction-engine", tags=["prediction-engine"], dependencies=_rbac("analytics"))
+app.include_router(recommendations_router,      prefix=f"{settings.API_V1_STR}/recommendations", tags=["recommendations"], dependencies=_rbac("ai"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))
