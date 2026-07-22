@@ -59,6 +59,8 @@ import { AiPlatformWidget } from '../../components/dashboard/AiPlatformWidget';
 import { CopilotWidget } from '../../components/dashboard/CopilotWidget';
 import { KnowledgeWidget } from '../../components/dashboard/KnowledgeWidget';
 import { DocumentIntelligenceWidget } from '../../components/dashboard/DocumentIntelligenceWidget';
+import { PredictionEngineWidget } from '../../components/dashboard/PredictionEngineWidget';
+import { RecommendationsWidget } from '../../components/dashboard/RecommendationsWidget';
 import { WorkflowAssistantWidget } from '../../components/dashboard/WorkflowAssistantWidget';
 import { LeadIntelligenceWidget } from '../../components/dashboard/LeadIntelligenceWidget';
 import { CommIntelligenceWidget } from '../../components/dashboard/CommIntelligenceWidget';
@@ -244,6 +246,8 @@ export const Home: React.FC = () => {
         <KnowledgeWidget />
         <DocumentIntelligenceWidget />
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowAssistantWidget />}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <PredictionEngineWidget />}
+        <RecommendationsWidget />
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LeadIntelligenceWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <CommIntelligenceWidget />}
         {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SalesIntelligenceWidget />}

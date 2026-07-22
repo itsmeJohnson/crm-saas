@@ -95,6 +95,7 @@ from app.models.knowledge_base import (
     KBCategory, KBArticle, KBArticleVersion, KBChunk, KBEvent,
 )
 from app.models.document_intelligence import DIDocument
+from app.models.recommendation import RecommendationFeedback
 
 __all__ = [
     "Base", 
@@ -233,4 +234,5 @@ __all__ = [
     "KBChunk",
     "KBEvent",
     "DIDocument",
+    "RecommendationFeedback",
 ]
