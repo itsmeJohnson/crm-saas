@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 import { dashboardApi, EmployeeSummary } from '../../services/dashboardApi';
 import { Sparkles, RefreshCw, FolderKanban, Phone, Users, ListTodo } from 'lucide-react';
 import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
+import { WorkQueueWidget } from '../../components/dashboard/WorkQueueWidget';
 import { MyLeadsWidget } from '../../components/dashboard/MyLeadsWidget';
 import { TodayScheduleWidget } from '../../components/dashboard/TodayScheduleWidget';
 import { AttendanceWidget } from '../../components/dashboard/AttendanceWidget';
@@ -77,6 +78,7 @@ export const EmployeeDashboard: React.FC = () => {
 
       {/* Personal work widgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <WorkQueueWidget />
         <MyTasksWidget />
         <MyLeadsWidget data={summary} loading={loading} />
         <TodayScheduleWidget data={summary} loading={loading} />

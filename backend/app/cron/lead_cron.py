@@ -205,6 +205,22 @@ async def dispatch_event_reminders(db: AsyncSession) -> int:
     return sent
 
 
+async def dispatch_missed_follow_ups(db: AsyncSession) -> int:
+    """Fire the follow_up_missed automation trigger for overdue follow-up tasks,
+    per organization. Best-effort; reuses FollowUpService.detect_missed."""
+    from app.services.follow_up_service import FollowUpService
+    org_ids = (await db.execute(
+        select(Lead.organization_id).where(Lead.is_deleted == False).distinct())).scalars().all()
+    total = 0
+    svc = FollowUpService(db)
+    for org_id in org_ids:
+        try:
+            total += await svc.detect_missed(org_id)
+        except Exception:
+            pass
+    return total
+
+
 async def run_lead_automation_check(session_maker) -> None:
     """Scheduler entry point: dispatch reminders then run escalation."""
     async with session_maker() as db:
@@ -213,9 +229,11 @@ async def run_lead_automation_check(session_maker) -> None:
             escalated = await run_escalation_scan(db)
             task_reminders = await dispatch_task_reminders(db)
             event_reminders = await dispatch_event_reminders(db)
+            missed_follow_ups = await dispatch_missed_follow_ups(db)
             await db.commit()
-            logger.info("Lead automation: %d reminders, %d escalations, %d task reminders, %d event reminders",
-                        sent, escalated, task_reminders, event_reminders)
+            logger.info("Lead automation: %d reminders, %d escalations, %d task reminders, "
+                        "%d event reminders, %d missed follow-ups",
+                        sent, escalated, task_reminders, event_reminders, missed_follow_ups)
         except Exception as e:
             await db.rollback()
             logger.error("Lead automation check failed: %s", e)

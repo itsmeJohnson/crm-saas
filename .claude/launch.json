@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "frontend"],
+      "port": 5173
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "backend"],
+      "port": 8000
+    },
+    {
+      "name": "proxy",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "proxy"],
+      "port": 80
+    }
+  ]
+}

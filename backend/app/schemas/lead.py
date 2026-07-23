@@ -150,3 +150,15 @@ class LeadResponse(LeadBase):
                     return "*" * len(phone_clean)
                 return phone_clean[:2] + "*" * (len(phone_clean) - 4) + phone_clean[-2:]
         return phone
+
+
+class FollowUpCreate(BaseModel):
+    """One-shot follow-up capture: the outcome of this touch + the next one."""
+    outcome: str = Field("Follow-up", max_length=40)
+    remarks: str | None = None
+    follow_up_type: str = Field("call", max_length=20)  # call|whatsapp|email|meeting|site_visit|visit|other
+    next_follow_up_at: datetime | None = None
+    priority: str = Field("Medium", max_length=20)      # Low|Medium|High|Urgent
+    reminder_minutes_before: int | None = Field(None, ge=0, le=10080)
+    create_calendar_event: bool = False
+    set_status: str | None = Field(None, max_length=50)

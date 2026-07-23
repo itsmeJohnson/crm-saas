@@ -405,6 +405,116 @@ class DashboardService:
             "limit": limit
         }
 
+    # ================= My Work Queue (prioritized, actionable) =================
+    async def _queue_scope(self, actor: User) -> set | None:
+        """None = whole org (admins); else actor + direct reports (managers) or
+        just the actor (individual contributors)."""
+        if actor.role in ("SuperAdmin", "OrgAdmin"):
+            return None
+        ids = {actor.id}
+        if actor.role == "Manager":
+            rows = (await self.db.execute(select(User.id).filter(
+                User.organization_id == actor.organization_id, User.is_deleted == False,
+                User.reporting_to_id == actor.id))).scalars().all()
+            ids |= set(rows)
+        return ids
+
+    async def work_queue(self, actor: User, limit_per_section: int = 25) -> Dict[str, Any]:
+        """The prioritized 'what to work on next' list. Ordered exactly:
+        overdue follow-ups → today's follow-ups → meetings → site visits →
+        hot → interested → new → cold → closed → personal tasks.
+        Follow-up tasks are lead-linked open tasks; personal tasks are the rest."""
+        from app.models.task import Task
+        from app.models.calendar_event import CalendarEvent
+        org = actor.organization_id
+        scope = await self._queue_scope(actor)
+        now = datetime.now(timezone.utc)
+        today = date.today()
+        day_end = datetime.combine(today, time.max).replace(tzinfo=timezone.utc)
+        OPEN_TASK = ("Todo", "InProgress")
+        CLOSED_LEAD = ("Converted", "Lost", "Closed", "Dead")
+
+        def uscope(q, col):
+            return q if scope is None else q.filter(col.in_(list(scope)))
+
+        # ---- follow-up tasks (lead-linked, open) ----
+        ftq = uscope(select(Task).filter(
+            Task.organization_id == org, Task.is_deleted == False,
+            Task.status.in_(OPEN_TASK), Task.lead_id != None, Task.due_date != None),
+            Task.assigned_user_id).order_by(Task.due_date.asc())
+        ftasks = list((await self.db.execute(ftq)).scalars().all())
+        overdue_fu, today_fu = [], []
+        for t in ftasks:
+            due = t.due_date if t.due_date.tzinfo else t.due_date.replace(tzinfo=timezone.utc)
+            item = {"type": "follow_up", "id": str(t.id), "lead_id": str(t.lead_id),
+                    "title": t.title, "priority": t.priority, "due_date": due.isoformat()}
+            if due < now:
+                item["overdue"] = True
+                overdue_fu.append(item)
+            elif due <= day_end:
+                today_fu.append(item)
+
+        # ---- meetings & site visits (upcoming calendar events) ----
+        evq = uscope(select(CalendarEvent).filter(
+            CalendarEvent.organization_id == org, CalendarEvent.is_deleted == False,
+            CalendarEvent.end_at >= now), CalendarEvent.assigned_user_id).order_by(CalendarEvent.start_at.asc())
+        events = list((await self.db.execute(evq)).scalars().all())
+        meetings, site_visits = [], []
+        for e in events:
+            item = {"type": "event", "id": str(e.id), "lead_id": str(e.lead_id) if e.lead_id else None,
+                    "title": e.title, "event_type": e.event_type,
+                    "start_at": (e.start_at if e.start_at.tzinfo else e.start_at.replace(tzinfo=timezone.utc)).isoformat()}
+            if (e.event_type or "").lower().replace(" ", "_") == "site_visit":
+                site_visits.append(item)
+            else:
+                meetings.append(item)
+
+        # ---- leads by temperature/status ----
+        lq = uscope(select(Lead).filter(
+            Lead.organization_id == org, Lead.is_deleted == False, Lead.is_archived == False),
+            Lead.assigned_user_id)
+        leads = list((await self.db.execute(lq)).scalars().all())
+        hot, interested, new, cold, closed = [], [], [], [], []
+        for l in leads:
+            item = {"type": "lead", "id": str(l.id), "title": l.title, "status": l.status,
+                    "score": l.score, "priority": l.priority, "value": float(l.value or 0)}
+            st = (l.status or "").lower()
+            if l.status in CLOSED_LEAD:
+                closed.append(item)
+            elif st == "interested":
+                interested.append(item)
+            elif (l.score or 0) >= 70 or l.priority in ("High", "Urgent"):
+                hot.append(item)
+            elif st in ("new", ""):
+                new.append(item)
+            else:
+                cold.append(item)
+        hot.sort(key=lambda x: -x["score"])
+
+        # ---- personal tasks (not lead-linked) ----
+        ptq = uscope(select(Task).filter(
+            Task.organization_id == org, Task.is_deleted == False,
+            Task.status.in_(OPEN_TASK), Task.lead_id == None),
+            Task.assigned_user_id).order_by(Task.due_date.asc().nullslast())
+        ptasks = [{"type": "task", "id": str(t.id), "title": t.title, "priority": t.priority,
+                   "due_date": (t.due_date.isoformat() if t.due_date else None)}
+                  for t in (await self.db.execute(ptq)).scalars().all()]
+
+        sections = [
+            ("overdue_follow_ups", overdue_fu), ("todays_follow_ups", today_fu),
+            ("meetings", meetings), ("site_visits", site_visits),
+            ("hot_leads", hot), ("interested_leads", interested), ("new_leads", new),
+            ("cold_leads", cold), ("closed_leads", closed), ("personal_tasks", ptasks),
+        ]
+        out, counts = [], {}
+        for i, (key, items) in enumerate(sections, 1):
+            counts[key] = len(items)
+            out.append({"key": key, "order": i, "label": key.replace("_", " ").title(),
+                        "count": len(items), "items": items[:limit_per_section]})
+        return {"generated_at": now.isoformat(), "scope": actor.role,
+                "next_action": (overdue_fu or today_fu or meetings or site_visits or hot or [None])[0],
+                "counts": counts, "sections": out}
+
     @staticmethod
     async def invalidate_cache(org_id: uuid.UUID):
         cache_key = f"dashboard_summary:{org_id}"

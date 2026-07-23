@@ -46,3 +46,15 @@ async def get_employee_summary(
     """Personal snapshot for the Employee Dashboard (my leads / today's calls &
     meetings / my tasks), scoped to the caller."""
     return await DashboardService(db).employee_summary(actor)
+
+
+@router.get("/work-queue", status_code=status.HTTP_200_OK)
+async def get_work_queue(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit_per_section: int = Query(25, ge=1, le=100),
+):
+    """Prioritized 'My Work Queue' — overdue follow-ups first, then today's
+    follow-ups, meetings, site visits, hot/interested/new/cold/closed leads and
+    personal tasks. Scoped to the caller (own / team / org by role)."""
+    return await DashboardService(db).work_queue(actor, limit_per_section=limit_per_section)
