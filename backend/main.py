@@ -70,6 +70,9 @@ from app.api.v1.document_intelligence import router as document_intelligence_rou
 from app.api.v1.workflow_assistant import router as workflow_assistant_router
 from app.api.v1.prediction_engine import router as prediction_engine_router
 from app.api.v1.recommendations import router as recommendations_router
+from app.api.v1.prompt_studio import router as prompt_studio_router
+from app.api.v1.ai_governance import router as ai_governance_router
+from app.api.v1.ai_analytics import router as ai_analytics_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -368,6 +371,9 @@ app.include_router(document_intelligence_router, prefix=f"{settings.API_V1_STR}/
 app.include_router(workflow_assistant_router,   prefix=f"{settings.API_V1_STR}/workflow-assistant", tags=["workflow-assistant"], dependencies=_rbac("workflows"))
 app.include_router(prediction_engine_router,    prefix=f"{settings.API_V1_STR}/prediction-engine", tags=["prediction-engine"], dependencies=_rbac("analytics"))
 app.include_router(recommendations_router,      prefix=f"{settings.API_V1_STR}/recommendations", tags=["recommendations"], dependencies=_rbac("ai"))
+app.include_router(prompt_studio_router,        prefix=f"{settings.API_V1_STR}/prompt-studio",   tags=["prompt-studio"], dependencies=_rbac("ai"))
+app.include_router(ai_governance_router,         prefix=f"{settings.API_V1_STR}/ai-governance",   tags=["ai-governance"], dependencies=_rbac("ai"))
+app.include_router(ai_analytics_router,          prefix=f"{settings.API_V1_STR}/ai-analytics",    tags=["ai-analytics"], dependencies=_rbac("ai"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))

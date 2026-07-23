@@ -66,6 +66,37 @@ class AIPromptTemplate(BaseModel):
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # seeded platform templates
     usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # ---- Prompt Studio authoring overlay (additive; defaults keep legacy behavior) ----
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="approved", nullable=False, index=True)  # draft|pending_review|approved|rejected|archived
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    variables: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # detected {{var}} names
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AIPromptTemplateVersion(BaseModel):
+    """Immutable snapshot of a prompt template captured before each content edit
+    (and on restore) — powers Prompt Versioning + Prompt History."""
+    __tablename__ = "ai_prompt_template_versions"
+    __table_args__ = (UniqueConstraint("template_id", "version", name="uq_ai_prompt_version"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    template_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ai_prompt_templates.id", ondelete="CASCADE"), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    task_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    template: Mapped[str] = mapped_column(Text, nullable=False)
+    model_override: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    provider_override: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    temperature: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)
+    edited_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    change_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class AIConversation(BaseModel):

@@ -79,6 +79,7 @@ from app.models.scheduled_report import ReportSchedule, ReportDeliveryLog
 from app.models.bi_export import BIToken, BISetting, ExportJob, BISyncConfig
 from app.models.history import MetricSnapshot, HistorySetting
 from app.models.ai_platform import (AISettings, AIProviderConfig, AIPromptTemplate,
+                                    AIPromptTemplateVersion,
                                     AIConversation, AIMessage, AIUsageLog, AICacheEntry)
 from app.models.automation import (
     AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
@@ -96,6 +97,7 @@ from app.models.knowledge_base import (
 )
 from app.models.document_intelligence import DIDocument
 from app.models.recommendation import RecommendationFeedback
+from app.models.ai_governance import AIGovernancePolicy, AIGovernanceEvent
 
 __all__ = [
     "Base", 
@@ -235,4 +237,6 @@ __all__ = [
     "KBEvent",
     "DIDocument",
     "RecommendationFeedback",
+    "AIGovernancePolicy",
+    "AIGovernanceEvent",
 ]

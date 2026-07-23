@@ -70,6 +70,9 @@ import { SalesIntelligencePage } from './pages/SalesIntelligencePage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { DocumentIntelligencePage } from './pages/DocumentIntelligencePage';
 import { PredictionEnginePage } from './pages/PredictionEnginePage';
+import { PromptStudioPage } from './pages/PromptStudioPage';
+import { AiGovernancePage } from './pages/AiGovernancePage';
+import { AiAnalyticsPage } from './pages/AiAnalyticsPage';
 import { RecommendationsPage } from './pages/RecommendationsPage';
 import { WorkflowAssistantPage } from './pages/WorkflowAssistantPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
@@ -196,6 +199,9 @@ export const App: React.FC = () => {
                   <Route path="/knowledge" element={<KnowledgeBasePage />} />
                   <Route path="/document-intelligence" element={<DocumentIntelligencePage />} />
                   <Route path="/prediction-engine" element={<PredictionEnginePage />} />
+                  <Route path="/prompt-studio" element={<PromptStudioPage />} />
+                  <Route path="/ai-governance" element={<AiGovernancePage />} />
+                  <Route path="/ai-analytics" element={<AiAnalyticsPage />} />
                   <Route path="/recommendations" element={<RecommendationsPage />} />
                   <Route path="/workflow-assistant" element={<WorkflowAssistantPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
