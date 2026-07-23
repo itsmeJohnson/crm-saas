@@ -10,6 +10,7 @@ import { PipelineWidget } from '../../components/dashboard/PipelineWidget';
 import { LeadSourcesWidget } from '../../components/dashboard/LeadSourcesWidget';
 import { TeamStatusWidget } from '../../components/dashboard/TeamStatusWidget';
 import { QuickActionsWidget } from '../../components/dashboard/QuickActionsWidget';
+import { WorkQueueWidget } from '../../components/dashboard/WorkQueueWidget';
 import { DashboardNotificationsWidget } from '../../components/dashboard/DashboardNotificationsWidget';
 import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
 import { CommunicationsWidget } from '../../components/dashboard/CommunicationsWidget';
@@ -169,12 +170,13 @@ export const Home: React.FC = () => {
       {/* KPI Cards Widget */}
       <SummaryCards summary={summary} isLoading={isLoadingSummary} />
 
-      {/* Today's Agenda + Quick Actions */}
+      {/* Today's Agenda + My Work Queue + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <TodayAgendaWidget summary={summary} isLoading={isLoadingSummary} />
         </div>
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
+          <WorkQueueWidget />
           <QuickActionsWidget />
         </div>
       </div>

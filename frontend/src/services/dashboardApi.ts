@@ -80,7 +80,47 @@ export const dashboardApi = {
     const response = await api.get<EmployeeSummary>('/dashboard/employee');
     return response.data;
   },
+
+  getWorkQueue: async (limitPerSection = 25) => {
+    const response = await api.get<WorkQueue>('/dashboard/work-queue', { params: { limit_per_section: limitPerSection } });
+    return response.data;
+  },
+
+  logFollowUp: async (leadId: string, payload: FollowUpPayload) => {
+    const response = await api.post<FollowUpResult>(`/leads/${leadId}/follow-up`, payload);
+    return response.data;
+  },
 };
+
+export interface WorkQueueItem {
+  type: string; id: string; title: string; lead_id?: string | null;
+  priority?: string; status?: string; score?: number; value?: number;
+  due_date?: string | null; start_at?: string; event_type?: string; overdue?: boolean;
+}
+export interface WorkQueueSection { key: string; order: number; label: string; count: number; items: WorkQueueItem[]; }
+export interface WorkQueue {
+  generated_at: string; scope: string;
+  next_action: WorkQueueItem | null;
+  counts: Record<string, number>;
+  sections: WorkQueueSection[];
+}
+
+export interface FollowUpPayload {
+  outcome: string; remarks?: string; follow_up_type?: string;
+  next_follow_up_at?: string | null; priority?: string;
+  reminder_minutes_before?: number | null; create_calendar_event?: boolean; set_status?: string | null;
+}
+export interface FollowUpResult {
+  lead_id: string; outcome: string; follow_up_type: string; activity_id: string;
+  task_id: string | null; calendar_event_id: string | null; next_follow_up_at: string | null;
+  status: string; status_changed: boolean; manager_notified: boolean;
+}
+
+export const FOLLOW_UP_OUTCOMES = [
+  'Interested', 'Follow-up', 'Call Back Later', 'No Response', 'Switched Off', 'Busy',
+  'Wrong Number', 'Invalid Lead', 'Meeting Scheduled', 'Site Visit Scheduled', 'Negotiation',
+  'Booking', 'Sale Won', 'Sale Lost', 'Not Interested',
+];
 
 export interface EmployeeSummary {
   my_leads_total: number;

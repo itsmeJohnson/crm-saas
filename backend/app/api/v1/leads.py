@@ -12,6 +12,7 @@ from app.schemas.lead import (
     LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
     LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
+    FollowUpCreate,
 )
 from app.schemas.saved_filter import SavedFilterCreate, SavedFilterUpdate, SavedFilterResponse
 from app.schemas.reports import LeadReportResponse
@@ -375,6 +376,21 @@ async def get_lead_timeline(
     """Unified chronological feed of notes, activities, and audit events for a lead."""
     lead_service = LeadService(db)
     return await lead_service.get_timeline(actor, lead_id)
+
+@router.post("/{lead_id}/follow-up", status_code=status.HTTP_201_CREATED)
+async def log_follow_up(
+    lead_id: uuid.UUID,
+    req: FollowUpCreate,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Log a call/interaction outcome and schedule the next follow-up in one
+    shot. Orchestrates: timeline entry, follow-up task (+ reminder), optional
+    calendar event, manager notification, audit, and the follow_up_created
+    automation trigger."""
+    from app.services.follow_up_service import FollowUpService
+    return await FollowUpService(db).create_follow_up(actor, lead_id, req.model_dump())
+
 
 @router.get("/{lead_id}/audit", response_model=List[LeadAuditEvent])
 async def get_lead_audit(

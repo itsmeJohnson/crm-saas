@@ -32,6 +32,8 @@ from app.services.notification_service import NotificationService
 TRIGGER_ENTITY = {
     "lead_created": "lead", "lead_updated": "lead", "lead_converted": "lead",
     "call_logged": "lead", "call_disposition": "lead",
+    "follow_up_created": "lead", "follow_up_missed": "lead",
+    "meeting_scheduled": "lead", "site_visit_scheduled": "lead",
     "sms_received": "lead", "whatsapp_received": "lead", "email_received": "lead",
     "sms_sent": "lead", "whatsapp_sent": "lead", "email_sent": "lead",
     "contact_created": "contact", "contact_updated": "contact",
