@@ -72,6 +72,8 @@ import { DocumentIntelligencePage } from './pages/DocumentIntelligencePage';
 import { PredictionEnginePage } from './pages/PredictionEnginePage';
 import { PromptStudioPage } from './pages/PromptStudioPage';
 import { AiGovernancePage } from './pages/AiGovernancePage';
+import { AiDeveloperPage } from './pages/AiDeveloperPage';
+import { IntegrationsPage } from './pages/IntegrationsPage';
 import { AiAnalyticsPage } from './pages/AiAnalyticsPage';
 import { RecommendationsPage } from './pages/RecommendationsPage';
 import { WorkflowAssistantPage } from './pages/WorkflowAssistantPage';
@@ -202,6 +204,8 @@ export const App: React.FC = () => {
                   <Route path="/prompt-studio" element={<PromptStudioPage />} />
                   <Route path="/ai-governance" element={<AiGovernancePage />} />
                   <Route path="/ai-analytics" element={<AiAnalyticsPage />} />
+                  <Route path="/ai-developer" element={<AiDeveloperPage />} />
+                  <Route path="/integrations" element={<IntegrationsPage />} />
                   <Route path="/recommendations" element={<RecommendationsPage />} />
                   <Route path="/workflow-assistant" element={<WorkflowAssistantPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />

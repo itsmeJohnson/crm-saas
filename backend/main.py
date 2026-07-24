@@ -73,6 +73,8 @@ from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.prompt_studio import router as prompt_studio_router
 from app.api.v1.ai_governance import router as ai_governance_router
 from app.api.v1.ai_analytics import router as ai_analytics_router
+from app.api.v1.ai_api import router as ai_developer_router, public_router as ai_public_api_router
+from app.api.v1.integrations import router as integrations_router, inbound_router as integrations_inbound_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.rules import router as rules_router
 from app.api.v1.automation import router as automation_router
@@ -110,6 +112,8 @@ from app.cron.okr_cron import run_okr_scan
 from app.cron.scheduled_report_cron import run_report_schedule_delivery
 from app.cron.bi_sync_cron import run_bi_data_sync
 from app.cron.history_cron import run_history_capture
+from app.cron.ai_webhook_cron import run_ai_webhook_retries
+from app.cron.integration_cron import run_integration_health_checks
 
 # ── JSON structured logging (production) ─────────────────────────────────────
 if os.getenv("LOG_JSON", "false").lower() == "true":
@@ -180,6 +184,10 @@ async def subscription_cron_scheduler():
                     await run_bi_data_sync(async_session_maker)
                     # Historical Analytics: capture daily metric snapshots + apply retention
                     await run_history_capture(async_session_maker)
+                    # AI API & SDK: retry due developer webhook deliveries
+                    await run_ai_webhook_retries(async_session_maker)
+                    # Integration Hub: health-check every configured connection
+                    await run_integration_health_checks(async_session_maker)
                 else:
                     logger.info("Another instance is already running the daily subscription check.")
         except asyncio.CancelledError:
@@ -374,6 +382,10 @@ app.include_router(recommendations_router,      prefix=f"{settings.API_V1_STR}/r
 app.include_router(prompt_studio_router,        prefix=f"{settings.API_V1_STR}/prompt-studio",   tags=["prompt-studio"], dependencies=_rbac("ai"))
 app.include_router(ai_governance_router,         prefix=f"{settings.API_V1_STR}/ai-governance",   tags=["ai-governance"], dependencies=_rbac("ai"))
 app.include_router(ai_analytics_router,          prefix=f"{settings.API_V1_STR}/ai-analytics",    tags=["ai-analytics"], dependencies=_rbac("ai"))
+app.include_router(ai_public_api_router,         prefix=f"{settings.API_V1_STR}/ai-api",          tags=["ai-api"])
+app.include_router(ai_developer_router,          prefix=f"{settings.API_V1_STR}/ai-developer",    tags=["ai-developer"], dependencies=_rbac("ai"))
+app.include_router(integrations_inbound_router,  prefix=f"{settings.API_V1_STR}/integrations/inbound", tags=["integrations-inbound"])
+app.include_router(integrations_router,          prefix=f"{settings.API_V1_STR}/integrations",    tags=["integrations"], dependencies=_rbac("integrations"))
 app.include_router(workflows_router,       prefix=f"{settings.API_V1_STR}/workflows",       tags=["workflows"], dependencies=_rbac("workflows"))
 app.include_router(rules_router,           prefix=f"{settings.API_V1_STR}/rules",           tags=["rules"], dependencies=_rbac("rules"))
 app.include_router(automation_router,      prefix=f"{settings.API_V1_STR}/automation",      tags=["automation"], dependencies=_rbac("automation"))

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, LogOut, Building, Building2, Contact, Users, FolderKanban,
   Workflow, Sun, Moon, Menu, X, CreditCard, ChevronRight,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp, Briefcase, BookOpen, ScanText, Wand2, Brain, ShieldCheck
+  UserCog, User, Landmark, Settings, LifeBuoy, Activity, Zap, HeartHandshake, ListChecks, CalendarDays, MessagesSquare, MessageSquare, MessageCircle, Mail, LayoutTemplate, Megaphone, Bell, Shield, UsersRound, MapPin, Clock, Plane, Trophy, Target, CheckCircle2, Filter, Cog, Radio, Layers, CalendarClock, BellRing, TrendingUp, Briefcase, BookOpen, ScanText, Wand2, Brain, ShieldCheck, Code2, Plug
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -87,6 +87,8 @@ export const AppLayout: React.FC = () => {
     { name: 'Prompt Studio',      path: '/prompt-studio',       icon: Wand2,             roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
     { name: 'AI Governance',      path: '/ai-governance',       icon: ShieldCheck,       roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'AI Analytics',       path: '/ai-analytics',        icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'AI API & SDK',       path: '/ai-developer',        icon: Code2,             roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
+    { name: 'Integration Hub',    path: '/integrations',        icon: Plug,              roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Recommendations',   path: '/recommendations',    icon: Sparkles,          roles: ['OrgAdmin', 'Manager', 'Employee'], section: 'workspace' },
     { name: 'Workflow Assistant', path: '/workflow-assistant', icon: Wand2,           roles: ['OrgAdmin', 'Manager'], section: 'workspace' },
     { name: 'Org Analytics',     path: '/org-analytics',     icon: BarChart3,         roles: ['OrgAdmin', 'Manager'], section: 'workspace' },

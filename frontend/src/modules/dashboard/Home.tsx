@@ -63,6 +63,9 @@ import { DocumentIntelligenceWidget } from '../../components/dashboard/DocumentI
 import { PredictionEngineWidget } from '../../components/dashboard/PredictionEngineWidget';
 import { PromptStudioWidget } from '../../components/dashboard/PromptStudioWidget';
 import { AiGovernanceWidget } from '../../components/dashboard/AiGovernanceWidget';
+import { AiDeveloperWidget } from '../../components/dashboard/AiDeveloperWidget';
+import { IntegrationsWidget } from '../../components/dashboard/IntegrationsWidget';
+import { LazyMount } from '../../components/dashboard/LazyMount';
 import { AiAnalyticsWidget } from '../../components/dashboard/AiAnalyticsWidget';
 import { RecommendationsWidget } from '../../components/dashboard/RecommendationsWidget';
 import { WorkflowAssistantWidget } from '../../components/dashboard/WorkflowAssistantWidget';
@@ -214,68 +217,70 @@ export const Home: React.FC = () => {
 
       {/* My Tasks + Communications + Calling + SMS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <MyTasksWidget />
-        <CommunicationsWidget />
-        <CallingWidget />
-        {features.includes('SMS_MESSAGING') && <SmsWidget />}
-        {features.includes('WHATSAPP_MESSAGING') && <WhatsAppWidget />}
-        {features.includes('EMAIL_MESSAGING') && <EmailWidget />}
-        <TemplatesWidget />
-        {features.includes('CAMPAIGN_MANAGEMENT') && <CampaignsWidget />}
-        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <CommAnalyticsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <DepartmentsWidget />}
-        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <TeamsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <BranchesWidget />}
-        <AttendanceWidget />
-        <LeaveWidget />
-        <ShiftsWidget />
-        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <PerformanceWidget />}
-        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <TargetsWidget />}
-        <ApprovalsWidget />
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AnnouncementsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OrgHealthWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SalesAnalyticsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EmployeeAnalyticsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <FinancialAnalyticsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ForecastingWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <KpiWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <OkrWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <VizWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ScheduledReportsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <BiExportWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <HistoryWidget />}
-        {user?.role === 'OrgAdmin' && <ComplianceWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <PredictiveWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AiPlatformWidget />}
-        <CopilotWidget />
-        <KnowledgeWidget />
-        <DocumentIntelligenceWidget />
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowAssistantWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <PredictionEngineWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <PromptStudioWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AiGovernanceWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AiAnalyticsWidget />}
-        <RecommendationsWidget />
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LeadIntelligenceWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <CommIntelligenceWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SalesIntelligenceWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ExecutiveDashboardWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <ReportBuilderWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <WorkflowsWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <RulesWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AutomationWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EventBusWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <QueueWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SchedulerWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <NotificationAutomationWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <SLAWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <EscalationWidget />}
-        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <AutomationAnalyticsWidget />}
+        <LazyMount><MyTasksWidget /></LazyMount>
+        <LazyMount><CommunicationsWidget /></LazyMount>
+        <LazyMount><CallingWidget /></LazyMount>
+        {features.includes('SMS_MESSAGING') && <LazyMount><SmsWidget /></LazyMount>}
+        {features.includes('WHATSAPP_MESSAGING') && <LazyMount><WhatsAppWidget /></LazyMount>}
+        {features.includes('EMAIL_MESSAGING') && <LazyMount><EmailWidget /></LazyMount>}
+        <LazyMount><TemplatesWidget /></LazyMount>
+        {features.includes('CAMPAIGN_MANAGEMENT') && <LazyMount><CampaignsWidget /></LazyMount>}
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <LazyMount><CommAnalyticsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><DepartmentsWidget /></LazyMount>}
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <LazyMount><TeamsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><BranchesWidget /></LazyMount>}
+        <LazyMount><AttendanceWidget /></LazyMount>
+        <LazyMount><LeaveWidget /></LazyMount>
+        <LazyMount><ShiftsWidget /></LazyMount>
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <LazyMount><PerformanceWidget /></LazyMount>}
+        {dashboardData?.role && dashboardData.role !== 'Telecaller' && <LazyMount><TargetsWidget /></LazyMount>}
+        <LazyMount><ApprovalsWidget /></LazyMount>
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AnnouncementsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><OrgHealthWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><SalesAnalyticsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><EmployeeAnalyticsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><FinancialAnalyticsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><ForecastingWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><KpiWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><OkrWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><VizWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><ScheduledReportsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><BiExportWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><HistoryWidget /></LazyMount>}
+        {user?.role === 'OrgAdmin' && <LazyMount><ComplianceWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><PredictiveWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AiPlatformWidget /></LazyMount>}
+        <LazyMount><CopilotWidget /></LazyMount>
+        <LazyMount><KnowledgeWidget /></LazyMount>
+        <LazyMount><DocumentIntelligenceWidget /></LazyMount>
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><WorkflowAssistantWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><PredictionEngineWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><PromptStudioWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AiGovernanceWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AiAnalyticsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AiDeveloperWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><IntegrationsWidget /></LazyMount>}
+        <LazyMount><RecommendationsWidget /></LazyMount>
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><LeadIntelligenceWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><CommIntelligenceWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><SalesIntelligenceWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><ExecutiveDashboardWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><ReportBuilderWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><WorkflowsWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><RulesWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AutomationWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><EventBusWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><QueueWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><SchedulerWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><NotificationAutomationWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><SLAWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><EscalationWidget /></LazyMount>}
+        {(user?.role === 'OrgAdmin' || user?.role === 'Manager') && <LazyMount><AutomationAnalyticsWidget /></LazyMount>}
       </div>
 
       {dashboardData?.role && dashboardData.role !== 'Telecaller' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <TeamStatusWidget />
+          <LazyMount><TeamStatusWidget /></LazyMount>
         </div>
       )}
     </div>

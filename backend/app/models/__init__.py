@@ -98,6 +98,8 @@ from app.models.knowledge_base import (
 from app.models.document_intelligence import DIDocument
 from app.models.recommendation import RecommendationFeedback
 from app.models.ai_governance import AIGovernancePolicy, AIGovernanceEvent
+from app.models.ai_api import AIApiKey, AIApiRequest, AIWebhook, AIWebhookDelivery
+from app.models.integration import Integration, IntegrationLog, IntegrationEvent
 
 __all__ = [
     "Base", 
@@ -239,4 +241,11 @@ __all__ = [
     "RecommendationFeedback",
     "AIGovernancePolicy",
     "AIGovernanceEvent",
+    "AIApiKey",
+    "AIApiRequest",
+    "AIWebhook",
+    "AIWebhookDelivery",
+    "Integration",
+    "IntegrationLog",
+    "IntegrationEvent",
 ]
