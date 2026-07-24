@@ -221,6 +221,29 @@ async def dispatch_missed_follow_ups(db: AsyncSession) -> int:
     return total
 
 
+async def run_reminder_dispatch(session_maker) -> None:
+    """Minute-cadence entry point: dispatch due lead/task/event reminders.
+
+    These are time-sensitive and cheap, so they run every ~60s rather than once
+    a day — a reminder set for 11:00 must notify near 11:00, not at the next
+    midnight batch. Every dispatcher is guarded (LeadReminder.is_sent,
+    Task.reminded, CalendarEvent.reminded) so running this frequently — alongside
+    the daily catch-up in run_lead_automation_check — never double-sends.
+    """
+    async with session_maker() as db:
+        try:
+            lead_r = await dispatch_due_reminders(db)
+            task_r = await dispatch_task_reminders(db)
+            event_r = await dispatch_event_reminders(db)
+            await db.commit()
+            if lead_r or task_r or event_r:
+                logger.info("Reminder dispatch: %d lead, %d task, %d event reminder(s) sent",
+                            lead_r, task_r, event_r)
+        except Exception as e:
+            await db.rollback()
+            logger.error("Reminder dispatch failed: %s", e)
+
+
 async def run_lead_automation_check(session_maker) -> None:
     """Scheduler entry point: dispatch reminders then run escalation."""
     async with session_maker() as db:

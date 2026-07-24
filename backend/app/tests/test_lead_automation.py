@@ -232,3 +232,82 @@ async def test_workflow_runs_on_update(client: AsyncClient, setup: dict):
     upd = await client.patch(f"/api/v1/leads/{lead_id}", json={"value": 80000}, headers=data["headers"])
     assert upd.status_code == 200
     assert upd.json()["priority"] == "High"
+
+
+# --- Reminder dispatch cadence (regression) ---
+
+@pytest.mark.asyncio
+async def test_follow_up_reminder_dispatched_by_minute_cron(client: AsyncClient, db: AsyncSession, setup: dict):
+    """Regression: the follow-up reminder path must be driven by the
+    minute-cadence dispatcher, not only the once-a-day subscription loop.
+
+    A follow-up creates a Task carrying remind_at; run_reminder_dispatch (called
+    every ~60s by reminder_dispatch_loop) must notify the assignee and flip the
+    Task.reminded guard, and must not double-send on the next tick.
+    """
+    from app.cron.lead_cron import dispatch_task_reminders
+    from app.models.task import Task
+
+    data = setup
+    emp = data["emp"]
+    emp_headers = {"Authorization": f"Bearer {create_access_token(emp.id)}"}
+
+    # a lead owned by the employee
+    res = await client.post("/api/v1/leads/", json={"last_name": "Remind", "title": "Reminder lead",
+                                                   "assigned_user_id": str(emp.id)}, headers=data["headers"])
+    lead_id = res.json()["id"]
+
+    # follow-up whose reminder is already due (next in 30min, remind 60min before => -30min)
+    next_at = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+    fu = await client.post(f"/api/v1/leads/{lead_id}/follow-up", json={
+        "outcome": "No Response", "follow_up_type": "call", "remarks": "retry",
+        "next_follow_up_at": next_at, "reminder_minutes_before": 60, "priority": "High",
+    }, headers=emp_headers)
+    assert fu.status_code == 201
+    task_id = uuid.UUID(fu.json()["task_id"])
+
+    tk = await db.get(Task, task_id)
+    assert tk.remind_at is not None and tk.reminded is False  # reminder created, unsent
+
+    # the reminder dispatcher (driven every ~60s by reminder_dispatch_loop) fires it
+    sent = await dispatch_task_reminders(db)
+    await db.commit()
+    assert sent >= 1
+    await db.refresh(tk)
+    assert tk.reminded is True
+
+    notif = (await db.execute(select(Notification).filter(
+        Notification.user_id == emp.id, Notification.title == "Task reminder"))).scalars().first()
+    assert notif is not None  # the assignee was notified near the reminder time
+
+    # a second tick must not re-notify (reminded guard prevents daily+minute double-send)
+    before = len((await db.execute(select(Notification).filter(
+        Notification.user_id == emp.id, Notification.title == "Task reminder"))).scalars().all())
+    assert await dispatch_task_reminders(db) == 0
+    await db.commit()
+    after = len((await db.execute(select(Notification).filter(
+        Notification.user_id == emp.id, Notification.title == "Task reminder"))).scalars().all())
+    assert after == before
+
+
+def test_reminder_dispatch_is_wired_for_minute_cadence():
+    """Regression guard: reminders must be dispatched by a minute-cadence loop,
+    not only the once-a-day subscription loop. Assert both the dispatcher and its
+    lifespan wiring exist, and that the dispatcher covers task/event/lead
+    reminders."""
+    import inspect
+    import main
+    from app.cron.lead_cron import run_reminder_dispatch
+
+    disp_src = inspect.getsource(run_reminder_dispatch)
+    for fn in ("dispatch_due_reminders", "dispatch_task_reminders", "dispatch_event_reminders"):
+        assert fn in disp_src
+
+    assert hasattr(main, "reminder_dispatch_loop")
+    loop_src = inspect.getsource(main.reminder_dispatch_loop)
+    assert "run_reminder_dispatch" in loop_src
+    assert "asyncio.sleep(60)" in loop_src  # ~minute cadence, not daily
+
+    lifespan_src = inspect.getsource(main.lifespan)
+    assert "reminder_dispatch_loop()" in lifespan_src
+    assert "reminder_task" in lifespan_src
