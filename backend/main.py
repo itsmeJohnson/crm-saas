@@ -238,6 +238,29 @@ async def scheduler_tick_loop():
             await asyncio.sleep(60)
 
 
+# ── Reminder dispatch ─────────────────────────────────────────────────────────
+async def reminder_dispatch_loop():
+    """Minute-granularity dispatch of due lead/task/event reminders. Without this
+    the reminder cron only ran inside the once-a-day subscription loop, so a
+    follow-up reminder set for 11:00 fired at the next midnight batch instead of
+    on time. Single active dispatcher via a redis lock; guards make repeated
+    runs idempotent."""
+    logger = logging.getLogger("app.cron.reminders")
+    from app.core.redis import redis_client
+    from app.cron.lead_cron import run_reminder_dispatch
+    while True:
+        try:
+            async with redis_client.lock("cron_lock:reminder_dispatch", lease_time=55, acquire_timeout=2.0) as locked:
+                if locked:
+                    await run_reminder_dispatch(async_session_maker)
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("reminder_dispatch_loop error: %s", e)
+            await asyncio.sleep(60)
+
+
 # ── App lifespan ──────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -261,10 +284,11 @@ async def lifespan(app: FastAPI):
     cron_task = asyncio.create_task(subscription_cron_scheduler())
     queue_task = asyncio.create_task(queue_worker_loop())
     scheduler_task = asyncio.create_task(scheduler_tick_loop())
+    reminder_task = asyncio.create_task(reminder_dispatch_loop())
     yield
-    for t in (cron_task, queue_task, scheduler_task):
+    for t in (cron_task, queue_task, scheduler_task, reminder_task):
         t.cancel()
-    for t in (cron_task, queue_task, scheduler_task):
+    for t in (cron_task, queue_task, scheduler_task, reminder_task):
         try:
             await t
         except asyncio.CancelledError:
