@@ -33,10 +33,31 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+/** Max automatic retries for a throttled (429) request before giving up. */
+const RATE_LIMIT_MAX_RETRIES = 2;
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // 429: honour the server's Retry-After and retry a bounded number of times.
+    // Without this a throttled widget just resolves to an empty catch block, so
+    // rate limiting is indistinguishable from "this org has no data".
+    if (error.response?.status === 429 && originalRequest) {
+      originalRequest._rlRetries = (originalRequest._rlRetries || 0) + 1;
+      if (originalRequest._rlRetries <= RATE_LIMIT_MAX_RETRIES) {
+        const headerVal = Number(error.response.headers?.['retry-after']);
+        const waitSeconds = Number.isFinite(headerVal) && headerVal > 0 ? headerVal : 2;
+        // Jitter keeps a screenful of widgets from retrying in lockstep and
+        // re-triggering the very limit they are backing off from.
+        const jitter = Math.random() * 500;
+        await new Promise((r) => setTimeout(r, waitSeconds * 1000 + jitter));
+        return api(originalRequest);
+      }
+      error.isRateLimited = true;
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
