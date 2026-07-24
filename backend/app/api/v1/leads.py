@@ -608,22 +608,23 @@ async def transfer_leads(
     audit_service = AuditService(db)
     notification_service = NotificationService(db)
 
-    # 1. Fetch actor downline ids recursively
-    downline_ids = await user_service.get_downline_user_ids(actor)
+    # 1. Users the actor may assign to / transfer from. Admins & managers get
+    #    org-wide authority; a team leader gets their downline plus themselves.
+    assignable_ids = await user_service.get_assignable_user_ids(actor)
 
     # 2. Validate source user id
-    if req.source_user_id != actor.id and req.source_user_id not in downline_ids:
+    if req.source_user_id not in assignable_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Source user is not yourself or in your downline reporting chain"
+            detail="Source user is not yourself or within your assignable users"
         )
 
     # 3. Validate destination user ids
     for dest_id in req.destination_user_ids:
-        if dest_id not in downline_ids:
+        if dest_id not in assignable_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Destination user {dest_id} is not in your downline reporting chain"
+                detail=f"Destination user {dest_id} is not within your assignable users"
             )
 
     # 4. Fetch destination users from database to ensure active status

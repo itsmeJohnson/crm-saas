@@ -127,16 +127,17 @@ class AssignmentService:
         Bulk assign leads to a list of downline users using a SPLIT or RANGE strategy.
         Locks rows in the database (FOR UPDATE) to prevent race conditions.
         """
-        # 1. Verify all assignee_ids are downlines of actor
+        # 1. Verify all assignee_ids are within the actor's assignable users.
+        #    Admins/managers may assign org-wide; a team leader may assign to
+        #    their downline plus themselves.
         user_service = UserService(self.db)
-        downline_ids = await user_service.get_downline_user_ids(actor)
-        
-        # Check if caller has downlines and assignees are valid downlines
+        assignable_ids = await user_service.get_assignable_user_ids(actor)
+
         for assignee_id in req.assignee_ids:
-            if assignee_id not in downline_ids:
+            if assignee_id not in assignable_ids:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"User {assignee_id} is not in your downline reporting chain"
+                    detail=f"User {assignee_id} is not within your assignable users"
                 )
 
         # 2. Fetch assignees to verify active status
