@@ -488,6 +488,39 @@ class UserService:
         """Fetch all downline user IDs in actor's reporting chain recursively."""
         return await self.get_downline_user_ids_by_id(actor.organization_id, actor.id)
 
+    async def get_assignable_user_ids(self, actor: User) -> set[uuid.UUID]:
+        """User ids the actor may assign leads to / transfer from.
+
+        Mirrors LeadService._resolve_scope: SuperAdmin/OrgAdmin/Manager have
+        ORG-WIDE lead authority, so they may assign among every active user in
+        the org — not just their reporting-chain downline (an OrgAdmin usually
+        has an empty downline, which previously blocked them from assigning any
+        lead). A team leader (an Employee with reports) gets their recursive
+        downline PLUS themselves, so they can also assign leads to themselves.
+        """
+        q = select(User.id).where(
+            User.organization_id == actor.organization_id,
+            User.is_deleted == False, User.is_active == True)
+        if actor.role in ("SuperAdmin", "OrgAdmin", "Manager"):
+            return set((await self.db.execute(q)).scalars().all())
+        downline = await self.get_downline_user_ids(actor)
+        return (downline | {actor.id})
+
+    async def list_assignable_users(self, actor: User) -> list[User]:
+        """Full active user records the actor may assign leads to / transfer
+        from — powers the transfer + bulk-assign pickers so the correct options
+        (all roles for admins/managers; downline + self for team leaders) are
+        always presented."""
+        ids = await self.get_assignable_user_ids(actor)
+        if not ids:
+            return []
+        rows = (await self.db.execute(select(User).filter(
+            User.id.in_(ids), User.is_deleted == False, User.is_active == True
+        ).order_by(User.first_name, User.last_name))).scalars().all()
+        for u in rows:
+            u.is_team_leader = await self.is_team_leader(u)
+        return list(rows)
+
     async def get_downline_user_ids_by_id(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> set[uuid.UUID]:
         """Fetch all downline user IDs in a user's reporting chain recursively."""
         query = select(User.id, User.reporting_to_id).where(

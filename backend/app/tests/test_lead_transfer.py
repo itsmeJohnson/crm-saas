@@ -200,3 +200,94 @@ async def test_transfer_leads_invalid_source_or_dest(client: AsyncClient, setup_
     }
     res = await client.post("/api/v1/leads/transfer", json=payload, headers=data["headers_tl"])
     assert res.status_code == 403
+
+
+# --- Regression: admin with an EMPTY downline + team-leader-to-self (real demo shape) ---
+
+@pytest.fixture
+async def setup_empty_downline(db: AsyncSession):
+    """Reproduces the real demo reporting shape where the OrgAdmin has NO direct
+    reports (the Manager reports to nobody), so the admin's reporting-chain
+    downline is empty. Previously this blocked the admin from assigning any lead."""
+    org = await OrganizationRepository(db).create({"name": "EmptyDL Org", "slug": "emptydl-org"})
+    await db.commit()
+    ur = UserRepository(db)
+
+    async def mk(email, role, reports_to=None):
+        return await ur.create_user(org.id, {
+            "email": email, "hashed_password": get_password_hash("password123"),
+            "first_name": email.split("@")[0], "last_name": "X", "role": role,
+            "is_active": True, "reporting_to_id": reports_to})
+
+    admin = await mk("adm@edl.com", "OrgAdmin")            # no one reports to admin
+    manager = await mk("mgr@edl.com", "Manager")           # reports to nobody
+    tl = await mk("tl@edl.com", "Employee", manager.id)    # team leader
+    tc1 = await mk("tc1@edl.com", "Employee", tl.id)       # telecaller under TL
+    tc2 = await mk("tc2@edl.com", "Employee", tl.id)
+    await db.commit()
+
+    stage = (await db.execute(select(PipelineStage.id).filter(
+        PipelineStage.organization_id == org.id, PipelineStage.is_system_default == True))).scalar()
+
+    # a lead assigned to the TL, and one to a telecaller
+    l_tl = Lead(organization_id=org.id, last_name="A", title="T", assigned_user_id=tl.id,
+                created_by=admin.id, stage_id=stage)
+    l_tc = Lead(organization_id=org.id, last_name="B", title="T", assigned_user_id=tc1.id,
+                created_by=admin.id, stage_id=stage)
+    db.add_all([l_tl, l_tc])
+    await db.commit()
+
+    def h(u): return {"Authorization": f"Bearer {create_access_token(u.id)}"}
+    return {"org": org, "admin": admin, "manager": manager, "tl": tl, "tc1": tc1, "tc2": tc2,
+            "l_tl": str(l_tl.id), "l_tc": str(l_tc.id),
+            "h_admin": h(admin), "h_tl": h(tl), "h_tc": h(tc1)}
+
+
+@pytest.mark.asyncio
+async def test_admin_with_empty_downline_can_transfer(client: AsyncClient, setup_empty_downline: dict):
+    d = setup_empty_downline
+    # OrgAdmin transfers a lead assigned to the team leader -> a telecaller
+    r = await client.post("/api/v1/leads/transfer", headers=d["h_admin"], json={
+        "source_user_id": str(d["tl"].id), "destination_user_ids": [str(d["tc2"].id)],
+        "lead_ids": [d["l_tl"]]})
+    assert r.status_code == 200, r.text
+
+
+@pytest.mark.asyncio
+async def test_team_leader_can_assign_to_self(client: AsyncClient, setup_empty_downline: dict):
+    d = setup_empty_downline
+    # TL transfers a team member's lead back to themselves
+    r = await client.post("/api/v1/leads/transfer", headers=d["h_tl"], json={
+        "source_user_id": str(d["tc1"].id), "destination_user_ids": [str(d["tl"].id)],
+        "lead_ids": [d["l_tc"]]})
+    assert r.status_code == 200, r.text
+    # ...and bulk-assign including themselves
+    r2 = await client.post("/api/v1/leads/assign-bulk", headers=d["h_tl"], json={
+        "assignee_ids": [str(d["tl"].id), str(d["tc2"].id)], "lead_ids": [d["l_tc"]],
+        "strategy": "SPLIT"})
+    assert r2.status_code == 200, r2.text
+
+
+@pytest.mark.asyncio
+async def test_assignable_users_by_role(client: AsyncClient, setup_empty_downline: dict):
+    d = setup_empty_downline
+    # OrgAdmin: org-wide (all 5 users, all roles)
+    admin_list = (await client.get("/api/v1/users/assignable", headers=d["h_admin"])).json()
+    assert len(admin_list) == 5
+    # Team leader: downline + self (tl, tc1, tc2) — NOT the manager/admin
+    tl_list = (await client.get("/api/v1/users/assignable", headers=d["h_tl"])).json()
+    tl_ids = {u["id"] for u in tl_list}
+    assert str(d["tl"].id) in tl_ids and str(d["tc1"].id) in tl_ids and str(d["tc2"].id) in tl_ids
+    assert str(d["manager"].id) not in tl_ids and str(d["admin"].id) not in tl_ids
+    # Plain telecaller cannot list assignable users (not a team leader)
+    assert (await client.get("/api/v1/users/assignable", headers=d["h_tc"])).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_team_leader_cannot_assign_outside_team(client: AsyncClient, setup_empty_downline: dict):
+    d = setup_empty_downline
+    # TL cannot transfer to the Manager (upline, outside the team)
+    r = await client.post("/api/v1/leads/transfer", headers=d["h_tl"], json={
+        "source_user_id": str(d["tc1"].id), "destination_user_ids": [str(d["manager"].id)],
+        "lead_ids": [d["l_tc"]]})
+    assert r.status_code == 403
