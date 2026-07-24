@@ -131,4 +131,17 @@ export interface EmployeeSummary {
   today_meetings: { id: string; title: string; event_type: string; start_at: string | null; status: string }[];
   open_tasks: number;
   overdue_tasks: number;
+  // Employee hero card (Phase 4)
+  employee_name?: string;
+  is_online?: boolean;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+  working_minutes?: number;
+  calls_made_today?: number;
+  todays_follow_ups?: number;
+  overdue_follow_ups?: number;
+  new_leads?: number;
+  interested_leads?: number;
+  meetings_today?: number;
+  tasks_pending?: number;
 }

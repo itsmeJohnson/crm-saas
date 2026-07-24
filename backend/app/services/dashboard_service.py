@@ -285,11 +285,50 @@ class DashboardService:
             Task.organization_id == org, Task.is_deleted == False, Task.assigned_user_id == actor.id,
             Task.status.in_(["Todo", "InProgress"]), Task.due_date.isnot(None), Task.due_date < end))).scalar() or 0
 
+        # Follow-up tasks are lead-linked open tasks (mirrors the work-queue tiers):
+        # overdue = due before today, today's = due within today.
+        _fu_base = [Task.organization_id == org, Task.is_deleted == False,
+                    Task.assigned_user_id == actor.id, Task.status.in_(["Todo", "InProgress"]),
+                    Task.lead_id.isnot(None), Task.due_date.isnot(None)]
+        overdue_follow_ups = (await self.db.execute(select(func.count(Task.id)).filter(
+            *_fu_base, Task.due_date < start))).scalar() or 0
+        todays_follow_ups = (await self.db.execute(select(func.count(Task.id)).filter(
+            *_fu_base, Task.due_date >= start, Task.due_date <= end))).scalar() or 0
+
+        # Attendance: today's clock-in drives the online/offline + working-duration hero.
+        from app.models.attendance import AttendanceRecord
+        att = (await self.db.execute(select(AttendanceRecord).filter(
+            AttendanceRecord.organization_id == org, AttendanceRecord.is_deleted == False,
+            AttendanceRecord.user_id == actor.id, AttendanceRecord.work_date == today))).scalars().first()
+        check_in_at = att.clock_in_at if att else None
+        check_out_at = att.clock_out_at if att else None
+        is_online = bool(check_in_at and not check_out_at)
+        if check_in_at:
+            _ci = check_in_at if check_in_at.tzinfo else check_in_at.replace(tzinfo=timezone.utc)
+            _end = check_out_at or datetime.now(timezone.utc)
+            _end = _end if _end.tzinfo else _end.replace(tzinfo=timezone.utc)
+            working_minutes = max(0, int((_end - _ci).total_seconds() // 60))
+        else:
+            working_minutes = 0
+
         return {
             "my_leads_total": my_leads_total, "my_leads_converted": converted,
             "my_leads_by_status": [{"status": s, "count": n} for s, n in by_status.items()],
             "today_calls": today_calls, "today_meetings_count": len(today_meetings),
             "today_meetings": today_meetings, "open_tasks": open_tasks, "overdue_tasks": overdue_tasks,
+            # ---- Employee hero card (Phase 4) ----
+            "employee_name": f"{actor.first_name or ''} {actor.last_name or ''}".strip() or actor.email,
+            "is_online": is_online,
+            "check_in_at": check_in_at.isoformat() if check_in_at else None,
+            "check_out_at": check_out_at.isoformat() if check_out_at else None,
+            "working_minutes": working_minutes,
+            "calls_made_today": today_calls,
+            "todays_follow_ups": int(todays_follow_ups),
+            "overdue_follow_ups": int(overdue_follow_ups),
+            "new_leads": int(by_status.get("New", 0)),
+            "interested_leads": int(by_status.get("Interested", 0)),
+            "meetings_today": len(today_meetings),
+            "tasks_pending": int(open_tasks),
         }
 
     async def get_team_status(self, actor: User) -> List[Dict[str, Any]]:
