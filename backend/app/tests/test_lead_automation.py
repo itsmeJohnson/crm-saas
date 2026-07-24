@@ -311,3 +311,69 @@ def test_reminder_dispatch_is_wired_for_minute_cadence():
     lifespan_src = inspect.getsource(main.lifespan)
     assert "reminder_dispatch_loop()" in lifespan_src
     assert "reminder_task" in lifespan_src
+
+
+# --- Interested-only automation: cost-control on send failure (Phase 2) ---
+
+@pytest.mark.asyncio
+async def test_interested_comm_failure_logs_and_notifies_admin(client: AsyncClient, db: AsyncSession, setup: dict, monkeypatch):
+    """When an automated Interested-triggered send fails (e.g. no credits), the
+    failure must be LOGGED and the org admin NOTIFIED once — and it must not be
+    retried in a loop (the send action returns without raising)."""
+    from app.services.sms_service import SmsService
+
+    async def boom(self, *a, **k):
+        raise RuntimeError("insufficient credits")
+    monkeypatch.setattr(SmsService, "send", boom)
+
+    data = setup
+    # rule: on lead_updated where status == Interested -> send_sms
+    r = await client.post("/api/v1/leads/workflows", headers=data["headers"], json={
+        "name": "SMS on Interested", "trigger_event": "lead_updated", "is_active": True,
+        "conditions": [{"field": "status", "op": "eq", "value": "Interested"}],
+        "actions": [{"type": "send_sms", "message": "Thanks for your interest!"}]})
+    assert r.status_code in (200, 201)
+
+    res = await client.post("/api/v1/leads/", json={"last_name": "C", "title": "T", "phone": "9998887770"},
+                            headers=data["headers"])
+    lead_id = res.json()["id"]
+
+    # advancing to Interested fires lead_updated -> send_sms -> fails -> handled
+    upd = await client.patch(f"/api/v1/leads/{lead_id}", json={"status": "Interested"}, headers=data["headers"])
+    assert upd.status_code == 200  # rule evaluation survived the send failure
+
+    fails = (await db.execute(select(AuditLog).filter(
+        AuditLog.organization_id == data["org"].id,
+        AuditLog.action == "COMM_AUTOMATION_FAILED"))).scalars().all()
+    assert len(fails) >= 1
+    assert fails[0].action_metadata.get("channel") == "SMS"
+
+    notif = (await db.execute(select(Notification).filter(
+        Notification.user_id == data["admin"].id,
+        Notification.title == "Automated message failed to send"))).scalars().first()
+    assert notif is not None and notif.priority == "high"
+
+
+@pytest.mark.asyncio
+async def test_non_interested_outcome_sends_no_automation(client: AsyncClient, db: AsyncSession, setup: dict, monkeypatch):
+    """Cost control: an outcome other than Interested must NOT trigger the
+    Interested-gated send rule, so no failure is logged either."""
+    from app.services.sms_service import SmsService
+    calls = {"n": 0}
+
+    async def boom(self, *a, **k):
+        calls["n"] += 1
+        raise RuntimeError("should not be called")
+    monkeypatch.setattr(SmsService, "send", boom)
+
+    data = setup
+    await client.post("/api/v1/leads/workflows", headers=data["headers"], json={
+        "name": "SMS on Interested only", "trigger_event": "lead_updated", "is_active": True,
+        "conditions": [{"field": "status", "op": "eq", "value": "Interested"}],
+        "actions": [{"type": "send_sms", "message": "hi"}]})
+    res = await client.post("/api/v1/leads/", json={"last_name": "C", "title": "T", "phone": "9998887771"},
+                            headers=data["headers"])
+    lead_id = res.json()["id"]
+    # advance to a NON-interested status -> rule condition false -> no send
+    await client.patch(f"/api/v1/leads/{lead_id}", json={"status": "Contacted"}, headers=data["headers"])
+    assert calls["n"] == 0
