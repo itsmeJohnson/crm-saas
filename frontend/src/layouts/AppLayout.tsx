@@ -10,11 +10,14 @@ import {
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
+import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
+  // Pop reminders/follow-ups as desktop notifications while the app is open.
+  useBrowserNotifications(!!user);
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
