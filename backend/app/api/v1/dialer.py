@@ -9,7 +9,7 @@ from app.middleware.permissions import require_active_user
 from app.models.user import User
 from app.models.lead import Lead
 from app.schemas.lead import LeadResponse
-from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest
+from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest, CallLeadRequest
 from app.services.agent_state_service import AgentStateService
 from app.services.disposition_service import DispositionService
 
@@ -203,6 +203,106 @@ async def get_state(
     state_service = AgentStateService()
     state_data = await state_service.get_agent_state(actor.organization_id, actor.id)
     return state_data
+
+@router.post("/leads/{lead_id}/call", response_model=LeadResponse)
+async def call_lead(
+    lead_id: uuid.UUID,
+    payload: CallLeadRequest = CallLeadRequest(),
+    actor: User = Depends(require_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Manually place a click-to-call to ONE specific lead from the Leads list
+    (any status — not just 'New' queue leads). The customer number is dialed
+    server-side so it is never revealed to a masked telecaller. Mirrors the
+    click-to-call half of get_next_lead but skips the queue fetch."""
+    # 1. Verify user is a Telecaller
+    is_tele = await check_is_telecaller(actor, db)
+    if not is_tele:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Telecallers are allowed to place calls."
+        )
+
+    # 2. Fetch the lead, scoped to org + assignment (agents call their own leads)
+    from sqlalchemy.orm import selectinload
+    res = await db.execute(
+        select(Lead).options(selectinload(Lead.stage)).filter(
+            Lead.id == lead_id,
+            Lead.organization_id == actor.organization_id,
+            Lead.is_deleted == False,
+        )
+    )
+    lead = res.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
+    if lead.assigned_user_id != actor.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only call leads assigned to you."
+        )
+    if not lead.phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This lead has no phone number.")
+
+    # 3. Integrated click-to-call is a paid feature and needs provider credentials.
+    if not (payload.knowlarity_api_key and payload.agent_phone_number):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Calling is not configured. Set your telephony API key and agent phone number in Telephony Settings.",
+        )
+    from app.dependencies.feature_guard import tenant_has_feature
+    if not await tenant_has_feature(db, actor, "OUTBOUND_CALLING"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Integrated outbound calling is not included in your plan. Please upgrade to enable click-to-call.",
+        )
+
+    call_sid = f"outbound-{uuid.uuid4()}"
+    try:
+        from app.services.knowlarity_service import trigger_knowlarity_call
+        call_res = await trigger_knowlarity_call(
+            api_key=payload.knowlarity_api_key,
+            srn=payload.knowlarity_srn or "",
+            agent_number=payload.agent_phone_number,
+            customer_number=lead.phone,
+        )
+        if call_res and isinstance(call_res, dict):
+            success_data = call_res.get("success", {})
+            if isinstance(success_data, dict):
+                call_sid = success_data.get("call_id") or call_res.get("call_id") or call_sid
+            else:
+                call_sid = call_res.get("call_id") or call_sid
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Outbound calling failed to initiate: {str(e)}",
+        )
+
+    # 4. Record the outbound call attempt as an Activity.
+    from app.models.activity import Activity
+    db.add(Activity(
+        organization_id=actor.organization_id,
+        activity_type="Call",
+        subject=f"Outbound Call to {lead.first_name or ''} {lead.last_name or ''}".strip(),
+        description="Outbound call initiated (manual, from Leads).",
+        status="Planned",
+        assigned_user_id=actor.id,
+        lead_id=lead.id,
+        created_by=actor.id,
+        call_sid=str(call_sid),
+        call_direction="OUTBOUND",
+    ))
+
+    # 5. Fire call_logged workflow rules, then flip the agent to ACTIVE_CALLING.
+    from app.services.workflow_service import WorkflowService
+    await WorkflowService(db).run("call_logged", lead, actor)
+    await AgentStateService().set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")
+
+    await db.commit()
+
+    refetched = await db.execute(
+        select(Lead).options(selectinload(Lead.stage)).filter(Lead.id == lead.id)
+    )
+    return refetched.scalar_one()
 
 @router.post("/leads/{lead_id}/disposition", response_model=LeadResponse)
 async def submit_disposition(

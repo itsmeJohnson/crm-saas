@@ -29,6 +29,12 @@ interface DialerState {
   goOnBreak: (reason: string) => Promise<void>;
   endBreak: () => Promise<void>;
   answerInboundCall: (lead: LeadResponse) => Promise<void>;
+  callSpecificLead: (
+    leadId: string,
+    knowlarityApiKey?: string,
+    knowlaritySrn?: string,
+    agentPhoneNumber?: string
+  ) => Promise<void>;
   resetStore: () => void;
 }
 
@@ -230,6 +236,37 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       startTimer(set, 0);
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to answer inbound call';
+      set({ error: errMsg, isLoading: false });
+      throw err;
+    }
+  },
+
+  // Manually call a specific already-known lead from the Leads list (any status),
+  // rather than pulling the next 'New' lead from the queue. Mirrors startCalling
+  // so the same ActiveCallDisposition form drives the outcome afterwards.
+  callSpecificLead: async (leadId, knowlarityApiKey?, knowlaritySrn?, agentPhoneNumber?) => {
+    set({ isLoading: true, error: null });
+    try {
+      const lead = await dialerApi.callLead(leadId, {
+        knowlarity_api_key: knowlarityApiKey,
+        knowlarity_srn: knowlaritySrn,
+        agent_phone_number: agentPhoneNumber,
+      });
+      const nowStr = new Date().toISOString();
+      set({
+        currentLead: lead,
+        agentState: 'ACTIVE_CALLING',
+        callDirection: 'OUTBOUND',
+        stateTimestamp: nowStr,
+        isLoading: false,
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+        localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
+      }
+      startTimer(set, 0);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to place the call';
       set({ error: errMsg, isLoading: false });
       throw err;
     }

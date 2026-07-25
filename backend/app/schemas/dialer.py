@@ -9,6 +9,15 @@ class NextLeadRequest(BaseModel):
     knowlarity_srn: Optional[str] = Field(default=None, description="Optional Knowlarity Caller ID (SRN) number.")
     agent_phone_number: Optional[str] = Field(default=None, description="Optional Agent phone number to bridge with the customer call.")
 
+class CallLeadRequest(BaseModel):
+    """Place a server-side click-to-call to ONE specific already-known lead (from
+    the Leads list), regardless of its status. Unlike next-lead this does not
+    fetch from the queue — the lead is chosen by the agent. The customer number
+    is dialed server-side so it is never exposed to a masked telecaller."""
+    knowlarity_api_key: Optional[str] = Field(default=None, description="Knowlarity API key for the outbound call.")
+    knowlarity_srn: Optional[str] = Field(default=None, description="Knowlarity Caller ID (SRN) number.")
+    agent_phone_number: Optional[str] = Field(default=None, description="Agent phone number to bridge with the customer call.")
+
 class AgentStateUpdate(BaseModel):
     state: Literal["IDLE", "ACTIVE_CALLING", "BREAK"] = Field(..., description="The state to transition to: 'IDLE', 'ACTIVE_CALLING', 'BREAK'")
     metadata: Dict[str, Any] | None = Field(default=None, description="Optional metadata (e.g. break_reason: 'Lunch')")

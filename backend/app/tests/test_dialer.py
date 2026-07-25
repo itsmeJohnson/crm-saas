@@ -286,3 +286,83 @@ async def test_dialer_collective_pooling(client: AsyncClient, setup_dialer_data:
     # Agent state should transition to ACTIVE_CALLING
     state_resp = await client.get("/api/v1/dialer/state", headers=agent_headers)
     assert state_resp.json()["state"] == "ACTIVE_CALLING"
+
+
+# ── Manual click-to-call for a specific lead (POST /leads/{id}/call) ──────────
+
+@pytest.mark.asyncio
+async def test_call_lead_places_call_for_any_status(client: AsyncClient, setup_dialer_data: dict, db: AsyncSession, monkeypatch):
+    """A telecaller can manually call an already-dispositioned (non-'New') lead
+    from the Leads list; the customer number is dialed server-side."""
+    data = setup_dialer_data
+    agent, org = data["agent"], data["org"]
+    agent_headers = data["headers_agent"]
+
+    # Stub the telephony provider so no real HTTP call is made.
+    import app.services.knowlarity_service as ks
+    async def fake_trigger(**kwargs):
+        return {"success": {"call_id": "kcall-123"}}
+    monkeypatch.setattr(ks, "trigger_knowlarity_call", fake_trigger)
+
+    lead = Lead(
+        organization_id=org.id, first_name="Called", last_name="Already",
+        phone="+919876500083", title="Deal for Software", status="Interested",  # NOT 'New'
+        assigned_user_id=agent.id, created_by=data["super_admin"].id,
+        stage_id=data["default_stage_id"],
+    )
+    db.add(lead)
+    await db.commit()
+
+    resp = await client.post(
+        f"/api/v1/dialer/leads/{lead.id}/call",
+        json={"knowlarity_api_key": "k-test", "agent_phone_number": "+919999900000"},
+        headers=agent_headers,
+    )
+    assert resp.status_code == status.HTTP_200_OK, resp.text
+    assert resp.json()["id"] == str(lead.id)
+    assert resp.json()["phone"] == "+91********83"          # still masked for the telecaller
+
+    # An outbound Call activity was recorded with the provider call id.
+    from app.models.activity import Activity
+    acts = (await db.execute(select(Activity).filter(
+        Activity.lead_id == lead.id, Activity.activity_type == "Call"))).scalars().all()
+    assert len(acts) == 1
+    assert acts[0].call_direction == "OUTBOUND" and acts[0].call_sid == "kcall-123"
+
+    # Agent flipped to ACTIVE_CALLING.
+    assert (await client.get("/api/v1/dialer/state", headers=agent_headers)).json()["state"] == "ACTIVE_CALLING"
+
+
+@pytest.mark.asyncio
+async def test_call_lead_requires_telephony_config(client: AsyncClient, setup_dialer_data: dict, db: AsyncSession):
+    data = setup_dialer_data
+    lead = Lead(organization_id=data["org"].id, first_name="No", last_name="Config",
+                phone="+919876500001", title="Deal", status="New",
+                assigned_user_id=data["agent"].id, created_by=data["super_admin"].id,
+                stage_id=data["default_stage_id"])
+    db.add(lead)
+    await db.commit()
+    resp = await client.post(f"/api/v1/dialer/leads/{lead.id}/call", json={}, headers=data["headers_agent"])
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "not configured" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_call_lead_role_and_assignment(client: AsyncClient, setup_dialer_data: dict, db: AsyncSession):
+    data = setup_dialer_data
+    # Lead assigned to the TL, not the agent.
+    lead = Lead(organization_id=data["org"].id, first_name="Not", last_name="Yours",
+                phone="+919876500002", title="Deal", status="New",
+                assigned_user_id=data["tl"].id, created_by=data["super_admin"].id,
+                stage_id=data["default_stage_id"])
+    db.add(lead)
+    await db.commit()
+    body = {"knowlarity_api_key": "k", "agent_phone_number": "+91999"}
+
+    # Manager is not a telecaller -> 403
+    r1 = await client.post(f"/api/v1/dialer/leads/{lead.id}/call", json=body, headers=data["headers_manager"])
+    assert r1.status_code == status.HTTP_403_FORBIDDEN
+
+    # Agent calling a lead that isn't theirs -> 403
+    r2 = await client.post(f"/api/v1/dialer/leads/{lead.id}/call", json=body, headers=data["headers_agent"])
+    assert r2.status_code == status.HTTP_403_FORBIDDEN
