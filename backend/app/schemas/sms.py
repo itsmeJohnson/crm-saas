@@ -11,6 +11,7 @@ class SmsSettingsResponse(BaseModel):
     provider: str
     account_sid: Optional[str] = None
     sender_id: Optional[str] = None
+    sms_priority: str = "ndnd"
     webhook_token: Optional[str] = None
     daily_limit: int
     is_active: bool
@@ -22,6 +23,7 @@ class SmsSettingsUpdate(BaseModel):
     account_sid: Optional[str] = Field(None, max_length=255)
     auth_token: Optional[str] = Field(None, max_length=255)
     sender_id: Optional[str] = Field(None, max_length=32)
+    sms_priority: Optional[str] = Field(None, pattern="^(ndnd|dnd)$")
     daily_limit: Optional[int] = Field(None, ge=0, le=100000)
     is_active: Optional[bool] = None
     regenerate_webhook_token: bool = False
