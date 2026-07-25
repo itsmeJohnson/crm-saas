@@ -12,7 +12,7 @@ import { LeadReminders } from '../components/crm/LeadReminders';
 import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { ImportModal } from '../components/leads/ImportModal';
 import { AssignmentSettings } from '../components/leads/AssignmentSettings';
@@ -27,10 +27,29 @@ import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
-  const { agentState, currentLead } = useDialerStore();
-  
+  const { agentState, currentLead, callSpecificLead, error: dialerError } = useDialerStore();
+  const [callError, setCallError] = useState<string | null>(null);
+
   const isTL = dashboardData?.role === 'TeamLeader';
   const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
+  // Telecallers (Employees) can place a manual click-to-call to their own leads.
+  const canManualCall = user?.role === 'Employee';
+
+  const handleManualCall = async (leadId: string) => {
+    setCallError(null);
+    const apiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_knowlarity_api_key') || '' : '';
+    const srn = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_knowlarity_srn') || '' : '';
+    const agentPhone = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_agent_phone_number') || '' : '';
+    if (!apiKey || !agentPhone) {
+      setCallError('Calling is not configured. Open the Dashboard → Telephony Settings and set your API key and agent phone number first.');
+      return;
+    }
+    try {
+      await callSpecificLead(leadId, apiKey, srn, agentPhone);
+    } catch (e: any) {
+      setCallError(e.response?.data?.detail || 'Failed to place the call.');
+    }
+  };
 
   const {
     leads,
@@ -437,6 +456,15 @@ export const LeadsPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {canManualCall && agentState !== 'ACTIVE_CALLING' && detailLead.phone && (
+                  <button
+                    onClick={() => handleManualCall(detailLead.id)}
+                    title="Place a call to this lead"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-500/10 border border-brand-500/30 hover:bg-brand-500/20 text-xs font-semibold text-brand-300 rounded-xl transition-all cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5" /> Call
+                  </button>
+                )}
                 {isPrivileged && !detailLead.converted_contact_id && (
                   <button
                     onClick={() => handleConvert(detailLead)}
@@ -464,6 +492,12 @@ export const LeadsPage: React.FC = () => {
 
             {/* Scrollable details view */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {(callError || dialerError) && agentState !== 'ACTIVE_CALLING' && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                  {callError || dialerError}
+                </div>
+              )}
+
               {/* Active Call Control/Disposition */}
               {agentState === 'ACTIVE_CALLING' && currentLead?.id === detailLead.id && (
                 <ActiveCallDisposition />

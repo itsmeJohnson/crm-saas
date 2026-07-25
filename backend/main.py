@@ -262,6 +262,11 @@ async def reminder_dispatch_loop():
 
 
 # ── App lifespan ──────────────────────────────────────────────────────────────
+# Max seconds to wait for background loops to cancel before forcing shutdown.
+# Tunable via env; a low value keeps the regression test fast.
+SHUTDOWN_GRACE_SECONDS = float(os.getenv("SHUTDOWN_GRACE_SECONDS", "10"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Block startup with default JWT secret
@@ -286,13 +291,23 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(scheduler_tick_loop())
     reminder_task = asyncio.create_task(reminder_dispatch_loop())
     yield
-    for t in (cron_task, queue_task, scheduler_task, reminder_task):
+    # Graceful shutdown of the background loops. Each is cancelled, then awaited
+    # with a BOUNDED timeout: if a loop is wedged in a non-cancellable await (a
+    # redis lock acquire, a long DB op), an unbounded `await t` stalls uvicorn on
+    # "Waiting for application shutdown" — the dev --reload hang that silently
+    # takes the whole app (and its reminder/scheduler jobs) down. Cap the wait so
+    # the process always restarts cleanly instead of freezing.
+    bg_tasks = (cron_task, queue_task, scheduler_task, reminder_task)
+    for t in bg_tasks:
         t.cancel()
-    for t in (cron_task, queue_task, scheduler_task, reminder_task):
-        try:
-            await t
-        except asyncio.CancelledError:
-            pass
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*bg_tasks, return_exceptions=True), timeout=SHUTDOWN_GRACE_SECONDS
+        )
+    except asyncio.TimeoutError:
+        logging.getLogger("app").warning(
+            "Background tasks did not stop within 10s of shutdown; proceeding anyway."
+        )
 
 
 # ── FastAPI application ────────────────────────────────────────────────────────
