@@ -330,3 +330,102 @@ async def test_workflow_crud_accepts_sms_trigger_and_action(client: AsyncClient,
         "name": "bad", "trigger_event": "sms_delivered", "conditions": [], "actions": []},
         headers=data["headers_admin"])
     assert r.status_code == 400
+
+
+# ── BhashSMS provider unit tests ──────────────────────────────────────────────
+
+class _FakeResponse:
+    def __init__(self, status_code: int, text: str):
+        self.status_code = status_code
+        self.text = text
+
+
+class _FakeAsyncClient:
+    """Stands in for httpx.AsyncClient; records the last GET params so we can
+    assert on how the provider builds the BhashSMS request, and returns a canned
+    response the test controls."""
+    last_params: dict = {}
+    response: _FakeResponse = _FakeResponse(200, "S.45657")
+
+    def __init__(self, *a, **k):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, url, params=None, timeout=None):
+        _FakeAsyncClient.last_params = dict(params or {})
+        return _FakeAsyncClient.response
+
+
+def test_bhash_normalize_indian_msisdn():
+    from app.services.sms_providers import normalize_indian_msisdn
+    assert normalize_indian_msisdn("9620194983") == "9620194983"
+    assert normalize_indian_msisdn("+91 96201 94983") == "9620194983"
+    assert normalize_indian_msisdn("919620194983") == "9620194983"
+    assert normalize_indian_msisdn("09620194983") == "9620194983"
+
+
+def test_get_provider_resolves_bhash():
+    from app.services.sms_providers import get_provider, BhashSmsProvider, MockSmsProvider
+
+    class S:
+        is_active = True
+        provider = "bhash"
+        account_sid = "RSolutionsWA"
+        auth_token = "secret"
+        sms_priority = "dnd"
+    prov = get_provider(S())
+    assert isinstance(prov, BhashSmsProvider)
+    assert prov.priority == "dnd"          # promotional route flows from settings
+
+    # Missing credentials → falls back to Mock, never a broken real provider.
+    class S2(S):
+        auth_token = None
+    assert isinstance(get_provider(S2()), MockSmsProvider)
+
+
+@pytest.mark.asyncio
+async def test_bhash_send_success_parses_id_and_strips_country_code(monkeypatch):
+    from app.services import sms_providers as sp
+    _FakeAsyncClient.response = _FakeResponse(200, "S.45657")
+    monkeypatch.setattr(sp.httpx, "AsyncClient", _FakeAsyncClient)
+
+    provider = sp.BhashSmsProvider("RSolutionsWA", "pw")
+    result = await provider.send(to_number="+919620194983", from_number="RSOLWA", body="Hello")
+
+    assert result.status == "sent"
+    assert result.provider_id == "S.45657"
+    p = _FakeAsyncClient.last_params
+    assert p["user"] == "RSolutionsWA" and p["pass"] == "pw"
+    assert p["sender"] == "RSOLWA"
+    assert p["phone"] == "9620194983"           # 91 country code stripped
+    assert p["stype"] == "normal"               # ASCII body
+    assert p["priority"] == "ndnd"              # transactional default
+
+
+@pytest.mark.asyncio
+async def test_bhash_send_unicode_body_uses_unicode_stype(monkeypatch):
+    from app.services import sms_providers as sp
+    _FakeAsyncClient.response = _FakeResponse(200, "S.99")
+    monkeypatch.setattr(sp.httpx, "AsyncClient", _FakeAsyncClient)
+
+    provider = sp.BhashSmsProvider("u", "p")
+    result = await provider.send(to_number="9620194983", from_number="RSOLWA", body="नमस्ते")
+    assert result.status == "sent"
+    assert _FakeAsyncClient.last_params["stype"] == "unicode"
+
+
+@pytest.mark.asyncio
+async def test_bhash_send_error_body_marks_failed(monkeypatch):
+    from app.services import sms_providers as sp
+    _FakeAsyncClient.response = _FakeResponse(200, "Invalid Username Or Password")
+    monkeypatch.setattr(sp.httpx, "AsyncClient", _FakeAsyncClient)
+
+    provider = sp.BhashSmsProvider("u", "wrong")
+    result = await provider.send(to_number="9620194983", from_number="RSOLWA", body="Hi")
+    assert result.status == "failed"
+    assert "Invalid Username" in (result.error or "")

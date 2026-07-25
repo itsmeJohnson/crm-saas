@@ -56,7 +56,7 @@ class SmsService:
         if actor.role not in ("SuperAdmin", "OrgAdmin"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only an OrgAdmin can change SMS settings.")
         s = await self.get_settings(actor, create=True)
-        for k in ("provider", "account_sid", "auth_token", "sender_id", "daily_limit", "is_active"):
+        for k in ("provider", "account_sid", "auth_token", "sender_id", "sms_priority", "daily_limit", "is_active"):
             if k in data and data[k] is not None:
                 setattr(s, k, data[k])
         if data.get("regenerate_webhook_token") or not s.webhook_token:
