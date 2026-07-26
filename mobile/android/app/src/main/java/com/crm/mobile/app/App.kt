@@ -22,6 +22,8 @@ import com.crm.mobile.core.session.SessionManager
 import com.crm.mobile.feature.auth.LoginScreen
 import com.crm.mobile.feature.calendar.CalendarScreen
 import com.crm.mobile.feature.cockpit.CockpitScreen
+import com.crm.mobile.feature.contacts.ContactDetailScreen
+import com.crm.mobile.feature.contacts.ContactsListScreen
 import com.crm.mobile.feature.customers.CustomerDetailScreen
 import com.crm.mobile.feature.customers.CustomersListScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
@@ -45,6 +47,7 @@ object Routes {
     const val MORE = "more"
     const val CALENDAR = "calendar"
     const val CUSTOMERS = "customers"
+    const val CONTACTS = "contacts"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -133,6 +136,10 @@ fun HomeShell() {
                 CustomersListScreen(onOpen = { id -> inner.navigate("customer/$id") { launchSingleTop = true } })
             }
             composable("customer/{companyId}") { CustomerDetailScreen() }
+            composable(Routes.CONTACTS) {
+                ContactsListScreen(onOpen = { id -> inner.navigate("contact/$id") { launchSingleTop = true } })
+            }
+            composable("contact/{contactId}") { ContactDetailScreen() }
         }
     }
 }
