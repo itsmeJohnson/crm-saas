@@ -69,6 +69,7 @@ async def list_leads(
     created_from: datetime | None = Query(None),
     created_to: datetime | None = Query(None),
     include_archived: bool = Query(False),
+    updated_after: datetime | None = Query(None, description="Delta-sync cursor: only leads changed after this timestamp (offline mobile)."),
 ):
     """List paginated, searchable leads scoped to the tenant organization."""
     lead_service = LeadService(db)
@@ -76,7 +77,7 @@ async def list_leads(
         actor, skip, limit, search, status, assigned_user_id, name, city,
         source=source, stage_id=stage_id, priority=priority, min_value=min_value,
         max_value=max_value, created_from=created_from, created_to=created_to,
-        include_archived=include_archived,
+        include_archived=include_archived, updated_after=updated_after,
     )
     return list(records)
 

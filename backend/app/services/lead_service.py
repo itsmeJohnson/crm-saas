@@ -155,6 +155,7 @@ class LeadService:
         created_from=None,
         created_to=None,
         include_archived: bool = False,
+        updated_after=None,
     ) -> Tuple[Sequence[Lead], int]:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
@@ -182,6 +183,7 @@ class LeadService:
             allowed_user_ids, source=source, stage_id=stage_id, priority=priority,
             min_value=min_value, max_value=max_value, created_from=created_from,
             created_to=created_to, include_archived=include_archived,
+            updated_after=updated_after,
         )
 
     async def export_leads(self, actor: User, filters: dict) -> Sequence[Lead]:

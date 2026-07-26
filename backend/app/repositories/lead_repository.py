@@ -164,12 +164,17 @@ class LeadRepository(BaseRepository[Lead]):
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         include_archived: bool = False,
+        updated_after: datetime | None = None,
     ) -> Tuple[Sequence[Lead], int]:
         query = self._apply_lead_filters(
             select(self.model), organization_id, search_query, status, assigned_user_id,
             name, city, allowed_user_ids, source, stage_id, priority, min_value, max_value,
             created_from, created_to, include_archived
         )
+        # Incremental (delta) sync cursor for offline mobile clients: only rows
+        # changed since the client's last pull.
+        if updated_after is not None:
+            query = query.filter(self.model.updated_at > updated_after)
 
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())

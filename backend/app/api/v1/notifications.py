@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.notification import (
     NotificationResponse, UnreadCountResponse, CategoryCount, PreferenceItem, PreferenceUpdate,
-    PushSubscribeReq, PushUnsubscribeReq, BulkReadReq, BroadcastReq, BroadcastResult, NotificationStats,
+    PushSubscribeReq, PushUnsubscribeReq, DeviceRegisterReq, DeviceUnregisterReq, BulkReadReq, BroadcastReq, BroadcastResult, NotificationStats,
 )
 from app.services.notification_service import NotificationService, CATEGORIES
 from app.middleware.permissions import require_active_user
@@ -59,6 +59,21 @@ async def push_subscribe(req: PushSubscribeReq, actor: Annotated[User, Depends(r
 @router.post("/push/unsubscribe", status_code=status.HTTP_204_NO_CONTENT)
 async def push_unsubscribe(req: PushUnsubscribeReq, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
     await NotificationService(db).unregister_push(actor, req.endpoint)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/devices")
+async def register_device(req: DeviceRegisterReq, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Register this device's native push token (FCM/APNS). Idempotent per token."""
+    dev = await NotificationService(db).register_device(actor, req.model_dump())
+    await db.commit()
+    return {"id": str(dev.id), "platform": dev.platform}
+
+
+@router.post("/devices/unregister", status_code=status.HTTP_204_NO_CONTENT)
+async def unregister_device(req: DeviceUnregisterReq, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    await NotificationService(db).unregister_device(actor, req.token)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
