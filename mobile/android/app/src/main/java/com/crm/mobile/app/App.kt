@@ -1,6 +1,8 @@
 package com.crm.mobile.app
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
@@ -9,6 +11,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -30,6 +33,9 @@ import com.crm.mobile.feature.customers.CustomersListScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
 import com.crm.mobile.feature.more.MoreScreen
+import com.crm.mobile.feature.notifications.CrmMessagingService
+import com.crm.mobile.feature.notifications.NotificationsScreen
+import com.crm.mobile.feature.notifications.deepLinkToRoute
 import com.crm.mobile.feature.reminders.ReminderScreen
 import com.crm.mobile.feature.tasks.TasksScreen
 import com.crm.mobile.feature.timeline.TimelineScreen
@@ -38,7 +44,16 @@ import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
 @HiltAndroidApp
-class CrmApplication : Application()
+class CrmApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        // Notification channel for FCM/system notifications (minSdk 26, always present).
+        val channel = NotificationChannel(
+            CrmMessagingService.CHANNEL_ID, "CRM Alerts", NotificationManager.IMPORTANCE_HIGH,
+        ).apply { description = "Reminders, follow-ups and other CRM alerts" }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+}
 
 object Routes {
     const val LOGIN = "login"
@@ -53,6 +68,7 @@ object Routes {
     const val CONTACTS = "contacts"
     const val TIMELINE = "timeline"
     const val REMINDERS = "reminders"
+    const val NOTIFICATIONS = "notifications"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -68,7 +84,10 @@ class MainActivity : FragmentActivity() {
                 val loggedIn by session.isLoggedIn.collectAsState(initial = null)
                 when (loggedIn) {
                     null -> Unit // brief splash while the session is read
-                    else -> AppNavGraph(startLoggedIn = loggedIn == true)
+                    else -> AppNavGraph(
+                        startLoggedIn = loggedIn == true,
+                        initialDeepLink = intent?.getStringExtra(CrmMessagingService.EXTRA_DEEP_LINK),
+                    )
                 }
             }
         }
@@ -76,7 +95,7 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun AppNavGraph(startLoggedIn: Boolean) {
+fun AppNavGraph(startLoggedIn: Boolean, initialDeepLink: String? = null) {
     val nav = rememberNavController()
     NavHost(
         navController = nav,
@@ -87,7 +106,8 @@ fun AppNavGraph(startLoggedIn: Boolean) {
                 nav.navigate(Routes.HOME) { popUpTo(Routes.LOGIN) { inclusive = true } }
             })
         }
-        composable(Routes.HOME) { HomeShell() }
+        // Deep link only applies when we open straight into the app (already signed in).
+        composable(Routes.HOME) { HomeShell(initialDeepLink = initialDeepLink.takeIf { startLoggedIn }) }
     }
 }
 
@@ -96,7 +116,7 @@ private data class Tab(val route: String, val label: String, val glyph: String)
 /** Bottom-nav shell hosting the role's primary destinations. New feature
  *  modules add a Tab + a composable() here — the navigation framework. */
 @Composable
-fun HomeShell() {
+fun HomeShell(initialDeepLink: String? = null) {
     val tabs = listOf(
         Tab(Routes.DASHBOARD, "Home", "▦"),
         Tab(Routes.COCKPIT, "Dialer", "☎"),
@@ -107,6 +127,12 @@ fun HomeShell() {
     val inner = rememberNavController()
     val backStack by inner.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: Routes.DASHBOARD
+
+    // A tapped push carries a link_url; route to the matching destination once.
+    LaunchedEffect(initialDeepLink) {
+        val route = deepLinkToRoute(initialDeepLink) ?: Routes.NOTIFICATIONS.takeIf { initialDeepLink != null }
+        route?.let { inner.navigate(it) { launchSingleTop = true } }
+    }
 
     Scaffold(
         bottomBar = {
@@ -151,6 +177,9 @@ fun HomeShell() {
             composable(Routes.TIMELINE) { TimelineScreen() }
             composable(Routes.REMINDERS) {
                 ReminderScreen(onOpenLead = { inner.navigate(Routes.LEADS) { launchSingleTop = true } })
+            }
+            composable(Routes.NOTIFICATIONS) {
+                NotificationsScreen(onDeepLink = { route -> inner.navigate(route) { launchSingleTop = true } })
             }
         }
     }

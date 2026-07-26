@@ -71,6 +71,14 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Native push (FCM). The app builds and runs WITHOUT a Firebase project —
+    // push is simply inert until you add app/google-services.json and apply the
+    // `com.google.gms.google-services` plugin (add its classpath to the root
+    // build.gradle and `id("com.google.gms.google-services")` to the plugins
+    // block above). Only then does token registration + delivery activate.
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-messaging")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.mockk:mockk:1.13.11")

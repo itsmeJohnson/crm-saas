@@ -26,6 +26,7 @@ class SessionManager @Inject constructor(
         val ACCESS = stringPreferencesKey("access_token")
         val REFRESH = stringPreferencesKey("refresh_token")
         val ROLE = stringPreferencesKey("user_role")
+        val PUSH = stringPreferencesKey("push_token")
         val TEL_KEY = stringPreferencesKey("telephony_api_key")
         val TEL_SRN = stringPreferencesKey("telephony_srn")
         val TEL_PHONE = stringPreferencesKey("telephony_agent_phone")
@@ -40,6 +41,11 @@ class SessionManager @Inject constructor(
     suspend fun accessToken(): String? = context.dataStore.data.first()[Keys.ACCESS]
     suspend fun refreshToken(): String? = context.dataStore.data.first()[Keys.REFRESH]
     suspend fun saveRole(role: String) { context.dataStore.edit { it[Keys.ROLE] = role } }
+
+    // Native push (FCM) device token — registered after login, unregistered on logout.
+    suspend fun pushToken(): String? = context.dataStore.data.first()[Keys.PUSH]
+    suspend fun savePushToken(token: String) { context.dataStore.edit { it[Keys.PUSH] = token } }
+    suspend fun clearPushToken() { context.dataStore.edit { it.remove(Keys.PUSH) } }
 
     suspend fun save(access: String, refresh: String) {
         context.dataStore.edit {

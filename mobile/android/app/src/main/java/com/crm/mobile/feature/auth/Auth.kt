@@ -1,5 +1,7 @@
 package com.crm.mobile.feature.auth
 
+import android.os.Build
+import com.crm.mobile.core.push.PushRegistrar
 import com.crm.mobile.core.session.SessionManager
 import com.squareup.moshi.JsonClass
 import retrofit2.http.Body
@@ -52,6 +54,7 @@ data class CurrentUser(
 class AuthRepository @Inject constructor(
     private val api: AuthApi,
     private val session: SessionManager,
+    private val pushRegistrar: PushRegistrar,
 ) {
     /** Logs in and persists tokens. Returns the authenticated user. */
     suspend fun login(email: String, password: String): CurrentUser {
@@ -59,6 +62,7 @@ class AuthRepository @Inject constructor(
         session.save(token.access_token, token.refresh_token ?: "")
         val user = me()
         session.saveRole(user.role)   // cache role for role-gated navigation
+        pushRegistrar.registerAsync(Build.MODEL)  // best-effort native-push enrolment
         return user
     }
 
@@ -72,5 +76,8 @@ class AuthRepository @Inject constructor(
         )
     }
 
-    suspend fun logout() = session.clear()
+    suspend fun logout() {
+        pushRegistrar.unregisterNow()   // must run before the session (and token) is cleared
+        session.clear()
+    }
 }
