@@ -30,6 +30,7 @@ import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
 import com.crm.mobile.feature.more.MoreScreen
 import com.crm.mobile.feature.tasks.TasksScreen
+import com.crm.mobile.feature.timeline.TimelineScreen
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -48,6 +49,7 @@ object Routes {
     const val CALENDAR = "calendar"
     const val CUSTOMERS = "customers"
     const val CONTACTS = "contacts"
+    const val TIMELINE = "timeline"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -140,6 +142,7 @@ fun HomeShell() {
                 ContactsListScreen(onOpen = { id -> inner.navigate("contact/$id") { launchSingleTop = true } })
             }
             composable("contact/{contactId}") { ContactDetailScreen() }
+            composable(Routes.TIMELINE) { TimelineScreen() }
         }
     }
 }
