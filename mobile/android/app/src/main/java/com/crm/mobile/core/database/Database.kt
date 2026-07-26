@@ -10,6 +10,8 @@ import com.crm.mobile.feature.dashboard.DashboardDao
 import com.crm.mobile.feature.dashboard.DashboardSnapshotEntity
 import com.crm.mobile.feature.leads.LeadDao
 import com.crm.mobile.feature.leads.LeadEntity
+import com.crm.mobile.feature.tasks.TaskDao
+import com.crm.mobile.feature.tasks.TaskEntity
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,14 +20,18 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Database(
-    entities = [LeadEntity::class, DashboardSnapshotEntity::class, PipelineStageEntity::class],
-    version = 3,
+    entities = [
+        LeadEntity::class, DashboardSnapshotEntity::class,
+        PipelineStageEntity::class, TaskEntity::class,
+    ],
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun leadDao(): LeadDao
     abstract fun dashboardDao(): DashboardDao
     abstract fun pipelineStageDao(): PipelineStageDao
+    abstract fun taskDao(): TaskDao
 }
 
 @Module
@@ -48,4 +54,7 @@ object DatabaseModule {
 
     @Provides
     fun pipelineStageDao(db: AppDatabase): PipelineStageDao = db.pipelineStageDao()
+
+    @Provides
+    fun taskDao(db: AppDatabase): TaskDao = db.taskDao()
 }
