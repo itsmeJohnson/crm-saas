@@ -42,6 +42,7 @@ fun MoreScreen(onNavigate: (String) -> Unit, vm: MoreViewModel = hiltViewModel()
     val items = listOf(
         MoreItem("calendar", "Calendar"),
         MoreItem("customers", "Customers", managerOnly = true),
+        MoreItem("contacts", "Contacts", managerOnly = true),
     ).filter { !it.managerOnly || isManagerPlus }
 
     LazyColumn(Modifier.fillMaxWidth().padding(12.dp)) {
