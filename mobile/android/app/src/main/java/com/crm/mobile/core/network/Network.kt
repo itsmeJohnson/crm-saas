@@ -150,6 +150,10 @@ object NetworkModule {
     @Provides @Singleton
     fun communicationApi(retrofit: Retrofit): com.crm.mobile.feature.communication.CommunicationApi =
         retrofit.create(com.crm.mobile.feature.communication.CommunicationApi::class.java)
+
+    @Provides @Singleton
+    fun reminderApi(retrofit: Retrofit): com.crm.mobile.feature.reminders.ReminderApi =
+        retrofit.create(com.crm.mobile.feature.reminders.ReminderApi::class.java)
 }
 
 private fun OkHttpClient.Builder.addLoggingInterceptor(): OkHttpClient.Builder {

@@ -17,6 +17,8 @@ import com.crm.mobile.feature.dashboard.DashboardDao
 import com.crm.mobile.feature.dashboard.DashboardSnapshotEntity
 import com.crm.mobile.feature.leads.LeadDao
 import com.crm.mobile.feature.leads.LeadEntity
+import com.crm.mobile.feature.reminders.ReminderDao
+import com.crm.mobile.feature.reminders.ReminderEntity
 import com.crm.mobile.feature.timeline.ActivityDao
 import com.crm.mobile.feature.timeline.ActivityEntity
 import com.crm.mobile.feature.tasks.TaskDao
@@ -33,9 +35,9 @@ import javax.inject.Singleton
         LeadEntity::class, DashboardSnapshotEntity::class,
         PipelineStageEntity::class, TaskEntity::class, CalendarItemEntity::class,
         CustomerEntity::class, ContactEntity::class, ContactFavoriteEntity::class,
-        ActivityEntity::class,
+        ActivityEntity::class, ReminderEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -47,6 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun customerDao(): CustomerDao
     abstract fun contactDao(): ContactDao
     abstract fun activityDao(): ActivityDao
+    abstract fun reminderDao(): ReminderDao
 }
 
 @Module
@@ -84,4 +87,7 @@ object DatabaseModule {
 
     @Provides
     fun activityDao(db: AppDatabase): ActivityDao = db.activityDao()
+
+    @Provides
+    fun reminderDao(db: AppDatabase): ReminderDao = db.reminderDao()
 }
