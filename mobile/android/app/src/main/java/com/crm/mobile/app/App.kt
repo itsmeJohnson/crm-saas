@@ -23,6 +23,7 @@ import com.crm.mobile.feature.auth.LoginScreen
 import com.crm.mobile.feature.cockpit.CockpitScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
+import com.crm.mobile.feature.tasks.TasksScreen
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -36,6 +37,7 @@ object Routes {
     const val DASHBOARD = "dashboard"
     const val COCKPIT = "cockpit"
     const val LEADS = "leads"
+    const val TASKS = "tasks"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -84,6 +86,7 @@ fun HomeShell() {
         Tab(Routes.DASHBOARD, "Home", "▦"),
         Tab(Routes.COCKPIT, "Dialer", "☎"),
         Tab(Routes.LEADS, "Leads", "☰"),
+        Tab(Routes.TASKS, "Tasks", "✔"),
     )
     val inner = rememberNavController()
     val backStack by inner.currentBackStackEntryAsState()
@@ -115,6 +118,7 @@ fun HomeShell() {
             }
             composable(Routes.COCKPIT) { CockpitScreen() }
             composable(Routes.LEADS) { LeadsScreen() }
+            composable(Routes.TASKS) { TasksScreen() }
         }
     }
 }
