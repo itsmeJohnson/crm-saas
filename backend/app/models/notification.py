@@ -54,3 +54,19 @@ class PushSubscription(BaseModel):
     p256dh: Mapped[str | None] = mapped_column(String(255), nullable=True)
     auth: Mapped[str | None] = mapped_column(String(255), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class DeviceToken(BaseModel):
+    """A native mobile push token for a user — FCM (Android) or APNS (iOS).
+    Parallel to PushSubscription (which is browser Web-Push); the notification
+    dispatcher fans out to both. Unique per (user, token) so re-registering the
+    same device is idempotent."""
+    __tablename__ = "device_tokens"
+    __table_args__ = (UniqueConstraint("user_id", "token", name="uq_device_token_user_token"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token: Mapped[str] = mapped_column(Text, nullable=False)
+    platform: Mapped[str] = mapped_column(String(10), nullable=False)  # fcm | apns
+    device_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_active_token: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

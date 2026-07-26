@@ -53,6 +53,16 @@ class PushUnsubscribeReq(BaseModel):
     endpoint: str
 
 
+class DeviceRegisterReq(BaseModel):
+    token: str = Field(..., min_length=1)
+    platform: str = Field(..., pattern="^(fcm|apns)$")
+    device_name: Optional[str] = None
+
+
+class DeviceUnregisterReq(BaseModel):
+    token: str = Field(..., min_length=1)
+
+
 class BulkReadReq(BaseModel):
     ids: Optional[List[uuid.UUID]] = None
     category: Optional[str] = None
