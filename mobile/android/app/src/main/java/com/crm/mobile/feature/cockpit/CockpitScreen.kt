@@ -146,7 +146,7 @@ class CockpitViewModel @Inject constructor(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CockpitScreen(vm: CockpitViewModel = hiltViewModel()) {
+fun CockpitScreen(onMessage: (String) -> Unit = {}, vm: CockpitViewModel = hiltViewModel()) {
     val lead by vm.lead.collectAsStateWithLifecycle()
     val stages by vm.stages.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -179,6 +179,9 @@ fun CockpitScreen(vm: CockpitViewModel = hiltViewModel()) {
                 Text(if (ui.calling) "Calling…" else "Call customer")
             }
             ui.callMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            OutlinedButton(onClick = { onMessage(l.id) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Message (SMS / WhatsApp / Email)")
+            }
 
             SectionLabel("Outcome")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
