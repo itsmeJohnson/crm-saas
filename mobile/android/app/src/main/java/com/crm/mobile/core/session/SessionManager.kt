@@ -25,6 +25,9 @@ class SessionManager @Inject constructor(
     private object Keys {
         val ACCESS = stringPreferencesKey("access_token")
         val REFRESH = stringPreferencesKey("refresh_token")
+        val TEL_KEY = stringPreferencesKey("telephony_api_key")
+        val TEL_SRN = stringPreferencesKey("telephony_srn")
+        val TEL_PHONE = stringPreferencesKey("telephony_agent_phone")
     }
 
     val isLoggedIn: Flow<Boolean> =
@@ -43,4 +46,23 @@ class SessionManager @Inject constructor(
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
     }
+
+    // Telephony creds for server-side click-to-call (set in Settings). Empty
+    // until configured — the backend then reports "calling not configured".
+    suspend fun telephony(): TelephonyCreds {
+        val p = context.dataStore.data.first()
+        return TelephonyCreds(p[Keys.TEL_KEY], p[Keys.TEL_SRN], p[Keys.TEL_PHONE])
+    }
+
+    suspend fun saveTelephony(apiKey: String?, srn: String?, agentPhone: String?) {
+        context.dataStore.edit {
+            apiKey?.let { v -> it[Keys.TEL_KEY] = v }
+            srn?.let { v -> it[Keys.TEL_SRN] = v }
+            agentPhone?.let { v -> it[Keys.TEL_PHONE] = v }
+        }
+    }
+}
+
+data class TelephonyCreds(val apiKey: String?, val srn: String?, val agentPhone: String?) {
+    val isConfigured: Boolean get() = !apiKey.isNullOrBlank() && !agentPhone.isNullOrBlank()
 }

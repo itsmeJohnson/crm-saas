@@ -20,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import com.crm.mobile.core.design.CrmTheme
 import com.crm.mobile.core.session.SessionManager
 import com.crm.mobile.feature.auth.LoginScreen
+import com.crm.mobile.feature.cockpit.CockpitScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,6 +34,7 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val DASHBOARD = "dashboard"
+    const val COCKPIT = "cockpit"
     const val LEADS = "leads"
 }
 
@@ -80,6 +82,7 @@ private data class Tab(val route: String, val label: String, val glyph: String)
 fun HomeShell() {
     val tabs = listOf(
         Tab(Routes.DASHBOARD, "Home", "▦"),
+        Tab(Routes.COCKPIT, "Dialer", "☎"),
         Tab(Routes.LEADS, "Leads", "☰"),
     )
     val inner = rememberNavController()
@@ -110,6 +113,7 @@ fun HomeShell() {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(onOpenLeads = { inner.navigate(Routes.LEADS) { launchSingleTop = true } })
             }
+            composable(Routes.COCKPIT) { CockpitScreen() }
             composable(Routes.LEADS) { LeadsScreen() }
         }
     }
