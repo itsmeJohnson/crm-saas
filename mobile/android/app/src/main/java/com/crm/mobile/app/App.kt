@@ -20,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import com.crm.mobile.core.design.CrmTheme
 import com.crm.mobile.core.session.SessionManager
 import com.crm.mobile.feature.auth.LoginScreen
+import com.crm.mobile.feature.calendar.CalendarScreen
 import com.crm.mobile.feature.cockpit.CockpitScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
@@ -38,6 +39,7 @@ object Routes {
     const val COCKPIT = "cockpit"
     const val LEADS = "leads"
     const val TASKS = "tasks"
+    const val CALENDAR = "calendar"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -87,6 +89,7 @@ fun HomeShell() {
         Tab(Routes.COCKPIT, "Dialer", "☎"),
         Tab(Routes.LEADS, "Leads", "☰"),
         Tab(Routes.TASKS, "Tasks", "✔"),
+        Tab(Routes.CALENDAR, "Calendar", "▤"),
     )
     val inner = rememberNavController()
     val backStack by inner.currentBackStackEntryAsState()
@@ -119,6 +122,7 @@ fun HomeShell() {
             composable(Routes.COCKPIT) { CockpitScreen() }
             composable(Routes.LEADS) { LeadsScreen() }
             composable(Routes.TASKS) { TasksScreen() }
+            composable(Routes.CALENDAR) { CalendarScreen() }
         }
     }
 }

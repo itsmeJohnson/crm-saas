@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.crm.mobile.feature.calendar.CalendarDao
+import com.crm.mobile.feature.calendar.CalendarItemEntity
 import com.crm.mobile.feature.cockpit.PipelineStageDao
 import com.crm.mobile.feature.cockpit.PipelineStageEntity
 import com.crm.mobile.feature.dashboard.DashboardDao
@@ -22,9 +24,9 @@ import javax.inject.Singleton
 @Database(
     entities = [
         LeadEntity::class, DashboardSnapshotEntity::class,
-        PipelineStageEntity::class, TaskEntity::class,
+        PipelineStageEntity::class, TaskEntity::class, CalendarItemEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dashboardDao(): DashboardDao
     abstract fun pipelineStageDao(): PipelineStageDao
     abstract fun taskDao(): TaskDao
+    abstract fun calendarDao(): CalendarDao
 }
 
 @Module
@@ -57,4 +60,7 @@ object DatabaseModule {
 
     @Provides
     fun taskDao(db: AppDatabase): TaskDao = db.taskDao()
+
+    @Provides
+    fun calendarDao(db: AppDatabase): CalendarDao = db.calendarDao()
 }
