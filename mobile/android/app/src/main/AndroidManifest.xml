@@ -30,5 +30,18 @@
                 <data android:scheme="crm" />
             </intent-filter>
         </activity>
+
+        <!-- Native push (FCM). Inert until google-services.json + the
+             com.google.gms.google-services plugin are added (see app/build.gradle.kts). -->
+        <service
+            android:name=".feature.notifications.CrmMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="crm_default" />
     </application>
 </manifest>
