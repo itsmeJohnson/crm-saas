@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.crm.mobile.feature.dashboard.DashboardDao
+import com.crm.mobile.feature.dashboard.DashboardSnapshotEntity
 import com.crm.mobile.feature.leads.LeadDao
 import com.crm.mobile.feature.leads.LeadEntity
 import dagger.Module
@@ -13,9 +15,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@Database(entities = [LeadEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [LeadEntity::class, DashboardSnapshotEntity::class],
+    version = 2,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun leadDao(): LeadDao
+    abstract fun dashboardDao(): DashboardDao
 }
 
 @Module
@@ -32,4 +39,7 @@ object DatabaseModule {
 
     @Provides
     fun leadDao(db: AppDatabase): LeadDao = db.leadDao()
+
+    @Provides
+    fun dashboardDao(db: AppDatabase): DashboardDao = db.dashboardDao()
 }
