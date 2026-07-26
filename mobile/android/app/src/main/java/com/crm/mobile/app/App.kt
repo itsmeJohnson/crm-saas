@@ -30,6 +30,7 @@ import com.crm.mobile.feature.customers.CustomersListScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
 import com.crm.mobile.feature.more.MoreScreen
+import com.crm.mobile.feature.reminders.ReminderScreen
 import com.crm.mobile.feature.tasks.TasksScreen
 import com.crm.mobile.feature.timeline.TimelineScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,6 +52,7 @@ object Routes {
     const val CUSTOMERS = "customers"
     const val CONTACTS = "contacts"
     const val TIMELINE = "timeline"
+    const val REMINDERS = "reminders"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -147,6 +149,9 @@ fun HomeShell() {
             }
             composable("contact/{contactId}") { ContactDetailScreen() }
             composable(Routes.TIMELINE) { TimelineScreen() }
+            composable(Routes.REMINDERS) {
+                ReminderScreen(onOpenLead = { inner.navigate(Routes.LEADS) { launchSingleTop = true } })
+            }
         }
     }
 }

@@ -40,6 +40,7 @@ fun MoreScreen(onNavigate: (String) -> Unit, vm: MoreViewModel = hiltViewModel()
     val isManagerPlus = role in setOf("SuperAdmin", "OrgAdmin", "Manager")
 
     val items = listOf(
+        MoreItem("reminders", "Reminders"),
         MoreItem("timeline", "Timeline"),
         MoreItem("calendar", "Calendar"),
         MoreItem("customers", "Customers", managerOnly = true),
