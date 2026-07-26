@@ -134,6 +134,10 @@ object NetworkModule {
     @Provides @Singleton
     fun calendarApi(retrofit: Retrofit): com.crm.mobile.feature.calendar.CalendarApi =
         retrofit.create(com.crm.mobile.feature.calendar.CalendarApi::class.java)
+
+    @Provides @Singleton
+    fun customerApi(retrofit: Retrofit): com.crm.mobile.feature.customers.CustomerApi =
+        retrofit.create(com.crm.mobile.feature.customers.CustomerApi::class.java)
 }
 
 private fun OkHttpClient.Builder.addLoggingInterceptor(): OkHttpClient.Builder {

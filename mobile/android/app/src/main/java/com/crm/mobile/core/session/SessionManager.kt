@@ -25,6 +25,7 @@ class SessionManager @Inject constructor(
     private object Keys {
         val ACCESS = stringPreferencesKey("access_token")
         val REFRESH = stringPreferencesKey("refresh_token")
+        val ROLE = stringPreferencesKey("user_role")
         val TEL_KEY = stringPreferencesKey("telephony_api_key")
         val TEL_SRN = stringPreferencesKey("telephony_srn")
         val TEL_PHONE = stringPreferencesKey("telephony_agent_phone")
@@ -33,8 +34,12 @@ class SessionManager @Inject constructor(
     val isLoggedIn: Flow<Boolean> =
         context.dataStore.data.map { !it[Keys.ACCESS].isNullOrBlank() }
 
+    /** Cached role (SuperAdmin|OrgAdmin|Manager|Employee) for role-gated UI. */
+    val role: Flow<String?> = context.dataStore.data.map { it[Keys.ROLE] }
+
     suspend fun accessToken(): String? = context.dataStore.data.first()[Keys.ACCESS]
     suspend fun refreshToken(): String? = context.dataStore.data.first()[Keys.REFRESH]
+    suspend fun saveRole(role: String) { context.dataStore.edit { it[Keys.ROLE] = role } }
 
     suspend fun save(access: String, refresh: String) {
         context.dataStore.edit {

@@ -57,7 +57,9 @@ class AuthRepository @Inject constructor(
     suspend fun login(email: String, password: String): CurrentUser {
         val token = api.login(LoginRequest(email.trim(), password))
         session.save(token.access_token, token.refresh_token ?: "")
-        return me()
+        val user = me()
+        session.saveRole(user.role)   // cache role for role-gated navigation
+        return user
     }
 
     suspend fun me(): CurrentUser {
