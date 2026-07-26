@@ -22,6 +22,7 @@ import com.crm.mobile.core.session.SessionManager
 import com.crm.mobile.feature.auth.LoginScreen
 import com.crm.mobile.feature.calendar.CalendarScreen
 import com.crm.mobile.feature.cockpit.CockpitScreen
+import com.crm.mobile.feature.communication.ComposeScreen
 import com.crm.mobile.feature.contacts.ContactDetailScreen
 import com.crm.mobile.feature.contacts.ContactsListScreen
 import com.crm.mobile.feature.customers.CustomerDetailScreen
@@ -129,7 +130,10 @@ fun HomeShell() {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(onOpenLeads = { inner.navigate(Routes.LEADS) { launchSingleTop = true } })
             }
-            composable(Routes.COCKPIT) { CockpitScreen() }
+            composable(Routes.COCKPIT) {
+                CockpitScreen(onMessage = { id -> inner.navigate("compose/$id") { launchSingleTop = true } })
+            }
+            composable("compose/{leadId}") { ComposeScreen(onDone = { inner.popBackStack() }) }
             composable(Routes.LEADS) { LeadsScreen() }
             composable(Routes.TASKS) { TasksScreen() }
             composable(Routes.MORE) { MoreScreen(onNavigate = { r -> inner.navigate(r) { launchSingleTop = true } }) }
