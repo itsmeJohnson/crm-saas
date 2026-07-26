@@ -8,6 +8,8 @@ import com.crm.mobile.feature.calendar.CalendarDao
 import com.crm.mobile.feature.calendar.CalendarItemEntity
 import com.crm.mobile.feature.cockpit.PipelineStageDao
 import com.crm.mobile.feature.cockpit.PipelineStageEntity
+import com.crm.mobile.feature.customers.CustomerDao
+import com.crm.mobile.feature.customers.CustomerEntity
 import com.crm.mobile.feature.dashboard.DashboardDao
 import com.crm.mobile.feature.dashboard.DashboardSnapshotEntity
 import com.crm.mobile.feature.leads.LeadDao
@@ -25,8 +27,9 @@ import javax.inject.Singleton
     entities = [
         LeadEntity::class, DashboardSnapshotEntity::class,
         PipelineStageEntity::class, TaskEntity::class, CalendarItemEntity::class,
+        CustomerEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pipelineStageDao(): PipelineStageDao
     abstract fun taskDao(): TaskDao
     abstract fun calendarDao(): CalendarDao
+    abstract fun customerDao(): CustomerDao
 }
 
 @Module
@@ -63,4 +67,7 @@ object DatabaseModule {
 
     @Provides
     fun calendarDao(db: AppDatabase): CalendarDao = db.calendarDao()
+
+    @Provides
+    fun customerDao(db: AppDatabase): CustomerDao = db.customerDao()
 }

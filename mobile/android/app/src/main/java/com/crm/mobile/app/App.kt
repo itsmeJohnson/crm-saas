@@ -22,8 +22,11 @@ import com.crm.mobile.core.session.SessionManager
 import com.crm.mobile.feature.auth.LoginScreen
 import com.crm.mobile.feature.calendar.CalendarScreen
 import com.crm.mobile.feature.cockpit.CockpitScreen
+import com.crm.mobile.feature.customers.CustomerDetailScreen
+import com.crm.mobile.feature.customers.CustomersListScreen
 import com.crm.mobile.feature.dashboard.DashboardScreen
 import com.crm.mobile.feature.leads.LeadsScreen
+import com.crm.mobile.feature.more.MoreScreen
 import com.crm.mobile.feature.tasks.TasksScreen
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
@@ -39,7 +42,9 @@ object Routes {
     const val COCKPIT = "cockpit"
     const val LEADS = "leads"
     const val TASKS = "tasks"
+    const val MORE = "more"
     const val CALENDAR = "calendar"
+    const val CUSTOMERS = "customers"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -89,7 +94,7 @@ fun HomeShell() {
         Tab(Routes.COCKPIT, "Dialer", "☎"),
         Tab(Routes.LEADS, "Leads", "☰"),
         Tab(Routes.TASKS, "Tasks", "✔"),
-        Tab(Routes.CALENDAR, "Calendar", "▤"),
+        Tab(Routes.MORE, "More", "⋯"),
     )
     val inner = rememberNavController()
     val backStack by inner.currentBackStackEntryAsState()
@@ -122,7 +127,12 @@ fun HomeShell() {
             composable(Routes.COCKPIT) { CockpitScreen() }
             composable(Routes.LEADS) { LeadsScreen() }
             composable(Routes.TASKS) { TasksScreen() }
+            composable(Routes.MORE) { MoreScreen(onNavigate = { r -> inner.navigate(r) { launchSingleTop = true } }) }
             composable(Routes.CALENDAR) { CalendarScreen() }
+            composable(Routes.CUSTOMERS) {
+                CustomersListScreen(onOpen = { id -> inner.navigate("customer/$id") { launchSingleTop = true } })
+            }
+            composable("customer/{companyId}") { CustomerDetailScreen() }
         }
     }
 }
