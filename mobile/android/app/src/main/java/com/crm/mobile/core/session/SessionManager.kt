@@ -1,6 +1,7 @@
 package com.crm.mobile.core.session
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -30,7 +31,17 @@ class SessionManager @Inject constructor(
         val TEL_KEY = stringPreferencesKey("telephony_api_key")
         val TEL_SRN = stringPreferencesKey("telephony_srn")
         val TEL_PHONE = stringPreferencesKey("telephony_agent_phone")
+        val BIOMETRIC = booleanPreferencesKey("biometric_enabled")
+        val PUSH_ENABLED = booleanPreferencesKey("push_enabled")
     }
+
+    /** Biometric app-unlock preference (default off until the user opts in). */
+    val biometricEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.BIOMETRIC] ?: false }
+    suspend fun setBiometricEnabled(on: Boolean) { context.dataStore.edit { it[Keys.BIOMETRIC] = on } }
+
+    /** Native-push opt-in (default on; toggled from Profile settings). */
+    val pushEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.PUSH_ENABLED] ?: true }
+    suspend fun setPushEnabled(on: Boolean) { context.dataStore.edit { it[Keys.PUSH_ENABLED] = on } }
 
     val isLoggedIn: Flow<Boolean> =
         context.dataStore.data.map { !it[Keys.ACCESS].isNullOrBlank() }

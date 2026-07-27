@@ -166,6 +166,10 @@ object NetworkModule {
     @Provides @Singleton
     fun reportsApi(retrofit: Retrofit): com.crm.mobile.feature.reports.ReportsApi =
         retrofit.create(com.crm.mobile.feature.reports.ReportsApi::class.java)
+
+    @Provides @Singleton
+    fun profileApi(retrofit: Retrofit): com.crm.mobile.feature.profile.ProfileApi =
+        retrofit.create(com.crm.mobile.feature.profile.ProfileApi::class.java)
 }
 
 private fun OkHttpClient.Builder.addLoggingInterceptor(): OkHttpClient.Builder {

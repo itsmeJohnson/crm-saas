@@ -36,6 +36,7 @@ import com.crm.mobile.feature.more.MoreScreen
 import com.crm.mobile.feature.notifications.CrmMessagingService
 import com.crm.mobile.feature.notifications.NotificationsScreen
 import com.crm.mobile.feature.notifications.deepLinkToRoute
+import com.crm.mobile.feature.profile.ProfileScreen
 import com.crm.mobile.feature.reminders.ReminderScreen
 import com.crm.mobile.feature.reports.ReportsScreen
 import com.crm.mobile.feature.tasks.TasksScreen
@@ -71,6 +72,7 @@ object Routes {
     const val REMINDERS = "reminders"
     const val NOTIFICATIONS = "notifications"
     const val REPORTS = "reports"
+    const val PROFILE = "profile"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -109,7 +111,14 @@ fun AppNavGraph(startLoggedIn: Boolean, initialDeepLink: String? = null) {
             })
         }
         // Deep link only applies when we open straight into the app (already signed in).
-        composable(Routes.HOME) { HomeShell(initialDeepLink = initialDeepLink.takeIf { startLoggedIn }) }
+        composable(Routes.HOME) {
+            HomeShell(
+                initialDeepLink = initialDeepLink.takeIf { startLoggedIn },
+                onLoggedOut = {
+                    nav.navigate(Routes.LOGIN) { popUpTo(Routes.HOME) { inclusive = true } }
+                },
+            )
+        }
     }
 }
 
@@ -118,7 +127,7 @@ private data class Tab(val route: String, val label: String, val glyph: String)
 /** Bottom-nav shell hosting the role's primary destinations. New feature
  *  modules add a Tab + a composable() here — the navigation framework. */
 @Composable
-fun HomeShell(initialDeepLink: String? = null) {
+fun HomeShell(initialDeepLink: String? = null, onLoggedOut: () -> Unit = {}) {
     val tabs = listOf(
         Tab(Routes.DASHBOARD, "Home", "▦"),
         Tab(Routes.COCKPIT, "Dialer", "☎"),
@@ -184,6 +193,7 @@ fun HomeShell(initialDeepLink: String? = null) {
                 NotificationsScreen(onDeepLink = { route -> inner.navigate(route) { launchSingleTop = true } })
             }
             composable(Routes.REPORTS) { ReportsScreen() }
+            composable(Routes.PROFILE) { ProfileScreen(onLoggedOut = onLoggedOut) }
         }
     }
 }
