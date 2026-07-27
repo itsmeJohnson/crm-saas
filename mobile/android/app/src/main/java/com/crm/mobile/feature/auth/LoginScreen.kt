@@ -1,13 +1,20 @@
 package com.crm.mobile.feature.auth
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -16,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -70,8 +78,9 @@ class LoginViewModel @Inject constructor(
 private fun Throwable.toUserMessage(): String = when {
     message?.contains("401") == true -> "Incorrect email or password."
     message?.contains("Unable to resolve host") == true ||
-        message?.contains("timeout") == true -> "Can't reach the server. Check your connection."
-    else -> "Sign-in failed. Please try again."
+        message?.contains("timeout") == true ||
+        message?.contains("Connection refused") == true -> "Can't reach the server. Check your connection or host IP."
+    else -> "Sign-in failed: ${message ?: "Unknown error"}"
 }
 
 @Composable
@@ -85,9 +94,9 @@ fun LoginScreen(
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Spacer(Modifier.height(48.dp))
         Text("Enterprise CRM", style = MaterialTheme.typography.headlineMedium)
         Text("Sign in to continue", style = MaterialTheme.typography.bodyMedium)
 
@@ -106,7 +115,7 @@ fun LoginScreen(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
 
         state.error?.let {
@@ -116,10 +125,45 @@ fun LoginScreen(
         Button(
             onClick = vm::submit,
             enabled = !state.loading,
-            modifier = Modifier.padding(top = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
         ) {
             if (state.loading) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
             Text("Sign in")
         }
+
+        Spacer(Modifier.height(32.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            "Quick Demo Login",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        val demoUsers = listOf(
+            DemoUser("Director / Owner", "admin@professional-demo.com"),
+            DemoUser("Sales Manager", "karan.singh@professional-demo.demo"),
+            DemoUser("Sales Executive (Amit)", "amit.kumar@professional-demo.demo"),
+            DemoUser("Sales Executive (Divya)", "divya.nair@professional-demo.demo"),
+            DemoUser("Sales Executive (Meena)", "meena.joshi@professional-demo.demo"),
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f)
+        ) {
+            items(demoUsers) { user ->
+                ListItem(
+                    headlineContent = { Text(user.role, fontWeight = FontWeight.Bold) },
+                    supportingContent = { Text(user.email) },
+                    modifier = Modifier.clickable {
+                        vm.onEmail(user.email)
+                        vm.onPassword("Demo@12345")
+                    }
+                )
+            }
+        }
     }
 }
+
+private data class DemoUser(val role: String, val email: String)
