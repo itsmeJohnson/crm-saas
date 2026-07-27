@@ -42,6 +42,7 @@ fun MoreScreen(onNavigate: (String) -> Unit, vm: MoreViewModel = hiltViewModel()
     val items = listOf(
         MoreItem("notifications", "Notifications"),
         MoreItem("reminders", "Reminders"),
+        MoreItem("reports", "Reports"),
         MoreItem("timeline", "Timeline"),
         MoreItem("calendar", "Calendar"),
         MoreItem("customers", "Customers", managerOnly = true),

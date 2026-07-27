@@ -37,6 +37,7 @@ import com.crm.mobile.feature.notifications.CrmMessagingService
 import com.crm.mobile.feature.notifications.NotificationsScreen
 import com.crm.mobile.feature.notifications.deepLinkToRoute
 import com.crm.mobile.feature.reminders.ReminderScreen
+import com.crm.mobile.feature.reports.ReportsScreen
 import com.crm.mobile.feature.tasks.TasksScreen
 import com.crm.mobile.feature.timeline.TimelineScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -69,6 +70,7 @@ object Routes {
     const val TIMELINE = "timeline"
     const val REMINDERS = "reminders"
     const val NOTIFICATIONS = "notifications"
+    const val REPORTS = "reports"
 }
 
 // FragmentActivity so BiometricPrompt can attach.
@@ -181,6 +183,7 @@ fun HomeShell(initialDeepLink: String? = null) {
             composable(Routes.NOTIFICATIONS) {
                 NotificationsScreen(onDeepLink = { route -> inner.navigate(route) { launchSingleTop = true } })
             }
+            composable(Routes.REPORTS) { ReportsScreen() }
         }
     }
 }
