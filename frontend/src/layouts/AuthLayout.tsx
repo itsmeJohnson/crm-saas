@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 
 export const AuthLayout: React.FC = () => {
   return (
@@ -46,9 +46,16 @@ export const AuthLayout: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <p className="mt-6 text-xs relative z-10" style={{ color: 'var(--text-muted)' }}>
-        © {new Date().getFullYear()} CRM Enterprise · Secure Multi-Tenant Platform
-      </p>
+      <div className="mt-6 relative z-10 text-center" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-xs">© {new Date().getFullYear()} CRM Enterprise · Secure Multi-Tenant Platform</p>
+        <div className="mt-1.5 flex items-center justify-center gap-3 text-xs">
+          <Link to="/legal/terms" style={{ color: 'var(--text-muted)' }} className="hover:underline">Terms</Link>
+          <span>·</span>
+          <Link to="/legal/privacy" style={{ color: 'var(--text-muted)' }} className="hover:underline">Privacy</Link>
+          <span>·</span>
+          <Link to="/legal/fair-use" style={{ color: 'var(--text-muted)' }} className="hover:underline">Fair Use</Link>
+        </div>
+      </div>
     </div>
   );
 };
