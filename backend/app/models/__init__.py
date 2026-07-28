@@ -46,6 +46,7 @@ from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
 from app.models.sms_settings import SmsSettings
+from app.models.telephony_settings import TelephonySettings
 from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
 from app.models.email_settings import EmailSettings
 from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment

@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -104,8 +105,8 @@ class ProfileViewModel @Inject constructor(
         if (on) push.registerAsync() else push.unregisterNow()
     }
 
-    fun saveTelephony(apiKey: String, srn: String, phone: String) = viewModelScope.launch {
-        session.saveTelephony(apiKey.ifBlank { null }, srn.ifBlank { null }, phone.ifBlank { null })
+    fun saveTelephony(creds: TelephonyCreds) = viewModelScope.launch {
+        session.saveTelephony(creds)
         telephony.value = session.telephony()
     }
 
@@ -232,7 +233,7 @@ private fun SettingsCard(
     tel: TelephonyCreds?,
     onBiometric: (Boolean) -> Unit,
     onPush: (Boolean) -> Unit,
-    onSaveTelephony: (String, String, String) -> Unit,
+    onSaveTelephony: (TelephonyCreds) -> Unit,
     onLogout: () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -256,17 +257,56 @@ private fun SettingsCard(
             HorizontalDivider()
             Text("Click-to-call (telephony)", style = MaterialTheme.typography.labelLarge)
 
+            var provider by remember(tel) { mutableStateOf(tel?.provider ?: "knowlarity") }
+            var phone by remember(tel) { mutableStateOf(tel?.agentPhone ?: "") }
+            // Knowlarity
             var apiKey by remember(tel) { mutableStateOf(tel?.apiKey ?: "") }
             var srn by remember(tel) { mutableStateOf(tel?.srn ?: "") }
-            var phone by remember(tel) { mutableStateOf(tel?.agentPhone ?: "") }
-            OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API key") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(srn, { srn = it }, label = { Text("SRN (optional)") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth())
+            // MyOperator
+            var myopKey by remember(tel) { mutableStateOf(tel?.myopXApiKey ?: "") }
+            var myopSecret by remember(tel) { mutableStateOf(tel?.myopSecretKey ?: "") }
+            var myopCompany by remember(tel) { mutableStateOf(tel?.myopCompanyId ?: "") }
+            var myopCaller by remember(tel) { mutableStateOf(tel?.myopCallerId ?: "") }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = provider == "knowlarity", onClick = { provider = "knowlarity" },
+                    label = { Text("Knowlarity") })
+                FilterChip(selected = provider == "myoperator", onClick = { provider = "myoperator" },
+                    label = { Text("MyOperator") })
+            }
             OutlinedTextField(phone, { phone = it }, label = { Text("Agent phone") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth())
-            OutlinedButton(onClick = { onSaveTelephony(apiKey, srn, phone) }) { Text("Save telephony") }
+
+            if (provider == "knowlarity") {
+                OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API key") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(srn, { srn = it }, label = { Text("SRN / Caller ID (optional)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+            } else {
+                OutlinedTextField(myopKey, { myopKey = it }, label = { Text("x-api-key") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(myopSecret, { myopSecret = it }, label = { Text("secret-key") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(myopCompany, { myopCompany = it }, label = { Text("Company ID") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(myopCaller, { myopCaller = it }, label = { Text("Caller ID / DID (optional)") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+            OutlinedButton(onClick = {
+                onSaveTelephony(
+                    TelephonyCreds(
+                        provider = provider,
+                        apiKey = apiKey.ifBlank { null },
+                        srn = srn.ifBlank { null },
+                        agentPhone = phone.ifBlank { null },
+                        myopXApiKey = myopKey.ifBlank { null },
+                        myopSecretKey = myopSecret.ifBlank { null },
+                        myopCompanyId = myopCompany.ifBlank { null },
+                        myopCallerId = myopCaller.ifBlank { null },
+                    ),
+                )
+            }) { Text("Save telephony") }
 
             HorizontalDivider()
             Button(onClick = onLogout, modifier = Modifier.fillMaxWidth()) { Text("Log out") }

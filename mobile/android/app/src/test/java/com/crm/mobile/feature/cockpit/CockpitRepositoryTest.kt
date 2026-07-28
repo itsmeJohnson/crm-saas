@@ -63,7 +63,7 @@ class CockpitRepositoryTest {
     fun call_without_telephony_config_is_blocked_before_the_network() = runTest {
         val api = FakeApi()
         val session = mockk<SessionManager>()
-        coEvery { session.telephony() } returns TelephonyCreds(null, null, null)
+        coEvery { session.telephony() } returns TelephonyCreds()
         val res = repo(api, session).call("1")
         assertFalse(res.ok)
         assertFalse(api.callInvoked)                 // guarded — never reached the API
@@ -74,7 +74,7 @@ class CockpitRepositoryTest {
     fun call_with_telephony_config_places_the_call() = runTest {
         val api = FakeApi()
         val session = mockk<SessionManager>()
-        coEvery { session.telephony() } returns TelephonyCreds("k", null, "+91999")
+        coEvery { session.telephony() } returns TelephonyCreds(apiKey = "k", agentPhone = "+91999")
         val res = repo(api, session).call("1")
         assertTrue(res.ok)
         assertTrue(api.callInvoked)

@@ -40,9 +40,14 @@ data class NextLeadReq(val collective_pooling: Boolean = false)
 
 @JsonClass(generateAdapter = true)
 data class CallReq(
-    val knowlarity_api_key: String?,
-    val knowlarity_srn: String?,
+    val provider: String,
     val agent_phone_number: String?,
+    val knowlarity_api_key: String? = null,
+    val knowlarity_srn: String? = null,
+    val myop_x_api_key: String? = null,
+    val myop_secret_key: String? = null,
+    val myop_company_id: String? = null,
+    val myop_caller_id: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -129,17 +134,26 @@ class CockpitRepository @Inject constructor(
         stageDao.upsertAll(api.stages().map { PipelineStageEntity(it.id, it.name, it.order_position) })
     }
 
-    suspend fun nextLead(collectivePooling: Boolean = false): CockpitLead? =
-        runCatching { api.nextLead(NextLeadReq(collectivePooling)).toDomain() }.getOrNull()
+    suspend fun nextLead(collectivePooling: Boolean = false): Result<CockpitLead?> =
+        runCatching { api.nextLead(NextLeadReq(collectivePooling)).toDomain() }
 
     /** Server-side click-to-call (keeps the customer number masked). */
     suspend fun call(leadId: String): CallResult {
         val tel = session.telephony()
         if (!tel.isConfigured) {
-            return CallResult(false, "Calling isn't configured. Add your telephony key and agent phone in Settings.")
+            return CallResult(false, "Calling isn't configured. Set your provider, keys and agent phone in Settings.")
         }
         return runCatching {
-            api.call(leadId, CallReq(tel.apiKey, tel.srn, tel.agentPhone))
+            api.call(leadId, CallReq(
+                provider = tel.provider,
+                agent_phone_number = tel.agentPhone,
+                knowlarity_api_key = tel.apiKey,
+                knowlarity_srn = tel.srn,
+                myop_x_api_key = tel.myopXApiKey,
+                myop_secret_key = tel.myopSecretKey,
+                myop_company_id = tel.myopCompanyId,
+                myop_caller_id = tel.myopCallerId,
+            ))
             CallResult(true, null)
         }.getOrElse { CallResult(false, it.toUserMessage()) }
     }

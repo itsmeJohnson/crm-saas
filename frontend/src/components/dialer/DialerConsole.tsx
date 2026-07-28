@@ -63,9 +63,17 @@ export const DialerConsole: React.FC = () => {
   const [knowlaritySrn, setKnowlaritySrn] = useState(() => 
     typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_knowlarity_srn') || '') : ''
   );
-  const [agentPhoneNumber, setAgentPhoneNumber] = useState(() => 
+  const [agentPhoneNumber, setAgentPhoneNumber] = useState(() =>
     typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_agent_phone_number') || '') : ''
   );
+  // Telephony provider + MyOperator (OBD) credentials.
+  const ls = (k: string) => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) || '' : '');
+  const [provider, setProvider] = useState(() => ls('crm_telephony_provider') || 'knowlarity');
+  const [myopXApiKey, setMyopXApiKey] = useState(() => ls('crm_myop_x_api_key'));
+  const [myopSecretKey, setMyopSecretKey] = useState(() => ls('crm_myop_secret_key'));
+  const [myopCompanyId, setMyopCompanyId] = useState(() => ls('crm_myop_company_id'));
+  const [myopPublicIvrId, setMyopPublicIvrId] = useState(() => ls('crm_myop_public_ivr_id'));
+  const [myopType, setMyopType] = useState(() => ls('crm_myop_type') || '1');
   const [autoDial, setAutoDial] = useState(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('crm_auto_dial');
@@ -103,6 +111,16 @@ export const DialerConsole: React.FC = () => {
       localStorage.setItem('crm_agent_phone_number', agentPhoneNumber);
     }
   }, [agentPhoneNumber]);
+
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('crm_telephony_provider', provider);
+    localStorage.setItem('crm_myop_x_api_key', myopXApiKey);
+    localStorage.setItem('crm_myop_secret_key', myopSecretKey);
+    localStorage.setItem('crm_myop_company_id', myopCompanyId);
+    localStorage.setItem('crm_myop_public_ivr_id', myopPublicIvrId);
+    localStorage.setItem('crm_myop_type', myopType);
+  }, [provider, myopXApiKey, myopSecretKey, myopCompanyId, myopPublicIvrId, myopType]);
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -179,19 +197,30 @@ export const DialerConsole: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Provider-aware credential assembly for click-to-call.
+  const credsConfigured =
+    provider === 'myoperator'
+      ? Boolean(myopXApiKey && myopSecretKey && myopCompanyId && myopPublicIvrId)
+      : Boolean(knowlarityApiKey && agentPhoneNumber);
+
+  const buildCreds = () => ({
+    provider,
+    agent_phone_number: agentPhoneNumber || undefined,
+    knowlarity_api_key: knowlarityApiKey || undefined,
+    knowlarity_srn: knowlaritySrn || undefined,
+    myop_x_api_key: myopXApiKey || undefined,
+    myop_secret_key: myopSecretKey || undefined,
+    myop_company_id: myopCompanyId || undefined,
+    myop_public_ivr_id: myopPublicIvrId || undefined,
+    myop_type: myopType || '1',
+  });
+
   const handleStartDialing = async () => {
     setNextCallCountdown(null);
     try {
-      if (callingEnabled && knowlarityApiKey && agentPhoneNumber) {
-        await startCalling(
-          collectivePooling,
-          knowlarityApiKey,
-          knowlaritySrn || undefined,
-          agentPhoneNumber
-        );
-      } else {
-        await startCalling(collectivePooling);
-      }
+      // Credentials are org-level (Settings → Communication → Calling) and applied
+      // server-side. Agents never send them.
+      await startCalling(collectivePooling);
     } catch (err) {}
   };
 
@@ -488,70 +517,9 @@ export const DialerConsole: React.FC = () => {
             )}
           </div>
 
-          {/* Outbound Telephony Settings — only for plans with integrated calling */}
-          {callingEnabled && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <button
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="w-full flex items-center justify-between font-semibold text-slate-100 focus:outline-none cursor-pointer"
-            >
-              <span className="flex items-center gap-2 text-sm uppercase tracking-wider text-indigo-400 font-bold">
-                <Settings className="w-4 h-4" />
-                Telephony Settings
-              </span>
-              <span className="text-slate-400 text-xs hover:text-slate-200 transition-colors">
-                {showSettings ? 'Hide' : 'Configure'}
-              </span>
-            </button>
-            
-            {showSettings && (
-              <div className="space-y-4 pt-4 border-t border-slate-800/60 animate-fade-in">
-                <div className="space-y-1.5">
-                  <label htmlFor="tele-api-key" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    Knowlarity API Key
-                  </label>
-                  <input
-                    id="tele-api-key"
-                    type="password"
-                    value={knowlarityApiKey}
-                    onChange={(e) => setKnowlarityApiKey(e.target.value)}
-                    placeholder="Enter API Key"
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-                
-                <div className="space-y-1.5">
-                  <label htmlFor="tele-srn" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    Caller ID (SRN)
-                  </label>
-                  <input
-                    id="tele-srn"
-                    type="text"
-                    value={knowlaritySrn}
-                    onChange={(e) => setKnowlaritySrn(e.target.value)}
-                    placeholder="e.g. +91XXXXXXXXXX"
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="tele-agent-num" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    Agent Phone Number
-                  </label>
-                  <input
-                    id="tele-agent-num"
-                    type="text"
-                    value={agentPhoneNumber}
-                    onChange={(e) => setAgentPhoneNumber(e.target.value)}
-                    placeholder="e.g. +91XXXXXXXXXX"
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-          )}
+          {/* Telephony credentials are configured once, org-wide, by an admin in
+              Settings → Communication → Calling — never per agent. Nothing to
+              set here; the backend applies the org config automatically. */}
         </div>
 
         {/* RIGHT CONTEXT PANEL (Cols 6-12) */}

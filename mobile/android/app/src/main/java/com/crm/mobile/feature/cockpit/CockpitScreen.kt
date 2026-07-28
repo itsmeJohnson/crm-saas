@@ -90,8 +90,12 @@ class CockpitViewModel @Inject constructor(
     fun loadNext() {
         _ui.update { it.copy(loading = true, error = null, callMessage = null, form = CockpitForm()) }
         viewModelScope.launch {
-            _lead.value = repo.nextLead()
-            _ui.update { it.copy(loading = false) }
+            repo.nextLead().onSuccess { l ->
+                _lead.value = l
+                _ui.update { it.copy(loading = false) }
+            }.onFailure { e ->
+                _ui.update { it.copy(loading = false, error = e.toUserMessage()) }
+            }
         }
     }
 
@@ -231,6 +235,15 @@ fun CockpitScreen(onMessage: (String) -> Unit = {}, vm: CockpitViewModel = hiltV
             Box(Modifier.padding(bottom = 24.dp)) {}
         }
     }
+}
+
+private fun Throwable.toUserMessage(): String = when {
+    message?.contains("400") == true -> "Please check in (Home screen) before starting the dialer."
+    message?.contains("403") == true -> "You don't have permission to use the dialer."
+    message?.contains("404") == true -> "No more leads available in the queue."
+    message?.contains("Unable to resolve host") == true || message?.contains("timeout") == true ->
+        "Can't reach the server. Check your connection."
+    else -> "Action failed: ${message ?: "Unknown error"}"
 }
 
 @Composable
