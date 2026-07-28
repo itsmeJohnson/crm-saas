@@ -182,6 +182,13 @@ export const Register: React.FC = () => {
         )}
       </button>
 
+      <p className="text-center text-xs text-slate-500 pt-1">
+        By creating a workspace you agree to our{' '}
+        <Link to="/legal/terms" className="text-brand-400 hover:text-brand-300">Terms of Service</Link>,{' '}
+        <Link to="/legal/privacy" className="text-brand-400 hover:text-brand-300">Privacy Policy</Link>, and{' '}
+        <Link to="/legal/fair-use" className="text-brand-400 hover:text-brand-300">Fair Use Policy</Link>.
+      </p>
+
       <div className="text-center pt-2">
         <p className="text-slate-400 text-sm">
           Already have an account?{' '}

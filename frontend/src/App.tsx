@@ -6,6 +6,7 @@ import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './modules/auth/Login';
 import { Register } from './modules/auth/Register';
+import { LegalPage } from './pages/legal/LegalPage';
 import { Home } from './modules/dashboard/Home';
 import { Profile } from './modules/organization/Profile';
 import { UsersPage } from './pages/UsersPage';
@@ -130,6 +131,10 @@ export const App: React.FC = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Route>
+
+          {/* Public legal pages (no auth) */}
+          <Route path="/legal/:doc" element={<LegalPage />} />
+          <Route path="/legal" element={<LegalPage />} />
 
           {/* Protected Routes — single shared shell (AppLayout) for the whole app */}
           <Route element={<ProtectedRoute />}>
