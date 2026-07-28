@@ -1,5 +1,6 @@
 package com.crm.mobile.feature.dashboard
 
+import android.util.Log
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -11,6 +12,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query as HttpQuery
@@ -50,6 +52,9 @@ data class RecentActivityDto(
 @JsonClass(generateAdapter = true)
 data class RecentActivitiesDto(val items: List<RecentActivityDto> = emptyList())
 
+@JsonClass(generateAdapter = true)
+data class ClockBody(val latitude: Double? = null, val longitude: Double? = null)
+
 interface DashboardApi {
     @GET("dashboard/employee")
     suspend fun employeeSummary(): EmployeeSummaryDto
@@ -58,10 +63,10 @@ interface DashboardApi {
     suspend fun recentActivities(@HttpQuery("limit") limit: Int = 15): RecentActivitiesDto
 
     @POST("attendance/clock-in")
-    suspend fun clockIn(): Unit
+    suspend fun clockIn(@Body body: ClockBody = ClockBody()): Unit
 
     @POST("attendance/clock-out")
-    suspend fun clockOut(): Unit
+    suspend fun clockOut(@Body body: ClockBody = ClockBody()): Unit
 }
 
 // ---- Local cache: a single snapshot row so the dashboard renders offline ----
@@ -144,10 +149,12 @@ class DashboardRepository @Inject constructor(
         val recent = runCatching { api.recentActivities().items }.getOrDefault(emptyList())
         dao.upsert(s.toEntity(recent, activitiesAdapter))
         true
+    }.onFailure {
+        Log.e("DashboardRepo", "Refresh failed", it)
     }.getOrDefault(false)
 
-    suspend fun clockIn(): Boolean = runCatching { api.clockIn(); refresh(); true }.getOrDefault(false)
-    suspend fun clockOut(): Boolean = runCatching { api.clockOut(); refresh(); true }.getOrDefault(false)
+    suspend fun clockIn(): Boolean = runCatching { api.clockIn(); refresh(); true }.onFailure { Log.e("DashboardRepo", "Clock in failed", it) }.getOrDefault(false)
+    suspend fun clockOut(): Boolean = runCatching { api.clockOut(); refresh(); true }.onFailure { Log.e("DashboardRepo", "Clock out failed", it) }.getOrDefault(false)
 }
 
 private fun EmployeeSummaryDto.toEntity(

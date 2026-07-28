@@ -37,15 +37,11 @@ export const LeadsPage: React.FC = () => {
 
   const handleManualCall = async (leadId: string) => {
     setCallError(null);
-    const apiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_knowlarity_api_key') || '' : '';
-    const srn = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_knowlarity_srn') || '' : '';
-    const agentPhone = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_agent_phone_number') || '' : '';
-    if (!apiKey || !agentPhone) {
-      setCallError('Calling is not configured. Open the Dashboard → Telephony Settings and set your API key and agent phone number first.');
-      return;
-    }
+    // Telephony is configured org-wide by an admin (Settings → Communication →
+    // Calling) and applied server-side. Agents send no credentials; if the org
+    // hasn't configured it, the backend returns a clear message.
     try {
-      await callSpecificLead(leadId, apiKey, srn, agentPhone);
+      await callSpecificLead(leadId);
     } catch (e: any) {
       setCallError(e.response?.data?.detail || 'Failed to place the call.');
     }

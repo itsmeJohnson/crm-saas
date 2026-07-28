@@ -9,6 +9,8 @@ import { Register } from './modules/auth/Register';
 import { Home } from './modules/dashboard/Home';
 import { Profile } from './modules/organization/Profile';
 import { UsersPage } from './pages/UsersPage';
+import { SettingsLayout, SettingsHome } from './pages/settings/SettingsLayout';
+import { SettingsCallingPage } from './pages/settings/SettingsCallingPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { LeadReportsPage } from './pages/LeadReportsPage';
 import { LeadAutomationPage } from './pages/LeadAutomationPage';
@@ -159,6 +161,13 @@ export const App: React.FC = () => {
                 <Route path="/campaigns" element={<CampaignsPage />} />
                 <Route path="/notifications" element={<NotificationCenterPage />} />
                 <Route path="/communication-analytics" element={<CommunicationAnalyticsPage />} />
+                {/* Settings module — SuperAdmin / OrgAdmin only (backend also enforces). */}
+                <Route element={<ProtectedRoute allowedRoles={['SuperAdmin', 'OrgAdmin']} />}>
+                  <Route path="/settings" element={<SettingsLayout />}>
+                    <Route index element={<SettingsHome />} />
+                    <Route path="calling" element={<SettingsCallingPage />} />
+                  </Route>
+                </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                   <Route path="/departments" element={<DepartmentsPage />} />
                 </Route>

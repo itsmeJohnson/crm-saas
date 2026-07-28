@@ -1,0 +1,18 @@
+# Android / Gradle build artifacts — never commit these
+.gradle/
+build/
+*/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Keystore / secrets
+*.jks
+*.keystore
+google-services.json

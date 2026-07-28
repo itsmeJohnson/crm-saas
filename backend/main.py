@@ -26,6 +26,7 @@ from app.api.v1.health import router as active_health_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.dialer import router as dialer_router
 from app.api.v1.calling import router as calling_router
+from app.api.v1.settings_calling import router as settings_calling_router
 from app.api.v1.sms import router as sms_router
 from app.api.v1.whatsapp import router as whatsapp_router
 from app.api.v1.email import router as email_router
@@ -318,6 +319,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Telephony settings access denial → exact contract body ────────────────────
+from fastapi.responses import JSONResponse as _JSONResponse
+from app.middleware.permissions import TelephonyAccessDenied
+
+
+@app.exception_handler(TelephonyAccessDenied)
+async def _telephony_access_denied_handler(request, exc):  # noqa: ANN001
+    return _JSONResponse(
+        status_code=403,
+        content={"success": False, "message": "You are not authorized to access telephony settings."},
+    )
+
+
 # ── CORS — explicit methods and headers only ──────────────────────────────────
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
@@ -371,6 +385,7 @@ app.include_router(active_health_router,   prefix=f"{settings.API_V1_STR}/health
 app.include_router(pipelines_router,       prefix=f"{settings.API_V1_STR}/pipelines",       tags=["pipelines"])
 app.include_router(dialer_router,          prefix=f"{settings.API_V1_STR}/dialer",          tags=["dialer"])
 app.include_router(calling_router,         prefix=f"{settings.API_V1_STR}/calling",         tags=["calling"])
+app.include_router(settings_calling_router, prefix=f"{settings.API_V1_STR}/settings/calling", tags=["settings-telephony"])
 app.include_router(sms_router,             prefix=f"{settings.API_V1_STR}/sms",             tags=["sms"])
 app.include_router(whatsapp_router,        prefix=f"{settings.API_V1_STR}/whatsapp",        tags=["whatsapp"])
 app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email",           tags=["email"])

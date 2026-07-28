@@ -20,6 +20,7 @@ import okhttp3.Route
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -83,8 +84,14 @@ object NetworkModule {
     /** Retrofit with NO authenticator — used only for token refresh. */
     @Provides @Singleton @Named("auth")
     fun authRetrofit(moshi: Moshi): Retrofit = Retrofit.Builder()
-        .baseUrl(BuildConfig.API_BASE_URL)
-        .client(OkHttpClient.Builder().addLoggingInterceptor().build())
+        .baseUrl("http://192.168.1.6:8000/api/v1/")
+        .client(
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .addLoggingInterceptor()
+                .build()
+        )
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
@@ -95,6 +102,8 @@ object NetworkModule {
     @Provides @Singleton
     fun okHttp(session: SessionManager, @Named("auth") refreshApi: AuthApi): OkHttpClient =
         OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(AuthInterceptor(session))
             .authenticator(TokenAuthenticator(session, refreshApi))
             // Certificate pinning is enabled per-environment; add the backend's
@@ -105,7 +114,7 @@ object NetworkModule {
 
     @Provides @Singleton
     fun retrofit(client: OkHttpClient, moshi: Moshi): Retrofit = Retrofit.Builder()
-        .baseUrl(BuildConfig.API_BASE_URL)
+        .baseUrl("http://192.168.1.6:8000/api/v1/")
         .client(client)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
