@@ -15,6 +15,7 @@ const SECTIONS: { title: string; items: { label: string; to?: string; soon?: boo
     { label: 'Calling', to: '/settings/calling' }, { label: 'Email', to: '/email' },
   ] },
   { title: 'Integrations', items: [
+    { label: 'Marketplace', to: '/settings/integrations' },
     { label: 'MyOperator', to: '/settings/calling' }, { label: 'Knowlarity', soon: true },
     { label: 'Exotel', soon: true }, { label: 'MSG91', soon: true },
     { label: 'Twilio', soon: true }, { label: 'Gupshup', soon: true },

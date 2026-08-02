@@ -10,7 +10,12 @@ logger = logging.getLogger(__name__)
 # Call APIs (logs + recordings): token auth on a different base URL.
 MYOPERATOR_DEV_BASE = "https://developers.myoperator.co"
 
-_REQUIRED = ("company_id", "x_api_key", "secret_token", "public_ivr_id")
+# Fields needed just to connect / receive inbound (logs, recordings, webhooks).
+# `public_ivr_id` is required ONLY for outbound OBD calls, so it is checked in
+# start_call — not here. This lets incoming-only accounts (e.g. trial plans that
+# route inbound to a mobile) activate MyOperator without an OBD flow id.
+_REQUIRED = ("company_id", "x_api_key", "secret_token")
+_REQUIRED_OUTBOUND = ("company_id", "x_api_key", "secret_token", "public_ivr_id")
 
 
 class MyOperatorProvider(TelephonyProvider):
@@ -18,22 +23,24 @@ class MyOperatorProvider(TelephonyProvider):
     logs/recordings use the Call APIs with the account's Calling API Token."""
     name = "myoperator"
 
-    def _missing(self) -> list[str]:
-        return [f for f in _REQUIRED if not self.config.get(f)]
+    def _missing(self, required=_REQUIRED) -> list[str]:
+        return [f for f in required if not self.config.get(f)]
 
     async def connect(self) -> dict:
         missing = self._missing()
         if missing:
             return {"success": False, "message": f"Missing MyOperator fields: {', '.join(missing)}"}
-        return {"success": True, "message": "MyOperator credentials present."}
+        out_missing = self._missing(_REQUIRED_OUTBOUND)
+        note = " Outbound calling needs Public IVR ID." if out_missing else ""
+        return {"success": True, "message": f"MyOperator connected.{note}"}
 
     async def disconnect(self) -> dict:
         return {"success": True}
 
     async def start_call(self, *, number: str, agent_number: str | None = None) -> dict:
-        missing = self._missing()
+        missing = self._missing(_REQUIRED_OUTBOUND)
         if missing:
-            raise ValueError(f"MyOperator not configured: missing {', '.join(missing)}")
+            raise ValueError(f"MyOperator outbound not configured: missing {', '.join(missing)}")
         return await trigger_myoperator_call(
             x_api_key=self.config["x_api_key"],
             secret_key=self.config["secret_token"],
