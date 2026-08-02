@@ -1,4 +1,6 @@
-version: '3.8'
+# Pinned project name so the DB named volume (crm-saas_postgres_data) is reused
+# regardless of the folder name — moving the repo won't orphan the database.
+name: crm-saas
 
 services:
   db:
