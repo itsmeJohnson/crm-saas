@@ -56,6 +56,10 @@ class LeadService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
+        # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
+        # supplied by the caller before they are persisted.
+        await self._validate_org_references(actor, lead_data)
+
         # Auto-link to a company when the free-text name matches an existing account
         if lead_data.get("company_name") and not lead_data.get("company_id"):
             from sqlalchemy import select, func
@@ -136,6 +140,39 @@ class LeadService:
         user_service = UserService(self.db)
         downline_ids = await user_service.get_downline_user_ids(actor)
         return downline_ids | {actor.id}
+
+    async def _validate_org_references(self, actor: User, data: dict) -> None:
+        """Reject any stage_id/branch_id/territory_id/company_id that is not a
+        live (non-deleted) row in the actor's organization. Absent/None keys are
+        skipped so nullable FKs stay backward-compatible. Closes the cross-tenant
+        FK-injection gap (Sprint 2 P0)."""
+        from sqlalchemy import select
+        from app.models.pipeline import PipelineStage
+        from app.models.branch import Branch, Territory
+        from app.models.company import Company
+
+        checks = (
+            ("stage_id", PipelineStage),
+            ("branch_id", Branch),
+            ("territory_id", Territory),
+            ("company_id", Company),
+        )
+        for field, model in checks:
+            ref_id = data.get(field)
+            if not ref_id:
+                continue
+            res = await self.db.execute(
+                select(model.id).filter(
+                    model.id == ref_id,
+                    model.organization_id == actor.organization_id,
+                    model.is_deleted == False,
+                ).limit(1)
+            )
+            if res.scalar() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{field} not found in your organization",
+                )
 
     async def paginate_leads(
         self,
@@ -290,6 +327,19 @@ class LeadService:
             if not stage_res.scalar():
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stage not found in your organization")
 
+        # P0: validate the bulk assignee (org + active + assignable) BEFORE any
+        # mutation, so an invalid target fails the whole request atomically (no
+        # partial writes) with HTTP 400.
+        new_assignee = fields.get("assigned_user_id")
+        if new_assignee:
+            from app.services.user_service import UserService
+            assignable_ids = await UserService(self.db).get_assignable_user_ids(actor)
+            if new_assignee not in assignable_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Assigned user is not active/assignable in your organization",
+                )
+
         allowed_user_ids = await self._resolve_scope(actor)
         leads = await self.lead_repo.get_leads_for_update(actor.organization_id, lead_ids)
 
@@ -334,6 +384,11 @@ class LeadService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Assigned user not found or inactive in your organization"
                 )
+
+        # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
+        # on update (validated only when the key is present, so partial PATCHes
+        # that don't touch these fields are unaffected).
+        await self._validate_org_references(actor, lead_data)
 
         updated = await self.lead_repo.update_lead(actor.organization_id, lead_id, lead_data)
 
