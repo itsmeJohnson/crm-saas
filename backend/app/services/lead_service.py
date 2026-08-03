@@ -344,9 +344,12 @@ class LeadService:
         leads = await self.lead_repo.get_leads_for_update(actor.organization_id, lead_ids)
 
         updated_ids = []
+        reassigned_count = 0
         for lead in leads:
             if allowed_user_ids is not None and lead.assigned_user_id not in allowed_user_ids:
                 continue
+            if new_assignee and lead.assigned_user_id != new_assignee:
+                reassigned_count += 1  # ownership actually changed on this lead (B)
             for key, val in fields.items():
                 setattr(lead, key, val)
             self.db.add(lead)
@@ -363,6 +366,18 @@ class LeadService:
                 action_metadata={"lead_ids": [str(i) for i in updated_ids], "fields": list(fields.keys())},
             )
             await DashboardService.invalidate_cache(actor.organization_id)
+
+        # B: one notification to the new owner when >=1 lead actually changed hands.
+        if new_assignee and new_assignee != actor.id and reassigned_count > 0:
+            await self.notification_service.create_notification(
+                organization_id=actor.organization_id,
+                user_id=new_assignee,
+                category="lead",
+                title="Leads assigned to you",
+                body=f"{reassigned_count} lead(s) were assigned to you.",
+                link_url="/leads",
+                action_metadata={"lead_ids": [str(i) for i in updated_ids], "count": reassigned_count},
+            )
         return {"updated_count": len(updated_ids), "lead_ids": updated_ids}
 
     async def update_lead(self, actor: User, lead_id: uuid.UUID, lead_data: dict) -> Lead:
@@ -370,6 +385,7 @@ class LeadService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
         lead = await self.get_lead(actor, lead_id)
+        old_owner = lead.assigned_user_id  # capture BEFORE mutation for reassignment notify (B)
 
         # Field-level permission check (no-op unless actor has a custom role)
         from app.services.permission_service import PermissionService
@@ -417,6 +433,19 @@ class LeadService:
         # Run lead-updated automation rules
         from app.services.workflow_service import WorkflowService
         await WorkflowService(self.db).run("lead_updated", updated, actor)
+
+        # B: notify the new owner only when ownership actually changes.
+        new_owner = lead_data.get("assigned_user_id")
+        if new_owner and new_owner != old_owner and new_owner != actor.id:
+            await self.notification_service.create_notification(
+                organization_id=actor.organization_id,
+                user_id=new_owner,
+                category="lead",
+                title="Lead assigned to you",
+                body=f'"{updated.title}" was assigned to you.',
+                link_url=f"/leads?leadId={updated.id}",
+                action_metadata={"lead_id": str(updated.id)},
+            )
 
         await DashboardService.invalidate_cache(actor.organization_id)
         return await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
@@ -738,6 +767,38 @@ class LeadService:
                 "title": al.action, "description": None,
                 "actor_user_id": str(al.actor_user_id) if al.actor_user_id else None,
                 "event_metadata": al.action_metadata,
+            })
+
+        # D: include Tasks and Reminders linked to this lead (read-only; org-scoped
+        # via the already-scoped lead) so the timeline shows scheduled work too.
+        from app.models.task import Task
+        tasks_res = await self.db.execute(
+            select(Task).filter(Task.lead_id == lead.id, Task.is_deleted == False)
+        )
+        for t in tasks_res.scalars().all():
+            events.append({
+                "type": "task", "id": str(t.id), "timestamp": t.created_at,
+                "title": f"Task: {t.title}", "description": t.description,
+                "actor_user_id": str(t.assigned_user_id) if t.assigned_user_id else (str(t.created_by) if t.created_by else None),
+                "event_metadata": {
+                    "status": t.status, "priority": t.priority,
+                    "due_date": t.due_date.isoformat() if t.due_date else None,
+                },
+            })
+
+        from app.models.lead_reminder import LeadReminder
+        rem_res = await self.db.execute(
+            select(LeadReminder).filter(LeadReminder.lead_id == lead.id, LeadReminder.is_deleted == False)
+        )
+        for r in rem_res.scalars().all():
+            events.append({
+                "type": "reminder", "id": str(r.id), "timestamp": r.created_at,
+                "title": "Reminder set", "description": r.note,
+                "actor_user_id": str(r.created_by) if r.created_by else None,
+                "event_metadata": {
+                    "remind_at": r.remind_at.isoformat() if r.remind_at else None,
+                    "is_sent": r.is_sent,
+                },
             })
 
         events.sort(key=lambda e: e["timestamp"], reverse=True)
