@@ -6,7 +6,7 @@ from app.repositories.organization import OrganizationRepository
 from app.repositories.user import UserRepository
 from app.repositories.session import UserSessionRepository
 from app.schemas.auth import RegisterTenantRequest, Token, LoginRequest
-from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token
+from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, hash_token
 from app.models.user import User
 from app.models.organization import Organization
 from app.core.config import settings
@@ -262,15 +262,17 @@ class AuthService:
         refresh_token = create_refresh_token(subject=user_id)
         
         expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
+
+        # ADR-001: persist only the SHA-256 hash of the refresh token; the raw
+        # token is returned to the client and never stored at rest.
         await self.session_repo.create({
             "user_id": user_id,
-            "refresh_token": refresh_token,
+            "refresh_token": hash_token(refresh_token),
             "expires_at": expires_at,
             "ip_address": ip_address,
             "user_agent": user_agent
         })
-        
+
         return Token(access_token=access_token, refresh_token=refresh_token)
 
     async def refresh_session(self, refresh_token: str, ip_address: str | None = None, user_agent: str | None = None) -> Token:
