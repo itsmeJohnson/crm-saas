@@ -357,6 +357,19 @@ export const superAdminApi = {
     const response = await api.put<CommercialSettingsResponse>('/super-admin/commercial-settings', payload);
     return response.data;
   },
+
+  getTrialRequests: async () => {
+    const response = await api.get<TrialRequestResponse[]>('/super-admin/trial-requests');
+    return response.data;
+  },
+  approveTrialRequest: async (id: string) => {
+    const response = await api.post<TrialRequestResponse>(`/super-admin/trial-requests/${id}/approve`);
+    return response.data;
+  },
+  rejectTrialRequest: async (id: string) => {
+    const response = await api.post<TrialRequestResponse>(`/super-admin/trial-requests/${id}/reject`);
+    return response.data;
+  },
 };
 
 export interface InvoiceConfigUpdate {
@@ -513,6 +526,17 @@ export interface CommercialSettingsUpdate {
 
 export interface CommercialSettingsResponse extends CommercialSettingsUpdate {
   id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrialRequestResponse {
+  id: string;
+  full_name: string;
+  company_name: string;
+  email: string;
+  phone: string;
+  status: string;
   created_at: string;
   updated_at: string;
 }

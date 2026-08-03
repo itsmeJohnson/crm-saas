@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
-import { AlertCircle, Loader2, KeyRound, Mail, ArrowLeft, CheckCircle, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Loader2, KeyRound, Mail, ArrowLeft, CheckCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -46,6 +46,7 @@ export const Login: React.FC = () => {
   const [demoToken, setDemoToken] = useState<string | null>(null);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [useBackupCode, setUseBackupCode] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Forms
   const {
@@ -216,12 +217,21 @@ export const Login: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-inter">Password</label>
-            <input
-              type="password"
-              {...loginRegister('password')}
-              className={`w-full px-4 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                {...loginRegister('password')}
+                className={`w-full pl-4 pr-10 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {loginErrors.password && <p className="mt-1.5 text-xs text-red-400">{loginErrors.password.message}</p>}
           </div>
 
@@ -252,6 +262,15 @@ export const Login: React.FC = () => {
             >
               Forgot Password?
             </button>
+          </div>
+
+          <div className="text-center pt-4 border-t border-slate-800/40 mt-4">
+            <p className="text-slate-400 text-sm">
+              New to CRM Enterprise?{' '}
+              <Link to="/register" className="text-brand-400 hover:text-brand-300 font-semibold transition-all">
+                Start 14-Day Free Trial
+              </Link>
+            </p>
           </div>
         </form>
       )}

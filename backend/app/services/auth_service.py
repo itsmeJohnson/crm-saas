@@ -86,30 +86,31 @@ class AuthService:
         plan_res = await self.db.execute(plan_stmt)
         plan = plan_res.scalars().first()
         if not plan:
-            # Fallback to any plan if Starter is not seeded
-            plan_stmt = select(Plan)
+            # Fallback to any active plan if requested plan is not found
+            plan_stmt = select(Plan).where(Plan.is_deleted == False)
             plan_res = await self.db.execute(plan_stmt)
-            plan = plan_res.scalar_one_or_none()
+            plan = plan_res.scalars().first()
             if not plan:
-                # Dynamically create and seed Starter plan on the fly (primarily for testing compatibility)
+                # Dynamically create and seed Professional plan on the fly (primarily for testing compatibility)
                 plan = Plan(
-                    name="Starter",
-                    display_name="Starter Plan",
-                    price_inr=3999.0,
-                    monthly_price=3999.0,
-                    max_users=10,
-                    minimum_users=10,
+                    name="Professional",
+                    display_name="Professional",
+                    price_inr=1999.0,
+                    monthly_price=1999.0,
+                    max_users=1000,
+                    minimum_users=5,
                     maximum_users=1000,
                     minimum_contract_months=3,
-                    extra_user_price=3999.0,
+                    extra_user_price=1999.0,
                     allow_additional_seats=True,
                     storage_limit_gb=10,
-                    recording_retention_days=30,
-                    priority_support=False,
+                    recording_retention_days=90,
+                    priority_support=True,
                     api_access=False,
                     is_active=True,
                     plan_active=True,
-                    is_trial=False,
+                    is_trial=True,
+                    trial_days=7,
                     features={}
                 )
                 self.db.add(plan)

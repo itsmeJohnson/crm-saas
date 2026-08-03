@@ -92,6 +92,7 @@ import { SLAPage } from './pages/SLAPage';
 import { EscalationPage } from './pages/EscalationPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
+import { TrialRequestsPage } from './pages/TrialRequestsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
 
 // Self Service Portal imports
@@ -285,6 +286,7 @@ export const App: React.FC = () => {
                 {/* SuperAdmin only */}
                 <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
                   <Route path="/tenants" element={<TenantsPage />} />
+                  <Route path="/trial-requests" element={<TrialRequestsPage />} />
                 </Route>
               </Route>
 
