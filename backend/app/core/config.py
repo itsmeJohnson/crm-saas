@@ -32,6 +32,12 @@ class Settings(BaseSettings):
         List[str], BeforeValidator(parse_cors)
     ] = ["http://localhost:5173", "http://localhost:3000", "http://localhost"]
 
+    # Public base URL of the frontend/SPA, used to build user-facing links such as
+    # password-reset URLs (M5). Set this in production; if unset we fall back to the
+    # first CORS origin, then localhost. Building links off CORS[0] alone is fragile
+    # because that list can be reordered or contain non-frontend origins.
+    FRONTEND_URL: str | None = None
+
     # Database
     POSTGRES_SERVER: str = "db"
     POSTGRES_USER: str = "postgres"

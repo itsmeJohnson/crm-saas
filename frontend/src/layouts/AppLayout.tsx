@@ -30,6 +30,7 @@ export const AppLayout: React.FC = () => {
     // ── Workspace ──────────────────────────────────────────────────────────
     { name: 'Dashboard',         path: '/',                  icon: LayoutDashboard,  section: 'workspace' },
     { name: 'Tenants',           path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace' },
+    { name: 'Trial Requests',    path: '/trial-requests',    icon: Clock,            roles: ['SuperAdmin'], section: 'workspace' },
     { name: 'Settings',          path: '/settings',          icon: Settings,          roles: ['SuperAdmin', 'OrgAdmin'], section: 'workspace' },
     { name: 'Tasks',             path: '/tasks',             icon: ListChecks,        section: 'workspace' },
     { name: 'Calendar',          path: '/calendar',          icon: CalendarDays,      section: 'workspace' },

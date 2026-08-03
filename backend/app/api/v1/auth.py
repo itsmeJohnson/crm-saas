@@ -8,6 +8,7 @@ from app.schemas.auth import (
     AuthMeResponse, ForgotPasswordRequest, ResetPasswordRequest,
     MFAVerifyRequest, MFASetupResponse, MFAEnableResponse, MFAStatusResponse
 )
+from app.schemas.trial_request import TrialRequestCreate
 from app.services.auth_service import AuthService
 from app.services.mfa_service import MFAService
 from app.dependencies.auth import get_current_active_user
@@ -78,6 +79,70 @@ async def public_register(
         browser_info=user_agent,
     )
     return tokens
+
+
+@router.post("/trial-register", status_code=201)
+async def trial_register(
+    payload: TrialRequestCreate,
+    http_request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Public trial registration request. Submits full name, company name, email,
+    and phone number. Saves the request as PENDING for admin approval.
+    """
+    from app.models.trial_request import TrialRequest
+    from app.services.audit_service import AuditService
+
+    # Check if a pending or approved trial request already exists for this email
+    stmt = select(TrialRequest).where(
+        TrialRequest.email == payload.email,
+        TrialRequest.status.in_(["PENDING", "APPROVED"]),
+        TrialRequest.is_deleted == False
+    )
+    res = await db.execute(stmt)
+    existing = res.scalars().first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A trial request for this email has already been submitted."
+        )
+
+    # Check if user already exists
+    from app.models.user import User
+    user_stmt = select(User).where(User.email == payload.email, User.is_deleted == False)
+    user_res = await db.execute(user_stmt)
+    if user_res.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email is already registered."
+        )
+
+    # Save request
+    trial_req = TrialRequest(
+        full_name=payload.full_name,
+        company_name=payload.company_name,
+        email=payload.email,
+        phone=payload.phone,
+        status="PENDING"
+    )
+    db.add(trial_req)
+    await db.commit()
+
+    ip_address = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
+    
+    await AuditService(db).log_event(
+        actor_id=None,
+        organization_id=None,
+        event_type="TRIAL_REQUEST_SUBMITTED",
+        description=f"Trial request submitted for '{payload.company_name}' ({payload.email})",
+        ip_address=ip_address,
+        browser_info=user_agent
+    )
+
+    return {"detail": "Thank you! Your trial request has been received and is under review."}
+
 
 @router.post("/login", response_model=Token)
 async def login(
@@ -224,36 +289,43 @@ async def forgot_password(
     payload: ForgotPasswordRequest,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    # Always return the same response to prevent email enumeration
+    from app.core.config import settings
+
+    # Always return the same response body to prevent email enumeration.
     GENERIC_RESPONSE = {"detail": "If your email is registered, you will receive a password reset link shortly."}
 
-    # Find user by email
-    query = select(User).where(User.email == payload.email, User.is_deleted == False)
+    query = select(User).where(
+        User.email == payload.email,
+        User.is_deleted == False,
+    )
     res = await db.execute(query)
     user = res.scalar_one_or_none()
 
     if not user:
         # Return 200 with generic message — never reveal whether email exists
         return GENERIC_RESPONSE
-    
+
     # Generate secure token and store its SHA-256 hash
     from app.core.security import generate_random_token, hash_token
     token = generate_random_token()
     hashed_token = hash_token(token)
-    
+
     user.reset_token = hashed_token
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
-    
+
     await db.commit()
-    
-    # Resolve frontend URL dynamically from config
-    from app.core.config import settings
-    frontend_url = "http://localhost:5173"
-    if settings.BACKEND_CORS_ORIGINS:
-        frontend_url = settings.BACKEND_CORS_ORIGINS[0]
-    
+
+    # M5: prefer an explicit FRONTEND_URL; fall back to the first CORS origin, then
+    # localhost. Building the link off CORS[0] alone is fragile (it can be reordered
+    # or hold a non-frontend origin), producing broken reset links in production.
+    frontend_url = (
+        settings.FRONTEND_URL
+        or (settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else None)
+        or "http://localhost:5173"
+    ).rstrip("/")
+
     reset_url = f"{frontend_url}/login?token={token}"
-    
+
     # Trigger email notification
     from app.services.email_service import send_email
     send_email(
@@ -262,7 +334,17 @@ async def forgot_password(
         template_name="password_reset.html",
         context={"reset_url": reset_url}
     )
-    return GENERIC_RESPONSE
+
+    # C1: when SMTP is disabled (mock mode) and we are NOT in production, surface the
+    # token so local dev / demos can finish the flow without a real inbox — this is
+    # what the frontend's "Demo Reset Code (SMTP Disabled)" box was already built to
+    # display. Guarded to non-prod + no-SMTP so a real deployment NEVER returns the
+    # token over the API (C2 guardrail: doing so would be trivial account takeover).
+    import os
+    response = dict(GENERIC_RESPONSE)
+    if not settings.is_production and not settings.SMTP_HOST and os.environ.get("TESTING") != "true":
+        response["token"] = token
+    return response
 
 # ---------------------------------------------------------------------------
 # MFA Endpoints

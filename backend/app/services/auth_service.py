@@ -6,7 +6,7 @@ from app.repositories.organization import OrganizationRepository
 from app.repositories.user import UserRepository
 from app.repositories.session import UserSessionRepository
 from app.schemas.auth import RegisterTenantRequest, Token, LoginRequest
-from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token
+from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, hash_token
 from app.models.user import User
 from app.models.organization import Organization
 from app.core.config import settings
@@ -86,30 +86,31 @@ class AuthService:
         plan_res = await self.db.execute(plan_stmt)
         plan = plan_res.scalars().first()
         if not plan:
-            # Fallback to any plan if Starter is not seeded
-            plan_stmt = select(Plan)
+            # Fallback to any active plan if requested plan is not found
+            plan_stmt = select(Plan).where(Plan.is_deleted == False)
             plan_res = await self.db.execute(plan_stmt)
-            plan = plan_res.scalar_one_or_none()
+            plan = plan_res.scalars().first()
             if not plan:
-                # Dynamically create and seed Starter plan on the fly (primarily for testing compatibility)
+                # Dynamically create and seed Professional plan on the fly (primarily for testing compatibility)
                 plan = Plan(
-                    name="Starter",
-                    display_name="Starter Plan",
-                    price_inr=3999.0,
-                    monthly_price=3999.0,
-                    max_users=10,
-                    minimum_users=10,
+                    name="Professional",
+                    display_name="Professional",
+                    price_inr=1999.0,
+                    monthly_price=1999.0,
+                    max_users=1000,
+                    minimum_users=5,
                     maximum_users=1000,
                     minimum_contract_months=3,
-                    extra_user_price=3999.0,
+                    extra_user_price=1999.0,
                     allow_additional_seats=True,
                     storage_limit_gb=10,
-                    recording_retention_days=30,
-                    priority_support=False,
+                    recording_retention_days=90,
+                    priority_support=True,
                     api_access=False,
                     is_active=True,
                     plan_active=True,
-                    is_trial=False,
+                    is_trial=True,
+                    trial_days=7,
                     features={}
                 )
                 self.db.add(plan)
@@ -262,15 +263,17 @@ class AuthService:
         refresh_token = create_refresh_token(subject=user_id)
         
         expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
+
+        # ADR-001: persist only the SHA-256 hash of the refresh token; the raw
+        # token is returned to the client and never stored at rest.
         await self.session_repo.create({
             "user_id": user_id,
-            "refresh_token": refresh_token,
+            "refresh_token": hash_token(refresh_token),
             "expires_at": expires_at,
             "ip_address": ip_address,
             "user_agent": user_agent
         })
-        
+
         return Token(access_token=access_token, refresh_token=refresh_token)
 
     async def refresh_session(self, refresh_token: str, ip_address: str | None = None, user_agent: str | None = None) -> Token:

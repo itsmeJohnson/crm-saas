@@ -1,53 +1,14 @@
-# Organization Portal
-
-## Database
-
-- [x] Organization Model
-- [x] Support Ticket Model
-- [x] Migrations
-- [x] Seed Updates
-
-## Schemas
-
-- [x] Portal Schemas
-- [x] Billing Schemas
-- [x] Profile Schemas
-- [x] Support Schemas
-
-## Services
-
-- [x] Portal Service
-- [x] Billing Service
-- [x] Support Service
-
-## APIs
-
-- [x] Dashboard
-- [x] Subscription
-- [x] Plans
-- [x] Invoices
-- [x] Payments
-- [x] Usage
-- [x] Storage
-- [x] Support
-- [x] Profile
-- [x] Billing
-
-## Frontend
-
-- [x] Sidebar
-- [x] Dashboard
-- [x] Subscription
-- [x] Invoice List
-- [x] Payments
-- [x] Usage
-- [x] Storage
-- [x] Support
-- [x] Profile
-- [x] Billing
-
-## Testing
-
-- [x] Backend Tests
-- [x] Frontend Tests
-- [x] Manual Verification
+- [x] Create `TrialRequest` database model in `backend/app/models/trial_request.py`
+- [x] Register `TrialRequest` in `backend/app/models/__init__.py`
+- [x] Generate and apply Alembic migration for `trial_requests` table
+- [x] Create TrialRequest schema in `backend/app/schemas/trial_request.py`
+- [x] Implement `POST /api/v1/auth/trial-register` in `backend/app/api/v1/auth.py`
+- [x] Implement super admin API endpoints in `backend/app/api/v1/super_admin.py`
+  - [x] `GET /trial-requests`
+  - [x] `POST /trial-requests/{id}/approve` with full provisioning logic
+  - [x] `POST /trial-requests/{id}/reject`
+- [x] Modify frontend `Register.tsx` to collect Full Name, Company Name, Email, and Phone Number
+- [x] Create frontend `TrialRequestsPage.tsx` for SuperAdmin management
+- [x] Update frontend routing in `App.tsx` and sidebar navigation in `AppLayout.tsx`
+- [x] Add automated tests in `backend/app/tests/test_trial_requests.py`
+- [x] Run full test suite and confirm everything is green

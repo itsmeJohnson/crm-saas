@@ -31,6 +31,7 @@ from app.schemas.super_admin import (
 )
 from app.services.auth_service import AuthService
 from app.schemas.auth import RegisterTenantRequest
+from app.schemas.trial_request import TrialRequestResponse
 
 router = APIRouter()
 require_super_admin = RoleChecker(["SuperAdmin"])
@@ -2015,3 +2016,268 @@ async def churn_report(
         "healthy": churn_rate < 5.0,
         "benchmark": "< 5% monthly churn is healthy for B2B SaaS"
     }
+
+
+@router.get("/trial-requests", response_model=List[TrialRequestResponse])
+async def list_trial_requests(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """List all trial requests."""
+    from app.models.trial_request import TrialRequest
+    stmt = select(TrialRequest).where(TrialRequest.is_deleted == False).order_by(TrialRequest.created_at.desc())
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+
+@router.post("/trial-requests/{id}/approve", response_model=TrialRequestResponse)
+async def approve_trial_request(
+    id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Approve a pending trial request, provisioning the Organization,
+    User (Owner), 14-day trial subscription, default team, default pipeline,
+    and sending a password setup welcome email.
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.models.trial_request import TrialRequest
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.models.tenant_subscription import TenantSubscription
+    from app.models.seat_history import SeatAssignmentHistory
+    from app.models.team import Team, TeamMember
+    from app.models.plan import Plan
+    from app.core.security import generate_random_token, hash_token, get_password_hash
+    from app.services.email_service import send_email
+    from app.services.audit_service import AuditService
+    from app.repositories.organization import OrganizationRepository
+    from app.repositories.user import UserRepository
+    from app.core.config import settings
+
+    # 1. Fetch Trial Request
+    stmt = select(TrialRequest).where(TrialRequest.id == id, TrialRequest.is_deleted == False)
+    res = await db.execute(stmt)
+    trial_req = res.scalar_one_or_none()
+    if not trial_req:
+        raise HTTPException(status_code=404, detail="Trial request not found")
+    if trial_req.status != "PENDING":
+        raise HTTPException(status_code=400, detail=f"Trial request is already {trial_req.status}")
+
+    # 2. Check if a user with that email already exists
+    user_stmt = select(User).where(User.email == trial_req.email, User.is_deleted == False)
+    user_res = await db.execute(user_stmt)
+    if user_res.scalars().first():
+        raise HTTPException(status_code=400, detail="A user with this email is already registered")
+
+    # 3. Generate Unique Slug
+    base_slug = trial_req.company_name.lower().strip()
+    import re
+    base_slug = re.sub(r"[^a-z0-9\s-]", "", base_slug)
+    base_slug = re.sub(r"\s+", "-", base_slug)
+    slug = base_slug
+    
+    # Ensure uniqueness
+    org_repo = OrganizationRepository(db)
+    collision_count = 0
+    while True:
+        existing_org = await org_repo.get_by_slug(slug)
+        if not existing_org:
+            break
+        collision_count += 1
+        slug = f"{base_slug}-{collision_count}"
+
+    # 4. Create Organization
+    org = await org_repo.create({
+        "name": trial_req.company_name,
+        "slug": slug
+    })
+
+    # 5. Fetch default Trial Plan (Professional)
+    plan_stmt = select(Plan).where(
+        func.lower(Plan.name) == "professional",
+        Plan.is_deleted == False
+    )
+    plan_res = await db.execute(plan_stmt)
+    plan = plan_res.scalars().first()
+    if not plan:
+        plan_stmt = select(Plan).where(Plan.is_deleted == False)
+        plan_res = await db.execute(plan_stmt)
+        plan = plan_res.scalars().first()
+        if not plan:
+            plan = Plan(
+                name="Professional",
+                display_name="Professional",
+                price_inr=1999.0,
+                monthly_price=1999.0,
+                max_users=1000,
+                minimum_users=5,
+                maximum_users=1000,
+                minimum_contract_months=3,
+                extra_user_price=1999.0,
+                allow_additional_seats=True,
+                storage_limit_gb=10,
+                recording_retention_days=90,
+                priority_support=True,
+                api_access=False,
+                is_active=True,
+                plan_active=True,
+                is_trial=True,
+                trial_days=7,
+                features={}
+            )
+            db.add(plan)
+            await db.flush()
+
+    # 6. Activate 14-day Trial Subscription
+    now_utc = datetime.now(timezone.utc)
+    trial_end = now_utc + timedelta(days=14)
+    
+    sub = TenantSubscription(
+        organization_id=org.id,
+        plan_id=plan.id,
+        status="trial",
+        start_date=now_utc,
+        end_date=trial_end,
+        trial_end_date=trial_end,
+        auto_renew=True,
+        billing_cycle="monthly",
+        users_purchased=10,
+        users_active=1
+    )
+    db.add(sub)
+    await db.flush()
+
+    org.subscription_plan = plan.name
+    org.max_users = 10
+    org.subscription_expires_at = trial_end.replace(tzinfo=None)
+    org.subscription_status = "trial"
+    db.add(org)
+
+    # 7. Create Organization Owner User
+    parts = trial_req.full_name.strip().split(" ", 1)
+    first_name = parts[0]
+    last_name = parts[1] if len(parts) > 1 else ""
+
+    temp_pwd = secrets.token_urlsafe(32)
+    hashed_password = get_password_hash(temp_pwd)
+
+    user_repo = UserRepository(db)
+    user = await user_repo.create({
+        "organization_id": org.id,
+        "email": trial_req.email,
+        "hashed_password": hashed_password,
+        "first_name": first_name,
+        "last_name": last_name,
+        "role": "OrgAdmin",
+        "is_verified": True,
+        "is_active": True,
+        "phone": trial_req.phone
+    })
+
+    user.seat_number = "Seat-001"
+    db.add(user)
+
+    history = SeatAssignmentHistory(
+        organization_id=org.id,
+        seat_number="Seat-001",
+        user_id=user.id,
+        action="Assigned",
+        performed_by_id=actor.id,
+        remarks="Initial trial admin seat assignment"
+    )
+    db.add(history)
+
+    # 8. Create Default Team
+    team = Team(
+        organization_id=org.id,
+        name="Sales Team",
+        code="SLS",
+        description="Default sales working group",
+        team_leader_id=user.id,
+        status="active",
+        created_by=user.id
+    )
+    db.add(team)
+    await db.flush()
+
+    team_member = TeamMember(
+        organization_id=org.id,
+        team_id=team.id,
+        user_id=user.id,
+        role_in_team="leader"
+    )
+    db.add(team_member)
+
+    # 9. Generate Password Setup Token
+    token = generate_random_token()
+    hashed_token = hash_token(token)
+    user.reset_token = hashed_token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+    db.add(user)
+
+    trial_req.status = "APPROVED"
+    db.add(trial_req)
+
+    await db.commit()
+
+    # 10. Send Password Setup Email
+    frontend_url = (
+        settings.FRONTEND_URL
+        or (settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else None)
+        or "http://localhost:5173"
+    ).rstrip("/")
+    reset_url = f"{frontend_url}/login?token={token}"
+
+    send_email(
+        to_email=user.email,
+        subject="Welcome to TeleCRM - Setup Your Password",
+        template_name="trial_approved.html",
+        context={
+            "reset_url": reset_url,
+            "full_name": trial_req.full_name,
+            "company_name": trial_req.company_name
+        }
+    )
+
+    await AuditService(db).log_event(
+        actor_id=actor.id,
+        organization_id=org.id,
+        event_type="TRIAL_REQUEST_APPROVED",
+        description=f"Trial request for '{trial_req.company_name}' was approved, tenant created ({slug})"
+    )
+
+    return trial_req
+
+
+@router.post("/trial-requests/{id}/reject", response_model=TrialRequestResponse)
+async def reject_trial_request(
+    id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Reject a pending trial request."""
+    from app.models.trial_request import TrialRequest
+    from app.services.audit_service import AuditService
+
+    stmt = select(TrialRequest).where(TrialRequest.id == id, TrialRequest.is_deleted == False)
+    res = await db.execute(stmt)
+    trial_req = res.scalar_one_or_none()
+    if not trial_req:
+        raise HTTPException(status_code=404, detail="Trial request not found")
+    if trial_req.status != "PENDING":
+        raise HTTPException(status_code=400, detail=f"Trial request is already {trial_req.status}")
+
+    trial_req.status = "REJECTED"
+    db.add(trial_req)
+    await db.commit()
+
+    await AuditService(db).log_event(
+        actor_id=actor.id,
+        organization_id=None,
+        event_type="TRIAL_REQUEST_REJECTED",
+        description=f"Trial request for '{trial_req.company_name}' ({trial_req.email}) was rejected"
+    )
+
+    return trial_req
