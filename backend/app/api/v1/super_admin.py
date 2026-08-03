@@ -2232,7 +2232,7 @@ async def approve_trial_request(
 
     send_email(
         to_email=user.email,
-        subject="Welcome to TeleCRM - Setup Your Password",
+        subject="Welcome to Johnson Softwares CRM - Setup Your Password",
         template_name="trial_approved.html",
         context={
             "reset_url": reset_url,

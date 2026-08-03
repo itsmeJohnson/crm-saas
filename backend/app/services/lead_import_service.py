@@ -531,6 +531,27 @@ class LeadImportService:
 
         if not stage_id:
             # Seed default stages if they don't exist
+            from app.models.pipeline import Pipeline
+            
+            # Fetch or create default pipeline
+            p_query = select(Pipeline).filter(
+                Pipeline.organization_id == actor.organization_id,
+                Pipeline.is_default == True,
+                Pipeline.is_deleted == False
+            )
+            p_res = await self.db.execute(p_query)
+            pipeline = p_res.scalar()
+            if not pipeline:
+                pipeline = Pipeline(
+                    organization_id=actor.organization_id,
+                    name="Default Pipeline",
+                    description="Primary Sales Pipeline",
+                    is_default=True,
+                    is_active=True
+                )
+                self.db.add(pipeline)
+                await self.db.flush()
+
             stages = [
                 ("Fresh Leads", 1, True),
                 ("Contacted", 2, False),
@@ -541,6 +562,7 @@ class LeadImportService:
             for name, pos, is_default in stages:
                 stage = PipelineStage(
                     organization_id=actor.organization_id,
+                    pipeline_id=pipeline.id,
                     name=name,
                     order_position=pos,
                     is_system_default=is_default

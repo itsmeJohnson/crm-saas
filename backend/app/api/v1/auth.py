@@ -311,7 +311,7 @@ async def forgot_password(
     hashed_token = hash_token(token)
 
     user.reset_token = hashed_token
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
 
     await db.commit()
 
@@ -330,7 +330,7 @@ async def forgot_password(
     from app.services.email_service import send_email
     send_email(
         to_email=user.email,
-        subject="Reset your TeleCRM Password",
+        subject="Reset your Johnson Softwares CRM Password",
         template_name="password_reset.html",
         context={"reset_url": reset_url}
     )

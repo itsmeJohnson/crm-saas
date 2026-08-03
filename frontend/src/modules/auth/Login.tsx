@@ -221,7 +221,7 @@ export const Login: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 {...loginRegister('password')}
-                className={`w-full pl-4 pr-10 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
+                className={`w-full pl-4 !pr-10 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
                 placeholder="••••••••"
               />
               <button
@@ -385,7 +385,7 @@ export const Login: React.FC = () => {
               <input
                 type="email"
                 {...forgotRegister('email')}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
+                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
                 placeholder="user@example.com"
               />
             </div>
