@@ -5,7 +5,7 @@ import { LeadTable } from '../components/crm/LeadTable';
 import { LeadModal } from '../components/crm/LeadModal';
 import { Filters } from '../components/crm/Filters';
 import { Pagination } from '../components/crm/Pagination';
-import { ActivityTimeline } from '../components/crm/ActivityTimeline';
+import { LeadTimeline } from '../components/crm/LeadTimeline';
 import { NotesPanel } from '../components/crm/NotesPanel';
 import { LeadAttachments } from '../components/crm/LeadAttachments';
 import { LeadReminders } from '../components/crm/LeadReminders';
@@ -577,9 +577,9 @@ export const LeadsPage: React.FC = () => {
                   <NotesPanel leadId={detailLead.id} />
                 </div>
 
-                {/* Activities timeline */}
+                {/* Unified activity timeline (notes + activities + audit + tasks + reminders) */}
                 <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
-                  <ActivityTimeline leadId={detailLead.id} />
+                  <LeadTimeline leadId={detailLead.id} />
                 </div>
               </div>
 
