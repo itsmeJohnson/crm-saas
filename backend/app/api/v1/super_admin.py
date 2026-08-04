@@ -146,6 +146,45 @@ async def update_tenant_subscription(
     if not org:
         raise HTTPException(status_code=404, detail="Tenant organization not found")
     
+    # Look up the plan by name (case-insensitive) to get plan ID
+    plan_stmt = select(Plan).where(Plan.name.ilike(payload.subscription_plan), Plan.is_deleted == False)
+    plan_res = await db.execute(plan_stmt)
+    plan = plan_res.scalar_one_or_none()
+    
+    # subscription_expires_at is a naive TIMESTAMP column; normalize any
+    # tz-aware input to UTC then drop tzinfo (asyncpg rejects writing an
+    # offset-aware datetime to a naive column).
+    expires_at = payload.subscription_expires_at
+    if expires_at and expires_at.tzinfo is not None:
+        expires_at = expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+    org.subscription_expires_at = expires_at
+
+    if plan:
+        org.plan_id = plan.id
+        # Update or create the TenantSubscription row to keep it in sync
+        if org.subscription:
+            org.subscription.plan_id = plan.id
+            org.subscription.status = payload.subscription_status
+            org.subscription.users_purchased = payload.max_users
+            if expires_at:
+                org.subscription.end_date = expires_at
+        else:
+            from datetime import timedelta
+            now = datetime.now(timezone.utc)
+            subscription = TenantSubscription(
+                organization_id=org.id,
+                plan_id=plan.id,
+                status=payload.subscription_status,
+                start_date=now.replace(tzinfo=None),
+                end_date=expires_at or (now + timedelta(days=365)).replace(tzinfo=None),
+                auto_renew=True,
+                billing_cycle="monthly",
+                users_purchased=payload.max_users,
+                users_active=0
+            )
+            db.add(subscription)
+            org.subscription = subscription
+
     org.subscription_plan = payload.subscription_plan
     org.subscription_status = payload.subscription_status
     org.max_users = payload.max_users
@@ -157,14 +196,6 @@ async def update_tenant_subscription(
         org.currency = payload.currency.strip().upper()
     if payload.timezone is not None and payload.timezone.strip():
         org.timezone = payload.timezone.strip()
-
-    # subscription_expires_at is a naive TIMESTAMP column; normalize any
-    # tz-aware input to UTC then drop tzinfo (asyncpg rejects writing an
-    # offset-aware datetime to a naive column).
-    expires_at = payload.subscription_expires_at
-    if expires_at and expires_at.tzinfo is not None:
-        expires_at = expires_at.astimezone(timezone.utc).replace(tzinfo=None)
-    org.subscription_expires_at = expires_at
     
     await db.commit()
 
