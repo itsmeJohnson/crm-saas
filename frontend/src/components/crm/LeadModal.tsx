@@ -8,6 +8,7 @@ import { useUserStore } from '../../store/userStore';
 import { useMetadataStore } from '../../store/metadataStore';
 import { DynamicCustomFields } from './DynamicCustomFields';
 import { X, Loader2 } from 'lucide-react';
+import { currencySymbol } from '../../utils/currency';
 
 const leadSchema = z.object({
   title: z.string().min(1, 'Lead Title is required').max(255),
@@ -286,7 +287,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Lead Value ($)</label>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Lead Value ({currencySymbol()})</label>
               <input
                 type="number"
                 step="any"

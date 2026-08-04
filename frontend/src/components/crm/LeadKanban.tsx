@@ -125,8 +125,8 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
                         </p>
                         <div className="flex items-center gap-2 mt-1.5">
                           {fmtValue(lead.value) && (
-                            <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-400">
-                              <DollarSign className="w-3 h-3" />{fmtValue(lead.value)}
+                            <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-400 font-medium">
+                              {fmtValue(lead.value)}
                             </span>
                           )}
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
