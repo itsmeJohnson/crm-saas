@@ -186,7 +186,7 @@ async def test_trial_requests_approval_flow(client: AsyncClient, setup_users: di
 
     # 7. Assert Setup Email captured
     assert capture_email["to"] == "bob@boblogistics.com"
-    assert capture_email["subject"] == "Welcome to TeleCRM - Setup Your Password"
+    assert capture_email["subject"] == "Welcome to Johnson Softwares CRM - Setup Your Password"
     assert capture_email["template_name"] == "trial_approved.html"
     assert "token" in capture_email["context"]["reset_url"]
 

@@ -340,9 +340,8 @@ async def forgot_password(
     # what the frontend's "Demo Reset Code (SMTP Disabled)" box was already built to
     # display. Guarded to non-prod + no-SMTP so a real deployment NEVER returns the
     # token over the API (C2 guardrail: doing so would be trivial account takeover).
-    import os
     response = dict(GENERIC_RESPONSE)
-    if not settings.is_production and not settings.SMTP_HOST and os.environ.get("TESTING") != "true":
+    if settings.ENVIRONMENT == "development" and not settings.SMTP_HOST:
         response["token"] = token
     return response
 

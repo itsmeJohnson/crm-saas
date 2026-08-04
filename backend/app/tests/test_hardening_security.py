@@ -40,7 +40,7 @@ async def test_password_reset_hardening_flow(client: AsyncClient, db: AsyncSessi
         args, kwargs = mock_send_email.call_args
         
         assert kwargs["to_email"] == "admin@hardening.com"
-        assert kwargs["subject"] == "Reset your TeleCRM Password"
+        assert kwargs["subject"] == "Reset your Johnson Softwares CRM Password"
         assert kwargs["template_name"] == "password_reset.html"
         
         reset_url = kwargs["context"]["reset_url"]

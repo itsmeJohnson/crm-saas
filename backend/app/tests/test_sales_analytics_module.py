@@ -39,13 +39,17 @@ async def setup(db: AsyncSession):
     emp = await ur.create_user(org.id, {"email": "emp@sa.com", "hashed_password": get_password_hash("password123"),
         "first_name": "Em", "last_name": "P", "role": "Employee", "is_active": True, "reporting_to_id": admin.id})
     await db.commit()
+    from app.models.pipeline import Pipeline
+    pipeline_stmt = select(Pipeline).filter(Pipeline.organization_id == org.id, Pipeline.is_default == True)
+    pipeline = (await db.execute(pipeline_stmt)).scalars().first()
+
     existing = list((await db.execute(select(PipelineStage).filter(
         PipelineStage.organization_id == org.id, PipelineStage.is_deleted == False))).scalars().all())
     stages = {s.name: s for s in existing}
     next_pos = (max([s.order_position for s in existing], default=0)) + 1
     for nm in ["New", "Contacted", "Converted"]:
         if nm not in stages:
-            st = PipelineStage(organization_id=org.id, name=nm, order_position=next_pos, is_system_default=False)
+            st = PipelineStage(organization_id=org.id, pipeline_id=pipeline.id, name=nm, order_position=next_pos, is_system_default=False)
             db.add(st); await db.flush()
             stages[nm] = st
             next_pos += 1

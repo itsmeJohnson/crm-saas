@@ -47,17 +47,19 @@ async def _make_user(db, org_id, email, role="Employee", is_active=True,
 async def _make_org(db, slug):
     org = await OrganizationRepository(db).create({"name": slug, "slug": slug})
     await db.flush()
-    stage_id = (await db.execute(select(PipelineStage.id).filter(
+    stage_row = (await db.execute(select(PipelineStage).filter(
         PipelineStage.organization_id == org.id,
         PipelineStage.is_system_default == True,
-    ))).scalar()
+    ))).scalars().first()
+    stage_id = stage_row.id
+    pipeline_id = stage_row.pipeline_id
     admin = await _make_user(db, org.id, f"admin@{slug}.com", role="OrgAdmin")
 
     branch = Branch(organization_id=org.id, name="Branch", created_by=admin.id)
     territory = Territory(organization_id=org.id, name="Territory", created_by=admin.id)
     company = Company(organization_id=org.id, name="Company", created_by=admin.id)
     # Soft-deleted siblings (same org, but is_deleted=True → must be rejected)
-    del_stage = PipelineStage(organization_id=org.id, name="ZDeletedStage",
+    del_stage = PipelineStage(organization_id=org.id, pipeline_id=pipeline_id, name="ZDeletedStage",
                               order_position=99, is_system_default=False, is_deleted=True)
     del_branch = Branch(organization_id=org.id, name="ZDelBranch", created_by=admin.id, is_deleted=True)
     del_territory = Territory(organization_id=org.id, name="ZDelTerritory", created_by=admin.id, is_deleted=True)
