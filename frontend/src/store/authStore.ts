@@ -20,6 +20,8 @@ export interface Organization {
   subscription_status?: string | null;
   subscription_expires_at?: string | null;
   max_users?: number | null;
+  currency?: string | null;
+  timezone?: string | null;
 }
 
 interface AuthState {

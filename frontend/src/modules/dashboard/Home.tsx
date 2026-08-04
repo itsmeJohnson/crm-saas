@@ -143,12 +143,12 @@ export const Home: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${(isLoadingSummary || isLoadingActivities) ? 'animate-spin' : ''}`} />
           </button>
 
-          <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl">
+          <div className="flex items-center gap-3 px-5 py-4 bg-slate-900/60 border border-slate-800 rounded-xl">
             <Building className="w-10 h-10 text-brand-400" />
             <div>
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Active Tenant</p>
               <p className="text-md font-bold text-slate-100">{organization?.name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">/{organization?.slug}</p>
+              <p className="text-xs text-slate-400">/{organization?.slug}</p>
             </div>
           </div>
         </div>

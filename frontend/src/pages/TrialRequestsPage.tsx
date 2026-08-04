@@ -84,6 +84,18 @@ export const TrialRequestsPage: React.FC = () => {
     }
   };
 
+  const handleResendActivation = async (id: string, email: string) => {
+    setActioningId(id);
+    try {
+      await superAdminApi.resendTrialActivationEmail(id);
+      showToast(`Activation email successfully resent to ${email}`, 'success');
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Failed to resend activation email.', 'error');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -135,7 +147,7 @@ export const TrialRequestsPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-brand-400" />
-            <h1 className="text-2xl font-bold text-white tracking-tight">Trial Registration Requests</h1>
+            <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Trial Registration Requests</h1>
           </div>
           <p className="text-sm text-slate-400 mt-1">
             Review and approve enterprise CRM trial workspaces. Approving provisions their tenant environment automatically.
@@ -161,7 +173,7 @@ export const TrialRequestsPage: React.FC = () => {
             placeholder="Search by name, company, email..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500/50"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500/50"
           />
         </div>
 
@@ -212,7 +224,7 @@ export const TrialRequestsPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
                 {/* Company & Status */}
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-white font-semibold">
+                  <div className="flex items-center gap-2 text-slate-100 font-semibold">
                     <Building className="w-4 h-4 text-brand-400 flex-shrink-0" />
                     <span className="truncate">{req.company_name}</span>
                   </div>
@@ -246,34 +258,50 @@ export const TrialRequestsPage: React.FC = () => {
               </div>
 
               {/* Action buttons */}
-              {req.status === 'PENDING' && (
-                <div className="flex items-center gap-2 lg:border-l lg:border-slate-900 lg:pl-6">
+              <div className="flex items-center gap-2 lg:border-l lg:border-slate-900 lg:pl-6">
+                {req.status === 'PENDING' && (
+                  <>
+                    <button
+                      disabled={actioningId !== null}
+                      onClick={() => handleReject(req.id, req.company_name)}
+                      className="flex-1 lg:flex-initial px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {actioningId === req.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <X className="w-3.5 h-3.5" />
+                      )}
+                      Reject
+                    </button>
+                    <button
+                      disabled={actioningId !== null}
+                      onClick={() => handleApprove(req.id, req.company_name)}
+                      className="flex-1 lg:flex-initial px-3.5 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-green-500/10 flex items-center justify-center gap-1.5"
+                    >
+                      {actioningId === req.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      Approve & Provision
+                    </button>
+                  </>
+                )}
+                {req.status === 'APPROVED' && (
                   <button
                     disabled={actioningId !== null}
-                    onClick={() => handleReject(req.id, req.company_name)}
-                    className="flex-1 lg:flex-initial px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                    onClick={() => handleResendActivation(req.id, req.email)}
+                    className="flex-1 lg:flex-initial px-3.5 py-2 bg-brand-500/10 hover:bg-brand-500/20 disabled:opacity-50 text-brand-400 hover:text-brand-300 border border-brand-500/20 hover:border-brand-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
                   >
                     {actioningId === req.id ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <X className="w-3.5 h-3.5" />
+                      <Mail className="w-3.5 h-3.5" />
                     )}
-                    Reject
+                    Resend Email
                   </button>
-                  <button
-                    disabled={actioningId !== null}
-                    onClick={() => handleApprove(req.id, req.company_name)}
-                    className="flex-1 lg:flex-initial px-3.5 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-green-500/10 flex items-center justify-center gap-1.5"
-                  >
-                    {actioningId === req.id ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Check className="w-3.5 h-3.5" />
-                    )}
-                    Approve & Provision
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>

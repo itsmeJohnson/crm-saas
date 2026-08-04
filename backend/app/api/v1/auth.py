@@ -311,7 +311,7 @@ async def forgot_password(
     hashed_token = hash_token(token)
 
     user.reset_token = hashed_token
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
 
     await db.commit()
 
@@ -330,9 +330,9 @@ async def forgot_password(
     from app.services.email_service import send_email
     send_email(
         to_email=user.email,
-        subject="Reset your TeleCRM Password",
+        subject="Reset your Johnson Softwares CRM Password",
         template_name="password_reset.html",
-        context={"reset_url": reset_url}
+        context={"reset_url": reset_url, "token": token}
     )
 
     # C1: when SMTP is disabled (mock mode) and we are NOT in production, surface the
@@ -340,9 +340,8 @@ async def forgot_password(
     # what the frontend's "Demo Reset Code (SMTP Disabled)" box was already built to
     # display. Guarded to non-prod + no-SMTP so a real deployment NEVER returns the
     # token over the API (C2 guardrail: doing so would be trivial account takeover).
-    import os
     response = dict(GENERIC_RESPONSE)
-    if not settings.is_production and not settings.SMTP_HOST and os.environ.get("TESTING") != "true":
+    if settings.ENVIRONMENT == "development" and not settings.SMTP_HOST:
         response["token"] = token
     return response
 

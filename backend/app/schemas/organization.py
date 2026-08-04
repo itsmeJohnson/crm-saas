@@ -22,5 +22,7 @@ class OrganizationResponse(OrganizationBase):
     subscription_status: str | None = None
     subscription_expires_at: datetime | None = None
     max_users: int | None = None
+    currency: str = "INR"
+    timezone: str = "Asia/Kolkata"
     created_at: datetime
     updated_at: datetime

@@ -35,9 +35,15 @@ async def test_pipeline_stages_seeding_and_constraints(db: AsyncSession):
     assert stages[4].name == "Converted"
 
     # 2. Test unique constraints
-    # Duplicate name within same org
+    from app.models.pipeline import Pipeline
+    pipeline_stmt = select(Pipeline).filter(Pipeline.organization_id == org_id, Pipeline.is_default == True)
+    pipeline = (await db.execute(pipeline_stmt)).scalars().first()
+    pipeline_id = pipeline.id
+
+    # Duplicate name within same pipeline
     dup_name_stage = PipelineStage(
         organization_id=org_id,
+        pipeline_id=pipeline_id,
         name="Fresh Leads",
         order_position=10,
         is_system_default=False
@@ -47,9 +53,10 @@ async def test_pipeline_stages_seeding_and_constraints(db: AsyncSession):
         await db.commit()
     await db.rollback()
 
-    # Duplicate order position within same org
+    # Duplicate order position within same pipeline
     dup_pos_stage = PipelineStage(
         organization_id=org_id,
+        pipeline_id=pipeline_id,
         name="New Stage",
         order_position=1,
         is_system_default=False

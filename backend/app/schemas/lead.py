@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, SerializationInfo
@@ -20,6 +21,7 @@ class LeadBase(BaseModel):
     pin_code: str | None = Field(None, max_length=20)
     branch_id: uuid.UUID | None = None
     territory_id: uuid.UUID | None = None
+    custom_fields: dict[str, Any] | None = None
 
 class LeadCreate(LeadBase):
     pass
@@ -42,6 +44,7 @@ class LeadUpdate(BaseModel):
     pin_code: str | None = Field(None, max_length=20)
     branch_id: uuid.UUID | None = None
     territory_id: uuid.UUID | None = None
+    custom_fields: dict[str, Any] | None = None
 
 class LeadTimelineEvent(BaseModel):
     type: str  # "note" | "activity" | "audit"
@@ -150,6 +153,30 @@ class LeadResponse(LeadBase):
                     return "*" * len(phone_clean)
                 return phone_clean[:2] + "*" * (len(phone_clean) - 4) + phone_clean[-2:]
         return phone
+
+    @field_serializer("custom_fields")
+    def serialize_custom_fields(self, custom_fields: dict[str, Any] | None, info: SerializationInfo) -> dict[str, Any] | None:
+        if not custom_fields:
+            return custom_fields
+        
+        from app.core.context import mask_phone_ctx
+        if mask_phone_ctx.get():
+            masked = dict(custom_fields)
+            for key, val in masked.items():
+                if isinstance(val, str) and ("phone" in key.lower() or "mobile" in key.lower()):
+                    phone_clean = val.strip()
+                    if phone_clean.startswith("+"):
+                        if len(phone_clean) <= 5:
+                            masked[key] = "+" + "*" * (len(phone_clean) - 1)
+                        else:
+                            masked[key] = phone_clean[:3] + "*" * (len(phone_clean) - 5) + phone_clean[-2:]
+                    else:
+                        if len(phone_clean) <= 4:
+                            masked[key] = "*" * len(phone_clean)
+                        else:
+                            masked[key] = phone_clean[:2] + "*" * (len(phone_clean) - 4) + phone_clean[-2:]
+            return masked
+        return custom_fields
 
 
 class FollowUpCreate(BaseModel):

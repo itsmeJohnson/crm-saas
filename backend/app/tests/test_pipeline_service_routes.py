@@ -106,7 +106,7 @@ async def test_create_stage_service_validation(db: AsyncSession, setup_pipeline_
         await pipeline_service.create_stage(
             db, org_id, {"name": "Qualified", "order_position": None}
         )
-    assert "already exists in this organization" in str(exc.value)
+    assert "already exists in this pipeline" in str(exc.value)
 
     # 3. Reject duplicate explicit order position
     with pytest.raises(PipelineStageValidationError) as exc:

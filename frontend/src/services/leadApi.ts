@@ -32,6 +32,7 @@ export interface LeadResponse {
   assigned_user_id: string | null;
   stage_id: string;
   stage?: PipelineStage;
+  custom_fields: Record<string, any> | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -153,6 +154,7 @@ export interface LeadListFilters {
   created_from?: string;
   created_to?: string;
   include_archived?: boolean;
+  custom_fields?: string;
 }
 
 export const leadApi = {
@@ -175,6 +177,7 @@ export const leadApi = {
     priority?: string;
     assigned_user_id?: string | null;
     stage_id?: string | null;
+    custom_fields?: Record<string, any> | null;
   }) => {
     const response = await api.post<LeadResponse>('/leads/', payload);
     return response.data;
@@ -199,6 +202,7 @@ export const leadApi = {
     priority?: string;
     assigned_user_id?: string | null;
     stage_id?: string | null;
+    custom_fields?: Record<string, any> | null;
   }) => {
     const response = await api.patch<LeadResponse>(`/leads/${leadId}`, payload);
     return response.data;

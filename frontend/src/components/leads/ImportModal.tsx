@@ -11,6 +11,7 @@ import { FailedRowsDownload } from './FailedRowsDownload';
 import { ImportPreviewResponse, LeadImportResponse } from '../../services/leadImportApi';
 import { userApi, UserResponse } from '../../services/userApi';
 import { useAnalyticsStore } from '../../store/analyticsStore';
+import { useMetadataStore } from '../../store/metadataStore';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     downloadFailedRows,
     clearError
   } = useLeadImportStore();
+  const { customFields, fetchBootstrap } = useMetadataStore();
 
   const [step, setStep] = useState<ImportStep>('upload');
   const [sourceType, setSourceType] = useState<'file' | 'google_sheets'>('file');
@@ -67,6 +69,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       setAssignedUserId(null);
       setAssignedUserIds([]);
       clearError();
+      fetchBootstrap();
 
       const fetchEmployees = async () => {
         setIsLoadingEmployees(true);
@@ -150,10 +153,13 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
 
       setPreviewData(res);
       
-      // Initialize Column Mapping from suggested mapping
+      // Initialize Column Mapping from suggested mapping (standard + tenant custom fields)
       const mapping: Record<string, string> = {};
-      const fields = ['first_name', 'last_name', 'email', 'phone', 'company_name', 'title', 'value', 'source'];
-      
+      const customKeys = customFields
+        .filter((f) => f.entity_type === 'lead' && f.is_active && f.importable)
+        .map((f) => f.key);
+      const fields = ['first_name', 'last_name', 'email', 'phone', 'company_name', 'title', 'value', 'source', ...customKeys];
+
       fields.forEach(field => {
         const suggestion = res.suggested_mapping[field];
         if (suggestion && suggestion.column) {
@@ -162,7 +168,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
           mapping[field] = '';
         }
       });
-      
+
       setColumnMapping(mapping);
       setStep('preview_mapping');
     } catch (err: any) {

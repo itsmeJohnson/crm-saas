@@ -19,6 +19,10 @@ const forgotSchema = z.object({
 const resetSchema = z.object({
   token: z.string().min(4, 'Code/Token is required'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
+  confirmPassword: z.string().min(8, 'Confirm Password must be at least 8 characters long'),
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword']
 });
 
 const mfaSchema = z.object({
@@ -88,7 +92,7 @@ export const Login: React.FC = () => {
     const token = searchParams.get('token') || searchParams.get('reset_token');
     if (token) {
       setStep('reset');
-      resetFormReset({ token, password: '' });
+      resetFormReset({ token, password: '', confirmPassword: '' });
     }
   }, [searchParams, resetFormReset]);
 
@@ -158,6 +162,9 @@ export const Login: React.FC = () => {
       setTimeout(() => {
         setStep('reset');
         setSuccess(null);
+        if (res.data.token) {
+          resetFormReset({ token: res.data.token, password: '', confirmPassword: '' });
+        }
       }, 4000);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to request password reset code.');
@@ -221,7 +228,7 @@ export const Login: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 {...loginRegister('password')}
-                className={`w-full pl-4 pr-10 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
+                className={`w-full pl-4 !pr-10 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
                 placeholder="••••••••"
               />
               <button
@@ -385,7 +392,7 @@ export const Login: React.FC = () => {
               <input
                 type="email"
                 {...forgotRegister('email')}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
+                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
                 placeholder="user@example.com"
               />
             </div>
@@ -429,7 +436,7 @@ export const Login: React.FC = () => {
 
           <div>
             <h3 className="text-lg font-bold text-slate-100 mb-1">Set New Password</h3>
-            <p className="text-xs text-slate-400 mb-4">Enter the code and specify your new password.</p>
+            <p className="text-xs text-slate-400 mb-4">Specify and confirm your new password below.</p>
           </div>
 
           {demoToken && (
@@ -444,16 +451,8 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Reset Code / Token</label>
-            <input
-              type="text"
-              {...resetRegister('token')}
-              className={`w-full px-4 py-3 rounded-xl glass-input font-mono tracking-widest text-center uppercase ${resetErrors.token ? 'border-red-500/50' : ''}`}
-              placeholder="E5A3F1"
-            />
-            {resetErrors.token && <p className="mt-1.5 text-xs text-red-400">{resetErrors.token.message}</p>}
-          </div>
+          <input type="hidden" {...resetRegister('token')} />
+          {resetErrors.token && <p className="mt-1.5 text-xs text-red-400 text-center">{resetErrors.token.message}</p>}
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">New Password</label>
@@ -464,6 +463,17 @@ export const Login: React.FC = () => {
               placeholder="•••••••• (Min 8 chars)"
             />
             {resetErrors.password && <p className="mt-1.5 text-xs text-red-400">{resetErrors.password.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Confirm New Password</label>
+            <input
+              type="password"
+              {...resetRegister('confirmPassword')}
+              className={`w-full px-4 py-3 rounded-xl glass-input ${resetErrors.confirmPassword ? 'border-red-500/50' : ''}`}
+              placeholder="•••••••• (Min 8 chars)"
+            />
+            {resetErrors.confirmPassword && <p className="mt-1.5 text-xs text-red-400">{resetErrors.confirmPassword.message}</p>}
           </div>
 
           <button

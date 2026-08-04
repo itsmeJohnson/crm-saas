@@ -23,7 +23,7 @@ DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://postgres:postgres@db:5432/crm",
 )
 
-SAFE_EMAIL = "admin@johnsonsoftwares.com"
+SAFE_EMAIL = "contact@support.johnsonsoftwares.com"
 PASSWORD   = "Demo@12345"
 
 DEMO_TENANTS = [
@@ -217,10 +217,22 @@ async def main():
                 if u["role"] == "Employee":
                     created_employee_ids.append(new_user.id)
 
-            # Default pipeline stages (PipelineStage links directly to org)
+            # Default pipeline (Pipeline links directly to org)
+            from app.models.pipeline import Pipeline
+            pipeline = Pipeline(
+                organization_id=org.id,
+                name="Default Pipeline",
+                description="Primary Sales Pipeline",
+                is_default=True,
+                is_active=True
+            )
+            db.add(pipeline)
+            await db.flush()
+
+            # Default pipeline stages (PipelineStage links to org and pipeline)
             stages = []
             for i, stage_name in enumerate(["New Lead", "Contacted", "Interested", "Negotiation", "Won", "Lost"], 1):
-                s = PipelineStage(organization_id=org.id, name=stage_name, order_position=i)
+                s = PipelineStage(organization_id=org.id, pipeline_id=pipeline.id, name=stage_name, order_position=i)
                 db.add(s)
                 stages.append(s)
             await db.flush()

@@ -17,7 +17,19 @@ class OrganizationRepository(BaseRepository[Organization]):
 
     async def create(self, obj_in: any) -> Organization:
         org = await super().create(obj_in)
-        from app.models.pipeline import PipelineStage
+        from app.models.pipeline import Pipeline, PipelineStage
+        
+        # Create default pipeline
+        pipeline = Pipeline(
+            organization_id=org.id,
+            name="Default Pipeline",
+            description="Primary Sales Pipeline",
+            is_default=True,
+            is_active=True
+        )
+        self.db.add(pipeline)
+        await self.db.flush()
+
         stages = [
             ("Fresh Leads", 1, True),
             ("Contacted", 2, False),
@@ -28,6 +40,7 @@ class OrganizationRepository(BaseRepository[Organization]):
         for name, pos, is_default in stages:
             stage = PipelineStage(
                 organization_id=org.id,
+                pipeline_id=pipeline.id,
                 name=name,
                 order_position=pos,
                 is_system_default=is_default

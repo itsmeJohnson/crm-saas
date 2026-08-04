@@ -56,56 +56,75 @@ class LeadService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
-        # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
-        # supplied by the caller before they are persisted.
-        await self._validate_org_references(actor, lead_data)
-
-        # Auto-link to a company when the free-text name matches an existing account
-        if lead_data.get("company_name") and not lead_data.get("company_id"):
-            from sqlalchemy import select, func
-            from app.models.company import Company
-            comp_res = await self.db.execute(
-                select(Company.id).filter(
-                    Company.organization_id == actor.organization_id,
-                    func.lower(Company.name) == lead_data["company_name"].strip().lower(),
-                    Company.is_deleted == False,
-                ).limit(1)
+        # Validate custom fields
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import MetadataValidationEngine, MetadataValidationError
+        
+        cf_service = CustomFieldService(self.db)
+        definitions = await cf_service.list_definitions(actor, "lead")
+        custom_fields_payload = lead_data.get("custom_fields") or {}
+        try:
+            sanitized_cf = await MetadataValidationEngine.validate_and_sanitize(
+                self.db, Lead, actor.organization_id, definitions, custom_fields_payload, exclude_id=None
             )
-            matched = comp_res.scalar()
-            if matched:
-                lead_data["company_id"] = matched
+            lead_data["custom_fields"] = sanitized_cf
+        except MetadataValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
 
-        # Auto-resolve branch & territory from the lead's PIN/city if a mapping
-        # exists and the caller didn't set them (backward compatible: only fills
-        # NULLs, best-effort — never blocks lead creation).
-        if not lead_data.get("territory_id") or not lead_data.get("branch_id"):
-            try:
-                from app.services.branch_territory_service import BranchTerritoryService
-                await BranchTerritoryService(self.db).apply_resolution_to_lead_data(
-                    actor.organization_id, lead_data)
-            except Exception:
-                pass
+        async with self.db.begin_nested():
+            # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
+            # supplied by the caller before they are persisted.
+            await self._validate_org_references(actor, lead_data)
 
-        # Compute initial lead score from provided attributes
-        lead_data["score"] = compute_score(
-            email=lead_data.get("email"),
-            phone=lead_data.get("phone"),
-            company_name=lead_data.get("company_name"),
-            value=lead_data.get("value"),
-            source=lead_data.get("source"),
-            priority=lead_data.get("priority"),
-        )
+            # Auto-link to a company when the free-text name matches an existing account
+            if lead_data.get("company_name") and not lead_data.get("company_id"):
+                from sqlalchemy import select, func
+                from app.models.company import Company
+                comp_res = await self.db.execute(
+                    select(Company.id).filter(
+                        Company.organization_id == actor.organization_id,
+                        func.lower(Company.name) == lead_data["company_name"].strip().lower(),
+                        Company.is_deleted == False,
+                    ).limit(1)
+                )
+                matched = comp_res.scalar()
+                if matched:
+                    lead_data["company_id"] = matched
 
-        lead = await self.lead_repo.create_lead(actor.organization_id, lead_data, actor.id)
+            # Auto-resolve branch & territory from the lead's PIN/city if a mapping
+            # exists and the caller didn't set them (backward compatible: only fills
+            # NULLs, best-effort — never blocks lead creation).
+            if not lead_data.get("territory_id") or not lead_data.get("branch_id"):
+                try:
+                    from app.services.branch_territory_service import BranchTerritoryService
+                    await BranchTerritoryService(self.db).apply_resolution_to_lead_data(
+                        actor.organization_id, lead_data)
+                except Exception:
+                    pass
 
-        await self.audit_service.log_event(
-            organization_id=actor.organization_id,
-            actor_user_id=actor.id,
-            action="LEAD_CREATED",
-            resource_type="lead",
-            resource_id=str(lead.id),
-            action_metadata={"title": lead.title, "status": lead.status}
-        )
+            # Compute initial lead score from provided attributes
+            lead_data["score"] = compute_score(
+                email=lead_data.get("email"),
+                phone=lead_data.get("phone"),
+                company_name=lead_data.get("company_name"),
+                value=lead_data.get("value"),
+                source=lead_data.get("source"),
+                priority=lead_data.get("priority"),
+            )
+
+            lead = await self.lead_repo.create_lead(actor.organization_id, lead_data, actor.id)
+
+            await self.audit_service.log_event(
+                organization_id=actor.organization_id,
+                actor_user_id=actor.id,
+                action="LEAD_CREATED",
+                resource_type="lead",
+                resource_id=str(lead.id),
+                action_metadata={"title": lead.title, "status": lead.status}
+            )
 
         if assigned_user_id and assigned_user_id != actor.id:
             await self.notification_service.create_notification(
@@ -193,6 +212,7 @@ class LeadService:
         created_to=None,
         include_archived: bool = False,
         updated_after=None,
+        custom_filters: dict | None = None,
     ) -> Tuple[Sequence[Lead], int]:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
@@ -220,7 +240,7 @@ class LeadService:
             allowed_user_ids, source=source, stage_id=stage_id, priority=priority,
             min_value=min_value, max_value=max_value, created_from=created_from,
             created_to=created_to, include_archived=include_archived,
-            updated_after=updated_after,
+            updated_after=updated_after, custom_filters=custom_filters,
         )
 
     async def export_leads(self, actor: User, filters: dict) -> Sequence[Lead]:
@@ -401,34 +421,71 @@ class LeadService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
-        # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
-        # on update (validated only when the key is present, so partial PATCHes
-        # that don't touch these fields are unaffected).
-        await self._validate_org_references(actor, lead_data)
-
-        updated = await self.lead_repo.update_lead(actor.organization_id, lead_id, lead_data)
-
-        # Recompute score if any scoring-relevant field changed
-        if {"email", "phone", "company_name", "value", "source", "priority"} & set(lead_data.keys()):
-            updated.score = compute_score(
-                email=updated.email,
-                phone=updated.phone,
-                company_name=updated.company_name,
-                value=updated.value,
-                source=updated.source,
-                priority=updated.priority,
+        # Validate custom fields
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import MetadataValidationEngine, MetadataValidationError
+        
+        cf_service = CustomFieldService(self.db)
+        definitions = await cf_service.list_definitions(actor, "lead")
+        
+        # Merge custom fields payload with existing lead data
+        db_cf = dict(lead.custom_fields or {})
+        incoming_cf = lead_data.get("custom_fields") or {}
+        
+        def_map = {d.key: d for d in definitions if d.is_active}
+        
+        for key, val in incoming_cf.items():
+            definition = def_map.get(key)
+            is_required = False
+            if definition:
+                rules = definition.validation_rules or {}
+                is_required = rules.get("required") is True
+            
+            if (val is None or val == "") and not is_required:
+                db_cf.pop(key, None)
+            else:
+                db_cf[key] = val
+                
+        try:
+            sanitized_cf = await MetadataValidationEngine.validate_and_sanitize(
+                self.db, Lead, actor.organization_id, definitions, db_cf, exclude_id=lead_id
             )
-            self.db.add(updated)
-            await self.db.flush()
+            lead_data["custom_fields"] = sanitized_cf
+        except MetadataValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
 
-        await self.audit_service.log_event(
-            organization_id=actor.organization_id,
-            actor_user_id=actor.id,
-            action="LEAD_UPDATED",
-            resource_type="lead",
-            resource_id=str(lead_id),
-            action_metadata={"updated_fields": list(lead_data.keys())}
-        )
+        async with self.db.begin_nested():
+            # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
+            # on update (validated only when the key is present, so partial PATCHes
+            # that don't touch these fields are unaffected).
+            await self._validate_org_references(actor, lead_data)
+
+            updated = await self.lead_repo.update_lead(actor.organization_id, lead_id, lead_data)
+
+            # Recompute score if any scoring-relevant field changed
+            if {"email", "phone", "company_name", "value", "source", "priority"} & set(lead_data.keys()):
+                updated.score = compute_score(
+                    email=updated.email,
+                    phone=updated.phone,
+                    company_name=updated.company_name,
+                    value=updated.value,
+                    source=updated.source,
+                    priority=updated.priority,
+                )
+                self.db.add(updated)
+                await self.db.flush()
+
+            await self.audit_service.log_event(
+                organization_id=actor.organization_id,
+                actor_user_id=actor.id,
+                action="LEAD_UPDATED",
+                resource_type="lead",
+                resource_id=str(lead_id),
+                action_metadata={"updated_fields": list(lead_data.keys())}
+            )
 
         # Run lead-updated automation rules
         from app.services.workflow_service import WorkflowService
@@ -904,8 +961,8 @@ class LeadService:
     ]
 
     @staticmethod
-    def _export_row(lead: Lead) -> list:
-        return [
+    def _export_row(lead: Lead, custom_defs: Sequence | None = None) -> list:
+        row = [
             lead.first_name or "",
             lead.last_name or "",
             lead.email or "",
@@ -921,28 +978,46 @@ class LeadService:
             lead.score,
             lead.created_at.isoformat() if lead.created_at else "",
         ]
+        if custom_defs:
+            cf = lead.custom_fields or {}
+            for d in custom_defs:
+                val = cf.get(d.key)
+                if val is None:
+                    row.append("")
+                elif isinstance(val, bool):
+                    row.append("Yes" if val else "No")
+                else:
+                    row.append(str(val))
+        return row
 
     @staticmethod
-    def build_export_csv(leads: Sequence[Lead]) -> str:
+    def _export_header(custom_defs: Sequence | None = None) -> list:
+        header = list(LeadService.EXPORT_COLUMNS)
+        if custom_defs:
+            header.extend(d.label for d in custom_defs)
+        return header
+
+    @staticmethod
+    def build_export_csv(leads: Sequence[Lead], custom_defs: Sequence | None = None) -> str:
         import csv
         import io
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(LeadService.EXPORT_COLUMNS)
+        writer.writerow(LeadService._export_header(custom_defs))
         for lead in leads:
-            writer.writerow(LeadService._export_row(lead))
+            writer.writerow(LeadService._export_row(lead, custom_defs))
         return buf.getvalue()
 
     @staticmethod
-    def build_export_xlsx(leads: Sequence[Lead]) -> bytes:
+    def build_export_xlsx(leads: Sequence[Lead], custom_defs: Sequence | None = None) -> bytes:
         import io
         import openpyxl
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Leads"
-        ws.append(LeadService.EXPORT_COLUMNS)
+        ws.append(LeadService._export_header(custom_defs))
         for lead in leads:
-            ws.append(LeadService._export_row(lead))
+            ws.append(LeadService._export_row(lead, custom_defs))
         out = io.BytesIO()
         wb.save(out)
         return out.getvalue()

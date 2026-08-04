@@ -89,6 +89,7 @@ async def setup_dialer_data(db: AsyncSession):
         "first_name": "Agent",
         "last_name": "One",
         "role": "Employee",
+        "phone": "+919999900000",
         "is_active": True,
         "reporting_to_id": tl.id
     })
@@ -299,10 +300,19 @@ async def test_call_lead_places_call_for_any_status(client: AsyncClient, setup_d
     agent_headers = data["headers_agent"]
 
     # Stub the telephony provider so no real HTTP call is made.
-    import app.services.knowlarity_service as ks
-    async def fake_trigger(**kwargs):
+    async def fake_trigger(*args, **kwargs):
         return {"success": {"call_id": "kcall-123"}}
-    monkeypatch.setattr(ks, "trigger_knowlarity_call", fake_trigger)
+    monkeypatch.setattr("app.services.telephony.knowlarity.trigger_knowlarity_call", fake_trigger)
+
+    import app.api.v1.dialer as dialer_module
+    async def mock_load_org_calling_config(*args, **kwargs):
+        return {"provider": "knowlarity", "x_api_key": "k-test"}
+    monkeypatch.setattr(dialer_module, "load_org_calling_config", mock_load_org_calling_config)
+
+    import app.dependencies.feature_guard as fg
+    async def mock_tenant_has_feature(*args, **kwargs):
+        return True
+    monkeypatch.setattr(fg, "tenant_has_feature", mock_tenant_has_feature)
 
     lead = Lead(
         organization_id=org.id, first_name="Called", last_name="Already",
