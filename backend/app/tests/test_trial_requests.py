@@ -215,3 +215,51 @@ async def test_trial_requests_rejection_flow(client: AsyncClient, setup_users: d
     stmt = select(TrialRequest).where(TrialRequest.id == req.id)
     req_db = (await db.execute(stmt)).scalar_one_or_none()
     assert req_db.status == "REJECTED"
+
+
+@pytest.mark.asyncio
+async def test_trial_requests_resend_activation_flow(client: AsyncClient, setup_users: dict, db: AsyncSession, capture_email: dict):
+    # 1. Create an approved request and corresponding user
+    req = TrialRequest(
+        full_name="David Miller",
+        company_name="David Tech",
+        email="david@davidtech.com",
+        phone="555-0300",
+        status="APPROVED"
+    )
+    db.add(req)
+    await db.flush()
+
+    # Create user for that trial request
+    user = User(
+        organization_id=setup_users["regular_user"].organization_id,  # just link to any org for test
+        email="david@davidtech.com",
+        hashed_password=get_password_hash("password123"),
+        first_name="David",
+        last_name="Miller",
+        role="OrgAdmin",
+        is_active=True,
+        is_verified=True
+    )
+    db.add(user)
+    await db.commit()
+
+    # 2. Resend activation
+    response = await client.post(
+        f"/api/v1/super-admin/trial-requests/{req.id}/resend-activation",
+        headers=setup_users["super_headers"]
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert "resent" in response.json()["message"]
+
+    # 3. Assert new token generated on the user in the database
+    await db.refresh(user)
+    assert user.reset_token is not None
+    assert user.reset_token_expires is not None
+
+    # 4. Assert welcome email captured
+    assert capture_email["to"] == "david@davidtech.com"
+    assert capture_email["subject"] == "Welcome to Johnson Softwares CRM - Setup Your Password"
+    assert capture_email["template_name"] == "trial_approved.html"
+    assert "token" in capture_email["context"]["reset_url"]

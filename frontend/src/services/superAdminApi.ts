@@ -375,6 +375,10 @@ export const superAdminApi = {
     const response = await api.post<TrialRequestResponse>(`/super-admin/trial-requests/${id}/reject`);
     return response.data;
   },
+  resendTrialActivationEmail: async (id: string) => {
+    const response = await api.post<{ status: string; message: string }>(`/super-admin/trial-requests/${id}/resend-activation`);
+    return response.data;
+  },
 };
 
 export interface InvoiceConfigUpdate {

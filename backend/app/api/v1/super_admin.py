@@ -2306,3 +2306,74 @@ async def reject_trial_request(
     )
 
     return trial_req
+
+
+@router.post("/trial-requests/{id}/resend-activation")
+async def resend_trial_activation_email(
+    id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Resend the password setup / activation welcome email for an approved trial request.
+    Generates a new token, updates user.reset_token, and sends the email.
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.models.trial_request import TrialRequest
+    from app.models.user import User
+    from app.core.security import generate_random_token, hash_token
+    from app.services.email_service import send_email
+    from app.core.config import settings
+    from app.services.audit_service import AuditService
+
+    # 1. Fetch Trial Request
+    stmt = select(TrialRequest).where(TrialRequest.id == id, TrialRequest.is_deleted == False)
+    res = await db.execute(stmt)
+    trial_req = res.scalar_one_or_none()
+    if not trial_req:
+        raise HTTPException(status_code=404, detail="Trial request not found")
+    if trial_req.status != "APPROVED":
+        raise HTTPException(status_code=400, detail="Activation email can only be resent for approved trial requests")
+
+    # 2. Fetch the created user
+    user_stmt = select(User).where(User.email == trial_req.email, User.is_deleted == False)
+    user_res = await db.execute(user_stmt)
+    user = user_res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Corresponding tenant user account not found")
+
+    # 3. Generate New Token
+    token = generate_random_token()
+    hashed_token = hash_token(token)
+    user.reset_token = hashed_token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+    db.add(user)
+    await db.commit()
+
+    # 4. Send Email
+    frontend_url = (
+        settings.FRONTEND_URL
+        or (settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else None)
+        or "http://localhost:5173"
+    ).rstrip("/")
+    reset_url = f"{frontend_url}/login?token={token}"
+
+    send_email(
+        to_email=user.email,
+        subject="Welcome to Johnson Softwares CRM - Setup Your Password",
+        template_name="trial_approved.html",
+        context={
+            "reset_url": reset_url,
+            "full_name": trial_req.full_name,
+            "company_name": trial_req.company_name
+        }
+    )
+
+    await AuditService(db).log_event(
+        actor_id=actor.id,
+        organization_id=user.organization_id,
+        event_type="TRIAL_ACTIVATION_RESENT",
+        description=f"Resent password setup welcome email to {trial_req.email}"
+    )
+
+    return {"status": "success", "message": f"Activation email successfully resent to {trial_req.email}"}
