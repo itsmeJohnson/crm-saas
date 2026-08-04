@@ -23,7 +23,7 @@ DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://postgres:postgres@db:5432/crm",
 )
 
-SAFE_EMAIL = "admin@johnsonsoftwares.com"
+SAFE_EMAIL = "contact@support.johnsonsoftwares.com"
 PASSWORD   = "Demo@12345"
 
 DEMO_TENANTS = [

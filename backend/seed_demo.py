@@ -98,17 +98,19 @@ async def seed():
         pwd_hash = get_password_hash("Password123")
         admin_user = User(
             organization_id=org.id,
-            email="admin@johnsonsoftwares.com",
+            email="contact@support.johnsonsoftwares.com",
             hashed_password=pwd_hash,
-            first_name="Johnson",
-            last_name="Softwares",
+            first_name="johnsonsoftwares",
+            last_name="",
             role="SuperAdmin",
             is_active=True,
             is_verified=True
         )
         session.add(admin_user)
         await session.flush()
-        logger.info(f"Created SuperAdmin User: admin@johnsonsoftwares.com (name: Johnson)")
+        logger.info(f"Created SuperAdmin User: contact@support.johnsonsoftwares.com (name: johnsonsoftwares)")
+
+
 
         # 4. Seed Dynamic Feature Registry
         logger.info("Seeding master feature registry...")
