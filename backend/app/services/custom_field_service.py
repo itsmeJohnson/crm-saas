@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +27,11 @@ class CustomFieldService:
         # Access through cache first
         # Convert cache mapping list of dicts to instances for repository compatibility
         cached = await MetadataCacheService.get_custom_fields(actor.organization_id, entity_type)
-        if cached is not None:
+        # Only trust cache entries that carry timestamps; older/partial payloads
+        # auto-heal by falling through to a fresh DB read (and re-cache) below.
+        if cached is not None and all(
+            isinstance(d, dict) and "created_at" in d for d in cached
+        ):
             return [
                 CustomFieldDefinition(
                     id=uuid.UUID(d["id"]),
@@ -47,7 +52,9 @@ class CustomFieldService:
                     searchable=d.get("searchable", True),
                     filterable=d.get("filterable", True),
                     exportable=d.get("exportable", True),
-                    importable=d.get("importable", True)
+                    importable=d.get("importable", True),
+                    created_at=datetime.fromisoformat(d["created_at"]) if d.get("created_at") else None,
+                    updated_at=datetime.fromisoformat(d["updated_at"]) if d.get("updated_at") else None,
                 )
                 for d in cached
             ]
@@ -81,7 +88,9 @@ class CustomFieldService:
                 "searchable": d.searchable,
                 "filterable": d.filterable,
                 "exportable": d.exportable,
-                "importable": d.importable
+                "importable": d.importable,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+                "updated_at": d.updated_at.isoformat() if d.updated_at else None,
             }
             for d in definitions
         ]

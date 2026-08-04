@@ -11,8 +11,8 @@ import { LeadAttachments } from '../components/crm/LeadAttachments';
 import { LeadReminders } from '../components/crm/LeadReminders';
 import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
-import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal } from 'lucide-react';
+import { LeadResponse, LeadReport } from '../services/leadApi';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
 import { formatMoney } from '../utils/currency';
@@ -131,8 +131,14 @@ export const LeadsPage: React.FC = () => {
 
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
+  const [report, setReport] = useState<LeadReport | null>(null);
   const { customFields, fetchBootstrap } = useMetadataStore();
   const leadCustomFields = customFields.filter((f) => f.entity_type === 'lead');
+
+  // Org-wide KPI summary (accurate totals, independent of the paginated table).
+  useEffect(() => {
+    leadApi.getReport().then(setReport).catch(() => {});
+  }, [leads]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const queryLeadId = searchParams.get('leadId');
@@ -268,6 +274,26 @@ export const LeadsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* KPI summary strip */}
+      {report && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Total Leads', value: report.total_leads.toLocaleString(), icon: Users2, tint: 'text-brand-400' },
+            { label: 'Pipeline Value', value: formatMoney(report.total_value), icon: DollarSign, tint: 'text-emerald-400' },
+            { label: 'Conversion Rate', value: `${report.conversion_rate}%`, icon: TrendingUp, tint: 'text-indigo-400' },
+            { label: 'Avg. Score', value: Math.round(report.avg_score || 0).toString(), icon: Star, tint: 'text-amber-400' },
+          ].map((s) => (
+            <div key={s.label} className="glass-panel border border-slate-800/80 rounded-2xl p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <s.icon className={`w-3.5 h-3.5 ${s.tint}`} />
+                {s.label}
+              </div>
+              <p className="text-2xl font-bold text-slate-100 mt-1.5">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filters, Table, Pagination */}
       <div className="space-y-4">
@@ -652,23 +678,38 @@ export const LeadsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Custom fields (tenant-defined) */}
-              {leadCustomFields.length > 0 && detailLead.custom_fields && Object.keys(detailLead.custom_fields).length > 0 && (
-                <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
-                  {leadCustomFields
-                    .filter((f) => detailLead.custom_fields && detailLead.custom_fields[f.key] !== undefined && detailLead.custom_fields[f.key] !== null && detailLead.custom_fields[f.key] !== '')
-                    .map((f) => (
-                      <div key={f.id}>
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{f.label}</p>
-                        <p className="text-sm font-medium text-slate-200 mt-0.5 break-words">
-                          {f.field_type === 'checkbox'
-                            ? (detailLead.custom_fields![f.key] ? 'Yes' : 'No')
-                            : String(detailLead.custom_fields![f.key])}
-                        </p>
-                      </div>
-                    ))}
-                </div>
-              )}
+              {/* Custom fields (tenant-defined) — always shown so the org's schema is
+                  visible on every lead, with "—" for values not filled in yet. */}
+              {(() => {
+                const activeCf = leadCustomFields.filter((f) => f.is_active && f.visible);
+                if (activeCf.length === 0) return null;
+                const cf = detailLead.custom_fields || {};
+                const fmt = (f: typeof activeCf[number]) => {
+                  const v = cf[f.key];
+                  if (v === undefined || v === null || v === '') return '—';
+                  if (f.field_type === 'checkbox') return v ? 'Yes' : 'No';
+                  return String(v);
+                };
+                return (
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Additional Details</p>
+                    <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+                      {activeCf.map((f) => {
+                        const v = cf[f.key];
+                        const empty = v === undefined || v === null || v === '';
+                        return (
+                          <div key={f.id}>
+                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{f.label}</p>
+                            <p className={`text-sm font-medium mt-0.5 break-words ${empty ? 'text-slate-500' : 'text-slate-200'}`}>
+                              {fmt(f)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/60">
                 {/* Notes logs */}
