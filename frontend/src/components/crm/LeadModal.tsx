@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { LeadResponse } from '../../services/leadApi';
 import { useLeadStore } from '../../store/leadStore';
 import { useUserStore } from '../../store/userStore';
-import { usePipelineStore } from '../../store/pipelineStore';
+import { useMetadataStore } from '../../store/metadataStore';
+import { DynamicCustomFields } from './DynamicCustomFields';
 import { X, Loader2 } from 'lucide-react';
 
 const leadSchema = z.object({
@@ -38,13 +39,19 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 }) => {
   const { createLead, updateLead } = useLeadStore();
   const { users, fetchUsers } = useUserStore();
-  const { stages, fetchStages } = usePipelineStore();
+  const { pipelines, customFields, fetchBootstrap, getPipelineForStage } = useMetadataStore();
   const activeUsers = users.filter(u => u.is_active);
+
+  const [pipelineId, setPipelineId] = useState<string>('');
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
+  const [customErrors, setCustomErrors] = useState<Record<string, string>>({});
 
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting }
   } = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -64,16 +71,28 @@ export const LeadModal: React.FC<LeadModalProps> = ({
     }
   });
 
+  const stageId = watch('stage_id');
+
+  const stagesForPipeline = useMemo(() => {
+    const p = pipelines.find((pl) => pl.id === pipelineId);
+    return p ? [...p.stages].sort((a, b) => a.order_position - b.order_position) : [];
+  }, [pipelines, pipelineId]);
+
+  const leadCustomFields = useMemo(
+    () => customFields.filter((f) => f.entity_type === 'lead'),
+    [customFields],
+  );
+
   useEffect(() => {
     if (isOpen) {
-      if (users.length === 0) {
-        fetchUsers();
-      }
-      fetchStages().catch(() => {});
+      if (users.length === 0) fetchUsers();
+      fetchBootstrap().catch(() => {});
     }
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    setCustomErrors({});
     if (lead) {
       reset({
         title: lead.title,
@@ -89,6 +108,10 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         assigned_user_id: lead.assigned_user_id || '',
         stage_id: lead.stage_id || '',
       });
+      setCustomValues(lead.custom_fields || {});
+      // Derive the pipeline that owns this lead's stage.
+      const owner = getPipelineForStage(lead.stage_id);
+      setPipelineId(owner?.id || '');
     } else {
       reset({
         title: '',
@@ -98,17 +121,46 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         phone: '',
         company_name: '',
         status: 'New',
+        priority: 'Medium',
         source: '',
         value: '',
         assigned_user_id: '',
         stage_id: '',
       });
+      setCustomValues({});
+      // Default to the org's default pipeline for new leads.
+      const def = pipelines.find((p) => p.is_default) || pipelines[0];
+      setPipelineId(def?.id || '');
     }
-  }, [lead, reset, isOpen]);
+  }, [lead, isOpen, pipelines.length]);
 
   if (!isOpen) return null;
 
+  const handlePipelineChange = (id: string) => {
+    setPipelineId(id);
+    // Reset stage selection to the new pipeline's default/first stage.
+    const p = pipelines.find((pl) => pl.id === id);
+    const sorted = p ? [...p.stages].sort((a, b) => a.order_position - b.order_position) : [];
+    const def = sorted.find((s) => s.is_system_default) || sorted[0];
+    setValue('stage_id', def?.id || '');
+  };
+
+  const validateCustomFields = (): boolean => {
+    const errs: Record<string, string> = {};
+    for (const def of leadCustomFields) {
+      if (!def.is_active || !def.visible) continue;
+      const required = def.validation_rules?.required === true;
+      const v = customValues[def.key];
+      if (required && (v === undefined || v === null || v === '')) {
+        errs[def.key] = `${def.label} is required`;
+      }
+    }
+    setCustomErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const onSubmit = async (values: LeadFormValues) => {
+    if (!validateCustomFields()) return;
     try {
       const payload: any = {
         title: values.title,
@@ -122,6 +174,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         value: values.value !== '' ? Number(values.value) : null,
         assigned_user_id: values.assigned_user_id || null,
         stage_id: values.stage_id || null,
+        custom_fields: customValues,
       };
 
       // Safeguard: omit phone number if it contains asterisks to avoid overwriting real number in DB
@@ -134,9 +187,6 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       if (lead) {
         await updateLead(lead.id, payload);
       } else {
-        if (values.phone && !values.phone.includes('*')) {
-          payload.phone = values.phone;
-        }
         await createLead(payload);
       }
       onClose();
@@ -149,7 +199,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose}></div>
 
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 z-10 space-y-6">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 z-10 space-y-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <h2 className="text-xl font-bold tracking-tight text-slate-100">
             {lead ? 'Edit Lead Opportunity' : 'Add New Lead'}
@@ -302,20 +352,49 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Pipeline Stage</label>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Pipeline</label>
               <select
-                {...register('stage_id')}
+                value={pipelineId}
+                onChange={(e) => handlePipelineChange(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
               >
-                <option value="">Default/None</option>
-                {stages.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                {pipelines.length === 0 && <option value="">No pipelines</option>}
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.is_default ? ' (default)' : ''}
                   </option>
                 ))}
               </select>
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Pipeline Stage</label>
+            <select
+              value={stageId}
+              onChange={(e) => setValue('stage_id', e.target.value)}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+            >
+              <option value="">Default/None</option>
+              {stagesForPipeline.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {leadCustomFields.length > 0 && (
+            <div className="pt-2 border-t border-slate-800/70 space-y-4">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Additional Details</h3>
+              <DynamicCustomFields
+                definitions={leadCustomFields}
+                values={customValues}
+                onChange={(key, val) => setCustomValues((prev) => ({ ...prev, [key]: val }))}
+                errors={customErrors}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button

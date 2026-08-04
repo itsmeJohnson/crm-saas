@@ -59,6 +59,8 @@ export interface TenantResponse {
   user_count: number;
   invoice_count: number;
   call_recording_usage: number;
+  currency: string;
+  timezone: string;
 }
 
 export interface TenantUserResponse {
@@ -84,6 +86,9 @@ export interface SubscriptionUpdateRequest {
   subscription_expires_at: string | null;
   subscription_status: string;
   max_users: number;
+  name?: string;
+  currency?: string;
+  timezone?: string;
 }
 
 export interface InvoiceCreateRequest {

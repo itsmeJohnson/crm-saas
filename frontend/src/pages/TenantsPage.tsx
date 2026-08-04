@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { 
-  Building, Users, FileText, Edit, Plus, X, ShieldAlert, 
+import { Link } from 'react-router-dom';
+import {
+  Building, Users, FileText, Edit, Plus, X, ShieldAlert, ArrowLeft,
   Loader2, Calendar, DollarSign, CheckCircle2, AlertCircle, Clock, Trash2,
   Workflow, CheckSquare, Settings, Lock, Unlock, Check, Key, ArrowUpDown, FolderKanban,
   Upload, Mail, CreditCard, Image, Receipt, Percent, LayoutDashboard,
@@ -105,6 +106,8 @@ export const TenantsPage: React.FC = () => {
   const [gatewayForms, setGatewayForms] = useState<Record<string, any>>({});
   const [expandedGateway, setExpandedGateway] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [showTenantPassword, setShowTenantPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const fetchAllData = async () => {
     setIsLoading(true); setGlobalError(null);
@@ -200,6 +203,9 @@ export const TenantsPage: React.FC = () => {
       setSubValue('subscription_status', selectedTenant.subscription_status);
       setSubValue('max_users', selectedTenant.max_users);
       setSubValue('subscription_expires_at', selectedTenant.subscription_expires_at?.substring(0, 10) || '');
+      setSubValue('name', selectedTenant.name);
+      setSubValue('currency', selectedTenant.currency || 'INR');
+      setSubValue('timezone', selectedTenant.timezone || 'Asia/Kolkata');
     }
   }, [selectedTenant, activeModal, setSubValue]);
   const onCreateTenant = async (data: CreateTenantRequest) => {
@@ -443,6 +449,13 @@ export const TenantsPage: React.FC = () => {
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Super Admin</p>
           <h2 className="text-sm font-bold text-slate-200 mt-0.5">Control Center</h2>
         </div>
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border-b border-slate-800/70 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 shrink-0" />
+          Back to CRM
+        </Link>
         <div className="py-2 flex-1">
           {navItems.map(item => <NavItem key={item.key} icon={item.icon} label={item.label} active={activeSection === item.key} onClick={() => { setActiveSection(item.key); setGlobalError(null); }} />)}
         </div>
@@ -616,10 +629,15 @@ export const TenantsPage: React.FC = () => {
                         {tenants.map((tenant) => (
                           <tr key={tenant.id} className="hover:bg-slate-900/10 transition-colors">
                             <td className="px-6 py-4.5">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-200">{tenant.name}</p>
+                              <button
+                                type="button"
+                                onClick={() => openEditSubModal(tenant)}
+                                className="text-left group cursor-pointer"
+                                title="Edit tenant details"
+                              >
+                                <p className="text-sm font-semibold text-slate-200 group-hover:text-brand-400 transition-colors">{tenant.name}</p>
                                 <p className="text-xs text-slate-500">/{tenant.slug}</p>
-                              </div>
+                              </button>
                             </td>
                             <td className="px-6 py-4.5">
                               <span className={`inline-flex items-center gap-1 text-xs font-medium ${
@@ -636,7 +654,7 @@ export const TenantsPage: React.FC = () => {
                                 <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-brand-500/10 text-brand-400 border border-brand-500/20 uppercase tracking-wider">
                                   {tenant.subscription_plan}
                                 </span>
-                                <p className="text-[10px] text-slate-400 mt-1">Licensed Seats: {tenant.max_users}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Licensed Seats: {tenant.max_users} · {tenant.currency || 'INR'}</p>
                               </div>
                             </td>
                             <td className="px-6 py-4.5 text-xs text-slate-300">
@@ -2887,15 +2905,24 @@ export const TenantsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">New Password</label>
-                <input
-                  type="password"
-                  placeholder="Minimum 8 characters"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    placeholder="Minimum 8 characters"
+                    required
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors focus:outline-none"
+                  >
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
@@ -3451,15 +3478,24 @@ export const TenantsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Admin Password</label>
-                    <input
-                      type="password"
-                      placeholder="Min 8 characters"
-                      {...regTenant('admin_password', { 
-                        required: 'Password is required',
-                        minLength: { value: 8, message: 'Password must be at least 8 characters' }
-                      })}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showTenantPassword ? 'text' : 'password'}
+                        placeholder="Min 8 characters"
+                        {...regTenant('admin_password', { 
+                          required: 'Password is required',
+                          minLength: { value: 8, message: 'Password must be at least 8 characters' }
+                        })}
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTenantPassword(!showTenantPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors focus:outline-none"
+                      >
+                        {showTenantPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {tenantErrors.admin_password && <p className="text-xs text-red-400 mt-1">{tenantErrors.admin_password.message}</p>}
                   </div>
                 </div>
@@ -3502,9 +3538,9 @@ export const TenantsPage: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
                   <Edit className="w-5 h-5 text-brand-400" />
-                  Subscription Settings
+                  Tenant Settings
                 </h3>
-                <p className="text-xs text-slate-400">Configure parameters for <strong>{selectedTenant.name}</strong>.</p>
+                <p className="text-xs text-slate-400">Configure plan, currency &amp; profile for <strong>{selectedTenant.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -3521,6 +3557,15 @@ export const TenantsPage: React.FC = () => {
                   <span>{modalError}</span>
                 </div>
               )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Organization Name</label>
+                <input
+                  type="text"
+                  {...regSub('name')}
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                />
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subscription Plan</label>
@@ -3574,6 +3619,31 @@ export const TenantsPage: React.FC = () => {
                   {...regSub('subscription_expires_at')}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency</label>
+                  <select
+                    {...regSub('currency')}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    {['INR', 'USD', 'EUR', 'GBP', 'AED', 'AUD', 'CAD', 'SGD', 'JPY']
+                      .concat(selectedTenant.currency && !['INR','USD','EUR','GBP','AED','AUD','CAD','SGD','JPY'].includes(selectedTenant.currency) ? [selectedTenant.currency] : [])
+                      .map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Timezone</label>
+                  <select
+                    {...regSub('timezone')}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    {['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'Australia/Sydney']
+                      .concat(selectedTenant.timezone && !['Asia/Kolkata','Asia/Dubai','Asia/Singapore','UTC','America/New_York','America/Los_Angeles','Europe/London','Europe/Berlin','Australia/Sydney'].includes(selectedTenant.timezone) ? [selectedTenant.timezone] : [])
+                      .map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">

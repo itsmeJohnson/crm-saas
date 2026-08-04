@@ -4,6 +4,7 @@ import { useUserStore } from '../../store/userStore';
 import { LeadResponse } from '../../services/leadApi';
 import { Edit3, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { MaskedField } from '../common/MaskedField';
+import { formatMoney } from '../../utils/currency';
 import { useAuthStore } from '../../store/authStore';
 
 interface LeadTableProps {
@@ -161,8 +162,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                 const ownerUser = users.find(u => u.id === lead.assigned_user_id);
                 const ownerName = ownerUser ? `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() : 'Unassigned';
 
-                const formattedValue = lead.value !== null 
-                  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(lead.value)
+                const formattedValue = lead.value !== null
+                  ? formatMoney(lead.value)
                   : '—';
 
                 return (

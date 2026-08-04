@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { customerApi, CustomerReport } from '../services/customerApi';
 import { Users, ShoppingCart, DollarSign, AlertTriangle, Loader2 } from 'lucide-react';
+import { formatMoney } from '../utils/currency';
 
-const currency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
+const currency = (n: number) => formatMoney(n);
 
 export const CustomerReportsPage: React.FC = () => {
   const [report, setReport] = useState<CustomerReport | null>(null);

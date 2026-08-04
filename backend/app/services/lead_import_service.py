@@ -574,6 +574,15 @@ class LeadImportService:
             res = await self.db.execute(stage_query)
             stage_id = res.scalar()
 
+        # Load importable custom-field definitions once, so mapped custom columns
+        # can be routed into lead.custom_fields with the same validation the
+        # create/update paths use.
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import MetadataValidationEngine, MetadataValidationError
+        all_definitions = await CustomFieldService(self.db).list_definitions(actor, "lead")
+        import_definitions = [d for d in all_definitions if d.is_active and d.importable]
+        custom_keys = {d.key for d in import_definitions}
+
         # Insert valid rows
         imported_leads = []
         for item in valid_rows:
@@ -607,6 +616,34 @@ class LeadImportService:
                 import_id=import_record.id,
                 stage_id=stage_id
             )
+
+            # Route mapped custom-field columns into custom_fields (validated).
+            if import_definitions:
+                custom_payload: Dict[str, Any] = {}
+                for ck in custom_keys:
+                    col = column_mapping.get(ck)
+                    if not col:
+                        continue
+                    raw_val = (raw_row.get(col, "") or "").strip()
+                    if raw_val != "":
+                        custom_payload[ck] = raw_val
+                try:
+                    sanitized_cf = await MetadataValidationEngine.validate_and_sanitize(
+                        self.db, Lead, actor.organization_id, import_definitions, custom_payload
+                    )
+                    if sanitized_cf:
+                        lead_obj.custom_fields = sanitized_cf
+                except MetadataValidationError as cf_err:
+                    reason = f"Custom field error: {cf_err}"
+                    errors_log.append({
+                        "row": item["row_index"],
+                        "email": mapped_values.get("email") or None,
+                        "reason": reason,
+                    })
+                    csv_writer.writerow([raw_row.get(h, "") for h in headers] + [reason])
+                    fail_count += 1
+                    continue
+
             self.db.add(lead_obj)
             imported_leads.append(lead_obj)
             success_count += 1

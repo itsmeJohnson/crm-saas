@@ -119,7 +119,28 @@
       "Bash(git -C /private/tmp/claude-501/-Users-apple-Workspace-johnson-softwares-crm/d01caa30-7c7e-46a3-bd11-da6e646886ec/scratchpad/stable-sync-wt status --short)",
       "Bash(grep -vE \"Pydantic|warnings summary|Docs:|migration|^\\\\s*class |^$\")",
       "Bash([ -s \"$OUT\" ])",
-      "Bash(grep -vE 'Pydantic|warnings summary|Docs:|migration|^\\\\s*class |^$' /tmp/sprint3_regression.txt)"
+      "Bash(grep -vE 'Pydantic|warnings summary|Docs:|migration|^\\\\s*class |^$' /tmp/sprint3_regression.txt)",
+      "Bash(grep -nA6 \"exportLeads\" store/leadStore.ts)",
+      "Bash(grep -nA8 \"export.*[Ee]xport\\\\|exportLeads\\\\|/export\" services/leadApi.ts)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/lead_import_service.py'\\).read\\(\\)\\); print\\('lead_import_service OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/lead_service.py'\\).read\\(\\)\\); print\\('lead_service OK'\\)\")",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('app/api/v1/leads.py'\\).read\\(\\)\\); ast.parse\\(open\\('app/repositories/lead_repository.py'\\).read\\(\\)\\); ast.parse\\(open\\('app/services/lead_service.py'\\).read\\(\\)\\); print\\('backend parse OK'\\)\")",
+      "Bash(lsof -iTCP -sTCP:LISTEN -P)",
+      "Bash(curl -s -o /dev/null -w \"openapi.json -> HTTP %{http_code}\\\\n\" http://localhost:8000/openapi.json)",
+      "Bash(curl -s -o /dev/null -w \"GET /api/v1/leads/ -> HTTP %{http_code}\\\\n\" \"http://localhost:8000/api/v1/leads/?custom_fields=%7B%22doctor%22%3A%22smith%22%7D\")",
+      "Bash(curl -s -o /dev/null -w \"GET /api/v1/metadata/bootstrap -> HTTP %{http_code}\\\\n\" http://localhost:8000/api/v1/metadata/bootstrap)",
+      "Bash(curl -s -o /dev/null -w \"GET /api/v1/pipelines/all -> HTTP %{http_code}\\\\n\" http://localhost:8000/api/v1/pipelines/all)",
+      "Bash(curl -s http://localhost:8000/openapi.json)",
+      "Bash(curl -s --max-time 8 -o /dev/null -w \"leads -> %{http_code}\\\\n\" \"http://localhost:8000/api/v1/leads/\")",
+      "Bash(curl -s --max-time 6 -o /dev/null -w \"GET /api/v1/leads/ -> HTTP %{http_code}\\\\n\" http://localhost:8000/api/v1/leads/)",
+      "Bash(curl -s --max-time 8 -o /dev/null -w \"GET /api/v1/leads/ -> %{http_code}\\\\n\" \"http://localhost:8000/api/v1/leads/?custom_fields=%7B%22doctor%22%3A%22smith%22%7D\")",
+      "Bash(curl -s --max-time 8 -o /dev/null -w \"GET /api/v1/metadata/bootstrap -> %{http_code}\\\\n\" http://localhost:8000/api/v1/metadata/bootstrap)",
+      "Bash(curl -s --max-time 8 -o /dev/null -w \"GET /api/v1/pipelines/all -> %{http_code}\\\\n\" http://localhost:8000/api/v1/pipelines/all)",
+      "Bash(curl -s --max-time 15 http://localhost:8000/openapi.json)",
+      "Bash(grep -nA25 \"async def list_pipelines\" app/services/pipeline_service.py)",
+      "Bash(grep -nB2 -A12 \"Active Tenant\" modules/dashboard/Home.tsx)",
+      "Bash(grep -nB1 -A12 \"const NavItem\" pages/TenantsPage.tsx)",
+      "Bash(grep -nE \"\\\\\\\\\\\\$|USD|Intl|NumberFormat|currency|toLocale\" pages/LeadReportsPage.tsx)"
     ]
   }
 }

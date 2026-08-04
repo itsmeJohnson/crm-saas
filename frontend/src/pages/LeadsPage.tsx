@@ -12,8 +12,12 @@ import { LeadReminders } from '../components/crm/LeadReminders';
 import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
+import { useMetadataStore } from '../store/metadataStore';
+import { formatMoney } from '../utils/currency';
+import { LeadKanban } from '../components/crm/LeadKanban';
+import { LeadCustomFieldsManager } from '../components/crm/LeadCustomFieldsManager';
 import { ImportModal } from '../components/leads/ImportModal';
 import { AssignmentSettings } from '../components/leads/AssignmentSettings';
 import { ImportHistoryTable } from '../components/leads/ImportHistoryTable';
@@ -125,6 +129,11 @@ export const LeadsPage: React.FC = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLead, setDetailLead] = useState<LeadResponse | null>(null);
 
+  const [view, setView] = useState<'table' | 'kanban'>('table');
+  const [isFieldsOpen, setIsFieldsOpen] = useState(false);
+  const { customFields, fetchBootstrap } = useMetadataStore();
+  const leadCustomFields = customFields.filter((f) => f.entity_type === 'lead');
+
   const [searchParams, setSearchParams] = useSearchParams();
   const queryLeadId = searchParams.get('leadId');
 
@@ -132,6 +141,7 @@ export const LeadsPage: React.FC = () => {
     fetchLeads();
     if (users.length === 0) fetchUsers();
     fetchDashboardMetrics();
+    fetchBootstrap();
   }, []);
 
   useEffect(() => {
@@ -169,8 +179,8 @@ export const LeadsPage: React.FC = () => {
   const activeOwner = detailLead && users.find(u => u.id === detailLead.assigned_user_id);
   const activeOwnerName = activeOwner ? `${activeOwner.first_name || ''} ${activeOwner.last_name || ''}`.trim() : 'Unassigned';
 
-  const formattedValue = detailLead && detailLead.value !== null 
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(detailLead.value)
+  const formattedValue = detailLead && detailLead.value !== null
+    ? formatMoney(detailLead.value)
     : '—';
 
   return (
@@ -187,6 +197,35 @@ export const LeadsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* View toggle: Table / Kanban */}
+          <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold transition-all cursor-pointer ${view === 'table' ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              title="Table view"
+            >
+              <List className="w-4 h-4" /> Table
+            </button>
+            <button
+              onClick={() => setView('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold border-l border-slate-800 transition-all cursor-pointer ${view === 'kanban' ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              title="Kanban board"
+            >
+              <LayoutGrid className="w-4 h-4" /> Board
+            </button>
+          </div>
+
+          {user?.role === 'OrgAdmin' && (
+            <button
+              onClick={() => setIsFieldsOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
+              title="Manage custom fields"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Custom Fields
+            </button>
+          )}
+
           {isPrivileged && <AssignmentSettings />}
 
           <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
@@ -296,6 +335,39 @@ export const LeadsPage: React.FC = () => {
             />
           </div>
 
+          {/* Dynamic custom-field filters (tenant-defined, filterable) */}
+          {leadCustomFields.filter((f) => f.is_active && f.filterable).map((f) => {
+            const val = filters.custom_fields[f.key] || '';
+            const update = (v: string) => {
+              const next = { ...filters.custom_fields };
+              if (v === '') delete next[f.key];
+              else next[f.key] = v;
+              setFilters({ custom_fields: next });
+            };
+            return (
+              <div key={f.id} className="w-full sm:w-44">
+                {f.field_type === 'select' ? (
+                  <select
+                    value={val}
+                    onChange={(e) => update(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                  >
+                    <option value="">{f.label}: All</option>
+                    {(f.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'}
+                    value={val}
+                    onChange={(e) => update(e.target.value)}
+                    placeholder={f.label}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                  />
+                )}
+              </div>
+            );
+          })}
+
           {/* Include archived toggle */}
           <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer select-none shrink-0">
             <input
@@ -311,20 +383,26 @@ export const LeadsPage: React.FC = () => {
           <SavedFilters currentFilters={filters} onApply={(def) => setFilters(def as any)} />
         </Filters>
 
-        <LeadTable 
-          onEditClick={handleEditClick} 
-          onRowClick={handleRowClick}
-          selectedLeadIds={selectedLeadIds}
-          onSelectLeads={setSelectedLeadIds}
-          hideCheckboxes={!isPrivileged}
-        />
-        
-        <Pagination
-          skip={pagination.skip}
-          limit={pagination.limit}
-          itemsCount={leads.length}
-          onPageChange={(skip) => setPagination({ skip })}
-        />
+        {view === 'table' ? (
+          <>
+            <LeadTable
+              onEditClick={handleEditClick}
+              onRowClick={handleRowClick}
+              selectedLeadIds={selectedLeadIds}
+              onSelectLeads={setSelectedLeadIds}
+              hideCheckboxes={!isPrivileged}
+            />
+
+            <Pagination
+              skip={pagination.skip}
+              limit={pagination.limit}
+              itemsCount={leads.length}
+              onPageChange={(skip) => setPagination({ skip })}
+            />
+          </>
+        ) : (
+          <LeadKanban onCardClick={handleRowClick} />
+        )}
       </div>
 
       {isPrivileged && (
@@ -338,6 +416,9 @@ export const LeadsPage: React.FC = () => {
 
       {/* Import Modal */}
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onSuccess={fetchLeads} />
+
+      {/* Custom Fields Manager (OrgAdmin) */}
+      <LeadCustomFieldsManager isOpen={isFieldsOpen} onClose={() => setIsFieldsOpen(false)} />
 
       {/* Bulk Assign Modal */}
       <BulkAssignModal 
@@ -570,6 +651,24 @@ export const LeadsPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Custom fields (tenant-defined) */}
+              {leadCustomFields.length > 0 && detailLead.custom_fields && Object.keys(detailLead.custom_fields).length > 0 && (
+                <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+                  {leadCustomFields
+                    .filter((f) => detailLead.custom_fields && detailLead.custom_fields[f.key] !== undefined && detailLead.custom_fields[f.key] !== null && detailLead.custom_fields[f.key] !== '')
+                    .map((f) => (
+                      <div key={f.id}>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{f.label}</p>
+                        <p className="text-sm font-medium text-slate-200 mt-0.5 break-words">
+                          {f.field_type === 'checkbox'
+                            ? (detailLead.custom_fields![f.key] ? 'Yes' : 'No')
+                            : String(detailLead.custom_fields![f.key])}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/60">
                 {/* Notes logs */}

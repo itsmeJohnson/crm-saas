@@ -95,6 +95,14 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
+    
+    if (
+      (error.response?.status === 400 && error.response?.data?.detail === "Inactive user") ||
+      (error.response?.status === 403 && error.response?.data?.detail === "User account is deactivated")
+    ) {
+      useAuthStore.getState().logout();
+    }
+    
     return Promise.reject(error);
   }
 );

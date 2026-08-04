@@ -212,6 +212,7 @@ class LeadService:
         created_to=None,
         include_archived: bool = False,
         updated_after=None,
+        custom_filters: dict | None = None,
     ) -> Tuple[Sequence[Lead], int]:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
@@ -239,7 +240,7 @@ class LeadService:
             allowed_user_ids, source=source, stage_id=stage_id, priority=priority,
             min_value=min_value, max_value=max_value, created_from=created_from,
             created_to=created_to, include_archived=include_archived,
-            updated_after=updated_after,
+            updated_after=updated_after, custom_filters=custom_filters,
         )
 
     async def export_leads(self, actor: User, filters: dict) -> Sequence[Lead]:
@@ -960,8 +961,8 @@ class LeadService:
     ]
 
     @staticmethod
-    def _export_row(lead: Lead) -> list:
-        return [
+    def _export_row(lead: Lead, custom_defs: Sequence | None = None) -> list:
+        row = [
             lead.first_name or "",
             lead.last_name or "",
             lead.email or "",
@@ -977,28 +978,46 @@ class LeadService:
             lead.score,
             lead.created_at.isoformat() if lead.created_at else "",
         ]
+        if custom_defs:
+            cf = lead.custom_fields or {}
+            for d in custom_defs:
+                val = cf.get(d.key)
+                if val is None:
+                    row.append("")
+                elif isinstance(val, bool):
+                    row.append("Yes" if val else "No")
+                else:
+                    row.append(str(val))
+        return row
 
     @staticmethod
-    def build_export_csv(leads: Sequence[Lead]) -> str:
+    def _export_header(custom_defs: Sequence | None = None) -> list:
+        header = list(LeadService.EXPORT_COLUMNS)
+        if custom_defs:
+            header.extend(d.label for d in custom_defs)
+        return header
+
+    @staticmethod
+    def build_export_csv(leads: Sequence[Lead], custom_defs: Sequence | None = None) -> str:
         import csv
         import io
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(LeadService.EXPORT_COLUMNS)
+        writer.writerow(LeadService._export_header(custom_defs))
         for lead in leads:
-            writer.writerow(LeadService._export_row(lead))
+            writer.writerow(LeadService._export_row(lead, custom_defs))
         return buf.getvalue()
 
     @staticmethod
-    def build_export_xlsx(leads: Sequence[Lead]) -> bytes:
+    def build_export_xlsx(leads: Sequence[Lead], custom_defs: Sequence | None = None) -> bytes:
         import io
         import openpyxl
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Leads"
-        ws.append(LeadService.EXPORT_COLUMNS)
+        ws.append(LeadService._export_header(custom_defs))
         for lead in leads:
-            ws.append(LeadService._export_row(lead))
+            ws.append(LeadService._export_row(lead, custom_defs))
         out = io.BytesIO()
         wb.save(out)
         return out.getvalue()

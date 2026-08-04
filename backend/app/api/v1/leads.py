@@ -70,14 +70,26 @@ async def list_leads(
     created_to: datetime | None = Query(None),
     include_archived: bool = Query(False),
     updated_after: datetime | None = Query(None, description="Delta-sync cursor: only leads changed after this timestamp (offline mobile)."),
+    custom_fields: str | None = Query(None, description="JSON object of {custom_field_key: value} filters."),
 ):
     """List paginated, searchable leads scoped to the tenant organization."""
+    custom_filters: dict | None = None
+    if custom_fields:
+        import json
+        try:
+            parsed = json.loads(custom_fields)
+            if isinstance(parsed, dict):
+                custom_filters = {str(k): v for k, v in parsed.items() if v not in (None, "")}
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="custom_fields must be a valid JSON object")
+
     lead_service = LeadService(db)
     records, _ = await lead_service.paginate_leads(
         actor, skip, limit, search, status, assigned_user_id, name, city,
         source=source, stage_id=stage_id, priority=priority, min_value=min_value,
         max_value=max_value, created_from=created_from, created_to=created_to,
         include_archived=include_archived, updated_after=updated_after,
+        custom_filters=custom_filters,
     )
     return list(records)
 
@@ -109,14 +121,21 @@ async def export_leads(
         "created_from": created_from, "created_to": created_to, "include_archived": include_archived,
     }
     leads = await lead_service.export_leads(actor, filters)
+
+    # Append the org's exportable custom-field columns so each tenant's export
+    # reflects their own schema.
+    from app.services.custom_field_service import CustomFieldService
+    all_defs = await CustomFieldService(db).list_definitions(actor, "lead")
+    custom_defs = [d for d in all_defs if d.is_active and d.exportable]
+
     if format == "xlsx":
-        content = LeadService.build_export_xlsx(leads)
+        content = LeadService.build_export_xlsx(leads, custom_defs)
         return StreamingResponse(
             io.BytesIO(content),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=leads_export.xlsx"},
         )
-    csv_text = LeadService.build_export_csv(leads)
+    csv_text = LeadService.build_export_csv(leads, custom_defs)
     return StreamingResponse(
         io.StringIO(csv_text),
         media_type="text/csv",

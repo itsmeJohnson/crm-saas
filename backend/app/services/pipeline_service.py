@@ -44,24 +44,83 @@ async def _get_or_create_default_pipeline(db: AsyncSession, org_id: uuid.UUID) -
     return pipeline
 
 
+def _stage_to_cache(s: PipelineStage) -> dict:
+    return {
+        "id": str(s.id),
+        "organization_id": str(s.organization_id),
+        "pipeline_id": str(s.pipeline_id),
+        "name": s.name,
+        "order_position": s.order_position,
+        "is_system_default": s.is_system_default,
+        "color": s.color,
+        "probability": s.probability,
+        "is_won": s.is_won,
+        "is_lost": s.is_lost,
+        "is_active": s.is_active,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+    }
+
+
+def _pipeline_to_cache(p: Pipeline) -> dict:
+    return {
+        "id": str(p.id),
+        "name": p.name,
+        "description": p.description,
+        "is_default": p.is_default,
+        "is_active": p.is_active,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        "stages": [_stage_to_cache(s) for s in sorted(p.stages, key=lambda x: x.order_position)],
+    }
+
+
+def _pipeline_from_cache(p: dict, org_id: uuid.UUID) -> Pipeline:
+    pipeline = Pipeline(
+        id=uuid.UUID(p["id"]),
+        organization_id=org_id,
+        name=p["name"],
+        description=p.get("description"),
+        is_default=p.get("is_default", False),
+        is_active=p.get("is_active", True),
+        created_at=datetime.fromisoformat(p["created_at"]) if p.get("created_at") else None,
+        updated_at=datetime.fromisoformat(p["updated_at"]) if p.get("updated_at") else None,
+    )
+    # Set the (selectin) relationship explicitly on this transient object so
+    # serialization reads the cached stages without touching the DB.
+    pipeline.stages = [
+        PipelineStage(
+            id=uuid.UUID(s["id"]),
+            organization_id=uuid.UUID(s["organization_id"]),
+            pipeline_id=uuid.UUID(s["pipeline_id"]),
+            name=s["name"],
+            order_position=s["order_position"],
+            is_system_default=s["is_system_default"],
+            color=s.get("color", "#4F46E5"),
+            probability=s.get("probability", 0),
+            is_won=s.get("is_won", False),
+            is_lost=s.get("is_lost", False),
+            is_active=s.get("is_active", True),
+            created_at=datetime.fromisoformat(s["created_at"]) if s.get("created_at") else None,
+            updated_at=datetime.fromisoformat(s["updated_at"]) if s.get("updated_at") else None,
+        )
+        for s in p.get("stages", [])
+    ]
+    return pipeline
+
+
 # Pipeline operations
 async def list_pipelines(db: AsyncSession, actor: User) -> list[Pipeline]:
-    # Cache lookup first
+    # Cache lookup first. Only trust cache entries that carry the full shape
+    # (timestamps + nested stages) so older/partial cache payloads auto-heal by
+    # falling through to a fresh DB read below.
     cached = await MetadataCacheService.get_pipelines(actor.organization_id)
-    if cached is not None:
-        # Convert dictionary to Pipeline objects for compatibility
-        return [
-            Pipeline(
-                id=uuid.UUID(p["id"]),
-                organization_id=actor.organization_id,
-                name=p["name"],
-                description=p.get("description"),
-                is_default=p.get("is_default", False),
-                is_active=p.get("is_active", True)
-            )
-            for p in cached
-        ]
+    if cached is not None and all(
+        isinstance(p, dict) and "created_at" in p and "stages" in p for p in cached
+    ):
+        return [_pipeline_from_cache(p, actor.organization_id) for p in cached]
 
+    # stages is lazy="selectin", so this query eager-loads them automatically.
     res = await db.execute(
         select(Pipeline).filter(
             Pipeline.organization_id == actor.organization_id,
@@ -70,18 +129,9 @@ async def list_pipelines(db: AsyncSession, actor: User) -> list[Pipeline]:
     )
     pipelines = list(res.scalars().all())
 
-    # Cache list
-    cache_data = [
-        {
-            "id": str(p.id),
-            "name": p.name,
-            "description": p.description,
-            "is_default": p.is_default,
-            "is_active": p.is_active
-        }
-        for p in pipelines
-    ]
-    await MetadataCacheService.set_pipelines(actor.organization_id, cache_data)
+    await MetadataCacheService.set_pipelines(
+        actor.organization_id, [_pipeline_to_cache(p) for p in pipelines]
+    )
     return pipelines
 
 

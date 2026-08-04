@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useCompanyStore } from '../store/companyStore';
+import { formatMoney } from '../utils/currency';
 import { CompanyTable } from '../components/crm/CompanyTable';
 import { CompanyModal } from '../components/crm/CompanyModal';
 import { Filters } from '../components/crm/Filters';
@@ -235,7 +236,7 @@ export const CompaniesPage: React.FC = () => {
                   <p className="text-sm font-medium text-slate-200 mt-0.5 flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                     {detailCompany.annual_revenue != null
-                      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(detailCompany.annual_revenue)
+                      ? formatMoney(detailCompany.annual_revenue)
                       : '—'}
                   </p>
                 </div>
