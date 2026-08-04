@@ -332,7 +332,7 @@ async def forgot_password(
         to_email=user.email,
         subject="Reset your Johnson Softwares CRM Password",
         template_name="password_reset.html",
-        context={"reset_url": reset_url}
+        context={"reset_url": reset_url, "token": token}
     )
 
     # C1: when SMTP is disabled (mock mode) and we are NOT in production, surface the
