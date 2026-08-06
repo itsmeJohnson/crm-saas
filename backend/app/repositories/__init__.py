@@ -7,6 +7,16 @@ from app.repositories.audit_repository import AuditRepository
 from app.repositories.lead_import_repository import LeadImportRepository
 from app.repositories.assignment_config_repository import AssignmentConfigRepository
 from app.repositories.commercial_settings import CommercialSettingsRepository
+from app.repositories.whatsapp_repository import (
+    WhatsAppSettingsRepository,
+    WhatsAppConversationRepository,
+    WhatsAppMessageRepository,
+    WhatsAppAttachmentRepository,
+    WhatsAppTemplateRepository,
+    WhatsAppWebhookEventRepository,
+    WhatsAppLabelRepository,
+    WhatsAppContactRepository
+)
 
 __all__ = [
     "BaseRepository",
@@ -17,5 +27,13 @@ __all__ = [
     "AuditRepository",
     "LeadImportRepository",
     "AssignmentConfigRepository",
-    "CommercialSettingsRepository"
+    "CommercialSettingsRepository",
+    "WhatsAppSettingsRepository",
+    "WhatsAppConversationRepository",
+    "WhatsAppMessageRepository",
+    "WhatsAppAttachmentRepository",
+    "WhatsAppTemplateRepository",
+    "WhatsAppWebhookEventRepository",
+    "WhatsAppLabelRepository",
+    "WhatsAppContactRepository"
 ]

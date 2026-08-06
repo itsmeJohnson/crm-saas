@@ -48,7 +48,11 @@ from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
 from app.models.sms_settings import SmsSettings
 from app.models.telephony_settings import TelephonySettings
-from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
+from app.models.whatsapp import (
+    WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply,
+    WhatsAppContact, WhatsAppLabel, WhatsAppMessage, WhatsAppAttachment,
+    WhatsAppTemplate, WhatsAppWebhookEvent
+)
 from app.models.email_settings import EmailSettings
 from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment
 from app.models.department import Department, DepartmentTarget
@@ -165,6 +169,12 @@ __all__ = [
     "WhatsAppSettings",
     "WhatsAppConversation",
     "WhatsAppQuickReply",
+    "WhatsAppContact",
+    "WhatsAppLabel",
+    "WhatsAppMessage",
+    "WhatsAppAttachment",
+    "WhatsAppTemplate",
+    "WhatsAppWebhookEvent",
     "EmailSettings",
     "Campaign",
     "CampaignRecipient",
