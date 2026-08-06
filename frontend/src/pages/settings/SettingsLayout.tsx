@@ -11,7 +11,7 @@ const SECTIONS: { title: string; items: { label: string; to?: string; soon?: boo
     { label: 'Departments', to: '/departments' }, { label: 'Teams', to: '/teams' },
   ] },
   { title: 'Communication', items: [
-    { label: 'SMS', to: '/sms' }, { label: 'WhatsApp', to: '/whatsapp' },
+    { label: 'SMS', to: '/sms' }, { label: 'WhatsApp', to: '/whatsapp/settings' },
     { label: 'Calling', to: '/settings/calling' }, { label: 'Email', to: '/email' },
   ] },
   { title: 'Integrations', items: [

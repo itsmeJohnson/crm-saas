@@ -4,6 +4,7 @@ export interface WaSettings {
   id: string;
   organization_id: string;
   provider: string;
+  friendly_name: string | null;
   phone_number_id: string | null;
   business_account_id: string | null;
   sender_number: string | null;
@@ -18,6 +19,12 @@ export interface WaSettings {
   auto_reply_message: string | null;
   is_active: boolean;
   health_status: string;
+  is_default: boolean;
+  quality_rating: string | null;
+  messaging_limit: string | null;
+  display_name_status: string | null;
+  created_at: string;
+  updated_at: string | null;
 }
 
 export interface WaLabel {
@@ -123,6 +130,25 @@ export interface WaReport {
   by_day: ReportBucket[];
 }
 
+export interface WaDashboardMetrics {
+  connected_accounts: number;
+  disconnected_accounts: number;
+  expired_tokens: number;
+  rate_limited_accounts: number;
+  maintenance_accounts: number;
+  quality_ratings: any[];
+  messaging_limits: any[];
+  webhook_status: string;
+  template_sync_status: string;
+  last_sync_time: string;
+  graph_api_latency_ms: number;
+  queue_size: number;
+  queue_health: string;
+  failed_messages: number;
+  success_rate: number;
+  daily_volume: number;
+}
+
 export interface QuickReply {
   id: string;
   shortcut: string;
@@ -155,6 +181,14 @@ export const whatsappApi = {
     (await api.post<{ health_status: string }>(`/whatsapp/settings/${settingsId}/health`)).data,
   syncTemplates: async (settingsId: string) =>
     (await api.post<WaTemplate[]>(`/whatsapp/settings/${settingsId}/sync-templates`)).data,
+  deleteSettings: async (settingsId: string) =>
+    (await api.delete(`/whatsapp/settings/${settingsId}`)),
+  refreshMetadata: async (settingsId: string) =>
+    (await api.post<{ status: string; reason?: string }>(`/whatsapp/settings/${settingsId}/refresh`)).data,
+  getDiagnostics: async (settingsId: string) =>
+    (await api.get<Record<string, 'green' | 'yellow' | 'red'>>(`/whatsapp/settings/${settingsId}/diagnostics`)).data,
+  exchangeSignupOAuth: async (code: string, redirectUri: string) =>
+    (await api.post<WaSettings[]>('/whatsapp/signup/exchange', { code, redirect_uri: redirectUri })).data,
 
   conversations: async (params: { status?: string; assigned_to?: string; search?: string; unread_only?: boolean; label_id?: string; settings_id?: string } = {}) =>
     (await api.get<WaConversation[]>('/whatsapp/conversations', { params })).data,
@@ -194,6 +228,7 @@ export const whatsappApi = {
     (await api.post<QuickReply>('/whatsapp/quick-replies', payload)).data,
   deleteQuickReply: async (id: string) => { await api.delete(`/whatsapp/quick-replies/${id}`); },
 
+  getDashboardMetrics: async () => (await api.get<WaDashboardMetrics>('/whatsapp/monitoring/dashboard')).data,
   reports: async (params: { date_from?: string; date_to?: string } = {}) =>
     (await api.get<WaReport>('/whatsapp/reports', { params })).data,
   exportReportsUrl: (format: 'excel' | 'pdf', dateFrom?: string, dateTo?: string) => {

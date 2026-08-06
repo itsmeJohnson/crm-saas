@@ -280,6 +280,46 @@ async def exchange_whatsapp_signup_oauth(
     return res
 
 
+@router.delete("/settings/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_whatsapp_settings(
+    id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role == "Employee":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Employee role not permitted.")
+    service = WhatsAppService(db)
+    await service.delete_settings(current_user, id)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/settings/{id}/refresh")
+async def refresh_whatsapp_settings_metadata(
+    id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role == "Employee":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Employee role not permitted.")
+    service = WhatsAppService(db)
+    res = await service.sync_settings_metadata(id, current_user)
+    await db.commit()
+    return res
+
+
+@router.get("/settings/{id}/diagnostics")
+async def get_whatsapp_diagnostics(
+    id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role == "Employee":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Employee role not permitted.")
+    service = WhatsAppService(db)
+    return await service.get_diagnostics(current_user, id)
+
+
 @router.get("/monitoring/dashboard", response_model=WaDashboardMetrics)
 async def get_whatsapp_monitoring_dashboard(
     current_user: User = Depends(get_current_user),

@@ -9,6 +9,7 @@ class WaSettingsResponse(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     provider: str
+    friendly_name: Optional[str] = None
     phone_number_id: Optional[str] = None
     business_account_id: Optional[str] = None
     sender_number: Optional[str] = None
@@ -33,6 +34,7 @@ class WaSettingsResponse(BaseModel):
 
 class WaSettingsUpdate(BaseModel):
     provider: Optional[str] = Field(None, max_length=30)
+    friendly_name: Optional[str] = Field(None, max_length=100)
     phone_number_id: Optional[str] = Field(None, max_length=64)
     business_account_id: Optional[str] = Field(None, max_length=64)
     access_token: Optional[str] = None
@@ -258,9 +260,18 @@ class WhatsAppSignupExchange(BaseModel):
 
 class WaDashboardMetrics(BaseModel):
     connected_accounts: int
+    disconnected_accounts: int
+    expired_tokens: int
+    rate_limited_accounts: int
+    maintenance_accounts: int
     quality_ratings: List[Dict[str, Any]]
     messaging_limits: List[Dict[str, Any]]
     webhook_status: str
+    template_sync_status: str
+    last_sync_time: str
+    graph_api_latency_ms: int
     queue_size: int
+    queue_health: str
     failed_messages: int
+    success_rate: float
     daily_volume: int
