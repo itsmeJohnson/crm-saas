@@ -28,6 +28,7 @@ class WhatsAppSettings(BaseModel):
 
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String(30), default="mock", nullable=False)  # mock|meta|twilio|gupshup
+    friendly_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone_number_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     business_account_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     access_token: Mapped[str | None] = mapped_column(Text, nullable=True)  # encrypted access token

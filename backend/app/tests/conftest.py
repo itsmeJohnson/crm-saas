@@ -1,5 +1,6 @@
 import os
 os.environ["JWT_SECRET_KEY"] = "test_secure_key_1234567890_saas_johnson"
+os.environ["TELEPHONY_ENCRYPTION_KEY"] = "YqUFhZmtAsiakLSb4rG4VTC5qW4UhTW92BzC1B4VGsk="
 os.environ["TESTING"] = "true"
 os.environ["ENVIRONMENT"] = "testing"
 

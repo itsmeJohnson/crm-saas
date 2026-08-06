@@ -491,3 +491,89 @@ async def test_monitoring_dashboard(client: AsyncClient, setup: dict, db: AsyncS
     assert "quality_ratings" in res
     assert "messaging_limits" in res
     assert "webhook_status" in res
+
+
+@pytest.mark.asyncio
+async def test_delete_whatsapp_settings(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_delete_123", webhook_token="token", webhook_verify_token="verify",
+        is_default=True
+    )
+    db.add(s)
+    await db.commit()
+
+    r = await client.delete(f"/api/v1/whatsapp/settings/{s.id}", headers=data["h_admin"])
+    assert r.status_code == 204
+
+    # Check that settings is soft deleted
+    await db.refresh(s)
+    assert s.is_deleted is True
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_manual_refresh(client: AsyncClient, setup: dict, db: AsyncSession, monkeypatch):
+    data = setup
+    from app.core.crypto import encrypt
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", business_account_id="waba_12345",
+        access_token=encrypt("EAAG_mock_ref"), webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+
+    r = await client.post(f"/api/v1/whatsapp/settings/{s.id}/refresh", headers=data["h_admin"])
+    assert r.status_code == 200
+    assert r.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_diagnostics(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify",
+        webhook_url="https://localhost:8000/webhook"
+    )
+    db.add(s)
+    await db.commit()
+
+    r = await client.get(f"/api/v1/whatsapp/settings/{s.id}/diagnostics", headers=data["h_admin"])
+    assert r.status_code == 200
+    res = r.json()
+    assert res["webhook_reachable"] == "green"
+    assert "token_valid" in res
+    assert "phone_verified" in res
+    assert "graph_api_reachable" in res
+    assert "template_sync" in res
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_hourly_sync_cron(db: AsyncSession):
+    from app.cron.whatsapp_cron import run_whatsapp_hourly_sync
+    from app.core.crypto import encrypt
+    s = WhatsAppSettings(
+        organization_id=uuid.uuid4(), provider="meta",
+        phone_number_id="phone_cron_test", business_account_id="waba_cron",
+        access_token=encrypt("EAAG_mock_cron"), webhook_token="token", webhook_verify_token="verify",
+        is_active=True
+    )
+    db.add(s)
+    await db.commit()
+
+    # Stub session maker
+    class MockSession:
+        def __init__(self, db_session):
+            self.db = db_session
+        async def __aenter__(self):
+            return self.db
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    def mock_session_maker():
+        return MockSession(db)
+
+    # This should complete without exceptions
+    await run_whatsapp_hourly_sync(mock_session_maker)
