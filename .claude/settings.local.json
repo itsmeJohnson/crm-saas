@@ -140,7 +140,12 @@
       "Bash(grep -nA25 \"async def list_pipelines\" app/services/pipeline_service.py)",
       "Bash(grep -nB2 -A12 \"Active Tenant\" modules/dashboard/Home.tsx)",
       "Bash(grep -nB1 -A12 \"const NavItem\" pages/TenantsPage.tsx)",
-      "Bash(grep -nE \"\\\\\\\\\\\\$|USD|Intl|NumberFormat|currency|toLocale\" pages/LeadReportsPage.tsx)"
+      "Bash(grep -nE \"\\\\\\\\\\\\$|USD|Intl|NumberFormat|currency|toLocale\" pages/LeadReportsPage.tsx)",
+      "Bash(grep -nA40 \"async def list_definitions\" app/services/custom_field_service.py)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('app/services/custom_field_service.py'\\).read\\(\\)\\); print\\('parse OK'\\)\")",
+      "Bash(grep -nE \"fetchDashboardMetrics\\\\\\(\\\\\\);|Filters, Table, Pagination|const \\\\[view|import \\\\{ leadApi|LeadReport\" pages/LeadsPage.tsx)",
+      "Bash(grep -nA15 \"async def create_definition\" app/services/custom_field_service.py)",
+      "Bash(git rev-list *)"
     ]
   }
 }

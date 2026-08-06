@@ -263,6 +263,24 @@ async def reminder_dispatch_loop():
             await asyncio.sleep(60)
 
 
+async def whatsapp_sla_loop():
+    """Minute-granularity check for WhatsApp Response SLA breaches."""
+    logger = logging.getLogger("app.cron.whatsapp")
+    from app.core.redis import redis_client
+    from app.cron.whatsapp_cron import run_whatsapp_sla_check
+    while True:
+        try:
+            async with redis_client.lock("cron_lock:whatsapp_sla", lease_time=55, acquire_timeout=2.0) as locked:
+                if locked:
+                    await run_whatsapp_sla_check(async_session_maker)
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("whatsapp_sla_loop error: %s", e)
+            await asyncio.sleep(60)
+
+
 # ── App lifespan ──────────────────────────────────────────────────────────────
 # Max seconds to wait for background loops to cancel before forcing shutdown.
 # Tunable via env; a low value keeps the regression test fast.
@@ -292,6 +310,7 @@ async def lifespan(app: FastAPI):
     queue_task = asyncio.create_task(queue_worker_loop())
     scheduler_task = asyncio.create_task(scheduler_tick_loop())
     reminder_task = asyncio.create_task(reminder_dispatch_loop())
+    whatsapp_sla_task = asyncio.create_task(whatsapp_sla_loop())
     yield
     # Graceful shutdown of the background loops. Each is cancelled, then awaited
     # with a BOUNDED timeout: if a loop is wedged in a non-cancellable await (a
@@ -299,7 +318,7 @@ async def lifespan(app: FastAPI):
     # "Waiting for application shutdown" — the dev --reload hang that silently
     # takes the whole app (and its reminder/scheduler jobs) down. Cap the wait so
     # the process always restarts cleanly instead of freezing.
-    bg_tasks = (cron_task, queue_task, scheduler_task, reminder_task)
+    bg_tasks = (cron_task, queue_task, scheduler_task, reminder_task, whatsapp_sla_task)
     for t in bg_tasks:
         t.cancel()
     try:
