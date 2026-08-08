@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Dental Tooth Crown & Roots Silhouette -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 C45,28 36,33 34,42 C32,50 34,58 37,66 C40,74 42,82 46,82 C49,82 50,75 52,68 C53,64 55,64 56,68 C58,75 59,82 62,82 C66,82 68,74 71,66 C74,58 76,50 74,42 C72,33 63,28 54,28 Z" />
+
+    <!-- Minimalist Inner Enamel Gloss Arch -->
+    <path
+        android:fillColor="#CCFBF1"
+        android:pathData="M54,34 C47,34 40,38 39,44 C38,48 40,54 42,60 C43,62 45,62 46,58 C47,54 49,48 54,48 C59,48 61,54 62,58 C63,62 65,62 66,60 C68,54 70,48 69,44 C68,38 61,34 54,34 Z" />
+
+    <!-- Modern FewClick Sparkle Star (Top Right) -->
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M78,24 L80,30 L86,32 L80,34 L78,40 L76,34 L70,32 L76,30 Z" />
+
+    <!-- Minimalist Click Accent Dot -->
+    <path
+        android:fillColor="#F0FDFA"
+        android:pathData="M84,46 A3,3 0 1,1 84,40 A3,3 0 1,1 84,46 Z" />
+</vector>

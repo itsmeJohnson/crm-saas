@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FewClick CRM</string>
+    <string name="clinic_name">FewClick Dental Clinic</string>
+    <string name="clinic_tagline">Smart &amp; Minimal Dental Practice CRM</string>
+</resources>

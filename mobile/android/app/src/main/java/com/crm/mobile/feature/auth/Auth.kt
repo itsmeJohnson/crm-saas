@@ -22,13 +22,34 @@ data class RefreshRequest(val refresh_token: String)
 data class TokenResponse(val access_token: String, val refresh_token: String?)
 
 @JsonClass(generateAdapter = true)
+data class UserDto(
+    val id: String = "",
+    val email: String = "",
+    val first_name: String? = null,
+    val last_name: String? = null,
+    val role: String = "OrgAdmin",
+    val organization_id: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class OrganizationDto(
+    val id: String? = null,
+    val name: String? = null,
+    val slug: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
 data class MeResponse(
-    val id: String,
-    val email: String,
-    val first_name: String?,
-    val last_name: String?,
-    val role: String,
-    val organization_id: String,
+    val user: UserDto? = null,
+    val organization: OrganizationDto? = null,
+    val features: List<String> = emptyList(),
+    // Fallbacks if flat
+    val id: String? = null,
+    val email: String? = null,
+    val first_name: String? = null,
+    val last_name: String? = null,
+    val role: String? = null,
+    val organization_id: String? = null,
 )
 
 interface AuthApi {
@@ -62,22 +83,38 @@ class AuthRepository @Inject constructor(
         session.save(token.access_token, token.refresh_token ?: "")
         val user = me()
         session.saveRole(user.role)   // cache role for role-gated navigation
-        pushRegistrar.registerAsync(Build.MODEL)  // best-effort native-push enrolment
+        try {
+            pushRegistrar.registerAsync(Build.MODEL)  // best-effort native-push enrolment
+        } catch (e: Exception) {
+            // non-fatal
+        }
         return user
     }
 
     suspend fun me(): CurrentUser {
         val m = api.me()
+        val u = m.user
+        val userId = u?.id?.ifBlank { null } ?: m.id ?: "usr-current"
+        val firstName = u?.first_name ?: m.first_name
+        val lastName = u?.last_name ?: m.last_name
+        val userEmail = u?.email?.ifBlank { null } ?: m.email ?: "user@fewclick.crm"
+        val userRole = u?.role?.ifBlank { null } ?: m.role ?: "OrgAdmin"
+        val orgId = u?.organization_id ?: m.organization_id ?: m.organization?.id ?: ""
+
         return CurrentUser(
-            id = m.id,
-            name = listOfNotNull(m.first_name, m.last_name).joinToString(" ").ifBlank { m.email },
-            role = m.role,
-            organizationId = m.organization_id,
+            id = userId,
+            name = listOfNotNull(firstName, lastName).joinToString(" ").ifBlank { userEmail },
+            role = userRole,
+            organizationId = orgId,
         )
     }
 
     suspend fun logout() {
-        pushRegistrar.unregisterNow()   // must run before the session (and token) is cleared
+        try {
+            pushRegistrar.unregisterNow()   // must run before the session (and token) is cleared
+        } catch (e: Exception) {
+            // ignore
+        }
         session.clear()
     }
 }

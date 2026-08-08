@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.NavHost
@@ -23,24 +24,14 @@ import androidx.navigation.compose.rememberNavController
 import com.crm.mobile.core.design.CrmTheme
 import com.crm.mobile.core.session.SessionManager
 import com.crm.mobile.feature.auth.LoginScreen
-import com.crm.mobile.feature.calendar.CalendarScreen
-import com.crm.mobile.feature.cockpit.CockpitScreen
-import com.crm.mobile.feature.communication.ComposeScreen
-import com.crm.mobile.feature.contacts.ContactDetailScreen
-import com.crm.mobile.feature.contacts.ContactsListScreen
-import com.crm.mobile.feature.customers.CustomerDetailScreen
-import com.crm.mobile.feature.customers.CustomersListScreen
-import com.crm.mobile.feature.dashboard.DashboardScreen
-import com.crm.mobile.feature.leads.LeadsScreen
-import com.crm.mobile.feature.more.MoreScreen
+import com.crm.mobile.feature.dental.DentalRepository
+import com.crm.mobile.feature.dental.ui.DentalAppointmentsScreen
+import com.crm.mobile.feature.dental.ui.DentalDashboardScreen
+import com.crm.mobile.feature.dental.ui.DentalPatientsScreen
+import com.crm.mobile.feature.dental.ui.DentalRecallsAnalyticsScreen
+import com.crm.mobile.feature.dental.ui.DentalTreatmentsBillingScreen
 import com.crm.mobile.feature.notifications.CrmMessagingService
-import com.crm.mobile.feature.notifications.NotificationsScreen
 import com.crm.mobile.feature.notifications.deepLinkToRoute
-import com.crm.mobile.feature.profile.ProfileScreen
-import com.crm.mobile.feature.reminders.ReminderScreen
-import com.crm.mobile.feature.reports.ReportsScreen
-import com.crm.mobile.feature.tasks.TasksScreen
-import com.crm.mobile.feature.timeline.TimelineScreen
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -49,10 +40,11 @@ import javax.inject.Inject
 class CrmApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Notification channel for FCM/system notifications (minSdk 26, always present).
         val channel = NotificationChannel(
-            CrmMessagingService.CHANNEL_ID, "CRM Alerts", NotificationManager.IMPORTANCE_HIGH,
-        ).apply { description = "Reminders, follow-ups and other CRM alerts" }
+            CrmMessagingService.CHANNEL_ID,
+            "FewClick CRM Dental Alerts",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply { description = "Patient recalls, appointments, and treatment updates" }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 }
@@ -61,25 +53,18 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val DASHBOARD = "dashboard"
-    const val COCKPIT = "cockpit"
-    const val LEADS = "leads"
-    const val TASKS = "tasks"
+    const val APPOINTMENTS = "appointments"
+    const val PATIENTS = "patients"
+    const val BILLING = "billing"
     const val MORE = "more"
-    const val CALENDAR = "calendar"
-    const val CUSTOMERS = "customers"
-    const val CONTACTS = "contacts"
-    const val TIMELINE = "timeline"
-    const val REMINDERS = "reminders"
-    const val NOTIFICATIONS = "notifications"
-    const val REPORTS = "reports"
-    const val PROFILE = "profile"
+    const val PATIENT_DETAIL = "patient_detail"
 }
 
-// FragmentActivity so BiometricPrompt can attach.
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
     @Inject lateinit var session: SessionManager
+    @Inject lateinit var dentalRepository: DentalRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,10 +72,11 @@ class MainActivity : FragmentActivity() {
             CrmTheme {
                 val loggedIn by session.isLoggedIn.collectAsState(initial = null)
                 when (loggedIn) {
-                    null -> Unit // brief splash while the session is read
+                    null -> Unit
                     else -> AppNavGraph(
                         startLoggedIn = loggedIn == true,
                         initialDeepLink = intent?.getStringExtra(CrmMessagingService.EXTRA_DEEP_LINK),
+                        dentalRepository = dentalRepository
                     )
                 }
             }
@@ -99,7 +85,11 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun AppNavGraph(startLoggedIn: Boolean, initialDeepLink: String? = null) {
+fun AppNavGraph(
+    startLoggedIn: Boolean,
+    initialDeepLink: String? = null,
+    dentalRepository: DentalRepository
+) {
     val nav = rememberNavController()
     NavHost(
         navController = nav,
@@ -107,13 +97,14 @@ fun AppNavGraph(startLoggedIn: Boolean, initialDeepLink: String? = null) {
     ) {
         composable(Routes.LOGIN) {
             LoginScreen(onLoggedIn = {
+                dentalRepository.syncWithBackend()
                 nav.navigate(Routes.HOME) { popUpTo(Routes.LOGIN) { inclusive = true } }
             })
         }
-        // Deep link only applies when we open straight into the app (already signed in).
         composable(Routes.HOME) {
             HomeShell(
                 initialDeepLink = initialDeepLink.takeIf { startLoggedIn },
+                dentalRepository = dentalRepository,
                 onLoggedOut = {
                     nav.navigate(Routes.LOGIN) { popUpTo(Routes.HOME) { inclusive = true } }
                 },
@@ -122,26 +113,30 @@ fun AppNavGraph(startLoggedIn: Boolean, initialDeepLink: String? = null) {
     }
 }
 
-private data class Tab(val route: String, val label: String, val glyph: String)
+private data class DentalTab(val route: String, val label: String, val glyph: String)
 
-/** Bottom-nav shell hosting the role's primary destinations. New feature
- *  modules add a Tab + a composable() here — the navigation framework. */
 @Composable
-fun HomeShell(initialDeepLink: String? = null, onLoggedOut: () -> Unit = {}) {
+fun HomeShell(
+    initialDeepLink: String? = null,
+    dentalRepository: DentalRepository,
+    onLoggedOut: () -> Unit = {}
+) {
+    LaunchedEffect(Unit) {
+        dentalRepository.syncWithBackend()
+    }
     val tabs = listOf(
-        Tab(Routes.DASHBOARD, "Home", "▦"),
-        Tab(Routes.COCKPIT, "Dialer", "☎"),
-        Tab(Routes.LEADS, "Leads", "☰"),
-        Tab(Routes.TASKS, "Tasks", "✔"),
-        Tab(Routes.MORE, "More", "⋯"),
+        DentalTab(Routes.DASHBOARD, "Clinic Hub", "🏥"),
+        DentalTab(Routes.APPOINTMENTS, "Chairs", "📅"),
+        DentalTab(Routes.PATIENTS, "Patients", "🦷"),
+        DentalTab(Routes.BILLING, "Billing", "💳"),
+        DentalTab(Routes.MORE, "Operations", "⋯"),
     )
     val inner = rememberNavController()
     val backStack by inner.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: Routes.DASHBOARD
 
-    // A tapped push carries a link_url; route to the matching destination once.
     LaunchedEffect(initialDeepLink) {
-        val route = deepLinkToRoute(initialDeepLink) ?: Routes.NOTIFICATIONS.takeIf { initialDeepLink != null }
+        val route = deepLinkToRoute(initialDeepLink) ?: Routes.MORE.takeIf { initialDeepLink != null }
         route?.let { inner.navigate(it) { launchSingleTop = true } }
     }
 
@@ -150,7 +145,7 @@ fun HomeShell(initialDeepLink: String? = null, onLoggedOut: () -> Unit = {}) {
             NavigationBar {
                 tabs.forEach { t ->
                     NavigationBarItem(
-                        selected = current == t.route,
+                        selected = current.startsWith(t.route),
                         onClick = {
                             inner.navigate(t.route) {
                                 popUpTo(inner.graph.startDestinationId) { saveState = true }
@@ -167,33 +162,50 @@ fun HomeShell(initialDeepLink: String? = null, onLoggedOut: () -> Unit = {}) {
     ) { padding ->
         NavHost(inner, startDestination = Routes.DASHBOARD, modifier = Modifier.padding(padding)) {
             composable(Routes.DASHBOARD) {
-                DashboardScreen(onOpenLeads = { inner.navigate(Routes.LEADS) { launchSingleTop = true } })
+                DentalDashboardScreen(
+                    repository = dentalRepository,
+                    onNavigateToPatients = { inner.navigate(Routes.PATIENTS) { launchSingleTop = true } },
+                    onNavigateToAppointments = { inner.navigate(Routes.APPOINTMENTS) { launchSingleTop = true } },
+                    onNavigateToBilling = { inner.navigate(Routes.BILLING) { launchSingleTop = true } },
+                    onNavigateToRecalls = { inner.navigate(Routes.MORE) { launchSingleTop = true } },
+                    onOpenPatientProfile = { patientId ->
+                        inner.navigate("${Routes.PATIENTS}?patientId=$patientId") { launchSingleTop = true }
+                    }
+                )
             }
-            composable(Routes.COCKPIT) {
-                CockpitScreen(onMessage = { id -> inner.navigate("compose/$id") { launchSingleTop = true } })
+            composable(Routes.APPOINTMENTS) {
+                DentalAppointmentsScreen(
+                    repository = dentalRepository,
+                    onOpenPatientProfile = { patientId ->
+                        inner.navigate("${Routes.PATIENTS}?patientId=$patientId") { launchSingleTop = true }
+                    }
+                )
             }
-            composable("compose/{leadId}") { ComposeScreen(onDone = { inner.popBackStack() }) }
-            composable(Routes.LEADS) { LeadsScreen() }
-            composable(Routes.TASKS) { TasksScreen() }
-            composable(Routes.MORE) { MoreScreen(onNavigate = { r -> inner.navigate(r) { launchSingleTop = true } }) }
-            composable(Routes.CALENDAR) { CalendarScreen() }
-            composable(Routes.CUSTOMERS) {
-                CustomersListScreen(onOpen = { id -> inner.navigate("customer/$id") { launchSingleTop = true } })
+            composable(Routes.PATIENTS) { backStackEntry ->
+                val patientId = backStackEntry.arguments?.getString("patientId")
+                DentalPatientsScreen(
+                    repository = dentalRepository,
+                    selectedPatientId = patientId
+                )
             }
-            composable("customer/{companyId}") { CustomerDetailScreen() }
-            composable(Routes.CONTACTS) {
-                ContactsListScreen(onOpen = { id -> inner.navigate("contact/$id") { launchSingleTop = true } })
+            composable("${Routes.PATIENTS}?patientId={patientId}") { backStackEntry ->
+                val patientId = backStackEntry.arguments?.getString("patientId")
+                DentalPatientsScreen(
+                    repository = dentalRepository,
+                    selectedPatientId = patientId
+                )
             }
-            composable("contact/{contactId}") { ContactDetailScreen() }
-            composable(Routes.TIMELINE) { TimelineScreen() }
-            composable(Routes.REMINDERS) {
-                ReminderScreen(onOpenLead = { inner.navigate(Routes.LEADS) { launchSingleTop = true } })
+            composable(Routes.BILLING) {
+                DentalTreatmentsBillingScreen(
+                    repository = dentalRepository
+                )
             }
-            composable(Routes.NOTIFICATIONS) {
-                NotificationsScreen(onDeepLink = { route -> inner.navigate(route) { launchSingleTop = true } })
+            composable(Routes.MORE) {
+                DentalRecallsAnalyticsScreen(
+                    repository = dentalRepository,
+                    onLogout = onLoggedOut
+                )
             }
-            composable(Routes.REPORTS) { ReportsScreen() }
-            composable(Routes.PROFILE) { ProfileScreen(onLoggedOut = onLoggedOut) }
         }
     }
 }

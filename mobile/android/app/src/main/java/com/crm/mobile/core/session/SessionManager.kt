@@ -40,6 +40,17 @@ class SessionManager @Inject constructor(
         val TEL_MYOP_CALLER = stringPreferencesKey("telephony_myop_caller_id")
         val BIOMETRIC = booleanPreferencesKey("biometric_enabled")
         val PUSH_ENABLED = booleanPreferencesKey("push_enabled")
+        val SERVER_URL = stringPreferencesKey("server_base_url")
+    }
+
+    /** Custom VPS or local server base URL */
+    val serverUrl: Flow<String?> = context.dataStore.data.map { it[Keys.SERVER_URL] }
+    suspend fun getServerUrl(): String? = context.dataStore.data.first()[Keys.SERVER_URL]
+    suspend fun setServerUrl(url: String) {
+        context.dataStore.edit {
+            val clean = url.trim().trimEnd('/')
+            if (clean.isNotEmpty()) it[Keys.SERVER_URL] = clean else it.remove(Keys.SERVER_URL)
+        }
     }
 
     /** Biometric app-unlock preference (default off until the user opts in). */
