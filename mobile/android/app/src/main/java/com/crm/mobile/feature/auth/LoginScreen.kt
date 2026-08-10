@@ -62,7 +62,7 @@ import javax.inject.Inject
 data class LoginUiState(
     val email: String = "dr.arvind@smilecaredental.com",
     val password: String = "Demo@12345",
-    val serverUrl: String = "http://192.168.1.6:8000",
+    val serverUrl: String = "https://crm.johnsonsoftwares.com",
     val showServerConfig: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,

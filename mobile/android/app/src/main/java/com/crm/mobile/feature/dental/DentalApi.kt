@@ -73,6 +73,17 @@ data class CrmEventUpdateDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class CrmTaskDto(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val due_date: String? = null,
+    val status: String = "Pending",
+    val priority: String? = "Medium",
+    val contact_id: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class CrmActivityCreateDto(
     val activity_type: String = "Dental Note",
     val subject: String,
@@ -112,6 +123,12 @@ interface DentalApi {
 
     @PATCH("calendar/events/{id}")
     suspend fun updateEvent(@Path("id") id: String, @Body body: CrmEventUpdateDto): CrmEventDto
+
+    @GET("tasks/")
+    suspend fun listTasks(@Query("limit") limit: Int = 100): List<CrmTaskDto>
+
+    @PATCH("tasks/{id}")
+    suspend fun updateTask(@Path("id") id: String, @Body body: Map<String, String>): CrmTaskDto
 
     @POST("activities/")
     suspend fun logActivity(@Body body: CrmActivityCreateDto): CrmActivityDto
