@@ -50,11 +50,10 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: str | None, info) -> str:
         if isinstance(v, str) and v:
             return v
-        data = info.data
-        server = data.get("POSTGRES_SERVER", "db")
-        user = data.get("POSTGRES_USER", "postgres")
-        password = data.get("POSTGRES_PASSWORD", "postgres")
-        db = data.get("POSTGRES_DB", "crm")
+        server = os.environ.get("POSTGRES_SERVER") or data.get("POSTGRES_SERVER", "localhost")
+        user = os.environ.get("POSTGRES_USER") or data.get("POSTGRES_USER", "postgres")
+        password = os.environ.get("POSTGRES_PASSWORD") or data.get("POSTGRES_PASSWORD", "postgres")
+        db = os.environ.get("POSTGRES_DB") or data.get("POSTGRES_DB", "crm")
         return f"postgresql+asyncpg://{user}:{password}@{server}/{db}"
 
     # Redis
@@ -68,8 +67,8 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v:
             return v
         data = info.data
-        host = data.get("REDIS_HOST", "redis")
-        port = data.get("REDIS_PORT", 6379)
+        host = os.environ.get("REDIS_HOST") or data.get("REDIS_HOST", "redis")
+        port = os.environ.get("REDIS_PORT") or data.get("REDIS_PORT", 6379)
         return f"redis://{host}:{port}/0"
 
     # SMTP / Emails

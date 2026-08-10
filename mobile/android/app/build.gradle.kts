@@ -19,8 +19,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        // Point at your backend. Use host LAN IP if emulator is bridged.
-        buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.6:8000/api/v1/\"")
+        // Point at production VPS backend with SSL
+        buildConfigField("String", "API_BASE_URL", "\"https://crm.johnsonsoftwares.com/api/v1/\"")
     }
 
     buildFeatures {

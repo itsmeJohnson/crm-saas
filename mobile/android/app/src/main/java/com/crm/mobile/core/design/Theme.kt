@@ -13,146 +13,163 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
 // ---------------------------------------------------------------------------
-// Brand palette — indigo accent on slate neutrals, with a muted-teal tertiary.
-// Full tonal families so every M3 role is on-brand (no stock purple leaks) and
-// consistent between light and dark.
+// Minimalist Dental Palette — Pure clinical teal/cyan accents on soft slate neutrals.
+// Engineered for dental practice clarity, minimal eye-strain, and rapid scanning.
 // ---------------------------------------------------------------------------
 
-private object Ind {   // indigo primary tones
-    val t20 = Color(0xFF1A1F6B); val t30 = Color(0xFF2E38A6)
-    val t40 = Color(0xFF4B56D6); val t80 = Color(0xFFBAC0FF); val t90 = Color(0xFFE0E2FB)
-}
-private object Slate { // neutral tones
-    val t10 = Color(0xFF1B1F2A); val t20 = Color(0xFF2B303C); val t30 = Color(0xFF474C5B)
-    val t60 = Color(0xFF8C90A0); val t80 = Color(0xFFC3C7D6); val t90 = Color(0xFFDDE1EC)
-}
-private object Teal {  // tertiary tones
-    val t20 = Color(0xFF00363F); val t30 = Color(0xFF104E59)
-    val t40 = Color(0xFF2E7D8F); val t80 = Color(0xFF8FD0DE); val t90 = Color(0xFFACE9F7)
+object DentalColors {
+    // Primary Dental Teal tones
+    val Teal50 = Color(0xFFF0FDFA)
+    val Teal100 = Color(0xFFCCFBF1)
+    val Teal200 = Color(0xFF99F6E4)
+    val Teal500 = Color(0xFF14B8A6)
+    val Teal600 = Color(0xFF0D9488)
+    val Teal700 = Color(0xFF0F766E)
+    val Teal900 = Color(0xFF134E4A)
+
+    // Slate neutrals
+    val Slate900 = Color(0xFF0F172A)
+    val Slate800 = Color(0xFF1E293B)
+    val Slate700 = Color(0xFF334155)
+    val Slate600 = Color(0xFF475569)
+    val Slate500 = Color(0xFF64748B)
+    val Slate400 = Color(0xFF94A3B8)
+    val Slate200 = Color(0xFFE2E8F0)
+    val Slate100 = Color(0xFFF1F5F9)
+    val Slate50 = Color(0xFFF8FAFC)
+
+    // Clinical Status & Badges
+    val StatusHealthy = Color(0xFF10B981) // Mint green
+    val StatusHealthyBg = Color(0xFFD1FAE5)
+    val StatusCaries = Color(0xFFEF4444) // Coral red
+    val StatusCariesBg = Color(0xFFFEE2E2)
+    val StatusCrown = Color(0xFFF59E0B) // Amber gold
+    val StatusCrownBg = Color(0xFFFEF3C7)
+    val StatusRCT = Color(0xFF8B5CF6) // Royal Purple
+    val StatusRCTBg = Color(0xFFEDE9FE)
+    val StatusImplant = Color(0xFF0284C7) // Sky blue
+    val StatusImplantBg = Color(0xFFE0F2FE)
+    val StatusMissing = Color(0xFF94A3B8) // Muted gray
+    val StatusMissingBg = Color(0xFFF1F5F9)
 }
 
 private val LightColors = lightColorScheme(
-    primary = Ind.t40,
+    primary = DentalColors.Teal600,
     onPrimary = Color.White,
-    primaryContainer = Ind.t90,
-    onPrimaryContainer = Ind.t20,
-    inversePrimary = Ind.t80,
+    primaryContainer = DentalColors.Teal100,
+    onPrimaryContainer = DentalColors.Teal900,
+    inversePrimary = DentalColors.Teal200,
 
-    secondary = Color(0xFF5A607D),
+    secondary = Color(0xFF0284C7),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDDE1F3),
-    onSecondaryContainer = Color(0xFF171B2C),
+    secondaryContainer = Color(0xFFE0F2FE),
+    onSecondaryContainer = Color(0xFF0369A1),
 
-    tertiary = Teal.t40,
+    tertiary = Color(0xFF6366F1),
     onTertiary = Color.White,
-    tertiaryContainer = Teal.t90,
-    onTertiaryContainer = Teal.t20,
+    tertiaryContainer = Color(0xFFEEF2FF),
+    onTertiaryContainer = Color(0xFF312E81),
 
-    background = Color(0xFFF5F6FA),
-    onBackground = Slate.t10,
+    background = DentalColors.Slate50,
+    onBackground = DentalColors.Slate900,
     surface = Color(0xFFFFFFFF),
-    onSurface = Slate.t10,
-    surfaceVariant = Color(0xFFE3E6F0),
-    onSurfaceVariant = Slate.t30,
-    surfaceTint = Ind.t40,
+    onSurface = DentalColors.Slate900,
+    surfaceVariant = DentalColors.Slate100,
+    onSurfaceVariant = DentalColors.Slate600,
+    surfaceTint = DentalColors.Teal600,
 
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF7F8FC),
-    surfaceContainer = Color(0xFFF1F3F9),
-    surfaceContainerHigh = Color(0xFFEBEEF6),
-    surfaceContainerHighest = Color(0xFFE5E9F3),
+    surfaceContainerLow = Color(0xFFF8FAFC),
+    surfaceContainer = Color(0xFFF1F5F9),
+    surfaceContainerHigh = Color(0xFFE2E8F0),
+    surfaceContainerHighest = Color(0xFFCBD5E1),
 
-    outline = Color(0xFFC3C8D6),
-    outlineVariant = Color(0xFFDBDFEA),
+    outline = DentalColors.Slate200,
+    outlineVariant = Color(0xFFE2E8F0),
 
-    error = Color(0xFFD92D36),
+    error = Color(0xFFE11D48),
     onError = Color.White,
-    errorContainer = Color(0xFFFCDCDE),
-    onErrorContainer = Color(0xFF410007),
+    errorContainer = Color(0xFFFFE4E6),
+    onErrorContainer = Color(0xFF881337),
 
-    inverseSurface = Slate.t20,
-    inverseOnSurface = Color(0xFFF0F1F6),
+    inverseSurface = DentalColors.Slate800,
+    inverseOnSurface = DentalColors.Slate50,
     scrim = Color(0xFF000000),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Ind.t80,
-    onPrimary = Ind.t20,
-    primaryContainer = Ind.t30,
-    onPrimaryContainer = Ind.t90,
-    inversePrimary = Ind.t40,
+    primary = DentalColors.Teal200,
+    onPrimary = DentalColors.Teal900,
+    primaryContainer = DentalColors.Teal700,
+    onPrimaryContainer = DentalColors.Teal100,
+    inversePrimary = DentalColors.Teal600,
 
-    secondary = Color(0xFFC2C6E0),
-    onSecondary = Color(0xFF2B3048),
-    secondaryContainer = Color(0xFF424764),
-    onSecondaryContainer = Color(0xFFDDE1F3),
+    secondary = Color(0xFF7DD3FC),
+    onSecondary = Color(0xFF082F49),
+    secondaryContainer = Color(0xFF0369A1),
+    onSecondaryContainer = Color(0xFFE0F2FE),
 
-    tertiary = Teal.t80,
-    onTertiary = Teal.t20,
-    tertiaryContainer = Teal.t30,
-    onTertiaryContainer = Teal.t90,
+    tertiary = Color(0xFFA5B4FC),
+    onTertiary = Color(0xFF1E1B4B),
+    tertiaryContainer = Color(0xFF3730A3),
+    onTertiaryContainer = Color(0xFFEEF2FF),
 
-    background = Color(0xFF0D1017),
-    onBackground = Color(0xFFE7EAF3),
-    surface = Color(0xFF12151D),
-    onSurface = Color(0xFFE7EAF3),
-    surfaceVariant = Color(0xFF434758),
-    onSurfaceVariant = Slate.t80,
-    surfaceTint = Ind.t80,
+    background = Color(0xFF0B0F19),
+    onBackground = Color(0xFFF8FAFC),
+    surface = Color(0xFF111827),
+    onSurface = Color(0xFFF8FAFC),
+    surfaceVariant = Color(0xFF1F2937),
+    onSurfaceVariant = DentalColors.Slate400,
+    surfaceTint = DentalColors.Teal200,
 
-    surfaceContainerLowest = Color(0xFF080A10),
-    surfaceContainerLow = Color(0xFF151A24),
-    surfaceContainer = Color(0xFF191E28),
-    surfaceContainerHigh = Color(0xFF232936),
-    surfaceContainerHighest = Color(0xFF2D3341),
+    surfaceContainerLowest = Color(0xFF080C14),
+    surfaceContainerLow = Color(0xFF131B2E),
+    surfaceContainer = Color(0xFF182238),
+    surfaceContainerHigh = Color(0xFF222F4C),
+    surfaceContainerHighest = Color(0xFF2D3C5E),
 
-    outline = Slate.t60,
-    outlineVariant = Color(0xFF434758),
+    outline = DentalColors.Slate700,
+    outlineVariant = Color(0xFF334155),
 
-    error = Color(0xFFFF6168),
-    onError = Color(0xFF680007),
-    errorContainer = Color(0xFF93000D),
-    onErrorContainer = Color(0xFFFFDAD8),
+    error = Color(0xFFFB7185),
+    onError = Color(0xFF4C0519),
+    errorContainer = Color(0xFF881337),
+    onErrorContainer = Color(0xFFFFE4E6),
 
-    inverseSurface = Color(0xFFE7EAF3),
-    inverseOnSurface = Slate.t20,
+    inverseSurface = Color(0xFFF8FAFC),
+    inverseOnSurface = DentalColors.Slate800,
     scrim = Color(0xFF000000),
 )
 
-// ---------------------------------------------------------------------------
-// Typography — system font, tuned weights + tracking for a cleaner, denser feel.
-// ---------------------------------------------------------------------------
-
-private val AppTypography = Typography().run {
-    copy(
-        headlineMedium = headlineMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp),
-        headlineSmall = headlineSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp),
-        titleLarge = titleLarge.copy(fontWeight = FontWeight.SemiBold),
-        titleMedium = titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        titleSmall = titleSmall.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = labelLarge.copy(fontWeight = FontWeight.Medium, letterSpacing = 0.1.sp),
-        labelMedium = labelMedium.copy(fontWeight = FontWeight.Medium),
-        bodyLarge = bodyLarge.copy(lineHeight = 22.sp),
-        bodyMedium = bodyMedium.copy(lineHeight = 20.sp, letterSpacing = 0.1.sp),
-    )
-}
-
-// ---------------------------------------------------------------------------
-// Shapes — slightly rounder than M3 defaults for a modern card language.
-// ---------------------------------------------------------------------------
+private val AppTypography = Typography(
+    headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp, letterSpacing = (-0.5).sp),
+    headlineMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, letterSpacing = (-0.3).sp),
+    headlineSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 18.sp, letterSpacing = (-0.2).sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, letterSpacing = (-0.1).sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, letterSpacing = 0.sp),
+    titleSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.1.sp),
+    bodyLarge = TextStyle(fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp),
+    bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp, letterSpacing = 0.1.sp),
+    bodySmall = TextStyle(fontWeight = FontWeight.Normal, fontSize = 11.sp, lineHeight = 15.sp),
+    labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.2.sp),
+    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 11.sp, letterSpacing = 0.2.sp),
+    labelSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 10.sp, letterSpacing = 0.3.sp),
+)
 
 private val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(14.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(22.dp),
+    extraLarge = RoundedCornerShape(30.dp),
 )
 
 @Composable
@@ -162,8 +179,6 @@ fun CrmTheme(
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors
 
-    // Tint the system status bar to match the app background (instead of the
-    // stock grey) and flip the icon contrast for the active theme.
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {

@@ -12,6 +12,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,18 +31,21 @@ import javax.inject.Singleton
  */
 class AuthInterceptor(private val session: SessionManager) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        if (request.url.encodedPath.contains("/auth/")) return chain.proceed(request)
-        val token = runBlocking { session.accessToken() }
-        val authed = if (token.isNullOrBlank()) request
-        else request.newBuilder().header("Authorization", "Bearer $token").build()
+        val original = chain.request()
+        val path = original.url.encodedPath
+        if (path.endsWith("/auth/login") || path.endsWith("/auth/refresh")) {
+            return chain.proceed(original)
+        }
+        val token = runBlocking { session.accessToken() } ?: return chain.proceed(original)
+        val authed = original.newBuilder()
+            .header("Authorization", "Bearer $token")
+            .build()
         return chain.proceed(authed)
     }
 }
 
 /**
- * On a 401, transparently refreshes the access token once and retries. Uses a
- * dedicated no-auth AuthApi so it can't recurse through this authenticator.
+ * Automatically refreshes the JWT when a request comes back 401 Unauthorized.
  * Synchronized so concurrent 401s refresh only once.
  */
 class TokenAuthenticator(
@@ -74,6 +78,26 @@ class TokenAuthenticator(
     }
 }
 
+class HostInterceptor(private val session: SessionManager) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        var request = chain.request()
+        val customUrl = kotlinx.coroutines.runBlocking { session.getServerUrl() }
+        if (!customUrl.isNullOrBlank()) {
+            val urlString = if (customUrl.startsWith("http")) customUrl else "http://$customUrl"
+            val parsed = urlString.toHttpUrlOrNull()
+            if (parsed != null) {
+                val newUrl = request.url.newBuilder()
+                    .scheme(parsed.scheme)
+                    .host(parsed.host)
+                    .port(parsed.port)
+                    .build()
+                request = request.newBuilder().url(newUrl).build()
+            }
+        }
+        return chain.proceed(request)
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -83,12 +107,13 @@ object NetworkModule {
 
     /** Retrofit with NO authenticator — used only for token refresh. */
     @Provides @Singleton @Named("auth")
-    fun authRetrofit(moshi: Moshi): Retrofit = Retrofit.Builder()
-        .baseUrl("http://192.168.1.6:8000/api/v1/")
+    fun authRetrofit(session: SessionManager, moshi: Moshi): Retrofit = Retrofit.Builder()
+        .baseUrl(BuildConfig.API_BASE_URL)
         .client(
             OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor(HostInterceptor(session))
                 .addLoggingInterceptor()
                 .build()
         )
@@ -104,6 +129,7 @@ object NetworkModule {
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(HostInterceptor(session))
             .addInterceptor(AuthInterceptor(session))
             .authenticator(TokenAuthenticator(session, refreshApi))
             // Certificate pinning is enabled per-environment; add the backend's
@@ -114,7 +140,7 @@ object NetworkModule {
 
     @Provides @Singleton
     fun retrofit(client: OkHttpClient, moshi: Moshi): Retrofit = Retrofit.Builder()
-        .baseUrl("http://192.168.1.6:8000/api/v1/")
+        .baseUrl(BuildConfig.API_BASE_URL)
         .client(client)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
@@ -179,6 +205,10 @@ object NetworkModule {
     @Provides @Singleton
     fun profileApi(retrofit: Retrofit): com.crm.mobile.feature.profile.ProfileApi =
         retrofit.create(com.crm.mobile.feature.profile.ProfileApi::class.java)
+
+    @Provides @Singleton
+    fun dentalApi(retrofit: Retrofit): com.crm.mobile.feature.dental.DentalApi =
+        retrofit.create(com.crm.mobile.feature.dental.DentalApi::class.java)
 }
 
 private fun OkHttpClient.Builder.addLoggingInterceptor(): OkHttpClient.Builder {

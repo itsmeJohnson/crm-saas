@@ -11,7 +11,7 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().accessToken;
-    if (token && config.headers) {
+    if (token && config.headers && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -42,15 +42,11 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // 429: honour the server's Retry-After and retry a bounded number of times.
-    // Without this a throttled widget just resolves to an empty catch block, so
-    // rate limiting is indistinguishable from "this org has no data".
     if (error.response?.status === 429 && originalRequest) {
       originalRequest._rlRetries = (originalRequest._rlRetries || 0) + 1;
       if (originalRequest._rlRetries <= RATE_LIMIT_MAX_RETRIES) {
         const headerVal = Number(error.response.headers?.['retry-after']);
         const waitSeconds = Number.isFinite(headerVal) && headerVal > 0 ? headerVal : 2;
-        // Jitter keeps a screenful of widgets from retrying in lockstep and
-        // re-triggering the very limit they are backing off from.
         const jitter = Math.random() * 500;
         await new Promise((r) => setTimeout(r, waitSeconds * 1000 + jitter));
         return api(originalRequest);
@@ -58,7 +54,13 @@ api.interceptors.response.use(
       error.isRateLimited = true;
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') ||
+                           originalRequest?.url?.includes('/auth/refresh') ||
+                           originalRequest?.url?.includes('/auth/forgot-password') ||
+                           originalRequest?.url?.includes('/auth/reset-password') ||
+                           originalRequest?.url?.includes('/auth/mfa/');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -92,7 +94,7 @@ api.interceptors.response.use(
         processQueue(refreshError, null);
         isRefreshing = false;
         useAuthStore.getState().logout();
-        return Promise.reject(refreshError);
+        return Promise.reject(error);
       }
     }
     

@@ -112,6 +112,8 @@ export const Login: React.FC = () => {
         return;
       }
 
+      useAuthStore.getState().setTokens(access_token, refresh_token);
+
       const meRes = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${access_token}` },
       });
@@ -451,8 +453,21 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          <input type="hidden" {...resetRegister('token')} />
-          {resetErrors.token && <p className="mt-1.5 text-xs text-red-400 text-center">{resetErrors.token.message}</p>}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              Verification Code / Reset Token
+            </label>
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                {...resetRegister('token')}
+                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input font-mono tracking-wider ${resetErrors.token ? 'border-red-500/50' : ''}`}
+                placeholder="Enter 6-digit OTP or reset token"
+              />
+            </div>
+            {resetErrors.token && <p className="mt-1.5 text-xs text-red-400">{resetErrors.token.message}</p>}
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">New Password</label>
