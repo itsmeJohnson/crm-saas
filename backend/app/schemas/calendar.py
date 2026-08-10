@@ -20,6 +20,8 @@ class EventCreate(BaseModel):
     recurrence: str = Field("none", max_length=20)
     recurrence_until: date | None = None
     remind_at: datetime | None = None
+    # Appointments reject overlapping slots for the same assignee; set true to double-book.
+    allow_conflict: bool = False
 
 
 class EventUpdate(BaseModel):
@@ -39,6 +41,7 @@ class EventUpdate(BaseModel):
     recurrence: str | None = Field(None, max_length=20)
     recurrence_until: date | None = None
     remind_at: datetime | None = None
+    allow_conflict: bool = False
 
 
 class EventResponse(BaseModel):

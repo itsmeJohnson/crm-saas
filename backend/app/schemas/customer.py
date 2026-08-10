@@ -116,6 +116,10 @@ class PaymentCreate(BaseModel):
     reference: str | None = Field(None, max_length=120)
     paid_at: datetime | None = None
     notes: str | None = None
+    # By default a payment cannot exceed the invoice's outstanding balance
+    # (guards against negative balance_due / corrupted AR). Set true to
+    # deliberately record an overpayment (e.g. an advance / credit on account).
+    allow_overpayment: bool = False
 
 class PaymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

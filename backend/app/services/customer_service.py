@@ -251,6 +251,11 @@ class CustomerService:
                 setattr(invoice, key, data[key])
         # explicit status change (e.g. Send / Void) if provided
         if data.get("status"):
+            # Voiding an invoice is destructive (writes off the receivable) —
+            # restrict it to OrgAdmin/Manager even though staff can edit invoices.
+            if data["status"] == "Void" and actor.role not in ("OrgAdmin", "Manager"):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                    detail="Only an OrgAdmin or Manager can void an invoice")
             invoice.status = data["status"]
         self._recompute_invoice_status(invoice)
         self.db.add(invoice)
@@ -300,6 +305,20 @@ class CustomerService:
         if invoice.status == "Void":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot record a payment on a void invoice")
         amount = _d(data["amount"])
+        # Reject payments that exceed the outstanding balance so amount_paid can
+        # never overshoot the total (which would drive balance_due negative and
+        # corrupt AR aging / outstanding-revenue reports). An explicit
+        # allow_overpayment flag opts into recording an advance / credit.
+        outstanding = _d(invoice.total_amount) - _d(invoice.amount_paid)
+        if not data.get("allow_overpayment") and amount > outstanding:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Payment of {invoice.currency} {float(amount):.2f} exceeds the outstanding "
+                    f"balance of {invoice.currency} {float(outstanding):.2f} on invoice "
+                    f"{invoice.invoice_number}. Set allow_overpayment to record an advance."
+                ),
+            )
         payment = CustomerPayment(
             organization_id=actor.organization_id,
             company_id=invoice.company_id,
