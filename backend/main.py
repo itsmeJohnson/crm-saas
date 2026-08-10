@@ -19,6 +19,7 @@ from app.api.v1.tasks import router as tasks_router
 from app.api.v1.calendar import router as calendar_router
 from app.api.v1.communications import router as communications_router
 from app.api.v1.leads import router as leads_router
+from app.api.v1.lead_capture import router as lead_capture_router
 from app.api.v1.activities import router as activities_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.dashboard import router as dashboard_router
@@ -417,6 +418,7 @@ app.include_router(tasks_router,           prefix=f"{settings.API_V1_STR}/tasks"
 app.include_router(calendar_router,        prefix=f"{settings.API_V1_STR}/calendar",        tags=["calendar"])
 app.include_router(communications_router,  prefix=f"{settings.API_V1_STR}/communications",  tags=["communications"])
 app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"], dependencies=_rbac("leads"))
+app.include_router(lead_capture_router,    prefix=f"{settings.API_V1_STR}/lead-capture",    tags=["lead-capture"])
 app.include_router(activities_router,      prefix=f"{settings.API_V1_STR}/activities",      tags=["activities"])
 app.include_router(notes_router,           prefix=f"{settings.API_V1_STR}/notes",           tags=["notes"])
 app.include_router(dashboard_router,       prefix=f"{settings.API_V1_STR}/dashboard",       tags=["dashboard"])
