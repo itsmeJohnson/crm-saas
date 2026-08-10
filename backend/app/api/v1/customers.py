@@ -15,6 +15,8 @@ from app.schemas.customer import (
     CustomerListItem, CustomerSummary, CustomerReportResponse, TimelineEvent,
 )
 from app.services.customer_service import CustomerService
+from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+from app.schemas.org_invoice_settings import OrgInvoiceSettingsResponse, OrgInvoiceSettingsUpdate
 from app.middleware.permissions import require_active_user, require_role
 
 _oa_or_mgr = require_role(["OrgAdmin", "Manager"])
@@ -60,6 +62,19 @@ async def customer_reports(
 ):
     """Order-to-cash analytics: orders, invoiced, collected, outstanding + overdue AR."""
     return await CustomerService(db).get_report(actor, date_from=date_from, date_to=date_to)
+
+# ================= Invoice settings (per-tenant customization) =================
+@router.get("/invoice-settings", response_model=OrgInvoiceSettingsResponse)
+async def get_invoice_settings(actor: Annotated[User, Depends(_oa_or_mgr)],
+                               db: Annotated[AsyncSession, Depends(get_db)]):
+    """Clinic invoice branding/tax/currency/numbering (created with defaults on first read)."""
+    return await OrgInvoiceSettingsService(db).get(actor)
+
+@router.put("/invoice-settings", response_model=OrgInvoiceSettingsResponse)
+async def update_invoice_settings(req: OrgInvoiceSettingsUpdate,
+                                  actor: Annotated[User, Depends(_oa_or_mgr)],
+                                  db: Annotated[AsyncSession, Depends(get_db)]):
+    return await OrgInvoiceSettingsService(db).update(actor, req.model_dump(exclude_unset=True))
 
 # ================= Orders =================
 

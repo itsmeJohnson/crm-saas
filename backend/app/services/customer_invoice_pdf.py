@@ -20,54 +20,110 @@ DUMMY_PDF_BYTES = (
 )
 
 
-def _rows(items: list) -> str:
+def _rows(items: list, sym: str) -> str:
     out = []
     for it in (items or []):
         out.append(
             f"<tr><td>{escape(str(it.get('description', '')))}</td>"
             f"<td style='text-align:right'>{it.get('quantity', 0)}</td>"
-            f"<td style='text-align:right'>{it.get('unit_price', 0)}</td>"
-            f"<td style='text-align:right'>{it.get('amount', 0)}</td></tr>"
+            f"<td style='text-align:right'>{sym}{float(it.get('unit_price', 0) or 0):.2f}</td>"
+            f"<td style='text-align:right'>{sym}{float(it.get('amount', 0) or 0):.2f}</td></tr>"
         )
-    return "".join(out)
+    return "".join(out) or "<tr><td colspan='4' style='color:#94a3b8'>No line items</td></tr>"
 
 
-def _html(invoice, company) -> str:
-    cur = invoice.currency
+def _issuer_block(s) -> str:
+    """The clinic / seller identity from tenant settings."""
+    if not s:
+        return ""
+    lines = []
+    logo = f"<img src='{escape(s.logo_url)}' style='max-height:56px;margin-bottom:8px'/>" if getattr(s, "logo_url", None) else ""
+    if s.legal_name:
+        lines.append(f"<div style='font-size:18px;font-weight:bold;color:#0f172a'>{escape(s.legal_name)}</div>")
+    if s.address:
+        lines.append(f"<div class='muted'>{escape(s.address).replace(chr(10), '<br/>')}</div>")
+    contact = " · ".join(x for x in [s.phone, s.email, s.website] if x)
+    if contact:
+        lines.append(f"<div class='muted'>{escape(contact)}</div>")
+    stat = " · ".join(x for x in [f"GSTIN: {s.gst_number}" if s.gst_number else "",
+                                  f"PAN: {s.pan}" if s.pan else ""] if x)
+    if stat:
+        lines.append(f"<div class='muted' style='margin-top:4px'>{escape(stat)}</div>")
+    return logo + "".join(lines)
+
+
+def _pay_block(s) -> str:
+    if not s:
+        return ""
+    parts = []
+    bank = [x for x in [
+        f"Bank: {s.bank_name}" if s.bank_name else "",
+        f"A/C: {s.account_holder} — {s.account_number}" if s.account_number else "",
+        f"IFSC: {s.ifsc}" if s.ifsc else "",
+        f"UPI: {s.upi_id}" if s.upi_id else "",
+    ] if x]
+    if bank:
+        parts.append("<div style='margin-top:16px'><strong>Payment details</strong><br/>" +
+                     "<br/>".join(escape(b) for b in bank) + "</div>")
+    if s.payment_terms:
+        parts.append(f"<div class='muted' style='margin-top:10px'>{escape(s.payment_terms)}</div>")
+    return "".join(parts)
+
+
+def _html(invoice, company, s=None) -> str:
+    sym = (getattr(s, "currency_symbol", None) or invoice.currency + " ")
+    tax_label = getattr(s, "tax_label", None) or "Tax"
+    footer = f"<div class='muted' style='margin-top:28px;text-align:center;border-top:1px solid #e2e8f0;padding-top:8px'>{escape(s.footer_text)}</div>" if (s and s.footer_text) else ""
     return f"""
     <html><head><style>
       body {{ font-family: Arial, sans-serif; color: #1e293b; font-size: 12px; }}
-      h1 {{ font-size: 22px; margin-bottom: 0; }}
       .muted {{ color: #64748b; }}
-      table {{ width: 100%; border-collapse: collapse; margin-top: 16px; }}
-      th, td {{ border-bottom: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }}
-      th {{ background: #f1f5f9; }}
-      .totals td {{ border: none; }}
+      .head {{ display:flex; justify-content:space-between; align-items:flex-start; }}
+      .inv-title {{ font-size: 26px; font-weight:bold; color:#0f172a; margin:0; }}
+      table.items {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+      table.items th, table.items td {{ border-bottom: 1px solid #e2e8f0; padding: 7px 8px; text-align: left; }}
+      table.items th {{ background: #f1f5f9; text-transform:uppercase; font-size:10px; letter-spacing:.05em; }}
+      .totals td {{ border: none; padding: 3px 8px; }}
     </style></head><body>
-      <h1>Invoice {escape(invoice.invoice_number)}</h1>
-      <p class="muted">Status: {escape(invoice.status)} &nbsp;|&nbsp; Issued: {invoice.issue_date.date() if invoice.issue_date else '-'} &nbsp;|&nbsp; Due: {invoice.due_date.date() if invoice.due_date else '-'}</p>
-      <p><strong>Bill to:</strong> {escape(company.name)}</p>
-      <table>
+      <div class="head">
+        <div>{_issuer_block(s)}</div>
+        <div style="text-align:right">
+          <p class="inv-title">INVOICE</p>
+          <div class="muted">{escape(invoice.invoice_number)}</div>
+          <div class="muted" style="margin-top:6px">Status: {escape(invoice.status)}</div>
+          <div class="muted">Issued: {invoice.issue_date.date() if invoice.issue_date else '-'}</div>
+          <div class="muted">Due: {invoice.due_date.date() if invoice.due_date else '-'}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px"><span class="muted">Bill to</span><br/>
+        <strong>{escape(company.name)}</strong></div>
+
+      <table class="items">
         <thead><tr><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit</th><th style="text-align:right">Amount</th></tr></thead>
-        <tbody>{_rows(invoice.items)}</tbody>
+        <tbody>{_rows(invoice.items, sym)}</tbody>
       </table>
-      <table class="totals" style="margin-top:12px; width: 260px; float:right;">
-        <tr><td>Subtotal</td><td style="text-align:right">{cur} {float(invoice.subtotal):.2f}</td></tr>
-        <tr><td>Tax</td><td style="text-align:right">{cur} {float(invoice.tax_amount):.2f}</td></tr>
-        <tr><td>Discount</td><td style="text-align:right">-{cur} {float(invoice.discount_amount):.2f}</td></tr>
-        <tr><td><strong>Total</strong></td><td style="text-align:right"><strong>{cur} {float(invoice.total_amount):.2f}</strong></td></tr>
-        <tr><td>Paid</td><td style="text-align:right">{cur} {float(invoice.amount_paid):.2f}</td></tr>
-        <tr><td><strong>Balance Due</strong></td><td style="text-align:right"><strong>{cur} {invoice.balance_due:.2f}</strong></td></tr>
+
+      <table class="totals" style="margin-top:14px; width: 280px; float:right;">
+        <tr><td>Subtotal</td><td style="text-align:right">{sym}{float(invoice.subtotal):.2f}</td></tr>
+        <tr><td>{escape(tax_label)}</td><td style="text-align:right">{sym}{float(invoice.tax_amount):.2f}</td></tr>
+        <tr><td>Discount</td><td style="text-align:right">-{sym}{float(invoice.discount_amount):.2f}</td></tr>
+        <tr><td style="border-top:1px solid #e2e8f0"><strong>Total</strong></td><td style="text-align:right;border-top:1px solid #e2e8f0"><strong>{sym}{float(invoice.total_amount):.2f}</strong></td></tr>
+        <tr><td>Paid</td><td style="text-align:right">{sym}{float(invoice.amount_paid):.2f}</td></tr>
+        <tr><td><strong>Balance Due</strong></td><td style="text-align:right"><strong>{sym}{float(invoice.balance_due):.2f}</strong></td></tr>
       </table>
+      <div style="clear:both"></div>
+      {_pay_block(s)}
+      {footer}
     </body></html>
     """
 
 
-def build_invoice_pdf(invoice, company) -> bytes:
+def build_invoice_pdf(invoice, company, settings=None) -> bytes:
     if not WEASYPRINT_AVAILABLE:
         return DUMMY_PDF_BYTES
     try:
-        return weasyprint.HTML(string=_html(invoice, company)).write_pdf()
+        return weasyprint.HTML(string=_html(invoice, company, settings)).write_pdf()
     except Exception as e:  # pragma: no cover
         logger.error("Customer invoice PDF render failed: %s", str(e))
         return DUMMY_PDF_BYTES

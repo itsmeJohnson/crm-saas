@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Receipt, Search, RefreshCw, Eye, DollarSign, CheckCircle2, AlertCircle, CreditCard, Plus
+  Receipt, Search, RefreshCw, Eye, DollarSign, CheckCircle2, AlertCircle, CreditCard, Plus, FileText, Download
 } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';
 import { RecordPaymentModal } from '../../components/dental/RecordPaymentModal';
+import { CreateInvoiceModal } from '../../components/dental/CreateInvoiceModal';
 import { PatientProfileModal } from '../../components/dental/PatientProfileModal';
 
 export const BillingPage: React.FC = () => {
@@ -16,6 +17,23 @@ export const BillingPage: React.FC = () => {
   // Modals
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  const downloadPdf = async (inv: any) => {
+    try {
+      const res = await api.get(`/customers/invoices/${inv.id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${inv.invoice_number || 'invoice'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Could not download the invoice PDF.');
+    }
+  };
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -69,14 +87,11 @@ export const BillingPage: React.FC = () => {
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => {
-              setSelectedInvoice(invoices[0] || null);
-              setIsPaymentOpen(true);
-            }}
+            onClick={() => setIsCreateOpen(true)}
             className="neo-btn-primary px-4 py-2.5 text-xs flex items-center gap-2"
           >
-            <CreditCard className="w-4 h-4" />
-            Record Patient Payment
+            <Plus className="w-4 h-4" />
+            Create Invoice
           </button>
         </div>
       </div>
@@ -204,15 +219,24 @@ export const BillingPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedInvoice(inv);
-                            setIsPaymentOpen(true);
-                          }}
-                          className="neo-btn px-2.5 py-1 text-xs text-cyan-400 hover:text-cyan-300 font-bold"
-                        >
-                          Record Payment
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => downloadPdf(inv)}
+                            title="Download PDF"
+                            className="neo-btn px-2.5 py-1 text-xs text-slate-300 hover:text-slate-100 flex items-center gap-1"
+                          >
+                            <Download className="w-3.5 h-3.5" /> PDF
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setIsPaymentOpen(true);
+                            }}
+                            className="neo-btn px-2.5 py-1 text-xs text-cyan-400 hover:text-cyan-300 font-bold"
+                          >
+                            Record Payment
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -222,6 +246,16 @@ export const BillingPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Create Invoice Modal */}
+      <CreateInvoiceModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={() => {
+          setIsCreateOpen(false);
+          fetchInvoices();
+        }}
+      />
 
       {/* Record Payment Modal */}
       <RecordPaymentModal

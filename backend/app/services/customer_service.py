@@ -166,18 +166,48 @@ class CustomerService:
         else:
             invoice.status = "Paid"
 
+    async def _resolve_billing_company(self, actor: User, data: dict) -> uuid.UUID:
+        """Return a company_id for the invoice. If one is supplied, validate it;
+        otherwise resolve it from the contact (patient) — reusing the contact's
+        linked company or creating a per-patient billing company on the fly."""
+        if data.get("company_id"):
+            await self._get_company(actor, data["company_id"])
+            return data["company_id"]
+        contact_id = data.get("contact_id")
+        if not contact_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Provide a patient (contact_id) or a company_id to invoice")
+        from app.models.contact import Contact
+        contact = (await self.db.execute(select(Contact).filter(
+            Contact.id == contact_id, Contact.organization_id == actor.organization_id))).scalar_one_or_none()
+        if not contact:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        if contact.company_id:
+            return contact.company_id
+        name = f"{contact.first_name or ''} {contact.last_name or ''}".strip() or "Patient"
+        company = Company(organization_id=actor.organization_id, name=name,
+                          company_type="Customer", created_by=actor.id)
+        self.db.add(company)
+        await self.db.flush()
+        contact.company_id = company.id  # link so future invoices reuse it
+        self.db.add(contact)
+        return company.id
+
     async def create_invoice(self, actor: User, data: dict) -> CustomerInvoice:
-        await self._get_company(actor, data["company_id"])
+        from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+        settings_svc = OrgInvoiceSettingsService(self.db)
+        org_settings = await settings_svc.get_or_create(actor.organization_id)
+        company_id = await self._resolve_billing_company(actor, data)
         items = [dict(i) for i in data.get("items", [])]
         subtotal, total = _compute_totals(items, data.get("discount_amount", 0), data.get("tax_amount", 0))
         invoice = CustomerInvoice(
             organization_id=actor.organization_id,
-            company_id=data["company_id"],
+            company_id=company_id,
             contact_id=data.get("contact_id"),
             order_id=data.get("order_id"),
-            invoice_number=_num("INV"),
+            invoice_number=await settings_svc.allocate_invoice_number(actor.organization_id),
             status="Draft",
-            currency=data.get("currency", "USD"),
+            currency=data.get("currency") or org_settings.currency or "INR",
             issue_date=data.get("issue_date") or datetime.now(timezone.utc),
             due_date=data.get("due_date"),
             items=items,
@@ -297,7 +327,9 @@ class CustomerService:
         invoice = await self.get_invoice(actor, invoice_id)
         company = await self._get_company(actor, invoice.company_id)
         from app.services.customer_invoice_pdf import build_invoice_pdf
-        return build_invoice_pdf(invoice, company)
+        from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+        settings = await OrgInvoiceSettingsService(self.db).get_or_create(actor.organization_id)
+        return build_invoice_pdf(invoice, company, settings)
 
     # ================= PAYMENTS =================
     async def record_payment(self, actor: User, invoice_id: uuid.UUID, data: dict) -> CustomerPayment:
