@@ -7,7 +7,7 @@ import {
   Sun, Moon, Menu, X, CreditCard, ChevronDown,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
   UserCog, Settings, Activity, ListChecks, CalendarDays, MessagesSquare,
-  MessageCircle, Megaphone, UsersRound, Clock, Stethoscope
+  MessageCircle, Megaphone, UsersRound, Clock, Stethoscope, Webhook
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -56,6 +56,7 @@ export const AppLayout: React.FC = () => {
     // ── Growth & Analytics ─────────────────────────────────────────────────
     { name: 'Clinical Reports',   path: '/reports',           icon: BarChart3,        section: 'workspace', group: 'Growth & Analytics', trial: true },
     { name: 'Marketing ROI',      path: '/marketing',         icon: Megaphone,        section: 'workspace', group: 'Growth & Analytics', trial: true },
+    { name: 'Lead Capture',       path: '/lead-capture',      icon: Webhook,          roles: ['OrgAdmin', 'Manager'], section: 'workspace', group: 'Growth & Analytics', trial: true },
 
     // ── Administration ─────────────────────────────────────────────────────
     { name: 'Clinic Settings',    path: '/settings',          icon: Settings,         roles: ['SuperAdmin', 'OrgAdmin'], section: 'workspace', group: 'Administration', trial: true },

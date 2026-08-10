@@ -121,6 +121,7 @@ import { DoctorsPage } from './pages/dental/DoctorsPage';
 import { StaffPage } from './pages/dental/StaffPage';
 import { DentalReportsPage } from './pages/dental/DentalReportsPage';
 import { MarketingPage } from './pages/dental/MarketingPage';
+import { LeadCapturePage } from './pages/dental/LeadCapturePage';
 import { DentalSettingsPage } from './pages/dental/DentalSettingsPage';
 
 const queryClient = new QueryClient({
@@ -169,6 +170,7 @@ export const App: React.FC = () => {
                 <Route path="/staff" element={<StaffPage />} />
                 <Route path="/reports" element={<DentalReportsPage />} />
                 <Route path="/marketing" element={<MarketingPage />} />
+                <Route path="/lead-capture" element={<LeadCapturePage />} />
 
                 {/* Tasks & Calendar — available to all active users */}
                 <Route path="/tasks" element={<TasksPage />} />
