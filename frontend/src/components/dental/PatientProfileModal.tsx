@@ -148,9 +148,9 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
               href={`https://wa.me/${(patient.phone || '').replace(/[^0-9]/g, '')}`}
               target="_blank"
               rel="noreferrer"
-              className="p-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-xl transition flex items-center gap-2 text-xs font-medium border border-emerald-500/30"
+              className="p-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition flex items-center gap-2 text-xs font-semibold border border-emerald-500 shadow-lg shadow-emerald-500/20"
             >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
+              <MessageSquare className="w-4 h-4 text-white" />
               WhatsApp
             </a>
             <button
