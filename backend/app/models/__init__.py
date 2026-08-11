@@ -10,6 +10,7 @@ from app.models.contact import Contact
 from app.models.lead import Lead
 from app.models.lead_capture import LeadCaptureSource, LeadCaptureEvent
 from app.models.org_invoice_settings import OrgInvoiceSettings
+from app.models.treatment_catalog import TreatmentCatalogItem
 from app.models.activity import Activity
 from app.models.note import Note
 from app.models.lead_import import LeadImport, LeadImportStatus
@@ -266,4 +267,5 @@ __all__ = [
     "LeadCaptureSource",
     "LeadCaptureEvent",
     "OrgInvoiceSettings",
+    "TreatmentCatalogItem",
 ]

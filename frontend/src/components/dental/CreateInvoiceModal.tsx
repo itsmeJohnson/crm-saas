@@ -17,6 +17,7 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
   const [taxPercent, setTaxPercent] = useState(0);
   const [notes, setNotes] = useState('');
   const [sym, setSym] = useState('₹');
+  const [catalog, setCatalog] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -24,16 +25,31 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
     if (!isOpen) return;
     (async () => {
       try {
-        const [p, s] = await Promise.all([
+        const [p, s, c] = await Promise.all([
           api.get('/contacts/', { params: { limit: 100 } }),
           api.get('/customers/invoice-settings'),
+          api.get('/treatment-catalog/', { params: { active_only: true } }),
         ]);
         setPatients(p.data || []);
         setTaxPercent(Number(s.data?.default_tax_percent || 0));
         setSym(s.data?.currency_symbol || '₹');
-      } catch { /* settings/patients optional */ }
+        setCatalog(c.data || []);
+      } catch { /* settings/patients/catalog optional */ }
     })();
   }, [isOpen]);
+
+  const addFromCatalog = (id: string) => {
+    const t = catalog.find((x) => x.id === id);
+    if (!t) return;
+    const row = { description: t.name, quantity: 1, unit_price: Number(t.price) || 0 };
+    setItems((prev) => {
+      const first = prev[0];
+      // replace an empty first row, else append
+      if (prev.length === 1 && !first.description && !first.unit_price) return [row];
+      return [...prev, row];
+    });
+    if (Number(t.tax_percent) > 0) setTaxPercent(Number(t.tax_percent));
+  };
 
   const subtotal = useMemo(
     () => items.reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0),
@@ -100,6 +116,15 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
               <button type="button" onClick={() => setItems((p) => [...p, { description: '', quantity: 1, unit_price: 0 }])}
                       className="neo-btn px-2 py-1 text-[11px] text-cyan-400 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add</button>
             </div>
+            {catalog.length > 0 && (
+              <select value="" onChange={(e) => { if (e.target.value) addFromCatalog(e.target.value); e.target.value=''; }}
+                      className="neo-input w-full px-3 py-2 text-xs mb-2">
+                <option value="">+ Add from price list…</option>
+                {catalog.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} — {sym}{Number(t.price).toLocaleString('en-IN')}{t.category ? ` (${t.category})` : ''}</option>
+                ))}
+              </select>
+            )}
             <div className="space-y-2">
               {items.map((it, i) => (
                 <div key={i} className="flex items-center gap-2">

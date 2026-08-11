@@ -54,6 +54,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Staff & Team',       path: '/staff',             icon: UsersRound,       section: 'workspace', group: 'Clinic Management', trial: true },
     { name: 'Invoice Settings',   path: '/billing/settings',  icon: Settings2,        roles: ['OrgAdmin', 'Manager'], section: 'workspace', group: 'Clinic Management', trial: true },
     { name: 'Pipelines',          path: '/pipelines',         icon: GitBranch,        roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE', section: 'workspace', group: 'Clinic Management', trial: true },
+    { name: 'Treatment Master',   path: '/treatments/master', icon: Stethoscope,      roles: ['OrgAdmin', 'Manager'], section: 'workspace', group: 'Clinic Management', trial: true },
 
     // ── Growth & Analytics ─────────────────────────────────────────────────
     { name: 'Clinical Reports',   path: '/reports',           icon: BarChart3,        section: 'workspace', group: 'Growth & Analytics', trial: true },

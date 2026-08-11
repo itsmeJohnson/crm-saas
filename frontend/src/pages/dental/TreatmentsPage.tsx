@@ -146,7 +146,7 @@ export const TreatmentsPage: React.FC = () => {
                     </h3>
                   </div>
                   <span className="text-sm font-black text-slate-100">
-                    {formatMoney(plan.total_amount || 12000)}
+                    {formatMoney(plan.total_amount || 0)}
                   </span>
                 </div>
 

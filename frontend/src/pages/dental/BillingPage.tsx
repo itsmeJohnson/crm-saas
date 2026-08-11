@@ -61,9 +61,10 @@ export const BillingPage: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const totalInvoiced = invoices.reduce((acc, i) => acc + Number(i.total_amount || 0), 0) || 682000;
-  const totalCollected = invoices.reduce((acc, i) => acc + Number(i.amount_paid || 0), 0) || 520000;
+  const totalInvoiced = invoices.reduce((acc, i) => acc + Number(i.total_amount || 0), 0);
+  const totalCollected = invoices.reduce((acc, i) => acc + Number(i.amount_paid || 0), 0);
   const totalOutstanding = Math.max(0, totalInvoiced - totalCollected);
+  const realizationRate = totalInvoiced ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
 
   const statuses = ['All', 'Paid', 'PartiallyPaid', 'Sent', 'Overdue'];
 
@@ -101,13 +102,13 @@ export const BillingPage: React.FC = () => {
         <div className="bento-card p-5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Billed</span>
           <div className="text-2xl font-black text-slate-100 mt-1">{formatMoney(totalInvoiced)}</div>
-          <span className="text-[10px] text-cyan-400 font-semibold mt-1 inline-block">35 Clinical Invoices</span>
+          <span className="text-[10px] text-cyan-400 font-semibold mt-1 inline-block">{invoices.length} Clinical Invoices</span>
         </div>
 
         <div className="bento-card p-5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Collections Cleared</span>
           <div className="text-2xl font-black text-emerald-400 mt-1">{formatMoney(totalCollected)}</div>
-          <span className="text-[10px] text-emerald-400 font-semibold mt-1 inline-block">76.2% Realization Rate</span>
+          <span className="text-[10px] text-emerald-400 font-semibold mt-1 inline-block">{realizationRate}% Realization Rate</span>
         </div>
 
         <div className="bento-card p-5">

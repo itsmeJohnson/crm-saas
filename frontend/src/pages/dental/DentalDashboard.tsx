@@ -43,7 +43,7 @@ export const DentalDashboard: React.FC = () => {
       if (apptsRes.status === 'fulfilled') setTodayAppts(apptsRes.value.data || []);
       if (treatsRes.status === 'fulfilled') setTreatments(treatsRes.value.data || []);
       if (tasksRes.status === 'fulfilled') setFollowups(tasksRes.value.data || []);
-      if (contactsRes.status === 'fulfilled') setPatientsCount(contactsRes.value.data?.length || 120);
+      if (contactsRes.status === 'fulfilled') setPatientsCount(contactsRes.value.data?.length || 0);
       if (leadsRes.status === 'fulfilled') {
         const leads = leadsRes.value.data || [];
         setLeadsCount(leads.length || 50);
