@@ -250,7 +250,7 @@ export const PipelineSettings: React.FC = () => {
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name); }}
-                    className="p-0.5 opacity-0 group-hover:opacity-100 transition"
+                    className="p-0.5 opacity-60 hover:opacity-100 transition"
                     title="Rename pipeline"
                   >
                     <Edit2 className="w-3 h-3" />
@@ -258,7 +258,7 @@ export const PipelineSettings: React.FC = () => {
                   {!p.is_default && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleSetDefaultPipeline(p.id); }}
-                      className="p-0.5 opacity-0 group-hover:opacity-100 transition"
+                      className="p-0.5 opacity-60 hover:opacity-100 transition"
                       title="Make default pipeline"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -267,7 +267,7 @@ export const PipelineSettings: React.FC = () => {
                   {pipelines.length > 1 && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePipelineClick(p); }}
-                      className="p-0.5 opacity-0 group-hover:opacity-100 transition"
+                      className="p-0.5 opacity-60 hover:opacity-100 transition"
                       title="Delete pipeline"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -7,7 +7,7 @@ import {
   Sun, Moon, Menu, X, CreditCard, ChevronDown,
   Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
   UserCog, Settings, Activity, ListChecks, CalendarDays, MessagesSquare,
-  MessageCircle, Megaphone, UsersRound, Clock, Stethoscope, Webhook, Settings2
+  MessageCircle, Megaphone, UsersRound, Clock, Stethoscope, Webhook, Settings2, GitBranch
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -53,6 +53,7 @@ export const AppLayout: React.FC = () => {
     { name: 'Dentists & Surgeons', path: '/doctors',          icon: Stethoscope,      section: 'workspace', group: 'Clinic Management', trial: true },
     { name: 'Staff & Team',       path: '/staff',             icon: UsersRound,       section: 'workspace', group: 'Clinic Management', trial: true },
     { name: 'Invoice Settings',   path: '/billing/settings',  icon: Settings2,        roles: ['OrgAdmin', 'Manager'], section: 'workspace', group: 'Clinic Management', trial: true },
+    { name: 'Pipelines',          path: '/pipelines',         icon: GitBranch,        roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE', section: 'workspace', group: 'Clinic Management', trial: true },
 
     // ── Growth & Analytics ─────────────────────────────────────────────────
     { name: 'Clinical Reports',   path: '/reports',           icon: BarChart3,        section: 'workspace', group: 'Growth & Analytics', trial: true },
