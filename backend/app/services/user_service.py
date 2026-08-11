@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Sequence, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
@@ -190,6 +190,7 @@ class UserService:
         assigned_seat = available_seats[0]
         user_data["seat_number"] = assigned_seat
 
+        plain_password = user_data.get("password")
         if "password" in user_data:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
 
@@ -226,6 +227,46 @@ class UserService:
             await WorkflowEngineService(self.db).dispatch("user_created", user, actor, "user")
         except Exception:
             pass
+
+        # Best-effort welcome email: login details + a secure set-password link.
+        # A set-password token (valid 7 days) lets the new user choose their own
+        # password; the temporary password is included as a fallback. Never fail
+        # user creation if the email can't be sent.
+        try:
+            from app.core.security import generate_random_token, hash_token
+            from app.services.email_service import send_email
+            from app.core.config import settings as _settings
+
+            token = generate_random_token()
+            user.reset_token = hash_token(token)
+            user.reset_token_expires = datetime.now(timezone.utc) + timedelta(days=7)
+
+            frontend_url = (
+                _settings.FRONTEND_URL
+                or (_settings.BACKEND_CORS_ORIGINS[0] if _settings.BACKEND_CORS_ORIGINS else None)
+                or "http://localhost:5173"
+            ).rstrip("/")
+            org_name = (await self.db.execute(
+                select(Organization.name).filter(Organization.id == actor.organization_id))).scalar() or "your clinic"
+
+            send_email(
+                to_email=user.email,
+                subject=f"Welcome to {org_name} — your CRM account is ready",
+                template_name="welcome_user.html",
+                context={
+                    "first_name": user.first_name or "there",
+                    "org_name": org_name,
+                    "email": user.email,
+                    "temp_password": plain_password or "",
+                    "role": user.role,
+                    "login_url": f"{frontend_url}/login",
+                    "set_password_url": f"{frontend_url}/login?token={token}",
+                    "invited_by": (f"{actor.first_name or ''} {actor.last_name or ''}".strip() or "your administrator"),
+                },
+            )
+        except Exception as _e:
+            import logging
+            logging.getLogger("user_service").warning(f"Welcome email not sent for {user.email}: {_e}")
 
         return user
 
