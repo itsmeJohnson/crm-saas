@@ -179,6 +179,15 @@ async def seed_dental_demo():
             pipe_stmt = select(Pipeline).where(Pipeline.organization_id == org_id, Pipeline.name == "Dental Patient Journey")
             pipeline = (await db.execute(pipe_stmt)).scalar_one_or_none()
             if not pipeline:
+                # An org must have exactly one default pipeline. Clear any existing
+                # default (e.g. the base "Software Pipeline") before making the
+                # dental journey the default, so we never end up with two defaults.
+                from sqlalchemy import update as _sa_update
+                await db.execute(
+                    _sa_update(Pipeline)
+                    .where(Pipeline.organization_id == org_id, Pipeline.is_default == True)
+                    .values(is_default=False)
+                )
                 pipeline = Pipeline(
                     id=uuid.uuid4(),
                     organization_id=org_id,
