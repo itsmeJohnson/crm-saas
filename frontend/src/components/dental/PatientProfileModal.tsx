@@ -94,13 +94,13 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
   const getStatusBadge = (cat: string) => {
     switch (cat) {
       case 'Active Treatment':
-        return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+        return 'bg-emerald-500/15 text-emerald-300 [.light_&]:text-emerald-700 border-emerald-500/30';
       case 'Recall Due':
-        return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+        return 'bg-amber-500/15 text-amber-300 [.light_&]:text-amber-700 border-amber-500/30';
       case 'New Patient':
-        return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
+        return 'bg-blue-500/15 text-blue-300 [.light_&]:text-blue-700 border-blue-500/30';
       case 'Follow-up Due':
-        return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+        return 'bg-rose-500/15 text-rose-300 [.light_&]:text-rose-700 border-rose-500/30';
       default:
         return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
     }
@@ -188,7 +188,7 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
           <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/60">
             <p className="text-slate-400 font-medium">Blood Group / Allergy</p>
             <p className="text-sm font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 rounded font-mono text-xs">{bloodGroup}</span>
+              <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 [.light_&]:text-rose-700 rounded font-mono text-xs">{bloodGroup}</span>
               <span className="text-slate-400 truncate">{allergies}</span>
             </p>
           </div>
@@ -384,7 +384,7 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
                               Plan #{t.order_number} • Doctor: {item.doctor || primaryDoc}
                             </p>
                           </div>
-                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 [.light_&]:text-emerald-700 border border-emerald-500/30">
                             {t.status || 'In Progress'}
                           </span>
                         </div>
@@ -453,7 +453,7 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
                             <td className="px-4 py-3 text-amber-400">{formatMoney(bal)}</td>
                             <td className="px-4 py-3 text-right">
                               <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                                inv.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                inv.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-300 [.light_&]:text-emerald-700 border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 [.light_&]:text-amber-700 border-amber-500/30'
                               }`}>
                                 {inv.status}
                               </span>
@@ -513,7 +513,7 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
                         <p className="text-[11px] text-slate-500">Due Date: {new Date(f.due_date).toLocaleDateString()}</p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full font-semibold border ${
-                        f.status === 'Done' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                        f.status === 'Done' ? 'bg-emerald-500/15 text-emerald-300 [.light_&]:text-emerald-700 border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 [.light_&]:text-amber-700 border-amber-500/30'
                       }`}>
                         {f.status}
                       </span>

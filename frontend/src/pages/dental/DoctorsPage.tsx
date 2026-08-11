@@ -105,7 +105,7 @@ export const DoctorsPage: React.FC = () => {
                 </div>
 
                 <div className="pt-3 border-t border-slate-800/70 flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 [.light_&]:text-emerald-700 border border-emerald-500/30">
                     Active & Available
                   </span>
                   <a
