@@ -159,13 +159,16 @@ class UserService:
             organization_id=actor.organization_id
         )
 
-        # Check global email uniqueness
-        existing = await self.user_repo.get_by_email_global(user_data["email"])
+        # Check global email uniqueness (including soft-deleted users — the email
+        # column is globally unique regardless of is_deleted, so reusing a removed
+        # user's email would violate the constraint and 500; surface a clear 400).
+        existing = (await self.db.execute(
+            select(User).filter(User.email == user_data["email"]))).scalars().first()
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
+            detail = ("This email belongs to a previously removed user. "
+                      "Reactivate that user or use a different email address."
+                      if getattr(existing, "is_deleted", False) else "Email already registered")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
         # Check phone uniqueness within the organization
         phone = user_data.get("phone")
