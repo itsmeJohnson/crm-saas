@@ -6,6 +6,7 @@ import {
   ChevronRight, Zap, Phone, MessageSquare, CheckCircle2
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { formatMoney } from '../../utils/currency';
 import { PatientProfileModal } from '../../components/dental/PatientProfileModal';
 import { BookAppointmentModal } from '../../components/dental/BookAppointmentModal';
 
@@ -16,8 +17,11 @@ export const DentalDashboard: React.FC = () => {
   const [treatments, setTreatments] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
   const [leadSources, setLeadSources] = useState<any[]>([]);
-  const [leadsCount, setLeadsCount] = useState(50);
-  const [patientsCount, setPatientsCount] = useState(120);
+  const [leadsCount, setLeadsCount] = useState(0);
+  const [patientsCount, setPatientsCount] = useState(0);
+  const [collections, setCollections] = useState(0);
+  const [totalBilled, setTotalBilled] = useState(0);
+  const [paidCount, setPaidCount] = useState(0);
 
   // Modals
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
@@ -32,27 +36,39 @@ export const DentalDashboard: React.FC = () => {
     setIsLoading(true);
     try {
       const todayStr = new Date().toISOString().split('T')[0];
-      const [apptsRes, treatsRes, tasksRes, leadsRes, contactsRes] = await Promise.allSettled([
+      const [apptsRes, treatsRes, tasksRes, leadsRes, contactsRes, invRes] = await Promise.allSettled([
         api.get(`/calendar/?date_from=${todayStr}T00:00:00Z&date_to=${todayStr}T23:59:59Z&types=Appointment`),
         api.get('/customers/orders'),
         api.get('/tasks/?limit=100'),
         api.get('/leads/?limit=100'),
         api.get('/contacts/?limit=100'),
+        api.get('/customers/invoices'),
       ]);
 
       if (apptsRes.status === 'fulfilled') setTodayAppts(apptsRes.value.data || []);
       if (treatsRes.status === 'fulfilled') setTreatments(treatsRes.value.data || []);
       if (tasksRes.status === 'fulfilled') setFollowups(tasksRes.value.data || []);
       if (contactsRes.status === 'fulfilled') setPatientsCount(contactsRes.value.data?.length || 0);
+      if (invRes.status === 'fulfilled') {
+        const inv = invRes.value.data || [];
+        setCollections(inv.reduce((a: number, i: any) => a + Number(i.amount_paid || 0), 0));
+        setTotalBilled(inv.reduce((a: number, i: any) => a + Number(i.total_amount || 0), 0));
+        setPaidCount(inv.filter((i: any) => Number(i.amount_paid || 0) > 0).length);
+      }
       if (leadsRes.status === 'fulfilled') {
         const leads = leadsRes.value.data || [];
-        setLeadsCount(leads.length || 50);
-        const sourceMap: Record<string, number> = {};
+        setLeadsCount(leads.length);
+        const total = leads.length || 1;
+        const sourceMap: Record<string, { count: number; value: number }> = {};
         leads.forEach((l: any) => {
-          const s = l.source || 'Website';
-          sourceMap[s] = (sourceMap[s] || 0) + 1;
+          const s = l.source || 'Unspecified';
+          sourceMap[s] = sourceMap[s] || { count: 0, value: 0 };
+          sourceMap[s].count += 1;
+          sourceMap[s].value += Number(l.value || 0);
         });
-        setLeadSources(Object.entries(sourceMap).map(([name, count]) => ({ name, count })));
+        setLeadSources(Object.entries(sourceMap)
+          .map(([name, v]) => ({ name, count: v.count, value: v.value, pct: Math.round((v.count / total) * 100) }))
+          .sort((a, b) => b.count - a.count));
       }
     } catch (err) {
       console.error('Error loading dental dashboard', err);
@@ -81,14 +97,14 @@ export const DentalDashboard: React.FC = () => {
 
   // 8 Core Lifecycle Stages
   const lifecycleStages = [
-    { name: 'Marketing', count: `${leadSources.length || 7} Channels`, path: '/marketing', desc: 'Google, Insta, WA' },
+    { name: 'Marketing', count: `${leadSources.length} Sources`, path: '/marketing', desc: 'Google, Insta, WA' },
     { name: 'Leads', count: `${leadsCount} Inquiries`, path: '/leads', desc: 'New Consultations' },
-    { name: 'Follow-up', count: `${followups.length || 31} Tasks`, path: '/follow-ups', desc: 'Pre-op & Inquiries' },
+    { name: 'Follow-up', count: `${followups.length} Tasks`, path: '/follow-ups', desc: 'Pre-op & Inquiries' },
     { name: 'Appointments', count: `${todayAppts.length} Today`, path: '/appointments', desc: 'Operatory Queue' },
     { name: 'Patients', count: `${patientsCount} Charts`, path: '/patients', desc: 'Active & Returning' },
-    { name: 'Treatments', count: `${treatments.length || 35} Active`, path: '/treatments', desc: 'Multi-sitting Plans' },
-    { name: 'Billing', count: '₹6.82L Total', path: '/billing', desc: 'Invoiced & Collected' },
-    { name: 'Recall / Repeat', count: '9 Due', path: '/follow-ups', desc: '6-Month Cleanings' },
+    { name: 'Treatments', count: `${treatments.length} Active`, path: '/treatments', desc: 'Multi-sitting Plans' },
+    { name: 'Billing', count: `${formatMoney(totalBilled)} Total`, path: '/billing', desc: 'Invoiced & Collected' },
+    { name: 'Recall / Repeat', count: `${overdueFollowups} Due`, path: '/follow-ups', desc: '6-Month Cleanings' },
   ];
 
   return (
@@ -153,7 +169,7 @@ export const DentalDashboard: React.FC = () => {
             <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Today's Appts</span>
             <Calendar className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{todayAppts.length || 12}</div>
+          <div className="text-2xl font-bold text-slate-100">{todayAppts.length}</div>
           <p className="text-[11px] text-cyan-400 mt-1 font-medium">
             {remainingToday > 0 ? `${remainingToday} remaining` : 'All completed'}
           </p>
@@ -170,7 +186,7 @@ export const DentalDashboard: React.FC = () => {
           </div>
           <div className="text-2xl font-bold text-slate-100">{patientsCount}</div>
           <p className="text-[11px] text-emerald-400 mt-1 font-medium">
-            +24 this month
+            Registered
           </p>
         </div>
 
@@ -183,7 +199,7 @@ export const DentalDashboard: React.FC = () => {
             <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Follow-ups</span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{followups.length || 31}</div>
+          <div className="text-2xl font-bold text-slate-100">{followups.length}</div>
           <p className="text-[11px] text-rose-400 mt-1 font-medium">
             {overdueFollowups > 0 ? `${overdueFollowups} overdue` : 'Up to date'}
           </p>
@@ -198,9 +214,9 @@ export const DentalDashboard: React.FC = () => {
             <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Treatments</span>
             <Activity className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{treatments.length || 35}</div>
+          <div className="text-2xl font-bold text-slate-100">{treatments.length}</div>
           <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-            RCT, Implants, Braces
+            Active plans
           </p>
         </div>
 
@@ -213,9 +229,9 @@ export const DentalDashboard: React.FC = () => {
             <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Collections</span>
             <DollarSign className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">₹38,500</div>
+          <div className="text-2xl font-bold text-slate-100">{formatMoney(collections)}</div>
           <p className="text-[11px] text-cyan-400 mt-1 font-medium">
-            8 Receipts cleared
+            {paidCount} receipt{paidCount === 1 ? '' : 's'} cleared
           </p>
         </div>
 
@@ -228,9 +244,9 @@ export const DentalDashboard: React.FC = () => {
             <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Monthly</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">₹6.82L</div>
+          <div className="text-2xl font-bold text-slate-100">{formatMoney(totalBilled)}</div>
           <p className="text-[11px] text-emerald-400 mt-1 font-medium">
-            +18.4% vs last mo.
+            Total billed
           </p>
         </div>
       </div>
@@ -382,11 +398,14 @@ export const DentalDashboard: React.FC = () => {
                 onClick={() => navigate('/follow-ups')}
                 className="text-xs text-amber-400 hover:text-amber-300 font-medium"
               >
-                All ({followups.length || 31})
+                All ({followups.length})
               </button>
             </div>
 
             <div className="space-y-2 my-2">
+              {followups.length === 0 && (
+                <div className="p-6 text-center text-slate-500 text-xs">No follow-ups or recalls due.</div>
+              )}
               {followups.slice(0, 4).map((task) => (
                 <div
                   key={task.id}
@@ -404,7 +423,7 @@ export const DentalDashboard: React.FC = () => {
                     {task.description || 'Call patient to check sensitivity post-filling.'}
                   </p>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[9px] text-slate-500">Dr. Priya Sharma</span>
+                    <span className="text-[9px] text-slate-500">{task.status || 'Pending'}</span>
                     <div className="flex items-center gap-1.5">
                       <button className="minimal-btn px-2 py-0.5 text-[10px] text-cyan-400 flex items-center gap-1">
                         <Phone className="w-3 h-3" /> Call
@@ -438,7 +457,7 @@ export const DentalDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-100">
-                Active Clinical Treatment Plans (5)
+                Active Clinical Treatment Plans ({treatments.length})
               </h3>
               <p className="text-[11px] text-slate-400">
                 In-progress multi-sitting procedures
@@ -453,31 +472,20 @@ export const DentalDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-2.5">
-            {[
-              { title: 'Zirconia Crown & Bridge', doctor: 'Dr. Vikram Rao', step: 'Step 3 of 3: Final Crown Cementation', pct: 100, cost: '₹15,000', paid: '₹15,000' },
-              { title: 'Ceramic Braces Treatment', doctor: 'Dr. Priya Sharma', step: 'Step 1 of 4: Bracket Bonding', pct: 25, cost: '₹60,000', paid: '₹15,000' },
-              { title: 'Molar Root Canal (RCT)', doctor: 'Dr. Johnson Dev', step: 'Step 2 of 3: Biomechanical Prep', pct: 66, cost: '₹8,500', paid: '₹5,000' },
-            ].map((t) => (
-              <div key={t.title} className="p-3.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-color)] space-y-2">
-                <div className="flex items-center justify-between">
+            {treatments.length === 0 ? (
+              <div className="p-6 text-center text-slate-500 text-xs">No active treatment plans yet.</div>
+            ) : treatments.slice(0, 6).map((t) => {
+              const title = t.items?.[0]?.description || t.order_number || 'Treatment';
+              return (
+                <div key={t.id} className="p-3.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-color)] flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-semibold text-slate-100">{t.title}</h4>
-                    <p className="text-[10px] text-slate-400">{t.doctor} • {t.step}</p>
+                    <h4 className="text-xs font-semibold text-slate-100">{title}</h4>
+                    <p className="text-[10px] text-slate-400">{t.status || 'Draft'}</p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-slate-100">{t.cost}</span>
-                    <p className="text-[9px] text-emerald-400">Paid: {t.paid}</p>
-                  </div>
+                  <span className="text-xs font-bold text-slate-100">{formatMoney(Number(t.total_amount || 0))}</span>
                 </div>
-
-                <div className="w-full h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-cyan-400 transition-all duration-300"
-                    style={{ width: `${t.pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -502,25 +510,19 @@ export const DentalDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-2.5">
-              {[
-                { name: 'Google Local Ads', count: 18, pct: 36, rev: '₹2.45L' },
-                { name: 'Instagram & Facebook', count: 14, pct: 28, rev: '₹1.80L' },
-                { name: 'Doctor Referrals', count: 10, pct: 20, rev: '₹1.60L' },
-                { name: 'Walk-ins & Website', count: 8, pct: 16, rev: '₹97K' },
-              ].map((src) => (
+              {leadSources.length === 0 ? (
+                <div className="p-6 text-center text-slate-500 text-xs">No lead sources yet.</div>
+              ) : leadSources.slice(0, 5).map((src) => (
                 <div key={src.name} className="p-2.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-color)] space-y-1">
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="text-slate-200">{src.name}</span>
-                    <span className="text-emerald-400 font-semibold">{src.rev}</span>
+                    <span className="text-emerald-400 font-semibold">{formatMoney(Number(src.value || 0))}</span>
                   </div>
                   <div className="w-full h-1 rounded-full bg-[var(--bg-inset)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-cyan-400"
-                      style={{ width: `${src.pct}%` }}
-                    />
+                    <div className="h-full rounded-full bg-cyan-400" style={{ width: `${src.pct}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-[9px] text-slate-500">
-                    <span>{src.count} inquiries</span>
+                    <span>{src.count} {src.count === 1 ? 'inquiry' : 'inquiries'}</span>
                     <span>{src.pct}%</span>
                   </div>
                 </div>
@@ -529,7 +531,7 @@ export const DentalDashboard: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t border-[var(--border-color)] text-center text-[10px] text-slate-500">
-            Avg. Patient Acquisition Cost: ₹420
+            {leadsCount} total lead{leadsCount === 1 ? '' : 's'} captured
           </div>
         </div>
       </div>
