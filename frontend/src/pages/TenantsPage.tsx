@@ -251,7 +251,7 @@ export const TenantsPage: React.FC = () => {
     'currency', 'max_users', 'max_admins', 'max_managers', 'max_team_leads', 'max_employees',
     'storage_limit_gb', 'recording_retention_days', 'priority_support', 'api_access',
     'display_order', 'setup_charges', 'minimum_users', 'maximum_users', 'minimum_contract_months',
-    'trial_days', 'extra_user_price', 'discount_percentage', 'gst_percentage', 'plan_color',
+    'trial_days', 'extra_user_price', 'discount_percentage', 'promo_price', 'gst_percentage', 'plan_color',
     'plan_badge', 'popular_plan', 'recommended_plan', 'allow_upgrade', 'allow_downgrade',
     'allow_trial', 'allow_additional_seats', 'auto_renew', 'plan_active',
   ];
@@ -264,6 +264,7 @@ export const TenantsPage: React.FC = () => {
     maximum_users: Number(data.maximum_users), minimum_contract_months: Number(data.minimum_contract_months),
     trial_days: Number(data.trial_days || 0), extra_user_price: Number(data.extra_user_price || 0),
     discount_percentage: Number(data.discount_percentage || 0), gst_percentage: Number(data.gst_percentage || 0),
+    promo_price: (data.promo_price === null || (data.promo_price as any) === '' || data.promo_price === undefined) ? null : Number(data.promo_price),
     popular_plan: Boolean(data.popular_plan), recommended_plan: Boolean(data.recommended_plan),
     allow_upgrade: Boolean(data.allow_upgrade), allow_downgrade: Boolean(data.allow_downgrade),
     allow_trial: Boolean(data.allow_trial), allow_additional_seats: Boolean(data.allow_additional_seats),
@@ -3138,7 +3139,7 @@ export const TenantsPage: React.FC = () => {
                     type="number"
                     {...regPlan('minimum_users', {
                       required: 'Minimum licensed seats is required',
-                      min: { value: 10, message: 'Minimum 10 licensed seats' }
+                      min: { value: 1, message: 'Minimum 1 licensed seat' }
                     })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
@@ -3195,6 +3196,18 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
                   {planErrors.discount_percentage && <p className="text-[10px] text-red-400 mt-1">{planErrors.discount_percentage.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Promotional Price (offer)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...regPlan('promo_price', { min: 0 })}
+                    placeholder="Empty = no offer"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  <p className="text-[9px] text-slate-500 mt-1">Below the monthly price → shown struck-through with a % OFF badge.</p>
+                  {planErrors.promo_price && <p className="text-[10px] text-red-400 mt-1">{planErrors.promo_price.message}</p>}
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1.5">GST Tax % (0-100)</label>

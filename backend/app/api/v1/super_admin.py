@@ -583,6 +583,7 @@ async def create_plan(
         trial_days=payload.trial_days,
         extra_user_price=payload.extra_user_price,
         discount_percentage=payload.discount_percentage,
+        promo_price=payload.promo_price,
         gst_percentage=payload.gst_percentage,
         plan_color=payload.plan_color,
         plan_badge=payload.plan_badge,
