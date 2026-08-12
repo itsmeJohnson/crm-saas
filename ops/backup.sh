@@ -16,18 +16,24 @@ set -euo pipefail
 
 BACKUP_DIR="${CRM_BACKUP_DIR:-/opt/backups/crm}"
 RETAIN_DAYS="${CRM_BACKUP_RETAIN_DAYS:-14}"
-DB_USER="${CRM_DB_USER:-postgres}"
-DB_NAME="${CRM_DB_NAME:-crm}"
-DB_CONTAINER="${CRM_DB_CONTAINER:-$(docker ps --format '{{.Names}}' | grep -iE '(^|[-_])postgres$|(^|[-_])postgres' | head -1)}"
+DB_CONTAINER="${CRM_DB_CONTAINER:-$(docker ps --format '{{.Names}}' | grep -iE 'postgres' | head -1)}"
 
 if [ -z "${DB_CONTAINER}" ]; then
   echo "[backup] ERROR: could not find a running postgres container. Set CRM_DB_CONTAINER." >&2
   exit 1
 fi
 
+# Auto-detect the DB user/name from the container's env so this works regardless
+# of whether the superuser is 'postgres', 'johnson', etc. Override with CRM_DB_*.
+DB_USER="${CRM_DB_USER:-$(docker exec "${DB_CONTAINER}" printenv POSTGRES_USER 2>/dev/null || echo postgres)}"
+DB_NAME="${CRM_DB_NAME:-$(docker exec "${DB_CONTAINER}" printenv POSTGRES_DB 2>/dev/null || echo crm)}"
+
 mkdir -p "${BACKUP_DIR}"
 TS="$(date +%F-%H%M%S)"
 FILE="${BACKUP_DIR}/crm-${TS}.sql.gz"
+# Remove a partial/failed dump on any early exit.
+_done=0
+trap '[ "${_done}" = "1" ] || rm -f "${FILE}"' EXIT
 
 echo "[backup] $(date '+%F %T') dumping '${DB_NAME}' from container '${DB_CONTAINER}' -> ${FILE}"
 # pg_dump | gzip; pipefail makes a pg_dump failure fail the whole pipeline.
@@ -45,6 +51,7 @@ fi
 # Prune old backups.
 find "${BACKUP_DIR}" -name 'crm-*.sql.gz' -type f -mtime "+${RETAIN_DAYS}" -delete 2>/dev/null || true
 
+_done=1
 echo "[backup] OK ${FILE} (${SIZE} bytes). Retained last ${RETAIN_DAYS} days."
 # ── OFF-SITE (recommended): uncomment and configure one of these ────────────
 # aws s3 cp "${FILE}" "s3://your-bucket/crm-backups/" --only-show-errors

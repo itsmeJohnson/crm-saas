@@ -11,9 +11,9 @@
 set -euo pipefail
 
 FILE="${1:?Usage: ops/restore.sh <backup.sql.gz>}"
-DB_USER="${CRM_DB_USER:-postgres}"
 TARGET="${CRM_RESTORE_TARGET:-crm_restore}"
 DB_CONTAINER="${CRM_DB_CONTAINER:-$(docker ps --format '{{.Names}}' | grep -iE 'postgres' | head -1)}"
+DB_USER="${CRM_DB_USER:-$(docker exec "${DB_CONTAINER}" printenv POSTGRES_USER 2>/dev/null || echo postgres)}"
 
 if [ "${TARGET}" = "crm" ] && [ "${CRM_RESTORE_CONFIRM:-no}" != "yes" ]; then
   echo "Refusing to overwrite live 'crm' without CRM_RESTORE_CONFIRM=yes. Aborting." >&2
