@@ -141,7 +141,24 @@ async def trial_register(
         browser_info=user_agent
     )
 
-    return {"detail": "Thank you! Your trial request has been received and is under review."}
+    # Auto-approve: provision the tenant immediately so trials are fully self-serve
+    # (SuperAdmin still retains suspend/delete/restore control). Toggle via
+    # settings.TRIAL_AUTO_APPROVE.
+    if settings.TRIAL_AUTO_APPROVE:
+        from app.services.trial_provisioning import provision_trial_tenant
+        try:
+            await provision_trial_tenant(db, trial_req)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        return {
+            "detail": "Your workspace is ready! We've emailed you a link to set your password and sign in.",
+            "auto_approved": True,
+        }
+
+    return {
+        "detail": "Thank you! Your trial request has been received and is under review.",
+        "auto_approved": False,
+    }
 
 
 @router.post("/login", response_model=Token)

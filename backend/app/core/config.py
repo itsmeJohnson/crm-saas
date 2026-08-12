@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # first CORS origin, then localhost. Building links off CORS[0] alone is fragile
     # because that list can be reordered or contain non-frontend origins.
     FRONTEND_URL: str | None = None
+    # When true, public trial signups are provisioned immediately (no manual
+    # SuperAdmin approval). SuperAdmin retains full suspend/delete/restore control.
+    TRIAL_AUTO_APPROVE: bool = True
 
     # Database
     POSTGRES_SERVER: str = "db"

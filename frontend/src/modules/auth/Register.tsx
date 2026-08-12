@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,9 +16,9 @@ const registerSchema = z.object({
 type RegisterForm = z.infer<typeof registerSchema>;
 
 export const Register: React.FC = () => {
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -33,7 +33,8 @@ export const Register: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await api.post('/auth/trial-register', data);
+      const res = await api.post('/auth/trial-register', data);
+      setSuccessMsg(res.data?.detail || '');
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed. Please check details and try again.');
@@ -48,12 +49,12 @@ export const Register: React.FC = () => {
         <div className="w-16 h-16 bg-green-500/10 border border-green-500/20 rounded-full flex items-center justify-center mx-auto animate-pulse">
           <CheckCircle className="w-8 h-8 text-green-400" />
         </div>
-        <h2 className="text-xl font-bold text-white">Request Submitted!</h2>
+        <h2 className="text-xl font-bold text-white">Your Workspace is Ready!</h2>
         <p className="text-slate-400 text-sm max-w-xs mx-auto">
-          Thank you! Your 14-day free trial request has been received and is under review.
+          {successMsg || "We've emailed you a secure link to set your password and sign in to your 14-day free trial."}
         </p>
         <p className="text-slate-500 text-xs max-w-xs mx-auto pt-2">
-          An email will be sent to you with instructions once your workspace is approved and provisioned.
+          Check your inbox (and spam) for the setup link, then log in to start using your CRM.
         </p>
         <div className="pt-4">
           <Link to="/login" className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all">
