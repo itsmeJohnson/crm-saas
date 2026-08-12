@@ -19,9 +19,22 @@ export const AppointmentsPage: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  const [doctors, setDoctors] = useState<string[]>([]);
+
   useEffect(() => {
     fetchAppointments();
   }, [selectedDate]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/users/?limit=100');
+        const users = res.data || [];
+        const docs = users.filter((u: any) => /doctor|dentist|surgeon/i.test(`${u.role || ''} ${u.custom_role_name || ''}`));
+        setDoctors((docs.length > 0 ? docs : users).map((u: any) => `${u.first_name || ''} ${u.last_name || ''}`.trim()).filter(Boolean));
+      } catch { /* non-fatal */ }
+    })();
+  }, []);
 
   const fetchAppointments = async () => {
     setIsLoading(true);
@@ -151,10 +164,7 @@ export const AppointmentsPage: React.FC = () => {
             className="neo-input px-3 py-2 text-xs text-slate-300 w-auto"
           >
             <option value="All">All Attending Doctors</option>
-            <option value="Arvind">Dr. Arvind Mehta (Orthodontics)</option>
-            <option value="Priya">Dr. Priya Sharma (Endodontics)</option>
-            <option value="Vikram">Dr. Vikram Rao (Implantology)</option>
-            <option value="Johnson">Dr. Johnson Dev</option>
+            {doctors.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
 
@@ -238,7 +248,7 @@ export const AppointmentsPage: React.FC = () => {
                       <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
                         <span className="flex items-center gap-1">
                           <Stethoscope className="w-3.5 h-3.5 text-cyan-400" />
-                          {appt.assigned_user_name || 'Dr. Arvind Mehta'}
+                          {appt.assigned_user_name || 'Unassigned'}
                         </span>
                       </div>
                     </div>

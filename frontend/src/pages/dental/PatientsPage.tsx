@@ -21,8 +21,11 @@ export const PatientsPage: React.FC = () => {
   const [isBookOpen, setIsBookOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
+  const [doctors, setDoctors] = useState<any[]>([]);
+
   useEffect(() => {
     fetchPatients();
+    fetchDoctors();
   }, []);
 
   const fetchPatients = async () => {
@@ -36,6 +39,15 @@ export const PatientsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchDoctors = async () => {
+    try {
+      const res = await api.get('/users/?limit=100');
+      const users = res.data || [];
+      const docs = users.filter((u: any) => /doctor|dentist|surgeon/i.test(`${u.role || ''} ${u.custom_role_name || ''}`));
+      setDoctors((docs.length > 0 ? docs : users).map((u: any) => `${u.first_name || ''} ${u.last_name || ''}`.trim()).filter(Boolean));
+    } catch { /* non-fatal */ }
   };
 
   const filteredPatients = patients.filter((p) => {
@@ -96,7 +108,8 @@ export const PatientsPage: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by patient name, phone number, email or treatment..."
-              className="neo-input w-full pl-10 pr-4 py-2.5 text-xs"
+              className="neo-input w-full pr-4 py-2.5 text-xs"
+              style={{ paddingLeft: '2.4rem' }}
             />
           </div>
 
@@ -107,10 +120,7 @@ export const PatientsPage: React.FC = () => {
             className="neo-input px-3.5 py-2.5 text-xs text-slate-300 w-auto"
           >
             <option value="All">All Attending Doctors</option>
-            <option value="Arvind">Dr. Arvind Mehta (Orthodontics)</option>
-            <option value="Priya">Dr. Priya Sharma (Endodontics)</option>
-            <option value="Vikram">Dr. Vikram Rao (Implantology)</option>
-            <option value="Johnson">Dr. Johnson Dev</option>
+            {doctors.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
 
@@ -170,7 +180,7 @@ export const PatientsPage: React.FC = () => {
                   const bloodGroup = cf.blood_group || 'O+';
                   const allergies = cf.allergies;
                   const treatment = cf.current_treatment || 'Routine Dental Checkup';
-                  const doctor = cf.primary_doctor || 'Dr. Arvind Mehta';
+                  const doctor = cf.primary_doctor || cf.consultant_name || 'Unassigned';
                   const category = cf.patient_category || patient.tags?.[0] || 'Active Treatment';
                   const balance = cf.outstanding_balance ?? 0;
                   const lastVisit = cf.last_visit_date ? new Date(cf.last_visit_date).toLocaleDateString('en-IN') : '12 Jul 2026';

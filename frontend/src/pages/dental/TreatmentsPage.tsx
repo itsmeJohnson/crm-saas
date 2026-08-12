@@ -87,7 +87,8 @@ export const TreatmentsPage: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by procedure name, attending doctor, clinical notes..."
-            className="neo-input w-full pl-10 pr-4 py-2.5 text-xs"
+            className="neo-input w-full pr-4 py-2.5 text-xs"
+            style={{ paddingLeft: '2.4rem' }}
           />
         </div>
 
