@@ -43,6 +43,7 @@ class TenantResponse(BaseModel):
     call_recording_usage: int = 0
     currency: str = "INR"
     timezone: str = "Asia/Kolkata"
+    is_deleted: bool = False
 
 class TenantUsageUpdateRequest(BaseModel):
     call_recording_usage: int

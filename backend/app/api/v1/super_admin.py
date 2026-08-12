@@ -39,9 +39,12 @@ require_super_admin = RoleChecker(["SuperAdmin"])
 @router.get("/tenants", response_model=List[TenantResponse])
 async def list_tenants(
     actor: Annotated[User, Depends(require_super_admin)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    include_deleted: bool = False,
 ):
-    """List all tenant organizations in the system with user and invoice counts."""
+    """List all tenant organizations in the system with user and invoice counts.
+    Pass include_deleted=true to also return soft-deleted (deactivated) tenants
+    so they can be restored."""
     from sqlalchemy.orm import selectinload
     # Subquery for user count
     user_sub = select(
@@ -63,7 +66,9 @@ async def list_tenants(
         user_sub, Organization.id == user_sub.c.organization_id
     ).outerjoin(
         inv_sub, Organization.id == inv_sub.c.organization_id
-    ).where(Organization.is_deleted == False).options(selectinload(Organization.subscription))
+    ).options(selectinload(Organization.subscription))
+    if not include_deleted:
+        query = query.where(Organization.is_deleted == False)
 
     res = await db.execute(query)
     results = []
@@ -82,7 +87,8 @@ async def list_tenants(
                 invoice_count=i_cnt,
                 call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0,
                 currency=org.currency,
-                timezone=org.timezone
+                timezone=org.timezone,
+                is_deleted=org.is_deleted,
             )
         )
     return results
@@ -534,6 +540,38 @@ async def delete_tenant(
     await invalidate_tenant_features(org_id)
 
     return {"detail": "Tenant organization deleted successfully"}
+
+
+@router.post("/tenants/{org_id}/restore", status_code=status.HTTP_200_OK)
+async def restore_tenant(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Restore a soft-deleted (deactivated) tenant: un-delete and reactivate the
+    org and re-enable its users (excluding removed/anonymized `.removed` accounts)
+    so they can log in again."""
+    org = await db.get(Organization, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Tenant organization not found")
+
+    org.is_deleted = False
+    org.is_active = True
+    org.subscription_status = "active"
+
+    # Reactivate real users; leave anonymized (removed) accounts deactivated.
+    await db.execute(
+        update(User)
+        .filter(User.organization_id == org_id, User.is_deleted == False,
+                ~User.email.like("%.removed.%"))
+        .values(is_active=True)
+    )
+    await db.commit()
+
+    from app.dependencies.feature_guard import invalidate_tenant_features
+    await invalidate_tenant_features(org_id)
+
+    return {"detail": "Tenant organization restored successfully"}
 
 
 # ==========================================

@@ -167,7 +167,7 @@ export const Login: React.FC = () => {
         if (res.data.token) {
           resetFormReset({ token: res.data.token, password: '', confirmPassword: '' });
         }
-      }, 4000);
+      }, 900);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to request password reset code.');
     } finally {
@@ -186,7 +186,7 @@ export const Login: React.FC = () => {
       setTimeout(() => {
         setStep('login');
         setSuccess(null);
-      }, 2500);
+      }, 900);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to reset password. Please verify the code.');
     } finally {

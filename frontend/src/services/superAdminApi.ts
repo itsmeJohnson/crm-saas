@@ -61,6 +61,7 @@ export interface TenantResponse {
   call_recording_usage: number;
   currency: string;
   timezone: string;
+  is_deleted?: boolean;
 }
 
 export interface TenantUserResponse {
@@ -112,8 +113,8 @@ export interface CreateTenantRequest {
 }
 
 export const superAdminApi = {
-  getTenants: async () => {
-    const response = await api.get<TenantResponse[]>('/super-admin/tenants');
+  getTenants: async (includeDeleted = false) => {
+    const response = await api.get<TenantResponse[]>('/super-admin/tenants', { params: { include_deleted: includeDeleted } });
     return response.data;
   },
 
@@ -158,6 +159,11 @@ export const superAdminApi = {
 
   deleteTenant: async (orgId: string) => {
     const response = await api.delete<{ detail: string }>(`/super-admin/tenants/${orgId}`);
+    return response.data;
+  },
+
+  restoreTenant: async (orgId: string) => {
+    const response = await api.post<{ detail: string }>(`/super-admin/tenants/${orgId}/restore`);
     return response.data;
   },
 

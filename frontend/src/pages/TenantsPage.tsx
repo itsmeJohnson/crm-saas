@@ -55,6 +55,7 @@ const NavItem: React.FC<{ icon: React.ElementType; label: string; active: boolea
 export const TenantsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>('tenants');
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
+  const [showDeletedTenants, setShowDeletedTenants] = useState(false);
   const [plans, setPlans] = useState<PlanResponse[]>([]);
   const [features, setFeatures] = useState<FeatureResponse[]>([]);
   const [mappings, setMappings] = useState<PlanFeatureResponse[]>([]);
@@ -114,7 +115,7 @@ export const TenantsPage: React.FC = () => {
     try {
       switch (activeSection) {
         case 'dashboard': { const d = await superAdminApi.getDashboard(dashboardPeriod); setDashboard(d); break; }
-        case 'tenants': { const [d, p] = await Promise.all([superAdminApi.getTenants(), superAdminApi.getPlans()]); setTenants(d); setPlans(p); break; }
+        case 'tenants': { const [d, p] = await Promise.all([superAdminApi.getTenants(showDeletedTenants), superAdminApi.getPlans()]); setTenants(d); setPlans(p); break; }
         case 'plans': { const d = await superAdminApi.getPlans(); setPlans(d); break; }
         case 'features': {
           const [p,f,m] = await Promise.all([superAdminApi.getPlans(),superAdminApi.getFeatures(),superAdminApi.getPlanFeatures()]);
@@ -163,7 +164,17 @@ export const TenantsPage: React.FC = () => {
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { fetchAllData(); }, [activeSection, dashboardPeriod]);
+  useEffect(() => { fetchAllData(); }, [activeSection, dashboardPeriod, showDeletedTenants]);
+
+  const handleRestoreTenant = async (tenant: TenantResponse) => {
+    try {
+      await superAdminApi.restoreTenant(tenant.id);
+      showSuccess(`${tenant.name} restored — its users can log in again.`);
+      await fetchAllData();
+    } catch (e: any) {
+      setGlobalError(e?.response?.data?.detail || 'Failed to restore tenant.');
+    }
+  };
 
   const showSuccess = (msg: string) => { setSuccessMessage(msg); setTimeout(() => setSuccessMessage(null), 4000); };
 
@@ -427,7 +438,6 @@ export const TenantsPage: React.FC = () => {
   };
 
   const navItems: { key: SectionKey; icon: React.ElementType; label: string }[] = [
-    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { key: 'tenants', icon: Building, label: 'Tenants' },
     { key: 'plans', icon: FolderKanban, label: 'Plans' },
     { key: 'features', icon: Workflow, label: 'Features' },
@@ -593,6 +603,14 @@ export const TenantsPage: React.FC = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Tenants List</h3>
+                <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeletedTenants(v => !v)}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${showDeletedTenants ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                >
+                  {showDeletedTenants ? 'Hide deactivated' : 'Show deactivated'}
+                </button>
                 <button
                   onClick={() => {
                     resetTenant();
@@ -604,6 +622,7 @@ export const TenantsPage: React.FC = () => {
                   <Plus className="w-3.5 h-3.5" />
                   Create Tenant
                 </button>
+                </div>
               </div>
 
               {tenants.length === 0 ? (
@@ -684,6 +703,17 @@ export const TenantsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4.5 text-right">
                               <div className="flex items-center justify-end gap-2.5">
+                                {tenant.is_deleted ? (
+                                  <button
+                                    onClick={() => handleRestoreTenant(tenant)}
+                                    className="px-3 py-1.5 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                    title="Restore this deactivated tenant"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    Restore
+                                  </button>
+                                ) : (
+                                <>
                                 <button
                                   onClick={() => openEditSubModal(tenant)}
                                   className="px-2 py-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
@@ -728,6 +758,8 @@ export const TenantsPage: React.FC = () => {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
+                                </>
+                                )}
                               </div>
                             </td>
                           </tr>

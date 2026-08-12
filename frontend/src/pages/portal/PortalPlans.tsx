@@ -20,6 +20,11 @@ export const PortalPlans: React.FC = () => {
 
   useEffect(() => {
     fetchPlans();
+    // Refetch when the tab regains focus so SuperAdmin price/plan changes show
+    // up without a manual reload.
+    const onFocus = () => fetchPlans();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   const fetchPlans = async () => {
