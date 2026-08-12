@@ -446,6 +446,7 @@ export interface PlanCreatePayload {
   trial_days: number;
   extra_user_price: number;
   discount_percentage: number;
+  promo_price?: number | null;
   gst_percentage: number;
   plan_color?: string;
   plan_badge?: string;

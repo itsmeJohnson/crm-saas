@@ -17,6 +17,9 @@ to exactly this definition (existing tenants keep their subscription rows).
 
 import asyncio
 from sqlalchemy import select
+
+# Launch promotional discount applied to every plan (0.30 = 30% off).
+PROMO_DISCOUNT = 0.30
 from app.core.database import async_session_maker
 from app.models.plan import Plan
 from app.models.feature import Feature
@@ -27,25 +30,29 @@ PLANS = [
     {
         "name": "Starter", "display_order": 1,
         "monthly_price": 1499.0, "quarterly_price": 4299.0, "annual_price": 15299.0,
-        "setup_charges": 0.0, "max_users": 50, "is_trial": False, "trial_days": None,
+        "setup_charges": 0.0, "max_users": 50, "minimum_users": 3, "maximum_users": 50,
+        "is_trial": False, "trial_days": None,
         "description": "Essential CRM for solo clinics & small teams. Manual lead & contact management, follow-ups, basic pipeline, click-to-call.",
     },
     {
         "name": "Growth", "display_order": 2,
         "monthly_price": 2999.0, "quarterly_price": 8599.0, "annual_price": 30599.0,
-        "setup_charges": 0.0, "max_users": 200, "is_trial": False, "trial_days": None,
+        "setup_charges": 0.0, "max_users": 200, "minimum_users": 5, "maximum_users": 200,
+        "is_trial": False, "trial_days": None,
         "description": "Scaling teams: bulk import, roles & teams, custom pipelines, auto-distribution, calling, SMS/Email/WhatsApp, KPI & manager dashboards.",
     },
     {
         "name": "Professional", "display_order": 3,
         "monthly_price": 4499.0, "quarterly_price": 12899.0, "annual_price": 45899.0,
-        "setup_charges": 25000.0, "max_users": 500, "is_trial": True, "trial_days": 14,
+        "setup_charges": 25000.0, "max_users": 500, "minimum_users": 10, "maximum_users": 500,
+        "is_trial": True, "trial_days": 14,
         "description": "Full sales engine: automatic Lead Capture from Google/Instagram/Facebook/webhooks, AI call summary & follow-up, advanced analytics, custom reports, priority support. (Free-trial plan.)",
     },
     {
         "name": "Enterprise", "display_order": 4,
         "monthly_price": 6999.0, "quarterly_price": 19999.0, "annual_price": 71399.0,
-        "setup_charges": 75000.0, "max_users": 9999, "is_trial": False, "trial_days": None,
+        "setup_charges": 75000.0, "max_users": 9999, "minimum_users": 10, "maximum_users": 9999,
+        "is_trial": False, "trial_days": None,
         "description": "Everything in Professional plus white-label branding, API access, dedicated SLA/account manager. Custom domain & dedicated hosting available as a white-glove setup.",
     },
 ]
@@ -98,8 +105,13 @@ async def seed():
                 annual_price=plan_data["annual_price"],
                 price_inr=plan_data["monthly_price"],
                 price_per_seat=plan_data["monthly_price"],
+                # Launch offer: 30% off, shown as struck-through original + promo price.
+                promo_price=round(plan_data["monthly_price"] * (1 - PROMO_DISCOUNT), 2),
+                discount_percentage=PROMO_DISCOUNT * 100,
                 setup_charges=plan_data["setup_charges"],
                 max_users=plan_data["max_users"],
+                minimum_users=plan_data["minimum_users"],
+                maximum_users=plan_data["maximum_users"],
                 description=plan_data["description"],
                 display_order=plan_data["display_order"],
                 is_trial=plan_data["is_trial"],

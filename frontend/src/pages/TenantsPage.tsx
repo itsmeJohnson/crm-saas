@@ -842,12 +842,37 @@ export const TenantsPage: React.FC = () => {
                         <p className="text-xs text-slate-400 line-clamp-2">{plan.description || 'No description provided.'}</p>
 
                         {/* Price block */}
-                        <div className="py-3 border-y border-slate-800/80">
-                          <p className="text-3xl font-black text-brand-400">
-                            {plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.monthly_price).toLocaleString('en-IN')}
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
-                        </div>
+                        {(() => {
+                          const sym = plan.currency === 'INR' ? '₹' : plan.currency;
+                          const price = Number(plan.monthly_price);
+                          const promo = plan.promo_price != null ? Number(plan.promo_price) : null;
+                          const hasPromo = promo != null && promo > 0 && promo < price;
+                          const pct = hasPromo
+                            ? Math.round(Number(plan.discount_percentage) || (100 - (promo! / price) * 100))
+                            : 0;
+                          return (
+                            <div className="py-3 border-y border-slate-800/80">
+                              {hasPromo ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-3xl font-black text-brand-400">
+                                    {sym}{promo!.toLocaleString('en-IN')}
+                                  </p>
+                                  <span className="text-base text-slate-500 line-through">
+                                    {sym}{price.toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
+                                    {pct}% OFF
+                                  </span>
+                                </div>
+                              ) : (
+                                <p className="text-3xl font-black text-brand-400">
+                                  {sym}{price.toLocaleString('en-IN')}
+                                </p>
+                              )}
+                              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
+                            </div>
+                          );
+                        })()}
 
                         {/* Plan details */}
                         <div className="space-y-1.5 pt-1">
