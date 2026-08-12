@@ -2119,41 +2119,52 @@ async def approve_trial_request(
         "slug": slug
     })
 
-    # 5. Fetch default Trial Plan (Professional)
-    plan_stmt = select(Plan).where(
-        func.lower(Plan.name) == "professional",
-        Plan.is_deleted == False
-    )
-    plan_res = await db.execute(plan_stmt)
-    plan = plan_res.scalars().first()
+    # 5. Pick a default plan for the trial. Prefer a named tier that actually
+    # has features enabled (PlanFeature.enabled) so we never provision a tenant
+    # onto a featureless plan — which would silently break every feature-gated
+    # route (Leads, Pipelines, ...) for that tenant. Selection is deterministic.
+    from app.models.plan_feature import PlanFeature
+
+    PLAN_PREFERENCE = ["growth", "enterprise", "starter", "professional"]
+    all_plans = list((await db.execute(
+        select(Plan).where(Plan.is_deleted == False)
+    )).scalars().all())
+    featured_plan_ids = set((await db.execute(
+        select(PlanFeature.plan_id).where(PlanFeature.enabled == True)
+    )).scalars().all())
+
+    def _plan_rank(p: Plan) -> int:
+        name = (p.name or "").lower()
+        return PLAN_PREFERENCE.index(name) if name in PLAN_PREFERENCE else len(PLAN_PREFERENCE)
+
+    # Prefer plans that have enabled features; fall back to any plan by preference.
+    pool = [p for p in all_plans if p.id in featured_plan_ids] or all_plans
+    plan = sorted(pool, key=_plan_rank)[0] if pool else None
     if not plan:
-        plan_stmt = select(Plan).where(Plan.is_deleted == False)
-        plan_res = await db.execute(plan_stmt)
-        plan = plan_res.scalars().first()
-        if not plan:
-            plan = Plan(
-                name="Professional",
-                display_name="Professional",
-                price_inr=1999.0,
-                monthly_price=1999.0,
-                max_users=1000,
-                minimum_users=5,
-                maximum_users=1000,
-                minimum_contract_months=3,
-                extra_user_price=1999.0,
-                allow_additional_seats=True,
-                storage_limit_gb=10,
-                recording_retention_days=90,
-                priority_support=True,
-                api_access=False,
-                is_active=True,
-                plan_active=True,
-                is_trial=True,
-                trial_days=7,
-                features={}
-            )
-            db.add(plan)
-            await db.flush()
+        # No plans exist at all — create a minimal fallback so approval can proceed.
+        plan = Plan(
+            name="Professional",
+            display_name="Professional",
+            price_inr=1999.0,
+            monthly_price=1999.0,
+            max_users=1000,
+            minimum_users=5,
+            maximum_users=1000,
+            minimum_contract_months=3,
+            extra_user_price=1999.0,
+            allow_additional_seats=True,
+            storage_limit_gb=10,
+            recording_retention_days=90,
+            priority_support=True,
+            api_access=False,
+            is_active=True,
+            plan_active=True,
+            is_trial=True,
+            trial_days=7,
+            features={}
+        )
+        db.add(plan)
+        await db.flush()
 
     # 6. Activate 14-day Trial Subscription
     now_utc = datetime.now(timezone.utc)
