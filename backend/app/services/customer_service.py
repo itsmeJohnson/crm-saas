@@ -1,4 +1,6 @@
 import uuid
+import hmac
+import hashlib
 from datetime import datetime, timezone, date
 from decimal import Decimal
 from fastapi import HTTPException, status
@@ -26,6 +28,18 @@ def _d(v) -> Decimal:
     if v is None:
         return Decimal("0")
     return v if isinstance(v, Decimal) else Decimal(str(v))
+
+
+def sign_invoice_id(invoice_id) -> str:
+    """Unguessable HMAC signature for an invoice id — lets us expose a public,
+    no-login PDF link (shareable via WhatsApp) without a DB token column."""
+    from app.core.config import settings
+    return hmac.new(settings.JWT_SECRET_KEY.encode(), f"inv:{invoice_id}".encode(),
+                    hashlib.sha256).hexdigest()[:40]
+
+
+def verify_invoice_sig(invoice_id, sig: str) -> bool:
+    return hmac.compare_digest(sign_invoice_id(invoice_id), sig or "")
 
 
 def _compute_totals(items: list[dict], discount, tax) -> tuple[Decimal, Decimal]:
@@ -331,6 +345,39 @@ class CustomerService:
         settings = await OrgInvoiceSettingsService(self.db).get_or_create(actor.organization_id)
         patient, consultant = await self._invoice_patient_and_consultant(invoice)
         return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+
+    async def render_invoice_pdf_by_id(self, invoice_id: uuid.UUID) -> bytes:
+        """Render a PDF for the given invoice WITHOUT an authed actor. Only call
+        after the request has proven authorization (e.g. a valid HMAC signature)."""
+        invoice = (await self.db.execute(
+            select(CustomerInvoice).where(CustomerInvoice.id == invoice_id))).scalar_one_or_none()
+        if not invoice:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+        company = (await self.db.execute(
+            select(Company).where(Company.id == invoice.company_id))).scalar_one_or_none()
+        from app.services.customer_invoice_pdf import build_invoice_pdf
+        from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+        settings = await OrgInvoiceSettingsService(self.db).get_or_create(invoice.organization_id)
+        patient, consultant = await self._invoice_patient_and_consultant(invoice)
+        return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+
+    async def whatsapp_share_info(self, actor: User, invoice_id: uuid.UUID) -> dict:
+        """Return the patient phone + public (signed) PDF URL so the client can
+        open WhatsApp with a link to the invoice."""
+        from app.core.config import settings as app_settings
+        invoice = await self.get_invoice(actor, invoice_id)
+        patient, _ = await self._invoice_patient_and_consultant(invoice)
+        phone_digits = "".join(ch for ch in ((patient or {}).get("phone") or "") if ch.isdigit())
+        base = (app_settings.FRONTEND_URL or "").rstrip("/")
+        sig = sign_invoice_id(invoice.id)
+        pdf_url = f"{base}{app_settings.API_V1_STR}/public/invoices/{invoice.id}/{sig}/pdf"
+        return {
+            "invoice_number": invoice.invoice_number,
+            "phone": phone_digits,
+            "pdf_url": pdf_url,
+            "total_amount": float(invoice.total_amount or 0),
+            "currency": invoice.currency,
+        }
 
     async def _invoice_patient_and_consultant(self, invoice) -> tuple[dict | None, str | None]:
         """Resolve the patient (name/age/gender/mobile) and consultant name for

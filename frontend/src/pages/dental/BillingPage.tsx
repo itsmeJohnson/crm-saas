@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Receipt, Search, RefreshCw, Eye, DollarSign, CheckCircle2, AlertCircle, CreditCard, Plus, FileText, Download
+  Receipt, Search, RefreshCw, Eye, DollarSign, CheckCircle2, AlertCircle, CreditCard, Plus, FileText, Download, MessageCircle
 } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';
@@ -18,6 +18,20 @@ export const BillingPage: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  const sendWhatsApp = async (inv: any) => {
+    try {
+      const res = await api.get(`/customers/invoices/${inv.id}/whatsapp-share`);
+      const { phone, pdf_url, invoice_number } = res.data || {};
+      const msg = `Hello, here is your invoice ${invoice_number || ''} from our clinic.\nView / download it here: ${pdf_url}`;
+      const wa = phone
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(wa, '_blank');
+    } catch (e) {
+      alert('Could not prepare the WhatsApp message for this invoice.');
+    }
+  };
 
   const downloadPdf = async (inv: any) => {
     try {
@@ -227,6 +241,13 @@ export const BillingPage: React.FC = () => {
                             className="neo-btn px-2.5 py-1 text-xs text-slate-300 hover:text-slate-100 flex items-center gap-1"
                           >
                             <Download className="w-3.5 h-3.5" /> PDF
+                          </button>
+                          <button
+                            onClick={() => sendWhatsApp(inv)}
+                            title="Send on WhatsApp"
+                            className="neo-btn px-2.5 py-1 text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                           </button>
                           <button
                             onClick={() => {

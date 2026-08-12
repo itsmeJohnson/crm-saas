@@ -149,6 +149,11 @@ async def invoice_pdf(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f"attachment; filename=invoice_{invoice_id}.pdf"})
 
+@router.get("/invoices/{invoice_id}/whatsapp-share")
+async def invoice_whatsapp_share(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Patient phone + public (signed) PDF link for sharing the invoice on WhatsApp."""
+    return await CustomerService(db).whatsapp_share_info(actor, invoice_id)
+
 @router.delete("/invoices/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
     await CustomerService(db).delete_invoice(actor, invoice_id)
