@@ -329,7 +329,36 @@ class CustomerService:
         from app.services.customer_invoice_pdf import build_invoice_pdf
         from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
         settings = await OrgInvoiceSettingsService(self.db).get_or_create(actor.organization_id)
-        return build_invoice_pdf(invoice, company, settings)
+        patient, consultant = await self._invoice_patient_and_consultant(invoice)
+        return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+
+    async def _invoice_patient_and_consultant(self, invoice) -> tuple[dict | None, str | None]:
+        """Resolve the patient (name/age/gender/mobile) and consultant name for
+        the dental-style invoice layout. Falls back gracefully to the billing
+        company / invoice creator when the patient contact isn't linked."""
+        from app.models.contact import Contact
+        patient, consultant = None, None
+        contact = None
+        if invoice.contact_id:
+            contact = (await self.db.execute(
+                select(Contact).where(Contact.id == invoice.contact_id))).scalar_one_or_none()
+        if contact:
+            cf = contact.custom_fields or {}
+            patient = {
+                "name": f"{contact.first_name or ''} {contact.last_name or ''}".strip(),
+                "age": cf.get("age"),
+                "gender": cf.get("gender"),
+                "phone": contact.phone or "",
+            }
+            consultant = cf.get("consultant_name") or cf.get("primary_doctor")
+            uid = contact.assigned_user_id or invoice.created_by
+        else:
+            uid = invoice.created_by
+        if not consultant and uid:
+            u = (await self.db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
+            if u:
+                consultant = f"{u.first_name or ''} {u.last_name or ''}".strip() or None
+        return patient, consultant
 
     # ================= PAYMENTS =================
     async def record_payment(self, actor: User, invoice_id: uuid.UUID, data: dict) -> CustomerPayment:
