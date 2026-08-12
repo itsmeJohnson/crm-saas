@@ -26,10 +26,18 @@ echo "==> [1/4] Backup before deploy"
 echo "==> [2/4] Pull latest code"
 git pull --ff-only
 
-echo "==> [3/4] Rebuild + restart: ${SERVICES[*]}"
+echo "==> [3/5] Rebuild + restart: ${SERVICES[*]}"
 docker compose up -d --build "${SERVICES[@]}"
 
-echo "==> [4/4] Waiting for backend health…"
+# Apply DB migrations (idempotent; no-op when already at head). Only when the
+# backend is part of this deploy.
+if printf '%s\n' "${SERVICES[@]}" | grep -qx backend; then
+  echo "==> [4/5] Applying DB migrations (alembic upgrade head)…"
+  sleep 4  # let the backend container settle
+  docker exec crm-backend alembic upgrade head
+fi
+
+echo "==> [5/5] Waiting for backend health…"
 ok=0
 for i in $(seq 1 20); do
   if docker exec crm-backend python -c "import httpx,asyncio
