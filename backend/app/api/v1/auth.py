@@ -144,7 +144,8 @@ async def trial_register(
     # Auto-approve: provision the tenant immediately so trials are fully self-serve
     # (SuperAdmin still retains suspend/delete/restore control). Toggle via
     # settings.TRIAL_AUTO_APPROVE.
-    if settings.TRIAL_AUTO_APPROVE:
+    from app.core.config import settings as app_settings
+    if app_settings.TRIAL_AUTO_APPROVE:
         from app.services.trial_provisioning import provision_trial_tenant
         try:
             await provision_trial_tenant(db, trial_req)
