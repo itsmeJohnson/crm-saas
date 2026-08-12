@@ -99,25 +99,25 @@ export const PatientsPage: React.FC = () => {
 
       {/* Filters Bar Bento */}
       <div className="bento-card p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Search input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by patient name, phone number, email or treatment..."
-              className="neo-input w-full pr-4 py-2.5 text-xs"
-              style={{ paddingLeft: '2.4rem' }}
-            />
-          </div>
+        {/* Search input — its own full-width bar */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by patient name, phone number or email..."
+            className="neo-input w-full pr-4 py-2.5 text-xs"
+            style={{ paddingLeft: '2.4rem' }}
+          />
+        </div>
 
-          {/* Doctor Filter */}
+        {/* Doctor Filter */}
+        <div className="flex items-center gap-2">
           <select
             value={selectedDoctor}
             onChange={(e) => setSelectedDoctor(e.target.value)}
-            className="neo-input px-3.5 py-2.5 text-xs text-slate-300 w-auto"
+            className="neo-input px-3.5 py-2.5 text-xs w-full sm:w-auto"
           >
             <option value="All">All Attending Doctors</option>
             {doctors.map((name) => <option key={name} value={name}>{name}</option>)}
