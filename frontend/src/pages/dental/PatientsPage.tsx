@@ -6,6 +6,7 @@ import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';
 import { PatientProfileModal } from '../../components/dental/PatientProfileModal';
 import { BookAppointmentModal } from '../../components/dental/BookAppointmentModal';
+import { RegisterPatientModal } from '../../components/dental/RegisterPatientModal';
 
 export const PatientsPage: React.FC = () => {
   const [patients, setPatients] = useState<any[]>([]);
@@ -18,6 +19,7 @@ export const PatientsPage: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isBookOpen, setIsBookOpen] = useState(false);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
   useEffect(() => {
     fetchPatients();
@@ -74,16 +76,7 @@ export const PatientsPage: React.FC = () => {
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => {
-              setSelectedPatient({
-                first_name: '',
-                last_name: '',
-                phone: '',
-                email: '',
-                custom_fields: { age: 30, gender: 'Male', patient_category: 'New Patient' }
-              });
-              setIsProfileOpen(true);
-            }}
+            onClick={() => setIsRegisterOpen(true)}
             className="neo-btn-primary px-4 py-2.5 text-xs flex items-center gap-2"
           >
             <UserPlus className="w-4 h-4" />
@@ -332,12 +325,22 @@ export const PatientsPage: React.FC = () => {
             setIsProfileOpen(false);
             setSelectedPatient(null);
           }}
-          onBookAppointment={(pat) => {
+          onBookAppointment={() => {
             setIsProfileOpen(false);
             setIsBookOpen(true);
           }}
         />
       )}
+
+      {/* Register / Walk-In Modal */}
+      <RegisterPatientModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onSuccess={() => {
+          setIsRegisterOpen(false);
+          fetchPatients();
+        }}
+      />
 
       {/* Book Appointment Modal */}
       <BookAppointmentModal
