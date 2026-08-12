@@ -28,7 +28,10 @@ from app.schemas.lead_transfer import LeadTransferRequest, LeadTransferResponse
 from app.services.lead_service import LeadService
 from app.services.lead_import_service import LeadImportService
 from app.services.assignment_service import AssignmentService
-from app.middleware.permissions import require_active_user, require_role, require_tl_or_above
+from app.middleware.permissions import require_active_user, require_role, require_tl_or_above, require_feature
+
+# Server-side plan gate: bulk import (CSV/Excel/Google Sheets) is Growth+.
+_gate_bulk_import = Depends(require_feature("BULK_IMPORT"))
 
 router = APIRouter()
 
@@ -491,7 +494,7 @@ async def get_import_template(
             headers={"Content-Disposition": f"attachment; filename=leads_template{filename_suffix}.csv"}
         )
 
-@router.post("/import/upload", response_model=ImportPreviewResponse)
+@router.post("/import/upload", response_model=ImportPreviewResponse, dependencies=[_gate_bulk_import])
 async def upload_import_file(
     actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -522,7 +525,7 @@ async def upload_import_file(
         
     return await import_service.get_preview_from_file(sanitized_filename, content)
 
-@router.post("/import/google-sheets", response_model=ImportPreviewResponse)
+@router.post("/import/google-sheets", response_model=ImportPreviewResponse, dependencies=[_gate_bulk_import])
 async def google_sheets_import_preview(
     req: GoogleSheetsPreviewRequest,
     actor: Annotated[User, Depends(require_tl_or_above)],
@@ -532,7 +535,7 @@ async def google_sheets_import_preview(
     import_service = LeadImportService(db)
     return await import_service.get_preview_from_google_sheets(req.url)
 
-@router.post("/import/process", response_model=LeadImportResponse)
+@router.post("/import/process", response_model=LeadImportResponse, dependencies=[_gate_bulk_import])
 async def process_import_batch(
     req: LeadImportProcessRequest,
     actor: Annotated[User, Depends(require_tl_or_above)],

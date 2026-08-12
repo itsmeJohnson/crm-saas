@@ -51,6 +51,56 @@ def require_user_management_permission():
     """Dependency enforcing that the user has administrative/management rights."""
     return require_role(["OrgAdmin", "Manager"])
 
+
+async def resolve_feature_codes(user: User, db: AsyncSession) -> set:
+    """Resolve the feature codes enabled for a user's tenant — identical logic
+    to the /auth/me feature resolution. SuperAdmin gets every active feature."""
+    from app.models.feature import Feature
+    from app.models.plan_feature import PlanFeature
+    from app.models.tenant_subscription import TenantSubscription
+
+    if user.role == "SuperAdmin":
+        res = await db.execute(
+            select(Feature.code).where(Feature.active == True, Feature.is_deleted == False)
+        )
+        return set(res.scalars().all())
+
+    stmt = (
+        select(Feature.code)
+        .join(PlanFeature, PlanFeature.feature_id == Feature.id)
+        .join(TenantSubscription, TenantSubscription.plan_id == PlanFeature.plan_id)
+        .where(
+            TenantSubscription.organization_id == user.organization_id,
+            TenantSubscription.is_deleted == False,
+            TenantSubscription.status.in_(["active", "trial"]),
+            PlanFeature.enabled == True,
+            Feature.active == True,
+            Feature.is_deleted == False,
+        )
+    )
+    res = await db.execute(stmt)
+    return set(res.scalars().all())
+
+
+def require_feature(feature_code: str):
+    """Dependency factory: 403 unless the caller's plan includes `feature_code`.
+    SuperAdmin bypasses. Server-side twin of the frontend FeatureGuardRoute so
+    plan gating cannot be bypassed by calling the API directly."""
+    async def dependency(
+        current_user: Annotated[User, Depends(require_active_user)],
+        db: Annotated[AsyncSession, Depends(get_db)],
+    ) -> User:
+        if current_user.role == "SuperAdmin":
+            return current_user
+        codes = await resolve_feature_codes(current_user, db)
+        if feature_code not in codes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Your plan does not include this feature. Please upgrade to access it.",
+            )
+        return current_user
+    return dependency
+
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
     """Check if the user is a Team Leader (Employee who reports to a Manager)."""
     if user.role != "Employee" or not user.reporting_to_id:

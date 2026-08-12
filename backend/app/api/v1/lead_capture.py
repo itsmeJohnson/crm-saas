@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.user import User
-from app.middleware.permissions import require_role
+from app.middleware.permissions import require_role, require_feature
 from app.schemas.lead_capture import (
     LeadCaptureSourceCreate, LeadCaptureSourceUpdate, LeadCaptureSourceResponse, LeadCaptureEventResponse,
 )
@@ -16,6 +16,9 @@ from app.services.lead_capture_service import LeadCaptureService
 
 router = APIRouter()
 _admin = require_role(["OrgAdmin", "Manager"])
+# Server-side plan gate for all lead-capture admin routes (public webhooks below
+# stay open so in-flight external integrations are not broken mid-request).
+_gate_lc = Depends(require_feature("LEAD_CAPTURE"))
 
 
 def _resp(src, request: Request) -> LeadCaptureSourceResponse:
@@ -28,45 +31,45 @@ def _resp(src, request: Request) -> LeadCaptureSourceResponse:
 
 
 # ============ admin CRUD (OrgAdmin / Manager) ============
-@router.post("/sources", response_model=LeadCaptureSourceResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/sources", response_model=LeadCaptureSourceResponse, status_code=status.HTTP_201_CREATED, dependencies=[_gate_lc])
 async def create_source(req: LeadCaptureSourceCreate, request: Request,
                         actor: Annotated[User, Depends(_admin)], db: Annotated[AsyncSession, Depends(get_db)]):
     src = await LeadCaptureService(db).create_source(actor, req.model_dump())
     return _resp(src, request)
 
 
-@router.get("/sources", response_model=List[LeadCaptureSourceResponse])
+@router.get("/sources", response_model=List[LeadCaptureSourceResponse], dependencies=[_gate_lc])
 async def list_sources(request: Request, actor: Annotated[User, Depends(_admin)],
                        db: Annotated[AsyncSession, Depends(get_db)]):
     return [_resp(s, request) for s in await LeadCaptureService(db).list_sources(actor)]
 
 
-@router.get("/sources/{source_id}", response_model=LeadCaptureSourceResponse)
+@router.get("/sources/{source_id}", response_model=LeadCaptureSourceResponse, dependencies=[_gate_lc])
 async def get_source(source_id: uuid.UUID, request: Request, actor: Annotated[User, Depends(_admin)],
                      db: Annotated[AsyncSession, Depends(get_db)]):
     return _resp(await LeadCaptureService(db).get_source(actor, source_id), request)
 
 
-@router.patch("/sources/{source_id}", response_model=LeadCaptureSourceResponse)
+@router.patch("/sources/{source_id}", response_model=LeadCaptureSourceResponse, dependencies=[_gate_lc])
 async def update_source(source_id: uuid.UUID, req: LeadCaptureSourceUpdate, request: Request,
                         actor: Annotated[User, Depends(_admin)], db: Annotated[AsyncSession, Depends(get_db)]):
     src = await LeadCaptureService(db).update_source(actor, source_id, req.model_dump(exclude_unset=True))
     return _resp(src, request)
 
 
-@router.post("/sources/{source_id}/rotate-token", response_model=LeadCaptureSourceResponse)
+@router.post("/sources/{source_id}/rotate-token", response_model=LeadCaptureSourceResponse, dependencies=[_gate_lc])
 async def rotate_token(source_id: uuid.UUID, request: Request, actor: Annotated[User, Depends(_admin)],
                        db: Annotated[AsyncSession, Depends(get_db)]):
     return _resp(await LeadCaptureService(db).rotate_token(actor, source_id), request)
 
 
-@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_gate_lc])
 async def delete_source(source_id: uuid.UUID, actor: Annotated[User, Depends(_admin)],
                         db: Annotated[AsyncSession, Depends(get_db)]):
     await LeadCaptureService(db).delete_source(actor, source_id)
 
 
-@router.get("/events", response_model=List[LeadCaptureEventResponse])
+@router.get("/events", response_model=List[LeadCaptureEventResponse], dependencies=[_gate_lc])
 async def list_events(actor: Annotated[User, Depends(_admin)], db: Annotated[AsyncSession, Depends(get_db)],
                       source_id: uuid.UUID | None = Query(None), limit: int = Query(50, ge=1, le=200)):
     return await LeadCaptureService(db).list_events(actor, source_id=source_id, limit=limit)

@@ -2119,27 +2119,33 @@ async def approve_trial_request(
         "slug": slug
     })
 
-    # 5. Pick a default plan for the trial. Prefer a named tier that actually
-    # has features enabled (PlanFeature.enabled) so we never provision a tenant
+    # 5. Pick the trial plan. Prefer the plan explicitly flagged is_trial
+    # (Professional) so trials showcase the full sales engine. Fall back to a
+    # feature-enabled plan by name preference so we never provision a tenant
     # onto a featureless plan — which would silently break every feature-gated
-    # route (Leads, Pipelines, ...) for that tenant. Selection is deterministic.
+    # route (Leads, Pipelines, ...). Finally, create a minimal plan if none exist.
     from app.models.plan_feature import PlanFeature
 
-    PLAN_PREFERENCE = ["growth", "enterprise", "starter", "professional"]
     all_plans = list((await db.execute(
         select(Plan).where(Plan.is_deleted == False)
     )).scalars().all())
-    featured_plan_ids = set((await db.execute(
-        select(PlanFeature.plan_id).where(PlanFeature.enabled == True)
-    )).scalars().all())
 
-    def _plan_rank(p: Plan) -> int:
-        name = (p.name or "").lower()
-        return PLAN_PREFERENCE.index(name) if name in PLAN_PREFERENCE else len(PLAN_PREFERENCE)
+    # First choice: an explicitly-flagged trial plan (Professional).
+    plan = next((p for p in all_plans if getattr(p, "is_trial", False)), None)
 
-    # Prefer plans that have enabled features; fall back to any plan by preference.
-    pool = [p for p in all_plans if p.id in featured_plan_ids] or all_plans
-    plan = sorted(pool, key=_plan_rank)[0] if pool else None
+    if not plan:
+        PLAN_PREFERENCE = ["professional", "growth", "enterprise", "starter"]
+        featured_plan_ids = set((await db.execute(
+            select(PlanFeature.plan_id).where(PlanFeature.enabled == True)
+        )).scalars().all())
+
+        def _plan_rank(p: Plan) -> int:
+            name = (p.name or "").lower()
+            return PLAN_PREFERENCE.index(name) if name in PLAN_PREFERENCE else len(PLAN_PREFERENCE)
+
+        # Prefer plans that have enabled features; fall back to any plan by preference.
+        pool = [p for p in all_plans if p.id in featured_plan_ids] or all_plans
+        plan = sorted(pool, key=_plan_rank)[0] if pool else None
     if not plan:
         # No plans exist at all — create a minimal fallback so approval can proceed.
         plan = Plan(
@@ -2166,9 +2172,10 @@ async def approve_trial_request(
         db.add(plan)
         await db.flush()
 
-    # 6. Activate 14-day Trial Subscription
+    # 6. Activate the trial subscription (window from the plan, default 14 days)
     now_utc = datetime.now(timezone.utc)
-    trial_end = now_utc + timedelta(days=14)
+    trial_days = getattr(plan, "trial_days", None) or 14
+    trial_end = now_utc + timedelta(days=trial_days)
     
     sub = TenantSubscription(
         organization_id=org.id,

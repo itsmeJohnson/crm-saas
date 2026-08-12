@@ -29,7 +29,9 @@ import { useDialerStore } from '../store/dialerStore';
 import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 
 export const LeadsPage: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, features } = useAuthStore();
+  // Bulk import (CSV/Excel/Sheets) is a Growth+ plan feature.
+  const canBulkImport = (features || []).includes('BULK_IMPORT');
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
   const { agentState, currentLead, callSpecificLead, error: dialerError } = useDialerStore();
   const [callError, setCallError] = useState<string | null>(null);
@@ -253,7 +255,7 @@ export const LeadsPage: React.FC = () => {
             </button>
           </div>
 
-          {isPrivileged && (
+          {isPrivileged && canBulkImport && (
             <button
               onClick={() => setIsImportOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
@@ -431,7 +433,7 @@ export const LeadsPage: React.FC = () => {
         )}
       </div>
 
-      {isPrivileged && (
+      {isPrivileged && canBulkImport && (
         <div className="pt-6 border-t border-slate-800/60">
           <ImportHistoryTable />
         </div>

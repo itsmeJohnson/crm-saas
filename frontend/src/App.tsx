@@ -174,7 +174,9 @@ export const App: React.FC = () => {
                 <Route path="/staff" element={<StaffPage />} />
                 <Route path="/reports" element={<DentalReportsPage />} />
                 <Route path="/marketing" element={<MarketingPage />} />
-                <Route path="/lead-capture" element={<LeadCapturePage />} />
+                <Route element={<FeatureGuardRoute featureCode="LEAD_CAPTURE" />}>
+                  <Route path="/lead-capture" element={<LeadCapturePage />} />
+                </Route>
 
                 {/* Tasks & Calendar — available to all active users */}
                 <Route path="/tasks" element={<TasksPage />} />
