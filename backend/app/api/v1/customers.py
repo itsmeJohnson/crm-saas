@@ -15,9 +15,14 @@ from app.schemas.customer import (
     CustomerListItem, CustomerSummary, CustomerReportResponse, TimelineEvent,
 )
 from app.services.customer_service import CustomerService
-from app.middleware.permissions import require_role
+from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+from app.schemas.org_invoice_settings import OrgInvoiceSettingsResponse, OrgInvoiceSettingsUpdate
+from app.middleware.permissions import require_active_user, require_role
 
 _oa_or_mgr = require_role(["OrgAdmin", "Manager"])
+# Any active user (incl. Employee = clinical staff) may do read/write work.
+# Destructive + org-config ops stay on _oa_or_mgr (see individual routes).
+_rw = require_active_user
 
 router = APIRouter()
 
@@ -39,7 +44,7 @@ def _invoice_out(inv) -> dict:
 
 @router.get("/", response_model=List[CustomerListItem])
 async def list_customers(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     search: str | None = Query(None),
     skip: int = Query(0, ge=0),
@@ -50,7 +55,7 @@ async def list_customers(
 
 @router.get("/reports", response_model=CustomerReportResponse)
 async def customer_reports(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
@@ -58,16 +63,29 @@ async def customer_reports(
     """Order-to-cash analytics: orders, invoiced, collected, outstanding + overdue AR."""
     return await CustomerService(db).get_report(actor, date_from=date_from, date_to=date_to)
 
+# ================= Invoice settings (per-tenant customization) =================
+@router.get("/invoice-settings", response_model=OrgInvoiceSettingsResponse)
+async def get_invoice_settings(actor: Annotated[User, Depends(_oa_or_mgr)],
+                               db: Annotated[AsyncSession, Depends(get_db)]):
+    """Clinic invoice branding/tax/currency/numbering (created with defaults on first read)."""
+    return await OrgInvoiceSettingsService(db).get(actor)
+
+@router.put("/invoice-settings", response_model=OrgInvoiceSettingsResponse)
+async def update_invoice_settings(req: OrgInvoiceSettingsUpdate,
+                                  actor: Annotated[User, Depends(_oa_or_mgr)],
+                                  db: Annotated[AsyncSession, Depends(get_db)]):
+    return await OrgInvoiceSettingsService(db).update(actor, req.model_dump(exclude_unset=True))
+
 # ================= Orders =================
 
 @router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(req: OrderCreate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def create_order(req: OrderCreate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """Create a customer sales order."""
     return await CustomerService(db).create_order(actor, req.model_dump())
 
 @router.get("/orders", response_model=List[OrderResponse])
 async def list_orders(
-    actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)],
+    actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)],
     company_id: uuid.UUID | None = Query(None), status_filter: str | None = Query(None, alias="status"),
     skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100),
 ):
@@ -75,11 +93,11 @@ async def list_orders(
     return list(await CustomerService(db).list_orders(actor, company_id=company_id, status_filter=status_filter, skip=skip, limit=limit))
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)
-async def get_order(order_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def get_order(order_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await CustomerService(db).get_order(actor, order_id)
 
 @router.patch("/orders/{order_id}", response_model=OrderResponse)
-async def update_order(order_id: uuid.UUID, req: OrderUpdate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def update_order(order_id: uuid.UUID, req: OrderUpdate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await CustomerService(db).update_order(actor, order_id, req.model_dump(exclude_unset=True))
 
 @router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -90,20 +108,20 @@ async def delete_order(order_id: uuid.UUID, actor: Annotated[User, Depends(_oa_o
 # ================= Invoices =================
 
 @router.post("/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
-async def create_invoice(req: InvoiceCreate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def create_invoice(req: InvoiceCreate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """Create a customer invoice (accounts receivable)."""
     inv = await CustomerService(db).create_invoice(actor, req.model_dump())
     return _invoice_out(inv)
 
 @router.post("/invoices/from-order", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
-async def create_invoice_from_order(req: InvoiceFromOrderRequest, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def create_invoice_from_order(req: InvoiceFromOrderRequest, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """Generate an invoice from an existing order."""
     inv = await CustomerService(db).create_invoice_from_order(actor, req.order_id, due_date=req.due_date)
     return _invoice_out(inv)
 
 @router.get("/invoices", response_model=List[InvoiceResponse])
 async def list_invoices(
-    actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)],
+    actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)],
     company_id: uuid.UUID | None = Query(None), status_filter: str | None = Query(None, alias="status"),
     skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100),
 ):
@@ -112,24 +130,29 @@ async def list_invoices(
     return [_invoice_out(i) for i in invoices]
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
-async def get_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def get_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return _invoice_out(await CustomerService(db).get_invoice(actor, invoice_id))
 
 @router.patch("/invoices/{invoice_id}", response_model=InvoiceResponse)
-async def update_invoice(invoice_id: uuid.UUID, req: InvoiceUpdate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def update_invoice(invoice_id: uuid.UUID, req: InvoiceUpdate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return _invoice_out(await CustomerService(db).update_invoice(actor, invoice_id, req.model_dump(exclude_unset=True)))
 
 @router.post("/invoices/{invoice_id}/send", response_model=InvoiceResponse)
-async def send_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def send_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """Mark a draft invoice as sent and notify the account owner."""
     return _invoice_out(await CustomerService(db).send_invoice(actor, invoice_id))
 
 @router.get("/invoices/{invoice_id}/pdf")
-async def invoice_pdf(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def invoice_pdf(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """Download the invoice as a PDF."""
     pdf = await CustomerService(db).render_invoice_pdf(actor, invoice_id)
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f"attachment; filename=invoice_{invoice_id}.pdf"})
+
+@router.get("/invoices/{invoice_id}/whatsapp-share")
+async def invoice_whatsapp_share(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Patient phone + public (signed) PDF link for sharing the invoice on WhatsApp."""
+    return await CustomerService(db).whatsapp_share_info(actor, invoice_id)
 
 @router.delete("/invoices/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
@@ -139,17 +162,17 @@ async def delete_invoice(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_
 # ================= Payments =================
 
 @router.post("/invoices/{invoice_id}/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
-async def record_payment(invoice_id: uuid.UUID, req: PaymentCreate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def record_payment(invoice_id: uuid.UUID, req: PaymentCreate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """Record a payment received against an invoice (updates its balance/status)."""
     return await CustomerService(db).record_payment(actor, invoice_id, req.model_dump())
 
 @router.get("/invoices/{invoice_id}/payments", response_model=List[PaymentResponse])
-async def list_invoice_payments(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def list_invoice_payments(invoice_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return list(await CustomerService(db).list_payments(actor, invoice_id=invoice_id))
 
 @router.get("/payments", response_model=List[PaymentResponse])
 async def list_payments(
-    actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)],
+    actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)],
     company_id: uuid.UUID | None = Query(None),
 ):
     return list(await CustomerService(db).list_payments(actor, company_id=company_id))
@@ -157,22 +180,22 @@ async def list_payments(
 # ================= Contracts =================
 
 @router.post("/contracts", response_model=ContractResponse, status_code=status.HTTP_201_CREATED)
-async def create_contract(req: ContractCreate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def create_contract(req: ContractCreate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await CustomerService(db).create_contract(actor, req.model_dump())
 
 @router.get("/contracts", response_model=List[ContractResponse])
 async def list_contracts(
-    actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)],
+    actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)],
     company_id: uuid.UUID | None = Query(None), status_filter: str | None = Query(None, alias="status"),
 ):
     return list(await CustomerService(db).list_contracts(actor, company_id=company_id, status_filter=status_filter))
 
 @router.get("/contracts/{contract_id}", response_model=ContractResponse)
-async def get_contract(contract_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def get_contract(contract_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await CustomerService(db).get_contract(actor, contract_id)
 
 @router.patch("/contracts/{contract_id}", response_model=ContractResponse)
-async def update_contract(contract_id: uuid.UUID, req: ContractUpdate, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def update_contract(contract_id: uuid.UUID, req: ContractUpdate, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     return await CustomerService(db).update_contract(actor, contract_id, req.model_dump(exclude_unset=True))
 
 @router.delete("/contracts/{contract_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -183,14 +206,14 @@ async def delete_contract(contract_id: uuid.UUID, actor: Annotated[User, Depends
 # ================= Customer detail (last: two-segment path) =================
 
 @router.get("/{company_id}/summary", response_model=CustomerSummary)
-async def customer_summary(company_id: uuid.UUID, actor: Annotated[User, Depends(_oa_or_mgr)], db: Annotated[AsyncSession, Depends(get_db)]):
+async def customer_summary(company_id: uuid.UUID, actor: Annotated[User, Depends(_rw)], db: Annotated[AsyncSession, Depends(get_db)]):
     """360 rollup for a customer account: orders, invoices, payments, contracts."""
     return await CustomerService(db).customer_summary(actor, company_id)
 
 @router.get("/{company_id}/timeline", response_model=List[TimelineEvent])
 async def customer_timeline(
     company_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     types: str | None = Query(None, description="Comma-separated event types to include"),
     search: str | None = Query(None),
@@ -205,7 +228,7 @@ async def customer_timeline(
 @router.get("/{company_id}/timeline/export")
 async def export_customer_timeline(
     company_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     types: str | None = Query(None),
     search: str | None = Query(None),

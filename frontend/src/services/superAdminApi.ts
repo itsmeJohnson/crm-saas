@@ -59,6 +59,9 @@ export interface TenantResponse {
   user_count: number;
   invoice_count: number;
   call_recording_usage: number;
+  currency: string;
+  timezone: string;
+  is_deleted?: boolean;
 }
 
 export interface TenantUserResponse {
@@ -84,6 +87,9 @@ export interface SubscriptionUpdateRequest {
   subscription_expires_at: string | null;
   subscription_status: string;
   max_users: number;
+  name?: string;
+  currency?: string;
+  timezone?: string;
 }
 
 export interface InvoiceCreateRequest {
@@ -107,8 +113,8 @@ export interface CreateTenantRequest {
 }
 
 export const superAdminApi = {
-  getTenants: async () => {
-    const response = await api.get<TenantResponse[]>('/super-admin/tenants');
+  getTenants: async (includeDeleted = false) => {
+    const response = await api.get<TenantResponse[]>('/super-admin/tenants', { params: { include_deleted: includeDeleted } });
     return response.data;
   },
 
@@ -153,6 +159,11 @@ export const superAdminApi = {
 
   deleteTenant: async (orgId: string) => {
     const response = await api.delete<{ detail: string }>(`/super-admin/tenants/${orgId}`);
+    return response.data;
+  },
+
+  restoreTenant: async (orgId: string) => {
+    const response = await api.post<{ detail: string }>(`/super-admin/tenants/${orgId}/restore`);
     return response.data;
   },
 
@@ -357,6 +368,23 @@ export const superAdminApi = {
     const response = await api.put<CommercialSettingsResponse>('/super-admin/commercial-settings', payload);
     return response.data;
   },
+
+  getTrialRequests: async () => {
+    const response = await api.get<TrialRequestResponse[]>('/super-admin/trial-requests');
+    return response.data;
+  },
+  approveTrialRequest: async (id: string) => {
+    const response = await api.post<TrialRequestResponse>(`/super-admin/trial-requests/${id}/approve`);
+    return response.data;
+  },
+  rejectTrialRequest: async (id: string) => {
+    const response = await api.post<TrialRequestResponse>(`/super-admin/trial-requests/${id}/reject`);
+    return response.data;
+  },
+  resendTrialActivationEmail: async (id: string) => {
+    const response = await api.post<{ status: string; message: string }>(`/super-admin/trial-requests/${id}/resend-activation`);
+    return response.data;
+  },
 };
 
 export interface InvoiceConfigUpdate {
@@ -424,6 +452,7 @@ export interface PlanCreatePayload {
   trial_days: number;
   extra_user_price: number;
   discount_percentage: number;
+  promo_price?: number | null;
   gst_percentage: number;
   plan_color?: string;
   plan_badge?: string;
@@ -513,6 +542,17 @@ export interface CommercialSettingsUpdate {
 
 export interface CommercialSettingsResponse extends CommercialSettingsUpdate {
   id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrialRequestResponse {
+  id: string;
+  full_name: string;
+  company_name: string;
+  email: string;
+  phone: string;
+  status: string;
   created_at: string;
   updated_at: string;
 }

@@ -29,6 +29,8 @@ async def require_active_user(
             mask_phone = True
             
     mask_phone_ctx.set(mask_phone)
+    from app.core.tenant_context import TenantContext
+    TenantContext.set_tenant_id(current_user.organization_id)
     return current_user
 
 class RoleRequired:
@@ -50,6 +52,56 @@ def require_role(allowed_roles: List[str]):
 def require_user_management_permission():
     """Dependency enforcing that the user has administrative/management rights."""
     return require_role(["OrgAdmin", "Manager"])
+
+
+async def resolve_feature_codes(user: User, db: AsyncSession) -> set:
+    """Resolve the feature codes enabled for a user's tenant — identical logic
+    to the /auth/me feature resolution. SuperAdmin gets every active feature."""
+    from app.models.feature import Feature
+    from app.models.plan_feature import PlanFeature
+    from app.models.tenant_subscription import TenantSubscription
+
+    if user.role == "SuperAdmin":
+        res = await db.execute(
+            select(Feature.code).where(Feature.active == True, Feature.is_deleted == False)
+        )
+        return set(res.scalars().all())
+
+    stmt = (
+        select(Feature.code)
+        .join(PlanFeature, PlanFeature.feature_id == Feature.id)
+        .join(TenantSubscription, TenantSubscription.plan_id == PlanFeature.plan_id)
+        .where(
+            TenantSubscription.organization_id == user.organization_id,
+            TenantSubscription.is_deleted == False,
+            TenantSubscription.status.in_(["active", "trial"]),
+            PlanFeature.enabled == True,
+            Feature.active == True,
+            Feature.is_deleted == False,
+        )
+    )
+    res = await db.execute(stmt)
+    return set(res.scalars().all())
+
+
+def require_feature(feature_code: str):
+    """Dependency factory: 403 unless the caller's plan includes `feature_code`.
+    SuperAdmin bypasses. Server-side twin of the frontend FeatureGuardRoute so
+    plan gating cannot be bypassed by calling the API directly."""
+    async def dependency(
+        current_user: Annotated[User, Depends(require_active_user)],
+        db: Annotated[AsyncSession, Depends(get_db)],
+    ) -> User:
+        if current_user.role == "SuperAdmin":
+            return current_user
+        codes = await resolve_feature_codes(current_user, db)
+        if feature_code not in codes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Your plan does not include this feature. Please upgrade to access it.",
+            )
+        return current_user
+    return dependency
 
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
     """Check if the user is a Team Leader (Employee who reports to a Manager)."""
@@ -119,3 +171,29 @@ async def require_tl_or_above(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You do not have enough privileges"
     )
+
+
+class TelephonyAccessDenied(Exception):
+    """Raised when a user may not access org telephony settings. An exception
+    handler (main.py) renders it to the exact contract body at HTTP 403:
+    {"success": false, "message": "You are not authorized to access telephony settings."}"""
+
+
+async def require_manage_telephony(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """Telephony settings are org-level and highly privileged. Allowed:
+      - SuperAdmin (organization owner) — always
+      - OrgAdmin — only if granted the 'integrations':'manage' permission
+    Everyone else (Employee, Manager, TeamLeader, HR, custom roles, …) is denied.
+    """
+    if not current_user.is_active:
+        raise TelephonyAccessDenied()
+    if current_user.role == "SuperAdmin":
+        return current_user
+    if current_user.role == "OrgAdmin":
+        from app.services.permission_service import PermissionService
+        if await PermissionService(db).check(current_user, "integrations", "manage"):
+            return current_user
+    raise TelephonyAccessDenied()

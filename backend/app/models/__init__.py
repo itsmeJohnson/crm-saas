@@ -1,17 +1,21 @@
 from app.models.base import Base, BaseModel
 from app.models.organization import Organization
 from app.models.user import User
+from app.models.trial_request import TrialRequest
 from app.models.session import UserSession
 from app.models.invitation import UserInvitation
 from app.models.audit_log import AuditLog
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.lead import Lead
+from app.models.lead_capture import LeadCaptureSource, LeadCaptureEvent
+from app.models.org_invoice_settings import OrgInvoiceSettings
+from app.models.treatment_catalog import TreatmentCatalogItem
 from app.models.activity import Activity
 from app.models.note import Note
 from app.models.lead_import import LeadImport, LeadImportStatus
 from app.models.assignment_config import AssignmentConfig, AssignmentStrategy
-from app.models.pipeline import PipelineStage
+from app.models.pipeline import Pipeline, PipelineStage
 from app.models.target import PerformanceTarget, TargetType, MetricType
 from app.models.invoice import Invoice
 from app.models.plan import Plan
@@ -46,7 +50,12 @@ from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
 from app.models.sms_settings import SmsSettings
-from app.models.whatsapp import WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply
+from app.models.telephony_settings import TelephonySettings
+from app.models.whatsapp import (
+    WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply,
+    WhatsAppContact, WhatsAppLabel, WhatsAppMessage, WhatsAppAttachment,
+    WhatsAppTemplate, WhatsAppWebhookEvent
+)
 from app.models.email_settings import EmailSettings
 from app.models.campaign import Campaign, CampaignRecipient, CampaignSegment
 from app.models.department import Department, DepartmentTarget
@@ -79,6 +88,7 @@ from app.models.scheduled_report import ReportSchedule, ReportDeliveryLog
 from app.models.bi_export import BIToken, BISetting, ExportJob, BISyncConfig
 from app.models.history import MetricSnapshot, HistorySetting
 from app.models.ai_platform import (AISettings, AIProviderConfig, AIPromptTemplate,
+                                    AIPromptTemplateVersion,
                                     AIConversation, AIMessage, AIUsageLog, AICacheEntry)
 from app.models.automation import (
     AutomationJob, AutomationRun, SLAPolicy, SLABreach, ScheduledReport,
@@ -95,6 +105,10 @@ from app.models.knowledge_base import (
     KBCategory, KBArticle, KBArticleVersion, KBChunk, KBEvent,
 )
 from app.models.document_intelligence import DIDocument
+from app.models.recommendation import RecommendationFeedback
+from app.models.ai_governance import AIGovernancePolicy, AIGovernanceEvent
+from app.models.ai_api import AIApiKey, AIApiRequest, AIWebhook, AIWebhookDelivery
+from app.models.integration import Integration, IntegrationLog, IntegrationEvent
 
 __all__ = [
     "Base", 
@@ -113,6 +127,7 @@ __all__ = [
     "LeadImportStatus",
     "AssignmentConfig",
     "AssignmentStrategy",
+    "Pipeline",
     "PipelineStage",
     "PerformanceTarget",
     "TargetType",
@@ -157,6 +172,12 @@ __all__ = [
     "WhatsAppSettings",
     "WhatsAppConversation",
     "WhatsAppQuickReply",
+    "WhatsAppContact",
+    "WhatsAppLabel",
+    "WhatsAppMessage",
+    "WhatsAppAttachment",
+    "WhatsAppTemplate",
+    "WhatsAppWebhookEvent",
     "EmailSettings",
     "Campaign",
     "CampaignRecipient",
@@ -233,4 +254,18 @@ __all__ = [
     "KBChunk",
     "KBEvent",
     "DIDocument",
+    "RecommendationFeedback",
+    "AIGovernancePolicy",
+    "AIGovernanceEvent",
+    "AIApiKey",
+    "AIApiRequest",
+    "AIWebhook",
+    "AIWebhookDelivery",
+    "Integration",
+    "IntegrationLog",
+    "IntegrationEvent",
+    "LeadCaptureSource",
+    "LeadCaptureEvent",
+    "OrgInvoiceSettings",
+    "TreatmentCatalogItem",
 ]

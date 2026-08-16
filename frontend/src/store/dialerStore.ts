@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { dialerApi } from '../services/dialerApi';
+import { dialerApi, CallCreds } from '../services/dialerApi';
 import { LeadResponse } from '../services/leadApi';
 
 export type AgentState = 'IDLE' | 'ACTIVE_CALLING' | 'BREAK';
@@ -17,9 +17,7 @@ interface DialerState {
   fetchCurrentState: () => Promise<void>;
   startCalling: (
     collectivePooling?: boolean,
-    knowlarityApiKey?: string,
-    knowlaritySrn?: string,
-    agentPhoneNumber?: string
+    creds?: CallCreds
   ) => Promise<void>;
   submitDisposition: (dispositionData: {
     status: string;
@@ -29,6 +27,10 @@ interface DialerState {
   goOnBreak: (reason: string) => Promise<void>;
   endBreak: () => Promise<void>;
   answerInboundCall: (lead: LeadResponse) => Promise<void>;
+  callSpecificLead: (
+    leadId: string,
+    creds?: CallCreds
+  ) => Promise<void>;
   resetStore: () => void;
 }
 
@@ -109,19 +111,12 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
   },
 
-  startCalling: async (
-    collectivePooling = false,
-    knowlarityApiKey?: string,
-    knowlaritySrn?: string,
-    agentPhoneNumber?: string
-  ) => {
+  startCalling: async (collectivePooling = false, creds?: CallCreds) => {
     set({ isLoading: true, error: null });
     try {
       const lead = await dialerApi.getNextLead({
         collective_pooling: collectivePooling,
-        knowlarity_api_key: knowlarityApiKey,
-        knowlarity_srn: knowlaritySrn,
-        agent_phone_number: agentPhoneNumber,
+        ...(creds || {}),
       });
       const nowStr = new Date().toISOString();
       set({
@@ -230,6 +225,33 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       startTimer(set, 0);
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to answer inbound call';
+      set({ error: errMsg, isLoading: false });
+      throw err;
+    }
+  },
+
+  // Manually call a specific already-known lead from the Leads list (any status),
+  // rather than pulling the next 'New' lead from the queue. Mirrors startCalling
+  // so the same ActiveCallDisposition form drives the outcome afterwards.
+  callSpecificLead: async (leadId, creds?: CallCreds) => {
+    set({ isLoading: true, error: null });
+    try {
+      const lead = await dialerApi.callLead(leadId, { ...(creds || {}) });
+      const nowStr = new Date().toISOString();
+      set({
+        currentLead: lead,
+        agentState: 'ACTIVE_CALLING',
+        callDirection: 'OUTBOUND',
+        stateTimestamp: nowStr,
+        isLoading: false,
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+        localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
+      }
+      startTimer(set, 0);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to place the call';
       set({ error: errMsg, isLoading: false });
       throw err;
     }

@@ -8,7 +8,7 @@ from app.services.invoice_config_service import InvoiceConfigService
 from app.schemas.commercial_settings import CommercialSettingsResponse, CommercialSettingsUpdate
 from app.services.commercial_settings_service import CommercialSettingsService
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, update
 
 from app.core.database import get_db
 from app.core.security import get_password_hash
@@ -31,6 +31,7 @@ from app.schemas.super_admin import (
 )
 from app.services.auth_service import AuthService
 from app.schemas.auth import RegisterTenantRequest
+from app.schemas.trial_request import TrialRequestResponse
 
 router = APIRouter()
 require_super_admin = RoleChecker(["SuperAdmin"])
@@ -38,9 +39,12 @@ require_super_admin = RoleChecker(["SuperAdmin"])
 @router.get("/tenants", response_model=List[TenantResponse])
 async def list_tenants(
     actor: Annotated[User, Depends(require_super_admin)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    include_deleted: bool = False,
 ):
-    """List all tenant organizations in the system with user and invoice counts."""
+    """List all tenant organizations in the system with user and invoice counts.
+    Pass include_deleted=true to also return soft-deleted (deactivated) tenants
+    so they can be restored."""
     from sqlalchemy.orm import selectinload
     # Subquery for user count
     user_sub = select(
@@ -62,7 +66,9 @@ async def list_tenants(
         user_sub, Organization.id == user_sub.c.organization_id
     ).outerjoin(
         inv_sub, Organization.id == inv_sub.c.organization_id
-    ).where(Organization.is_deleted == False).options(selectinload(Organization.subscription))
+    ).options(selectinload(Organization.subscription))
+    if not include_deleted:
+        query = query.where(Organization.is_deleted == False)
 
     res = await db.execute(query)
     results = []
@@ -79,7 +85,10 @@ async def list_tenants(
                 max_users=org.max_users,
                 user_count=u_cnt,
                 invoice_count=i_cnt,
-                call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0
+                call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0,
+                currency=org.currency,
+                timezone=org.timezone,
+                is_deleted=org.is_deleted,
             )
         )
     return results
@@ -143,14 +152,56 @@ async def update_tenant_subscription(
     if not org:
         raise HTTPException(status_code=404, detail="Tenant organization not found")
     
+    # Look up the plan by name (case-insensitive) to get plan ID
+    plan_stmt = select(Plan).where(Plan.name.ilike(payload.subscription_plan), Plan.is_deleted == False)
+    plan_res = await db.execute(plan_stmt)
+    plan = plan_res.scalar_one_or_none()
+    
+    # subscription_expires_at is a naive TIMESTAMP column; normalize any
+    # tz-aware input to UTC then drop tzinfo (asyncpg rejects writing an
+    # offset-aware datetime to a naive column).
+    expires_at = payload.subscription_expires_at
+    if expires_at and expires_at.tzinfo is not None:
+        expires_at = expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+    org.subscription_expires_at = expires_at
+
+    if plan:
+        org.plan_id = plan.id
+        # Update or create the TenantSubscription row to keep it in sync
+        if org.subscription:
+            org.subscription.plan_id = plan.id
+            org.subscription.status = payload.subscription_status
+            org.subscription.users_purchased = payload.max_users
+            if expires_at:
+                org.subscription.end_date = expires_at
+        else:
+            from datetime import timedelta
+            now = datetime.now(timezone.utc)
+            subscription = TenantSubscription(
+                organization_id=org.id,
+                plan_id=plan.id,
+                status=payload.subscription_status,
+                start_date=now.replace(tzinfo=None),
+                end_date=expires_at or (now + timedelta(days=365)).replace(tzinfo=None),
+                auto_renew=True,
+                billing_cycle="monthly",
+                users_purchased=payload.max_users,
+                users_active=0
+            )
+            db.add(subscription)
+            org.subscription = subscription
+
     org.subscription_plan = payload.subscription_plan
     org.subscription_status = payload.subscription_status
     org.max_users = payload.max_users
-    
-    expires_at = payload.subscription_expires_at
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    org.subscription_expires_at = expires_at
+
+    # Optional tenant profile fields.
+    if payload.name is not None and payload.name.strip():
+        org.name = payload.name.strip()
+    if payload.currency is not None and payload.currency.strip():
+        org.currency = payload.currency.strip().upper()
+    if payload.timezone is not None and payload.timezone.strip():
+        org.timezone = payload.timezone.strip()
     
     await db.commit()
 
@@ -176,7 +227,9 @@ async def update_tenant_subscription(
         max_users=org.max_users,
         user_count=u_res.scalar() or 0,
         invoice_count=i_res.scalar() or 0,
-        call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0
+        call_recording_usage=org.subscription.call_recording_usage if org.subscription else 0,
+        currency=org.currency,
+        timezone=org.timezone
     )
 
 @router.put("/tenants/{org_id}/usage", response_model=TenantResponse)
@@ -452,54 +505,33 @@ async def delete_tenant(
     actor: Annotated[User, Depends(require_super_admin)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Hard delete a tenant organization and all of its related data from the database."""
-    # Check if organization exists
+    """Soft-delete a tenant organization: mark it deleted, deactivate it and its
+    users so no one can log in, and remove it from the tenant list.
+
+    A hard delete is intentionally avoided — 148 tables carry organization_id,
+    so a manual cascade is unmaintainable and would fail on foreign keys. The
+    tenant list (and all tenant queries) filter is_deleted == False, so a
+    soft-deleted tenant disappears immediately and its data can still be purged
+    out-of-band if ever required.
+    """
     org = await db.get(Organization, org_id)
-    if not org:
+    if not org or org.is_deleted:
         raise HTTPException(status_code=404, detail="Tenant organization not found")
 
-    # Import related models for manual cascading deletes
-    from app.models.note import Note
-    from app.models.activity import Activity
-    from app.models.lead import Lead
-    from app.models.contact import Contact
-    from app.models.company import Company
-    from app.models.pipeline import PipelineStage
-    from app.models.target import PerformanceTarget
-    from app.models.invoice import Invoice
-    from app.models.invitation import UserInvitation
-    from app.models.audit_log import AuditLog
+    org.is_deleted = True
+    org.is_active = False
+    org.subscription_status = "cancelled"
+
+    # Deactivate every user so the tenant can no longer authenticate.
+    await db.execute(
+        update(User).filter(User.organization_id == org_id).values(is_active=False)
+    )
+
+    # Invalidate any live sessions for those users.
     from app.models.session import UserSession
-    from app.models.tenant_subscription import TenantSubscription
-    from app.models.lead_import import LeadImport
-    from app.models.assignment_config import AssignmentConfig
-
-    # 1. Delete dependent entities by organization_id
-    await db.execute(delete(Note).filter(Note.organization_id == org_id))
-    await db.execute(delete(Activity).filter(Activity.organization_id == org_id))
-    await db.execute(delete(Lead).filter(Lead.organization_id == org_id))
-    await db.execute(delete(Contact).filter(Contact.organization_id == org_id))
-    await db.execute(delete(Company).filter(Company.organization_id == org_id))
-    await db.execute(delete(PipelineStage).filter(PipelineStage.organization_id == org_id))
-    await db.execute(delete(PerformanceTarget).filter(PerformanceTarget.organization_id == org_id))
-    await db.execute(delete(Invoice).filter(Invoice.organization_id == org_id))
-    await db.execute(delete(UserInvitation).filter(UserInvitation.organization_id == org_id))
-    await db.execute(delete(AuditLog).filter(AuditLog.organization_id == org_id))
-    await db.execute(delete(TenantSubscription).filter(TenantSubscription.organization_id == org_id))
-    await db.execute(delete(LeadImport).filter(LeadImport.organization_id == org_id))
-    await db.execute(delete(AssignmentConfig).filter(AssignmentConfig.organization_id == org_id))
-
-    # 2. Get user ids to delete their sessions
-    user_ids_result = await db.execute(select(User.id).filter(User.organization_id == org_id))
-    user_ids = user_ids_result.scalars().all()
+    user_ids = (await db.execute(select(User.id).filter(User.organization_id == org_id))).scalars().all()
     if user_ids:
         await db.execute(delete(UserSession).filter(UserSession.user_id.in_(user_ids)))
-
-    # 3. Delete all users belonging to this organization
-    await db.execute(delete(User).filter(User.organization_id == org_id))
-
-    # 4. Delete the organization itself
-    await db.execute(delete(Organization).filter(Organization.id == org_id))
 
     await db.commit()
 
@@ -507,7 +539,39 @@ async def delete_tenant(
     from app.dependencies.feature_guard import invalidate_tenant_features
     await invalidate_tenant_features(org_id)
 
-    return {"detail": "Tenant organization and all related data deleted successfully"}
+    return {"detail": "Tenant organization deleted successfully"}
+
+
+@router.post("/tenants/{org_id}/restore", status_code=status.HTTP_200_OK)
+async def restore_tenant(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Restore a soft-deleted (deactivated) tenant: un-delete and reactivate the
+    org and re-enable its users (excluding removed/anonymized `.removed` accounts)
+    so they can log in again."""
+    org = await db.get(Organization, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Tenant organization not found")
+
+    org.is_deleted = False
+    org.is_active = True
+    org.subscription_status = "active"
+
+    # Reactivate real users; leave anonymized (removed) accounts deactivated.
+    await db.execute(
+        update(User)
+        .filter(User.organization_id == org_id, User.is_deleted == False,
+                ~User.email.like("%.removed.%"))
+        .values(is_active=True)
+    )
+    await db.commit()
+
+    from app.dependencies.feature_guard import invalidate_tenant_features
+    await invalidate_tenant_features(org_id)
+
+    return {"detail": "Tenant organization restored successfully"}
 
 
 # ==========================================
@@ -557,6 +621,7 @@ async def create_plan(
         trial_days=payload.trial_days,
         extra_user_price=payload.extra_user_price,
         discount_percentage=payload.discount_percentage,
+        promo_price=payload.promo_price,
         gst_percentage=payload.gst_percentage,
         plan_color=payload.plan_color,
         plan_badge=payload.plan_badge,
@@ -2015,3 +2080,163 @@ async def churn_report(
         "healthy": churn_rate < 5.0,
         "benchmark": "< 5% monthly churn is healthy for B2B SaaS"
     }
+
+
+@router.get("/trial-requests", response_model=List[TrialRequestResponse])
+async def list_trial_requests(
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """List all trial requests."""
+    from app.models.trial_request import TrialRequest
+    stmt = select(TrialRequest).where(TrialRequest.is_deleted == False).order_by(TrialRequest.created_at.desc())
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+
+@router.post("/trial-requests/{id}/approve", response_model=TrialRequestResponse)
+async def approve_trial_request(
+    id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Approve a pending trial request, provisioning the Organization,
+    User (Owner), 14-day trial subscription, default team, default pipeline,
+    and sending a password setup welcome email.
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.models.trial_request import TrialRequest
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.models.tenant_subscription import TenantSubscription
+    from app.models.seat_history import SeatAssignmentHistory
+    from app.models.team import Team, TeamMember
+    from app.models.plan import Plan
+    from app.core.security import generate_random_token, hash_token, get_password_hash
+    from app.services.email_service import send_email
+    from app.services.audit_service import AuditService
+    from app.repositories.organization import OrganizationRepository
+    from app.repositories.user import UserRepository
+    from app.core.config import settings
+
+    # 1. Fetch Trial Request
+    stmt = select(TrialRequest).where(TrialRequest.id == id, TrialRequest.is_deleted == False)
+    res = await db.execute(stmt)
+    trial_req = res.scalar_one_or_none()
+    if not trial_req:
+        raise HTTPException(status_code=404, detail="Trial request not found")
+    if trial_req.status != "PENDING":
+        raise HTTPException(status_code=400, detail=f"Trial request is already {trial_req.status}")
+
+    # Provision via the shared flow (identical to auto-approve at signup).
+    from app.services.trial_provisioning import provision_trial_tenant
+    try:
+        await provision_trial_tenant(db, trial_req, performed_by_actor_id=actor.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return trial_req
+
+
+
+@router.post("/trial-requests/{id}/reject", response_model=TrialRequestResponse)
+async def reject_trial_request(
+    id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Reject a pending trial request."""
+    from app.models.trial_request import TrialRequest
+    from app.services.audit_service import AuditService
+
+    stmt = select(TrialRequest).where(TrialRequest.id == id, TrialRequest.is_deleted == False)
+    res = await db.execute(stmt)
+    trial_req = res.scalar_one_or_none()
+    if not trial_req:
+        raise HTTPException(status_code=404, detail="Trial request not found")
+    if trial_req.status != "PENDING":
+        raise HTTPException(status_code=400, detail=f"Trial request is already {trial_req.status}")
+
+    trial_req.status = "REJECTED"
+    db.add(trial_req)
+    await db.commit()
+
+    await AuditService(db).log_event(
+        actor_id=actor.id,
+        organization_id=None,
+        event_type="TRIAL_REQUEST_REJECTED",
+        description=f"Trial request for '{trial_req.company_name}' ({trial_req.email}) was rejected"
+    )
+
+    return trial_req
+
+
+@router.post("/trial-requests/{id}/resend-activation")
+async def resend_trial_activation_email(
+    id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Resend the password setup / activation welcome email for an approved trial request.
+    Generates a new token, updates user.reset_token, and sends the email.
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.models.trial_request import TrialRequest
+    from app.models.user import User
+    from app.core.security import generate_random_token, hash_token
+    from app.services.email_service import send_email
+    from app.core.config import settings
+    from app.services.audit_service import AuditService
+
+    # 1. Fetch Trial Request
+    stmt = select(TrialRequest).where(TrialRequest.id == id, TrialRequest.is_deleted == False)
+    res = await db.execute(stmt)
+    trial_req = res.scalar_one_or_none()
+    if not trial_req:
+        raise HTTPException(status_code=404, detail="Trial request not found")
+    if trial_req.status != "APPROVED":
+        raise HTTPException(status_code=400, detail="Activation email can only be resent for approved trial requests")
+
+    # 2. Fetch the created user
+    user_stmt = select(User).where(User.email == trial_req.email, User.is_deleted == False)
+    user_res = await db.execute(user_stmt)
+    user = user_res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Corresponding tenant user account not found")
+
+    # 3. Generate New Token
+    token = generate_random_token()
+    hashed_token = hash_token(token)
+    user.reset_token = hashed_token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+    db.add(user)
+    await db.commit()
+
+    # 4. Send Email
+    frontend_url = (
+        settings.FRONTEND_URL
+        or (settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else None)
+        or "http://localhost:5173"
+    ).rstrip("/")
+    reset_url = f"{frontend_url}/login?token={token}"
+
+    send_email(
+        to_email=user.email,
+        subject="Welcome to Johnson Softwares CRM - Setup Your Password",
+        template_name="trial_approved.html",
+        context={
+            "reset_url": reset_url,
+            "full_name": trial_req.full_name,
+            "company_name": trial_req.company_name
+        }
+    )
+
+    await AuditService(db).log_event(
+        actor_id=actor.id,
+        organization_id=user.organization_id,
+        event_type="TRIAL_ACTIVATION_RESENT",
+        description=f"Resent password setup welcome email to {trial_req.email}"
+    )
+
+    return {"status": "success", "message": f"Activation email successfully resent to {trial_req.email}"}

@@ -20,6 +20,8 @@ export interface Organization {
   subscription_status?: string | null;
   subscription_expires_at?: string | null;
   max_users?: number | null;
+  currency?: string | null;
+  timezone?: string | null;
 }
 
 interface AuthState {
@@ -33,12 +35,22 @@ interface AuthState {
   logout: () => void;
 }
 
+const safeParse = <T>(key: string, fallback: T): T => {
+  try {
+    const val = localStorage.getItem(key);
+    if (!val || val === 'undefined' || val === 'null') return fallback;
+    return JSON.parse(val) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: localStorage.getItem('access_token'),
   refreshToken: localStorage.getItem('refresh_token'),
-  user: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null,
-  organization: localStorage.getItem('organization') ? JSON.parse(localStorage.getItem('organization')!) : null,
-  features: localStorage.getItem('features') ? JSON.parse(localStorage.getItem('features')!) : [],
+  user: safeParse<User | null>('user', null),
+  organization: safeParse<Organization | null>('organization', null),
+  features: safeParse<string[]>('features', []),
 
   setAuth: (user, organization, features, accessToken, refreshToken) => {
     localStorage.setItem('access_token', accessToken);

@@ -17,7 +17,7 @@ async def create_activity(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new activity (event/task) for the organization."""
-    activity_service = ActivityService(db)
+    activity_service = ActivityService(db, actor.organization_id)
     return await activity_service.create_activity(actor, activity_in.model_dump())
 
 @router.get("/", response_model=List[ActivityResponse])
@@ -34,7 +34,7 @@ async def list_activities(
     company_id: uuid.UUID | None = Query(None)
 ):
     """List paginated activities scoped to the tenant organization with optional filters."""
-    activity_service = ActivityService(db)
+    activity_service = ActivityService(db, actor.organization_id)
     records, _ = await activity_service.paginate_activities(
         actor=actor,
         skip=skip,
@@ -55,7 +55,7 @@ async def get_activity(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Retrieve detailed activity details scoped to organization."""
-    activity_service = ActivityService(db)
+    activity_service = ActivityService(db, actor.organization_id)
     return await activity_service.get_activity(actor, activity_id)
 
 @router.patch("/{activity_id}", response_model=ActivityResponse)
@@ -66,7 +66,7 @@ async def update_activity(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update properties of a scoped activity."""
-    activity_service = ActivityService(db)
+    activity_service = ActivityService(db, actor.organization_id)
     return await activity_service.update_activity(actor, activity_id, activity_in.model_dump(exclude_unset=True))
 
 @router.delete("/{activity_id}", response_model=ActivityResponse)
@@ -76,5 +76,5 @@ async def delete_activity(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Soft delete activity from organization database."""
-    activity_service = ActivityService(db)
+    activity_service = ActivityService(db, actor.organization_id)
     return await activity_service.soft_delete_activity(actor, activity_id)

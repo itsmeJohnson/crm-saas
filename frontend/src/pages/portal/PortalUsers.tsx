@@ -646,7 +646,7 @@ export const PortalUsers: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-left">
           <form
             onSubmit={handleAddUser}
-            className="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 bg-slate-950"
+            className="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 bg-slate-950 max-h-[92vh] overflow-y-auto"
           >
             <div>
               <h3 className="text-lg font-bold text-slate-100">Allocate User Seat</h3>
@@ -745,6 +745,12 @@ export const PortalUsers: React.FC = () => {
                 />
               </div>
             </div>
+
+            {error && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-medium">
+                {error}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-2">
               <button

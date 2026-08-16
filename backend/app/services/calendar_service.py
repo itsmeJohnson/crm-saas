@@ -112,9 +112,36 @@ class CalendarService:
                 title=f"Event {verb}", body=f'"{ev.title}" on {ev.start_at.strftime("%b %d, %H:%M")}',
                 link_url=f"/calendar?eventId={ev.id}", action_metadata={"event_id": str(ev.id)})
 
+    async def _assert_no_appointment_conflict(self, actor: User, start_at, end_at, assigned_user_id, exclude_id=None) -> None:
+        """Reject an Appointment slot that overlaps another (non-cancelled) appointment
+        for the same assignee/doctor. Overlap = existing.start < new.end AND existing.end > new.start."""
+        q = select(CalendarEvent.id, CalendarEvent.title, CalendarEvent.start_at).filter(
+            CalendarEvent.organization_id == actor.organization_id,
+            CalendarEvent.is_deleted == False,
+            CalendarEvent.event_type == "Appointment",
+            CalendarEvent.assigned_user_id == assigned_user_id,
+            or_(CalendarEvent.status.is_(None), CalendarEvent.status != "Cancelled"),
+            CalendarEvent.start_at < end_at,
+            CalendarEvent.end_at > start_at,
+        )
+        if exclude_id is not None:
+            q = q.filter(CalendarEvent.id != exclude_id)
+        clash = (await self.db.execute(q)).first()
+        if clash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(f"This slot overlaps an existing appointment "
+                        f"(\"{clash.title}\" at {clash.start_at:%Y-%m-%d %H:%M}). "
+                        f"Set allow_conflict to double-book."),
+            )
+
     async def create_event(self, actor: User, data: dict) -> CalendarEvent:
         if data["end_at"] < data["start_at"]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="end_at must be after start_at")
+        if data.get("event_type", "Meeting") == "Appointment" and not data.get("allow_conflict"):
+            await self._assert_no_appointment_conflict(
+                actor, data["start_at"], data["end_at"],
+                data.get("assigned_user_id") or actor.id)
         if data.get("assigned_user_id"):
             from app.repositories.user_repository import UserRepository
             u = await UserRepository(self.db).get_user_by_id(actor.organization_id, data["assigned_user_id"])
@@ -153,10 +180,14 @@ class CalendarService:
 
     async def update_event(self, actor: User, event_id: uuid.UUID, data: dict) -> CalendarEvent:
         ev = await self._get_event(actor, event_id)
+        allow_conflict = data.pop("allow_conflict", False)
         for k, v in data.items():
             setattr(ev, k, v)
         if ev.end_at < ev.start_at:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="end_at must be after start_at")
+        if ev.event_type == "Appointment" and ev.status != "Cancelled" and not allow_conflict:
+            await self._assert_no_appointment_conflict(
+                actor, ev.start_at, ev.end_at, ev.assigned_user_id, exclude_id=ev.id)
         self.db.add(ev)
         await self.db.flush()
         await self.audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,

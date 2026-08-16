@@ -1,68 +1,41 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { api } from '../../services/api';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
 
 const registerSchema = z.object({
+  full_name: z.string().min(1, 'Full name is required'),
   company_name: z.string().min(2, 'Company name must be at least 2 characters'),
-  slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
-  admin_email: z.string().email('Please enter a valid email address'),
-  admin_password: z.string().min(8, 'Password must be at least 8 characters long'),
-  first_name: z.string().min(1, 'First name is required'),
-  last_name: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().min(5, 'Please enter a valid phone number'),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
 export const Register: React.FC = () => {
-  const navigate = useNavigate();
-  const { setAuth } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
 
-  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const generatedSlug = value
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-');
-    setValue('slug', generatedSlug, { shouldValidate: true });
-  };
-
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
     setError(null);
     try {
-      const regRes = await api.post('/auth/public-register', data);
-      const { access_token, refresh_token } = regRes.data;
-
-      // Fetch user profile using the new access token
-      const meRes = await api.get('/auth/me', {
-        headers: { Authorization: `Bearer ${access_token}` }
-      });
-      const { user, organization, features } = meRes.data;
-
-      // Store in auth store
-      setAuth(user, organization, features || [], access_token, refresh_token);
-
+      const res = await api.post('/auth/trial-register', data);
+      setSuccessMsg(res.data?.detail || '');
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed. Please check details and try again.');
     } finally {
@@ -73,19 +46,32 @@ export const Register: React.FC = () => {
   if (success) {
     return (
       <div className="text-center py-6 space-y-4">
-        <div className="w-16 h-16 bg-green-500/10 border border-green-500/20 rounded-full flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 bg-green-500/10 border border-green-500/20 rounded-full flex items-center justify-center mx-auto animate-pulse">
           <CheckCircle className="w-8 h-8 text-green-400" />
         </div>
-        <h2 className="text-xl font-bold text-white">Tenant Created!</h2>
+        <h2 className="text-xl font-bold text-white">Your Workspace is Ready!</h2>
         <p className="text-slate-400 text-sm max-w-xs mx-auto">
-          Your organization workspace has been created successfully. Redirecting you to login...
+          {successMsg || "We've emailed you a secure link to set your password and sign in to your 14-day free trial."}
         </p>
+        <p className="text-slate-500 text-xs max-w-xs mx-auto pt-2">
+          Check your inbox (and spam) for the setup link, then log in to start using your CRM.
+        </p>
+        <div className="pt-4">
+          <Link to="/login" className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all">
+            Return to Login
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="text-center pb-2">
+        <h2 className="text-lg font-semibold text-white">Start Your 14-Day Trial</h2>
+        <p className="text-xs text-slate-400 mt-1">Submit your details to request an enterprise-grade CRM workspace.</p>
+      </div>
+
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-200 text-sm rounded-xl flex items-start gap-3">
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400" />
@@ -93,78 +79,48 @@ export const Register: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Company Name</label>
-          <input
-            type="text"
-            {...register('company_name')}
-            onChange={(e) => {
-              register('company_name').onChange(e);
-              handleCompanyNameChange(e);
-            }}
-            className={`w-full px-4 py-3 rounded-xl glass-input ${errors.company_name ? 'border-red-500/50' : ''}`}
-            placeholder="Acme Corp"
-          />
-          {errors.company_name && <p className="mt-1.5 text-xs text-red-400">{errors.company_name.message}</p>}
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Org Slug</label>
-          <input
-            type="text"
-            {...register('slug')}
-            className={`w-full px-4 py-3 rounded-xl glass-input ${errors.slug ? 'border-red-500/50' : ''}`}
-            placeholder="acme-corp"
-          />
-          {errors.slug && <p className="mt-1.5 text-xs text-red-400">{errors.slug.message}</p>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">First Name</label>
-          <input
-            type="text"
-            {...register('first_name')}
-            className={`w-full px-4 py-3 rounded-xl glass-input ${errors.first_name ? 'border-red-500/50' : ''}`}
-            placeholder="John"
-          />
-          {errors.first_name && <p className="mt-1.5 text-xs text-red-400">{errors.first_name.message}</p>}
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Last Name</label>
-          <input
-            type="text"
-            {...register('last_name')}
-            className={`w-full px-4 py-3 rounded-xl glass-input ${errors.last_name ? 'border-red-500/50' : ''}`}
-            placeholder="Doe"
-          />
-          {errors.last_name && <p className="mt-1.5 text-xs text-red-400">{errors.last_name.message}</p>}
-        </div>
+      <div>
+        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Full Name</label>
+        <input
+          type="text"
+          {...register('full_name')}
+          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.full_name ? 'border-red-500/50' : ''}`}
+          placeholder="John Doe"
+        />
+        {errors.full_name && <p className="mt-1.5 text-xs text-red-400">{errors.full_name.message}</p>}
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Admin Email</label>
+        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Company Name</label>
+        <input
+          type="text"
+          {...register('company_name')}
+          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.company_name ? 'border-red-500/50' : ''}`}
+          placeholder="Acme Corp"
+        />
+        {errors.company_name && <p className="mt-1.5 text-xs text-red-400">{errors.company_name.message}</p>}
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Email Address</label>
         <input
           type="email"
-          {...register('admin_email')}
-          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.admin_email ? 'border-red-500/50' : ''}`}
-          placeholder="admin@acme.com"
+          {...register('email')}
+          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.email ? 'border-red-500/50' : ''}`}
+          placeholder="john@acme.com"
         />
-        {errors.admin_email && <p className="mt-1.5 text-xs text-red-400">{errors.admin_email.message}</p>}
+        {errors.email && <p className="mt-1.5 text-xs text-red-400">{errors.email.message}</p>}
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Password</label>
+        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Phone Number</label>
         <input
-          type="password"
-          {...register('admin_password')}
-          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.admin_password ? 'border-red-500/50' : ''}`}
-          placeholder="••••••••"
+          type="tel"
+          {...register('phone')}
+          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.phone ? 'border-red-500/50' : ''}`}
+          placeholder="+91 98765 43210"
         />
-        {errors.admin_password && <p className="mt-1.5 text-xs text-red-400">{errors.admin_password.message}</p>}
+        {errors.phone && <p className="mt-1.5 text-xs text-red-400">{errors.phone.message}</p>}
       </div>
 
       <button
@@ -175,12 +131,18 @@ export const Register: React.FC = () => {
         {isLoading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Creating Workspace...
+            Submitting Request...
           </>
         ) : (
-          'Register Tenant'
+          'Request Free Trial'
         )}
       </button>
+
+      <p className="text-center text-[10px] text-slate-500 pt-1 leading-normal">
+        By requesting a trial, you agree to our{' '}
+        <Link to="/legal/terms" className="text-brand-400 hover:text-brand-300">Terms of Service</Link> and{' '}
+        <Link to="/legal/privacy" className="text-brand-400 hover:text-brand-300">Privacy Policy</Link>.
+      </p>
 
       <div className="text-center pt-2">
         <p className="text-slate-400 text-sm">

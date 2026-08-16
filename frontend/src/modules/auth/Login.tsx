@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
-import { AlertCircle, Loader2, KeyRound, Mail, ArrowLeft, CheckCircle, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Loader2, KeyRound, Mail, ArrowLeft, CheckCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -19,6 +19,10 @@ const forgotSchema = z.object({
 const resetSchema = z.object({
   token: z.string().min(4, 'Code/Token is required'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
+  confirmPassword: z.string().min(8, 'Confirm Password must be at least 8 characters long'),
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword']
 });
 
 const mfaSchema = z.object({
@@ -46,6 +50,7 @@ export const Login: React.FC = () => {
   const [demoToken, setDemoToken] = useState<string | null>(null);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [useBackupCode, setUseBackupCode] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Forms
   const {
@@ -87,7 +92,7 @@ export const Login: React.FC = () => {
     const token = searchParams.get('token') || searchParams.get('reset_token');
     if (token) {
       setStep('reset');
-      resetFormReset({ token, password: '' });
+      resetFormReset({ token, password: '', confirmPassword: '' });
     }
   }, [searchParams, resetFormReset]);
 
@@ -106,6 +111,8 @@ export const Login: React.FC = () => {
         setStep('mfa');
         return;
       }
+
+      useAuthStore.getState().setTokens(access_token, refresh_token);
 
       const meRes = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${access_token}` },
@@ -157,7 +164,10 @@ export const Login: React.FC = () => {
       setTimeout(() => {
         setStep('reset');
         setSuccess(null);
-      }, 4000);
+        if (res.data.token) {
+          resetFormReset({ token: res.data.token, password: '', confirmPassword: '' });
+        }
+      }, 900);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to request password reset code.');
     } finally {
@@ -176,7 +186,7 @@ export const Login: React.FC = () => {
       setTimeout(() => {
         setStep('login');
         setSuccess(null);
-      }, 2500);
+      }, 900);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to reset password. Please verify the code.');
     } finally {
@@ -216,12 +226,21 @@ export const Login: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-inter">Password</label>
-            <input
-              type="password"
-              {...loginRegister('password')}
-              className={`w-full px-4 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                {...loginRegister('password')}
+                className={`w-full pl-4 !pr-10 py-3 rounded-xl glass-input ${loginErrors.password ? 'border-red-500/50' : ''}`}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {loginErrors.password && <p className="mt-1.5 text-xs text-red-400">{loginErrors.password.message}</p>}
           </div>
 
@@ -252,6 +271,15 @@ export const Login: React.FC = () => {
             >
               Forgot Password?
             </button>
+          </div>
+
+          <div className="text-center pt-4 border-t border-slate-800/40 mt-4">
+            <p className="text-slate-400 text-sm">
+              New to CRM Enterprise?{' '}
+              <Link to="/register" className="text-brand-400 hover:text-brand-300 font-semibold transition-all">
+                Start 14-Day Free Trial
+              </Link>
+            </p>
           </div>
         </form>
       )}
@@ -366,7 +394,7 @@ export const Login: React.FC = () => {
               <input
                 type="email"
                 {...forgotRegister('email')}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
+                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
                 placeholder="user@example.com"
               />
             </div>
@@ -410,7 +438,7 @@ export const Login: React.FC = () => {
 
           <div>
             <h3 className="text-lg font-bold text-slate-100 mb-1">Set New Password</h3>
-            <p className="text-xs text-slate-400 mb-4">Enter the code and specify your new password.</p>
+            <p className="text-xs text-slate-400 mb-4">Specify and confirm your new password below.</p>
           </div>
 
           {demoToken && (
@@ -426,13 +454,18 @@ export const Login: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Reset Code / Token</label>
-            <input
-              type="text"
-              {...resetRegister('token')}
-              className={`w-full px-4 py-3 rounded-xl glass-input font-mono tracking-widest text-center uppercase ${resetErrors.token ? 'border-red-500/50' : ''}`}
-              placeholder="E5A3F1"
-            />
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              Verification Code / Reset Token
+            </label>
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                {...resetRegister('token')}
+                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input font-mono tracking-wider ${resetErrors.token ? 'border-red-500/50' : ''}`}
+                placeholder="Enter 6-digit OTP or reset token"
+              />
+            </div>
             {resetErrors.token && <p className="mt-1.5 text-xs text-red-400">{resetErrors.token.message}</p>}
           </div>
 
@@ -445,6 +478,17 @@ export const Login: React.FC = () => {
               placeholder="•••••••• (Min 8 chars)"
             />
             {resetErrors.password && <p className="mt-1.5 text-xs text-red-400">{resetErrors.password.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Confirm New Password</label>
+            <input
+              type="password"
+              {...resetRegister('confirmPassword')}
+              className={`w-full px-4 py-3 rounded-xl glass-input ${resetErrors.confirmPassword ? 'border-red-500/50' : ''}`}
+              placeholder="•••••••• (Min 8 chars)"
+            />
+            {resetErrors.confirmPassword && <p className="mt-1.5 text-xs text-red-400">{resetErrors.confirmPassword.message}</p>}
           </div>
 
           <button

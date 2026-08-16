@@ -15,9 +15,9 @@ from app.models.user import User
 from app.models.lead import Lead
 
 class LeadService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, organization_id: uuid.UUID):
         self.db = db
-        self.lead_repo = LeadRepository(db)
+        self.lead_repo = LeadRepository(db, organization_id)
         self.user_repo = UserRepository(db)
         self.activity_repo = ActivityRepository(db)
         self.note_repo = NoteRepository(db)
@@ -28,7 +28,7 @@ class LeadService:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
-        lead = await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+        lead = await self.lead_repo.get_lead_by_id(lead_id)
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
 
@@ -56,52 +56,75 @@ class LeadService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
-        # Auto-link to a company when the free-text name matches an existing account
-        if lead_data.get("company_name") and not lead_data.get("company_id"):
-            from sqlalchemy import select, func
-            from app.models.company import Company
-            comp_res = await self.db.execute(
-                select(Company.id).filter(
-                    Company.organization_id == actor.organization_id,
-                    func.lower(Company.name) == lead_data["company_name"].strip().lower(),
-                    Company.is_deleted == False,
-                ).limit(1)
+        # Validate custom fields
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import MetadataValidationEngine, MetadataValidationError
+        
+        cf_service = CustomFieldService(self.db)
+        definitions = await cf_service.list_definitions(actor, "lead")
+        custom_fields_payload = lead_data.get("custom_fields") or {}
+        try:
+            sanitized_cf = await MetadataValidationEngine.validate_and_sanitize(
+                self.db, Lead, actor.organization_id, definitions, custom_fields_payload, exclude_id=None
             )
-            matched = comp_res.scalar()
-            if matched:
-                lead_data["company_id"] = matched
+            lead_data["custom_fields"] = sanitized_cf
+        except MetadataValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
 
-        # Auto-resolve branch & territory from the lead's PIN/city if a mapping
-        # exists and the caller didn't set them (backward compatible: only fills
-        # NULLs, best-effort — never blocks lead creation).
-        if not lead_data.get("territory_id") or not lead_data.get("branch_id"):
-            try:
-                from app.services.branch_territory_service import BranchTerritoryService
-                await BranchTerritoryService(self.db).apply_resolution_to_lead_data(
-                    actor.organization_id, lead_data)
-            except Exception:
-                pass
+        async with self.db.begin_nested():
+            # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
+            # supplied by the caller before they are persisted.
+            await self._validate_org_references(actor, lead_data)
 
-        # Compute initial lead score from provided attributes
-        lead_data["score"] = compute_score(
-            email=lead_data.get("email"),
-            phone=lead_data.get("phone"),
-            company_name=lead_data.get("company_name"),
-            value=lead_data.get("value"),
-            source=lead_data.get("source"),
-            priority=lead_data.get("priority"),
-        )
+            # Auto-link to a company when the free-text name matches an existing account
+            if lead_data.get("company_name") and not lead_data.get("company_id"):
+                from sqlalchemy import select, func
+                from app.models.company import Company
+                comp_res = await self.db.execute(
+                    select(Company.id).filter(
+                        Company.organization_id == actor.organization_id,
+                        func.lower(Company.name) == lead_data["company_name"].strip().lower(),
+                        Company.is_deleted == False,
+                    ).limit(1)
+                )
+                matched = comp_res.scalar()
+                if matched:
+                    lead_data["company_id"] = matched
 
-        lead = await self.lead_repo.create_lead(actor.organization_id, lead_data, actor.id)
+            # Auto-resolve branch & territory from the lead's PIN/city if a mapping
+            # exists and the caller didn't set them (backward compatible: only fills
+            # NULLs, best-effort — never blocks lead creation).
+            if not lead_data.get("territory_id") or not lead_data.get("branch_id"):
+                try:
+                    from app.services.branch_territory_service import BranchTerritoryService
+                    await BranchTerritoryService(self.db).apply_resolution_to_lead_data(
+                        actor.organization_id, lead_data)
+                except Exception:
+                    pass
 
-        await self.audit_service.log_event(
-            organization_id=actor.organization_id,
-            actor_user_id=actor.id,
-            action="LEAD_CREATED",
-            resource_type="lead",
-            resource_id=str(lead.id),
-            action_metadata={"title": lead.title, "status": lead.status}
-        )
+            # Compute initial lead score from provided attributes
+            lead_data["score"] = compute_score(
+                email=lead_data.get("email"),
+                phone=lead_data.get("phone"),
+                company_name=lead_data.get("company_name"),
+                value=lead_data.get("value"),
+                source=lead_data.get("source"),
+                priority=lead_data.get("priority"),
+            )
+
+            lead = await self.lead_repo.create_lead(lead_data, actor.id)
+
+            await self.audit_service.log_event(
+                organization_id=actor.organization_id,
+                actor_user_id=actor.id,
+                action="LEAD_CREATED",
+                resource_type="lead",
+                resource_id=str(lead.id),
+                action_metadata={"title": lead.title, "status": lead.status}
+            )
 
         if assigned_user_id and assigned_user_id != actor.id:
             await self.notification_service.create_notification(
@@ -126,7 +149,7 @@ class LeadService:
             pass
 
         await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_by_id(actor.organization_id, lead.id)
+        return await self.lead_repo.get_lead_by_id(lead.id)
 
     async def _resolve_scope(self, actor: User) -> set[uuid.UUID] | None:
         """Return the set of user ids whose leads the actor may see, or None for org-wide."""
@@ -136,6 +159,39 @@ class LeadService:
         user_service = UserService(self.db)
         downline_ids = await user_service.get_downline_user_ids(actor)
         return downline_ids | {actor.id}
+
+    async def _validate_org_references(self, actor: User, data: dict) -> None:
+        """Reject any stage_id/branch_id/territory_id/company_id that is not a
+        live (non-deleted) row in the actor's organization. Absent/None keys are
+        skipped so nullable FKs stay backward-compatible. Closes the cross-tenant
+        FK-injection gap (Sprint 2 P0)."""
+        from sqlalchemy import select
+        from app.models.pipeline import PipelineStage
+        from app.models.branch import Branch, Territory
+        from app.models.company import Company
+
+        checks = (
+            ("stage_id", PipelineStage),
+            ("branch_id", Branch),
+            ("territory_id", Territory),
+            ("company_id", Company),
+        )
+        for field, model in checks:
+            ref_id = data.get(field)
+            if not ref_id:
+                continue
+            res = await self.db.execute(
+                select(model.id).filter(
+                    model.id == ref_id,
+                    model.organization_id == actor.organization_id,
+                    model.is_deleted == False,
+                ).limit(1)
+            )
+            if res.scalar() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{field} not found in your organization",
+                )
 
     async def paginate_leads(
         self,
@@ -155,6 +211,8 @@ class LeadService:
         created_from=None,
         created_to=None,
         include_archived: bool = False,
+        updated_after=None,
+        custom_filters: dict | None = None,
     ) -> Tuple[Sequence[Lead], int]:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
@@ -178,10 +236,11 @@ class LeadService:
                 )
 
         return await self.lead_repo.paginate_leads(
-            actor.organization_id, skip, limit, search_query, status_filter, assigned_user_id, name, city,
+            skip, limit, search_query, status_filter, assigned_user_id, name, city,
             allowed_user_ids, source=source, stage_id=stage_id, priority=priority,
             min_value=min_value, max_value=max_value, created_from=created_from,
             created_to=created_to, include_archived=include_archived,
+            updated_after=updated_after, custom_filters=custom_filters,
         )
 
     async def export_leads(self, actor: User, filters: dict) -> Sequence[Lead]:
@@ -190,7 +249,7 @@ class LeadService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
         allowed_user_ids = await self._resolve_scope(actor)
         return await self.lead_repo.stream_leads_for_export(
-            actor.organization_id, allowed_user_ids=allowed_user_ids, **filters
+            allowed_user_ids=allowed_user_ids, **filters
         )
 
     async def find_duplicates(
@@ -206,7 +265,7 @@ class LeadService:
                 detail="Provide an email or phone to search for duplicates"
             )
         candidates = await self.lead_repo.find_duplicates(
-            actor.organization_id, email=email, phone=phone, exclude_lead_id=exclude_lead_id
+            email=email, phone=phone, exclude_lead_id=exclude_lead_id
         )
         # Apply visibility scoping for non-admins
         allowed_user_ids = await self._resolve_scope(actor)
@@ -231,13 +290,13 @@ class LeadService:
                 resource_id=str(lead_id),
             )
             await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_any_state(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_any_state(lead_id)
 
     async def restore_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         """Un-archive and/or un-delete a lead."""
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
-        lead = await self.lead_repo.get_lead_any_state(actor.organization_id, lead_id)
+        lead = await self.lead_repo.get_lead_any_state(lead_id)
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
         # Scope check for non-admins
@@ -263,7 +322,7 @@ class LeadService:
             resource_id=str(lead_id),
         )
         await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_any_state(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_any_state(lead_id)
 
     async def bulk_update(self, actor: User, lead_ids: list[uuid.UUID], fields: dict) -> dict:
         """Apply the same field updates to many scoped leads at once."""
@@ -288,13 +347,29 @@ class LeadService:
             if not stage_res.scalar():
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stage not found in your organization")
 
+        # P0: validate the bulk assignee (org + active + assignable) BEFORE any
+        # mutation, so an invalid target fails the whole request atomically (no
+        # partial writes) with HTTP 400.
+        new_assignee = fields.get("assigned_user_id")
+        if new_assignee:
+            from app.services.user_service import UserService
+            assignable_ids = await UserService(self.db).get_assignable_user_ids(actor)
+            if new_assignee not in assignable_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Assigned user is not active/assignable in your organization",
+                )
+
         allowed_user_ids = await self._resolve_scope(actor)
-        leads = await self.lead_repo.get_leads_for_update(actor.organization_id, lead_ids)
+        leads = await self.lead_repo.get_leads_for_update(lead_ids)
 
         updated_ids = []
+        reassigned_count = 0
         for lead in leads:
             if allowed_user_ids is not None and lead.assigned_user_id not in allowed_user_ids:
                 continue
+            if new_assignee and lead.assigned_user_id != new_assignee:
+                reassigned_count += 1  # ownership actually changed on this lead (B)
             for key, val in fields.items():
                 setattr(lead, key, val)
             self.db.add(lead)
@@ -311,6 +386,18 @@ class LeadService:
                 action_metadata={"lead_ids": [str(i) for i in updated_ids], "fields": list(fields.keys())},
             )
             await DashboardService.invalidate_cache(actor.organization_id)
+
+        # B: one notification to the new owner when >=1 lead actually changed hands.
+        if new_assignee and new_assignee != actor.id and reassigned_count > 0:
+            await self.notification_service.create_notification(
+                organization_id=actor.organization_id,
+                user_id=new_assignee,
+                category="lead",
+                title="Leads assigned to you",
+                body=f"{reassigned_count} lead(s) were assigned to you.",
+                link_url="/leads",
+                action_metadata={"lead_ids": [str(i) for i in updated_ids], "count": reassigned_count},
+            )
         return {"updated_count": len(updated_ids), "lead_ids": updated_ids}
 
     async def update_lead(self, actor: User, lead_id: uuid.UUID, lead_data: dict) -> Lead:
@@ -318,6 +405,7 @@ class LeadService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
         lead = await self.get_lead(actor, lead_id)
+        old_owner = lead.assigned_user_id  # capture BEFORE mutation for reassignment notify (B)
 
         # Field-level permission check (no-op unless actor has a custom role)
         from app.services.permission_service import PermissionService
@@ -333,36 +421,91 @@ class LeadService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
-        updated = await self.lead_repo.update_lead(actor.organization_id, lead_id, lead_data)
-
-        # Recompute score if any scoring-relevant field changed
-        if {"email", "phone", "company_name", "value", "source", "priority"} & set(lead_data.keys()):
-            updated.score = compute_score(
-                email=updated.email,
-                phone=updated.phone,
-                company_name=updated.company_name,
-                value=updated.value,
-                source=updated.source,
-                priority=updated.priority,
+        # Validate custom fields
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import MetadataValidationEngine, MetadataValidationError
+        
+        cf_service = CustomFieldService(self.db)
+        definitions = await cf_service.list_definitions(actor, "lead")
+        
+        # Merge custom fields payload with existing lead data
+        db_cf = dict(lead.custom_fields or {})
+        incoming_cf = lead_data.get("custom_fields") or {}
+        
+        def_map = {d.key: d for d in definitions if d.is_active}
+        
+        for key, val in incoming_cf.items():
+            definition = def_map.get(key)
+            is_required = False
+            if definition:
+                rules = definition.validation_rules or {}
+                is_required = rules.get("required") is True
+            
+            if (val is None or val == "") and not is_required:
+                db_cf.pop(key, None)
+            else:
+                db_cf[key] = val
+                
+        try:
+            sanitized_cf = await MetadataValidationEngine.validate_and_sanitize(
+                self.db, Lead, actor.organization_id, definitions, db_cf, exclude_id=lead_id
             )
-            self.db.add(updated)
-            await self.db.flush()
+            lead_data["custom_fields"] = sanitized_cf
+        except MetadataValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
 
-        await self.audit_service.log_event(
-            organization_id=actor.organization_id,
-            actor_user_id=actor.id,
-            action="LEAD_UPDATED",
-            resource_type="lead",
-            resource_id=str(lead_id),
-            action_metadata={"updated_fields": list(lead_data.keys())}
-        )
+        async with self.db.begin_nested():
+            # P0: reject cross-org / soft-deleted stage/branch/territory/company refs
+            # on update (validated only when the key is present, so partial PATCHes
+            # that don't touch these fields are unaffected).
+            await self._validate_org_references(actor, lead_data)
+
+            updated = await self.lead_repo.update_lead(lead_id, lead_data)
+
+            # Recompute score if any scoring-relevant field changed
+            if {"email", "phone", "company_name", "value", "source", "priority"} & set(lead_data.keys()):
+                updated.score = compute_score(
+                    email=updated.email,
+                    phone=updated.phone,
+                    company_name=updated.company_name,
+                    value=updated.value,
+                    source=updated.source,
+                    priority=updated.priority,
+                )
+                self.db.add(updated)
+                await self.db.flush()
+
+            await self.audit_service.log_event(
+                organization_id=actor.organization_id,
+                actor_user_id=actor.id,
+                action="LEAD_UPDATED",
+                resource_type="lead",
+                resource_id=str(lead_id),
+                action_metadata={"updated_fields": list(lead_data.keys())}
+            )
 
         # Run lead-updated automation rules
         from app.services.workflow_service import WorkflowService
         await WorkflowService(self.db).run("lead_updated", updated, actor)
 
+        # B: notify the new owner only when ownership actually changes.
+        new_owner = lead_data.get("assigned_user_id")
+        if new_owner and new_owner != old_owner and new_owner != actor.id:
+            await self.notification_service.create_notification(
+                organization_id=actor.organization_id,
+                user_id=new_owner,
+                category="lead",
+                title="Lead assigned to you",
+                body=f'"{updated.title}" was assigned to you.',
+                link_url=f"/leads?leadId={updated.id}",
+                action_metadata={"lead_id": str(updated.id)},
+            )
+
         await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_by_id(lead_id)
 
     async def soft_delete_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         if not actor.is_active:
@@ -370,7 +513,7 @@ class LeadService:
 
         lead = await self.get_lead(actor, lead_id)
 
-        deleted = await self.lead_repo.soft_delete_lead(actor.organization_id, lead_id)
+        deleted = await self.lead_repo.soft_delete_lead(lead_id)
 
         # Cascade soft-delete activities and notes
         await self.activity_repo.soft_delete_by_parent(actor.organization_id, "lead", lead_id)
@@ -633,7 +776,7 @@ class LeadService:
         )
         self.db.add(lead)
         await self.db.flush()
-        return await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_by_id(lead_id)
 
     async def get_timeline(self, actor: User, lead_id: uuid.UUID) -> list[dict]:
         """Merge notes, activities, and audit events for a lead into one chronological feed."""
@@ -681,6 +824,38 @@ class LeadService:
                 "title": al.action, "description": None,
                 "actor_user_id": str(al.actor_user_id) if al.actor_user_id else None,
                 "event_metadata": al.action_metadata,
+            })
+
+        # D: include Tasks and Reminders linked to this lead (read-only; org-scoped
+        # via the already-scoped lead) so the timeline shows scheduled work too.
+        from app.models.task import Task
+        tasks_res = await self.db.execute(
+            select(Task).filter(Task.lead_id == lead.id, Task.is_deleted == False)
+        )
+        for t in tasks_res.scalars().all():
+            events.append({
+                "type": "task", "id": str(t.id), "timestamp": t.created_at,
+                "title": f"Task: {t.title}", "description": t.description,
+                "actor_user_id": str(t.assigned_user_id) if t.assigned_user_id else (str(t.created_by) if t.created_by else None),
+                "event_metadata": {
+                    "status": t.status, "priority": t.priority,
+                    "due_date": t.due_date.isoformat() if t.due_date else None,
+                },
+            })
+
+        from app.models.lead_reminder import LeadReminder
+        rem_res = await self.db.execute(
+            select(LeadReminder).filter(LeadReminder.lead_id == lead.id, LeadReminder.is_deleted == False)
+        )
+        for r in rem_res.scalars().all():
+            events.append({
+                "type": "reminder", "id": str(r.id), "timestamp": r.created_at,
+                "title": "Reminder set", "description": r.note,
+                "actor_user_id": str(r.created_by) if r.created_by else None,
+                "event_metadata": {
+                    "remind_at": r.remind_at.isoformat() if r.remind_at else None,
+                    "is_sent": r.is_sent,
+                },
             })
 
         events.sort(key=lambda e: e["timestamp"], reverse=True)
@@ -786,8 +961,8 @@ class LeadService:
     ]
 
     @staticmethod
-    def _export_row(lead: Lead) -> list:
-        return [
+    def _export_row(lead: Lead, custom_defs: Sequence | None = None) -> list:
+        row = [
             lead.first_name or "",
             lead.last_name or "",
             lead.email or "",
@@ -803,28 +978,46 @@ class LeadService:
             lead.score,
             lead.created_at.isoformat() if lead.created_at else "",
         ]
+        if custom_defs:
+            cf = lead.custom_fields or {}
+            for d in custom_defs:
+                val = cf.get(d.key)
+                if val is None:
+                    row.append("")
+                elif isinstance(val, bool):
+                    row.append("Yes" if val else "No")
+                else:
+                    row.append(str(val))
+        return row
 
     @staticmethod
-    def build_export_csv(leads: Sequence[Lead]) -> str:
+    def _export_header(custom_defs: Sequence | None = None) -> list:
+        header = list(LeadService.EXPORT_COLUMNS)
+        if custom_defs:
+            header.extend(d.label for d in custom_defs)
+        return header
+
+    @staticmethod
+    def build_export_csv(leads: Sequence[Lead], custom_defs: Sequence | None = None) -> str:
         import csv
         import io
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(LeadService.EXPORT_COLUMNS)
+        writer.writerow(LeadService._export_header(custom_defs))
         for lead in leads:
-            writer.writerow(LeadService._export_row(lead))
+            writer.writerow(LeadService._export_row(lead, custom_defs))
         return buf.getvalue()
 
     @staticmethod
-    def build_export_xlsx(leads: Sequence[Lead]) -> bytes:
+    def build_export_xlsx(leads: Sequence[Lead], custom_defs: Sequence | None = None) -> bytes:
         import io
         import openpyxl
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Leads"
-        ws.append(LeadService.EXPORT_COLUMNS)
+        ws.append(LeadService._export_header(custom_defs))
         for lead in leads:
-            ws.append(LeadService._export_row(lead))
+            ws.append(LeadService._export_row(lead, custom_defs))
         out = io.BytesIO()
         wb.save(out)
         return out.getvalue()

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { companyApi, CompanyReport, CompanyReportBucket } from '../services/companyApi';
 import { Building2, DollarSign, Users2, Trophy, Loader2 } from 'lucide-react';
+import { formatMoney } from '../utils/currency';
 
-const currency = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+const currency = (n: number) => formatMoney(n);
 
 const BreakdownCard: React.FC<{ title: string; buckets: CompanyReportBucket[]; showRevenue?: boolean }> = ({ title, buckets, showRevenue }) => {
   const max = Math.max(1, ...buckets.map((b) => b.count));

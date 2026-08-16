@@ -8,6 +8,10 @@ class SubscriptionUpdateRequest(BaseModel):
     subscription_expires_at: datetime | None = None
     subscription_status: str
     max_users: int = Field(..., ge=1, le=1000, description="Licensed seat limit (max 1000).")
+    # Optional tenant profile fields the SuperAdmin can set from the console.
+    name: str | None = None
+    currency: str | None = None
+    timezone: str | None = None
 
 class TenantUserResponse(BaseModel):
     id: uuid.UUID
@@ -37,6 +41,9 @@ class TenantResponse(BaseModel):
     user_count: int
     invoice_count: int
     call_recording_usage: int = 0
+    currency: str = "INR"
+    timezone: str = "Asia/Kolkata"
+    is_deleted: bool = False
 
 class TenantUsageUpdateRequest(BaseModel):
     call_recording_usage: int
@@ -66,12 +73,13 @@ class PlanCreate(BaseModel):
     api_access: bool = False
     display_order: int = 0
     setup_charges: float = 0.0
-    minimum_users: int = Field(10, ge=10, description="Minimum Initial Licensed Seats (default 10)")
+    minimum_users: int = Field(10, ge=1, description="Minimum Initial Licensed Seats")
     maximum_users: int = 1000
-    minimum_contract_months: int = Field(3, ge=3, description="Minimum Initial Contract (default 3 months)")
+    minimum_contract_months: int = Field(3, ge=1, description="Minimum Initial Contract (months)")
     trial_days: int = 0
     extra_user_price: float = 0.0
     discount_percentage: float = 0.0
+    promo_price: float | None = None
     gst_percentage: float = 0.0
     plan_color: str | None = None
     plan_badge: str | None = None
@@ -127,12 +135,13 @@ class PlanUpdate(BaseModel):
     api_access: bool | None = None
     display_order: int | None = None
     setup_charges: float | None = None
-    minimum_users: int | None = Field(None, ge=10, description="Minimum Initial Licensed Seats (default 10)")
+    minimum_users: int | None = Field(None, ge=1, description="Minimum Initial Licensed Seats")
     maximum_users: int | None = None
-    minimum_contract_months: int | None = Field(None, ge=3, description="Minimum Initial Contract (default 3 months)")
+    minimum_contract_months: int | None = Field(None, ge=1, description="Minimum Initial Contract (months)")
     trial_days: int | None = Field(None, ge=0, le=365)
     extra_user_price: float | None = Field(None, ge=0.0)
     discount_percentage: float | None = Field(None, ge=0.0, le=100.0)
+    promo_price: float | None = Field(None, ge=0.0)
     gst_percentage: float | None = Field(None, ge=0.0, le=100.0)
     plan_color: str | None = None
     plan_badge: str | None = None
@@ -172,6 +181,7 @@ class PlanResponse(BaseModel):
     trial_days: int | None = None
     extra_user_price: float
     discount_percentage: float
+    promo_price: float | None = None
     gst_percentage: float
     plan_color: str | None = None
     plan_badge: str | None = None

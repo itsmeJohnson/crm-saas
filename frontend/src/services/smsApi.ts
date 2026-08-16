@@ -6,6 +6,7 @@ export interface SmsSettings {
   provider: string;
   account_sid: string | null;
   sender_id: string | null;
+  sms_priority: string;
   webhook_token: string | null;
   daily_limit: number;
   is_active: boolean;

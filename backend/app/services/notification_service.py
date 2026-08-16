@@ -137,17 +137,30 @@ class NotificationService:
             return False
 
     async def _send_push(self, org_id, user_id, title, body, url) -> bool:
+        from app.models.notification import DeviceToken
+        from app.services.push_provider import get_push_sender, get_native_push_sender
+        ok = False
+
+        # Browser Web-Push subscriptions.
         subs = list((await self.db.execute(select(PushSubscription).filter(
             PushSubscription.user_id == user_id, PushSubscription.is_deleted == False))).scalars().all())
-        if not subs:
-            return False
-        from app.services.push_provider import get_push_sender
-        sender = get_push_sender()
-        ok = False
-        for s in subs:
-            if sender.send(subscription={"endpoint": s.endpoint, "p256dh": s.p256dh, "auth": s.auth},
-                           title=title, body=body, url=url):
-                ok = True
+        if subs:
+            sender = get_push_sender()
+            for s in subs:
+                if sender.send(subscription={"endpoint": s.endpoint, "p256dh": s.p256dh, "auth": s.auth},
+                               title=title, body=body, url=url):
+                    ok = True
+
+        # Native mobile device tokens (FCM/APNS).
+        devices = list((await self.db.execute(select(DeviceToken).filter(
+            DeviceToken.user_id == user_id, DeviceToken.is_deleted == False,
+            DeviceToken.is_active_token == True))).scalars().all())
+        if devices:
+            native = get_native_push_sender()
+            for d in devices:
+                if native.send(token=d.token, platform=d.platform, title=title, body=body, url=url):
+                    ok = True
+
         return ok
 
     # ---------- Preferences ----------
@@ -214,6 +227,38 @@ class NotificationService:
         if sub:
             sub.is_deleted = True
             self.db.add(sub)
+            await self.db.flush()
+
+    # ---------- Native mobile device tokens (FCM/APNS) ----------
+    async def register_device(self, actor: User, data: dict) -> "DeviceToken":
+        from app.models.notification import DeviceToken
+        token = data["token"]
+        platform = (data.get("platform") or "fcm").lower()
+        existing = (await self.db.execute(select(DeviceToken).filter(
+            DeviceToken.user_id == actor.id, DeviceToken.token == token))).scalars().first()
+        if existing:
+            existing.platform = platform
+            existing.device_name = data.get("device_name")
+            existing.is_active_token = True
+            existing.is_deleted = False
+            self.db.add(existing)
+            await self.db.flush()
+            return existing
+        dev = DeviceToken(organization_id=actor.organization_id, user_id=actor.id, token=token,
+                          platform=platform, device_name=data.get("device_name"))
+        self.db.add(dev)
+        await self.db.flush()
+        await self.db.refresh(dev)
+        return dev
+
+    async def unregister_device(self, actor: User, token: str) -> None:
+        from app.models.notification import DeviceToken
+        dev = (await self.db.execute(select(DeviceToken).filter(
+            DeviceToken.user_id == actor.id, DeviceToken.token == token))).scalars().first()
+        if dev:
+            dev.is_deleted = True
+            dev.is_active_token = False
+            self.db.add(dev)
             await self.db.flush()
 
     # ---------- Queries ----------

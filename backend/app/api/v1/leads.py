@@ -12,6 +12,7 @@ from app.schemas.lead import (
     LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
     LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
+    FollowUpCreate,
 )
 from app.schemas.saved_filter import SavedFilterCreate, SavedFilterUpdate, SavedFilterResponse
 from app.schemas.reports import LeadReportResponse
@@ -27,7 +28,10 @@ from app.schemas.lead_transfer import LeadTransferRequest, LeadTransferResponse
 from app.services.lead_service import LeadService
 from app.services.lead_import_service import LeadImportService
 from app.services.assignment_service import AssignmentService
-from app.middleware.permissions import require_active_user, require_role, require_tl_or_above
+from app.middleware.permissions import require_active_user, require_role, require_tl_or_above, require_feature
+
+# Server-side plan gate: bulk import (CSV/Excel/Google Sheets) is Growth+.
+_gate_bulk_import = Depends(require_feature("BULK_IMPORT"))
 
 router = APIRouter()
 
@@ -40,7 +44,7 @@ async def create_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new lead opportunity."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     lead = await lead_service.create_lead(actor, lead_in.model_dump())
     
     # Auto assign if lead is created manually
@@ -68,14 +72,27 @@ async def list_leads(
     created_from: datetime | None = Query(None),
     created_to: datetime | None = Query(None),
     include_archived: bool = Query(False),
+    updated_after: datetime | None = Query(None, description="Delta-sync cursor: only leads changed after this timestamp (offline mobile)."),
+    custom_fields: str | None = Query(None, description="JSON object of {custom_field_key: value} filters."),
 ):
     """List paginated, searchable leads scoped to the tenant organization."""
-    lead_service = LeadService(db)
+    custom_filters: dict | None = None
+    if custom_fields:
+        import json
+        try:
+            parsed = json.loads(custom_fields)
+            if isinstance(parsed, dict):
+                custom_filters = {str(k): v for k, v in parsed.items() if v not in (None, "")}
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="custom_fields must be a valid JSON object")
+
+    lead_service = LeadService(db, actor.organization_id)
     records, _ = await lead_service.paginate_leads(
         actor, skip, limit, search, status, assigned_user_id, name, city,
         source=source, stage_id=stage_id, priority=priority, min_value=min_value,
         max_value=max_value, created_from=created_from, created_to=created_to,
-        include_archived=include_archived,
+        include_archived=include_archived, updated_after=updated_after,
+        custom_filters=custom_filters,
     )
     return list(records)
 
@@ -99,7 +116,7 @@ async def export_leads(
     include_archived: bool = Query(False),
 ):
     """Export the caller's visible leads (matching the same filters as listing) as CSV or Excel."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     filters = {
         "search_query": search, "status": status, "assigned_user_id": assigned_user_id,
         "name": name, "city": city, "source": source, "stage_id": stage_id,
@@ -107,14 +124,21 @@ async def export_leads(
         "created_from": created_from, "created_to": created_to, "include_archived": include_archived,
     }
     leads = await lead_service.export_leads(actor, filters)
+
+    # Append the org's exportable custom-field columns so each tenant's export
+    # reflects their own schema.
+    from app.services.custom_field_service import CustomFieldService
+    all_defs = await CustomFieldService(db).list_definitions(actor, "lead")
+    custom_defs = [d for d in all_defs if d.is_active and d.exportable]
+
     if format == "xlsx":
-        content = LeadService.build_export_xlsx(leads)
+        content = LeadService.build_export_xlsx(leads, custom_defs)
         return StreamingResponse(
             io.BytesIO(content),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=leads_export.xlsx"},
         )
-    csv_text = LeadService.build_export_csv(leads)
+    csv_text = LeadService.build_export_csv(leads, custom_defs)
     return StreamingResponse(
         io.StringIO(csv_text),
         media_type="text/csv",
@@ -130,7 +154,7 @@ async def find_duplicate_leads(
     exclude_lead_id: uuid.UUID | None = Query(None),
 ):
     """Find existing leads that share the given email or phone within the organization."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return list(await lead_service.find_duplicates(actor, email=email, phone=phone, exclude_lead_id=exclude_lead_id))
 
 @router.post("/bulk-update", response_model=LeadBulkUpdateResponse)
@@ -140,7 +164,7 @@ async def bulk_update_leads(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Apply the same field changes to multiple scoped leads at once."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     fields = req.fields.model_dump(exclude_unset=True, exclude_none=True)
     result = await lead_service.bulk_update(actor, req.lead_ids, fields)
     return LeadBulkUpdateResponse(**result)
@@ -155,7 +179,7 @@ async def get_lead_reports(
     date_to: datetime | None = Query(None),
 ):
     """Tenant-scoped lead analytics: totals plus breakdowns by source, status, priority, stage, and owner."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_lead_report(actor, date_from=date_from, date_to=date_to)
 
 # --- Escalation config (OrgAdmin / Manager) ---
@@ -267,7 +291,7 @@ async def get_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Retrieve detailed lead opportunity scoped to organization."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_lead(actor, lead_id)
 
 @router.patch("/{lead_id}", response_model=LeadResponse)
@@ -278,7 +302,7 @@ async def update_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update properties of a scoped lead opportunity."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.update_lead(actor, lead_id, lead_in.model_dump(exclude_unset=True))
 
 @router.delete("/{lead_id}", response_model=LeadResponse)
@@ -288,7 +312,7 @@ async def delete_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Soft delete lead from organization database."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.soft_delete_lead(actor, lead_id)
 
 @router.post("/{lead_id}/archive", response_model=LeadResponse)
@@ -298,7 +322,7 @@ async def archive_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Archive a lead (hidden from default listings, retained for restore)."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.archive_lead(actor, lead_id)
 
 @router.post("/{lead_id}/restore", response_model=LeadResponse)
@@ -308,7 +332,7 @@ async def restore_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Restore an archived or soft-deleted lead back to active state."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.restore_lead(actor, lead_id)
 
 @router.post("/{lead_id}/recompute-score", response_model=LeadResponse)
@@ -318,7 +342,7 @@ async def recompute_lead_score(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Recompute the rule-based score for a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.recompute_score(actor, lead_id)
 
 @router.post("/{lead_id}/convert", response_model=LeadConvertResponse)
@@ -329,7 +353,7 @@ async def convert_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Convert a lead into a Contact (+ optional Company); archives and links the lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     result = await lead_service.convert_lead(actor, lead_id, create_company=req.create_company)
     return LeadConvertResponse(**result)
 
@@ -340,7 +364,7 @@ async def list_lead_reminders(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List reminders set on a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return list(await lead_service.list_reminders(actor, lead_id))
 
 @router.post("/{lead_id}/reminders", response_model=LeadReminderResponse, status_code=status.HTTP_201_CREATED)
@@ -351,7 +375,7 @@ async def create_lead_reminder(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Schedule a reminder for a lead; fires an in-app notification when due."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.create_reminder(actor, lead_id, req.remind_at, req.note, req.user_id)
 
 @router.delete("/{lead_id}/reminders/{reminder_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -362,7 +386,7 @@ async def delete_lead_reminder(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Delete a lead reminder."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     await lead_service.delete_reminder(actor, lead_id, reminder_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -373,8 +397,23 @@ async def get_lead_timeline(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Unified chronological feed of notes, activities, and audit events for a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_timeline(actor, lead_id)
+
+@router.post("/{lead_id}/follow-up", status_code=status.HTTP_201_CREATED)
+async def log_follow_up(
+    lead_id: uuid.UUID,
+    req: FollowUpCreate,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Log a call/interaction outcome and schedule the next follow-up in one
+    shot. Orchestrates: timeline entry, follow-up task (+ reminder), optional
+    calendar event, manager notification, audit, and the follow_up_created
+    automation trigger."""
+    from app.services.follow_up_service import FollowUpService
+    return await FollowUpService(db).create_follow_up(actor, lead_id, req.model_dump())
+
 
 @router.get("/{lead_id}/audit", response_model=List[LeadAuditEvent])
 async def get_lead_audit(
@@ -383,7 +422,7 @@ async def get_lead_audit(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Tenant-visible audit trail for a single lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_audit_trail(actor, lead_id)
 
 @router.get("/{lead_id}/attachments", response_model=List[LeadAttachmentResponse])
@@ -393,7 +432,7 @@ async def list_lead_attachments(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List files attached to a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.list_attachments(actor, lead_id)
 
 @router.post("/{lead_id}/attachments", response_model=LeadAttachmentResponse, status_code=status.HTTP_201_CREATED)
@@ -408,7 +447,7 @@ async def upload_lead_attachment(
     content = await file.read(MAX_UPLOAD + 1)
     if len(content) > MAX_UPLOAD:
         raise HTTPException(status_code=400, detail="File exceeds the limit of 5.0MB")
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.add_attachment(actor, lead_id, content, file.filename or "attachment")
 
 @router.delete("/{lead_id}/attachments/{stored_name}")
@@ -419,7 +458,7 @@ async def delete_lead_attachment(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Remove a file attached to a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.delete_attachment(actor, lead_id, stored_name)
 
 # --- Bulk Lead Imports ---
@@ -455,14 +494,14 @@ async def get_import_template(
             headers={"Content-Disposition": f"attachment; filename=leads_template{filename_suffix}.csv"}
         )
 
-@router.post("/import/upload", response_model=ImportPreviewResponse)
+@router.post("/import/upload", response_model=ImportPreviewResponse, dependencies=[_gate_bulk_import])
 async def upload_import_file(
     actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...)
 ):
     """Upload bulk lead CSV/Excel and retrieve mapping suggestions and preview."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
 
     from fastapi import HTTPException
     from app.core.storage import validate_and_sanitize_file
@@ -486,24 +525,24 @@ async def upload_import_file(
         
     return await import_service.get_preview_from_file(sanitized_filename, content)
 
-@router.post("/import/google-sheets", response_model=ImportPreviewResponse)
+@router.post("/import/google-sheets", response_model=ImportPreviewResponse, dependencies=[_gate_bulk_import])
 async def google_sheets_import_preview(
     req: GoogleSheetsPreviewRequest,
     actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Fetch shared Google Sheets URL and retrieve mapping suggestions and preview."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     return await import_service.get_preview_from_google_sheets(req.url)
 
-@router.post("/import/process", response_model=LeadImportResponse)
+@router.post("/import/process", response_model=LeadImportResponse, dependencies=[_gate_bulk_import])
 async def process_import_batch(
     req: LeadImportProcessRequest,
     actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Execute validation and lead creations based on mapped headers."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     return await import_service.process_import_batch(
         actor=actor,
         file_token=req.file_token,
@@ -523,7 +562,7 @@ async def list_import_history(
     limit: int = Query(50, ge=1, le=100)
 ):
     """List details of previous bulk lead imports."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     records = await import_service.import_repo.list_imports(actor.organization_id, skip, limit)
     return list(records)
 
@@ -534,7 +573,7 @@ async def download_failed_rows(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Download CSV file of failed validation rows for a specific import job."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     csv_report = await import_service.get_failed_rows_report(actor.organization_id, import_id)
     return Response(
         content=csv_report,
@@ -592,22 +631,23 @@ async def transfer_leads(
     audit_service = AuditService(db)
     notification_service = NotificationService(db)
 
-    # 1. Fetch actor downline ids recursively
-    downline_ids = await user_service.get_downline_user_ids(actor)
+    # 1. Users the actor may assign to / transfer from. Admins & managers get
+    #    org-wide authority; a team leader gets their downline plus themselves.
+    assignable_ids = await user_service.get_assignable_user_ids(actor)
 
     # 2. Validate source user id
-    if req.source_user_id != actor.id and req.source_user_id not in downline_ids:
+    if req.source_user_id not in assignable_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Source user is not yourself or in your downline reporting chain"
+            detail="Source user is not yourself or within your assignable users"
         )
 
     # 3. Validate destination user ids
     for dest_id in req.destination_user_ids:
-        if dest_id not in downline_ids:
+        if dest_id not in assignable_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Destination user {dest_id} is not in your downline reporting chain"
+                detail=f"Destination user {dest_id} is not within your assignable users"
             )
 
     # 4. Fetch destination users from database to ensure active status

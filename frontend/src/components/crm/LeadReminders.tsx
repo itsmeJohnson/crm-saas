@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { leadApi, LeadReminder } from '../../services/leadApi';
 import { Bell, Plus, Trash2, Check } from 'lucide-react';
+import { DateTimePicker } from '../common/DateTimePicker';
 
 interface Props {
   leadId: string;
@@ -53,27 +54,26 @@ export const LeadReminders: React.FC<Props> = ({ leadId }) => {
         Reminders
       </h3>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-3">
-        <input
-          type="datetime-local"
-          value={remindAt}
-          onChange={(e) => setRemindAt(e.target.value)}
-          className="flex-1 px-3 py-2 bg-slate-950/50 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-brand-500/50"
-        />
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Note (optional)"
-          className="flex-1 px-3 py-2 bg-slate-950/50 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50"
-        />
-        <button
-          onClick={handleCreate}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add
-        </button>
+      <div className="flex flex-col gap-2 mb-3">
+        <DateTimePicker value={remindAt} onChange={setRemindAt} placeholder="Pick date & time" />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Note (optional)"
+            className="flex-1 min-w-0 px-3 py-2 bg-slate-950/50 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50"
+          />
+          <button
+            onClick={handleCreate}
+            disabled={!remindAt}
+            title={!remindAt ? 'Pick a date and time first' : 'Add reminder'}
+            className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-xs text-red-400 mb-2">{error}</p>}

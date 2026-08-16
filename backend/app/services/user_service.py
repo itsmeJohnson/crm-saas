@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Sequence, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
@@ -159,13 +159,16 @@ class UserService:
             organization_id=actor.organization_id
         )
 
-        # Check global email uniqueness
-        existing = await self.user_repo.get_by_email_global(user_data["email"])
+        # Check global email uniqueness (including soft-deleted users — the email
+        # column is globally unique regardless of is_deleted, so reusing a removed
+        # user's email would violate the constraint and 500; surface a clear 400).
+        existing = (await self.db.execute(
+            select(User).filter(User.email == user_data["email"]))).scalars().first()
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
+            detail = ("This email belongs to a previously removed user. "
+                      "Reactivate that user or use a different email address."
+                      if getattr(existing, "is_deleted", False) else "Email already registered")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
         # Check phone uniqueness within the organization
         phone = user_data.get("phone")
@@ -187,6 +190,7 @@ class UserService:
         assigned_seat = available_seats[0]
         user_data["seat_number"] = assigned_seat
 
+        plain_password = user_data.get("password")
         if "password" in user_data:
             user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
 
@@ -223,6 +227,46 @@ class UserService:
             await WorkflowEngineService(self.db).dispatch("user_created", user, actor, "user")
         except Exception:
             pass
+
+        # Best-effort welcome email: login details + a secure set-password link.
+        # A set-password token (valid 7 days) lets the new user choose their own
+        # password; the temporary password is included as a fallback. Never fail
+        # user creation if the email can't be sent.
+        try:
+            from app.core.security import generate_random_token, hash_token
+            from app.services.email_service import send_email
+            from app.core.config import settings as _settings
+
+            token = generate_random_token()
+            user.reset_token = hash_token(token)
+            user.reset_token_expires = datetime.now(timezone.utc) + timedelta(days=7)
+
+            frontend_url = (
+                _settings.FRONTEND_URL
+                or (_settings.BACKEND_CORS_ORIGINS[0] if _settings.BACKEND_CORS_ORIGINS else None)
+                or "http://localhost:5173"
+            ).rstrip("/")
+            org_name = (await self.db.execute(
+                select(Organization.name).filter(Organization.id == actor.organization_id))).scalar() or "your clinic"
+
+            send_email(
+                to_email=user.email,
+                subject=f"Welcome to {org_name} — your CRM account is ready",
+                template_name="welcome_user.html",
+                context={
+                    "first_name": user.first_name or "there",
+                    "org_name": org_name,
+                    "email": user.email,
+                    "temp_password": plain_password or "",
+                    "role": user.role,
+                    "login_url": f"{frontend_url}/login",
+                    "set_password_url": f"{frontend_url}/login?token={token}",
+                    "invited_by": (f"{actor.first_name or ''} {actor.last_name or ''}".strip() or "your administrator"),
+                },
+            )
+        except Exception as _e:
+            import logging
+            logging.getLogger("user_service").warning(f"Welcome email not sent for {user.email}: {_e}")
 
         return user
 
@@ -487,6 +531,39 @@ class UserService:
     async def get_downline_user_ids(self, actor: User) -> set[uuid.UUID]:
         """Fetch all downline user IDs in actor's reporting chain recursively."""
         return await self.get_downline_user_ids_by_id(actor.organization_id, actor.id)
+
+    async def get_assignable_user_ids(self, actor: User) -> set[uuid.UUID]:
+        """User ids the actor may assign leads to / transfer from.
+
+        Mirrors LeadService._resolve_scope: SuperAdmin/OrgAdmin/Manager have
+        ORG-WIDE lead authority, so they may assign among every active user in
+        the org — not just their reporting-chain downline (an OrgAdmin usually
+        has an empty downline, which previously blocked them from assigning any
+        lead). A team leader (an Employee with reports) gets their recursive
+        downline PLUS themselves, so they can also assign leads to themselves.
+        """
+        q = select(User.id).where(
+            User.organization_id == actor.organization_id,
+            User.is_deleted == False, User.is_active == True)
+        if actor.role in ("SuperAdmin", "OrgAdmin", "Manager"):
+            return set((await self.db.execute(q)).scalars().all())
+        downline = await self.get_downline_user_ids(actor)
+        return (downline | {actor.id})
+
+    async def list_assignable_users(self, actor: User) -> list[User]:
+        """Full active user records the actor may assign leads to / transfer
+        from — powers the transfer + bulk-assign pickers so the correct options
+        (all roles for admins/managers; downline + self for team leaders) are
+        always presented."""
+        ids = await self.get_assignable_user_ids(actor)
+        if not ids:
+            return []
+        rows = (await self.db.execute(select(User).filter(
+            User.id.in_(ids), User.is_deleted == False, User.is_active == True
+        ).order_by(User.first_name, User.last_name))).scalars().all()
+        for u in rows:
+            u.is_team_leader = await self.is_team_leader(u)
+        return list(rows)
 
     async def get_downline_user_ids_by_id(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> set[uuid.UUID]:
         """Fetch all downline user IDs in a user's reporting chain recursively."""

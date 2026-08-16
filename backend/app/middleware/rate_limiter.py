@@ -65,12 +65,24 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         effective_limit = 10 if auth_sensitive else self.limit_per_minute
         bucket = "auth" if auth_sensitive else "gen"
 
+        # Authenticated traffic is budgeted PER USER, not per IP. Keying on IP
+        # alone means every user behind one office NAT / proxy shares a single
+        # budget, so a handful of colleagues throttle each other. Auth-sensitive
+        # endpoints stay per-IP on purpose — that bucket exists to blunt
+        # credential stuffing, where the attacker controls the identity claim.
+        identity = client_ip
+        if not auth_sensitive:
+            user_id = self._user_from_token(request)
+            if user_id:
+                identity = f"u:{user_id}"
+                bucket = "user"
+
         is_allowed = True
 
         # Try Redis first if available — fail-closed on outage (prevents per-instance bypass)
         if self.redis_client:
             try:
-                key = f"rate_limit:{bucket}:{client_ip}:{int(current_time) // 60}"
+                key = f"rate_limit:{bucket}:{identity}:{int(current_time) // 60}"
                 pipe = self.redis_client.pipeline()
                 pipe.incr(key)
                 pipe.expire(key, 60)
@@ -85,15 +97,45 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 )
         else:
             # No Redis configured — in-memory fallback (dev/single-instance only)
-            is_allowed = self._check_memory_limit(f"{bucket}:{client_ip}", current_time, effective_limit)
+            is_allowed = self._check_memory_limit(f"{bucket}:{identity}", current_time, effective_limit)
 
         if not is_allowed:
+            # Seconds remaining in the current fixed minute window. Clients (and
+            # our own frontend) need Retry-After to back off correctly instead of
+            # hammering a throttled endpoint.
+            retry_after = max(1, 60 - int(current_time % 60))
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Too many requests. Please try again in a minute."}
+                content={"detail": "Too many requests. Please try again in a minute."},
+                headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Limit": str(effective_limit),
+                    "X-RateLimit-Remaining": "0",
+                },
             )
 
         return await call_next(request)
+
+    @staticmethod
+    def _user_from_token(request) -> str | None:
+        """Resolve the caller's user id from a VERIFIED bearer token.
+
+        Verification matters: an unverified `sub` claim would let anyone mint
+        arbitrary identities and sidestep the limit entirely. On any failure we
+        return None and the caller falls back to the per-IP budget.
+        """
+        auth = request.headers.get("authorization") or ""
+        if not auth.lower().startswith("bearer "):
+            return None
+        try:
+            import jwt as _jwt
+            from app.core.config import settings as _s
+            payload = _jwt.decode(auth[7:].strip(), _s.JWT_SECRET_KEY,
+                                  algorithms=[_s.JWT_ALGORITHM])
+            sub = payload.get("sub")
+            return str(sub) if sub else None
+        except Exception:
+            return None
 
     def _check_memory_limit(self, client_ip: str, current_time: float, limit: int | None = None) -> bool:
         limit = limit if limit is not None else self.limit_per_minute

@@ -68,6 +68,14 @@ export const userApi = {
     return response.data;
   },
 
+  // Users the current actor may assign leads to / transfer from (all roles for
+  // admins/managers; downline + self for team leaders). Use this for the
+  // transfer + bulk-assign pickers so the assign option is always present.
+  getAssignableUsers: async () => {
+    const response = await api.get<UserResponse[]>('/users/assignable');
+    return response.data;
+  },
+
   createUser: async (payload: {
     email: string;
     first_name?: string;

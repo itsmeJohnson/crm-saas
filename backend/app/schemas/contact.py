@@ -15,7 +15,9 @@ class ContactBase(BaseModel):
     custom_fields: dict[str, Any] | None = None
 
 class ContactCreate(ContactBase):
-    pass
+    # Reject creating a patient whose phone/email already exists; set true to override
+    # (e.g. family members who legitimately share a contact number).
+    allow_duplicate: bool = False
 
 class ContactUpdate(BaseModel):
     first_name: str | None = Field(None, max_length=100)

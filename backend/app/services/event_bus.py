@@ -61,6 +61,8 @@ TRIGGER_EVENT_MAP = {
     "lead_created": "lead.created", "lead_updated": "lead.updated", "lead_converted": "lead.converted",
     "task_created": "task.created", "task_updated": "task.updated", "task_completed": "task.completed",
     "call_logged": "communication.call_logged", "call_disposition": "communication.call_disposition",
+    "follow_up_created": "lead.follow_up_created", "follow_up_missed": "lead.follow_up_missed",
+    "meeting_scheduled": "lead.meeting_scheduled", "site_visit_scheduled": "lead.site_visit_scheduled",
     "sms_sent": "communication.sms_sent", "sms_received": "communication.sms_received",
     "whatsapp_sent": "communication.whatsapp_sent", "whatsapp_received": "communication.whatsapp_received",
     "email_sent": "communication.email_sent", "email_received": "communication.email_received",

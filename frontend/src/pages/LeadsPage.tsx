@@ -5,15 +5,19 @@ import { LeadTable } from '../components/crm/LeadTable';
 import { LeadModal } from '../components/crm/LeadModal';
 import { Filters } from '../components/crm/Filters';
 import { Pagination } from '../components/crm/Pagination';
-import { ActivityTimeline } from '../components/crm/ActivityTimeline';
+import { LeadTimeline } from '../components/crm/LeadTimeline';
 import { NotesPanel } from '../components/crm/NotesPanel';
 import { LeadAttachments } from '../components/crm/LeadAttachments';
 import { LeadReminders } from '../components/crm/LeadReminders';
 import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
-import { LeadResponse } from '../services/leadApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame } from 'lucide-react';
+import { LeadResponse, LeadReport } from '../services/leadApi';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
+import { useMetadataStore } from '../store/metadataStore';
+import { formatMoney } from '../utils/currency';
+import { LeadKanban } from '../components/crm/LeadKanban';
+import { LeadCustomFieldsManager } from '../components/crm/LeadCustomFieldsManager';
 import { ImportModal } from '../components/leads/ImportModal';
 import { AssignmentSettings } from '../components/leads/AssignmentSettings';
 import { ImportHistoryTable } from '../components/leads/ImportHistoryTable';
@@ -25,12 +29,29 @@ import { useDialerStore } from '../store/dialerStore';
 import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 
 export const LeadsPage: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, features } = useAuthStore();
+  // Bulk import (CSV/Excel/Sheets) is a Growth+ plan feature.
+  const canBulkImport = (features || []).includes('BULK_IMPORT');
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
-  const { agentState, currentLead } = useDialerStore();
-  
+  const { agentState, currentLead, callSpecificLead, error: dialerError } = useDialerStore();
+  const [callError, setCallError] = useState<string | null>(null);
+
   const isTL = dashboardData?.role === 'TeamLeader';
   const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
+  // Telecallers (Employees) can place a manual click-to-call to their own leads.
+  const canManualCall = user?.role === 'Employee';
+
+  const handleManualCall = async (leadId: string) => {
+    setCallError(null);
+    // Telephony is configured org-wide by an admin (Settings → Communication →
+    // Calling) and applied server-side. Agents send no credentials; if the org
+    // hasn't configured it, the backend returns a clear message.
+    try {
+      await callSpecificLead(leadId);
+    } catch (e: any) {
+      setCallError(e.response?.data?.detail || 'Failed to place the call.');
+    }
+  };
 
   const {
     leads,
@@ -110,6 +131,17 @@ export const LeadsPage: React.FC = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLead, setDetailLead] = useState<LeadResponse | null>(null);
 
+  const [view, setView] = useState<'table' | 'kanban'>('table');
+  const [isFieldsOpen, setIsFieldsOpen] = useState(false);
+  const [report, setReport] = useState<LeadReport | null>(null);
+  const { customFields, fetchBootstrap } = useMetadataStore();
+  const leadCustomFields = customFields.filter((f) => f.entity_type === 'lead');
+
+  // Org-wide KPI summary (accurate totals, independent of the paginated table).
+  useEffect(() => {
+    leadApi.getReport().then(setReport).catch(() => {});
+  }, [leads]);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const queryLeadId = searchParams.get('leadId');
 
@@ -117,6 +149,7 @@ export const LeadsPage: React.FC = () => {
     fetchLeads();
     if (users.length === 0) fetchUsers();
     fetchDashboardMetrics();
+    fetchBootstrap();
   }, []);
 
   useEffect(() => {
@@ -154,8 +187,8 @@ export const LeadsPage: React.FC = () => {
   const activeOwner = detailLead && users.find(u => u.id === detailLead.assigned_user_id);
   const activeOwnerName = activeOwner ? `${activeOwner.first_name || ''} ${activeOwner.last_name || ''}`.trim() : 'Unassigned';
 
-  const formattedValue = detailLead && detailLead.value !== null 
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(detailLead.value)
+  const formattedValue = detailLead && detailLead.value !== null
+    ? formatMoney(detailLead.value)
     : '—';
 
   return (
@@ -172,6 +205,35 @@ export const LeadsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* View toggle: Table / Kanban */}
+          <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold transition-all cursor-pointer ${view === 'table' ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              title="Table view"
+            >
+              <List className="w-4 h-4" /> Table
+            </button>
+            <button
+              onClick={() => setView('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold border-l border-slate-800 transition-all cursor-pointer ${view === 'kanban' ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              title="Kanban board"
+            >
+              <LayoutGrid className="w-4 h-4" /> Board
+            </button>
+          </div>
+
+          {user?.role === 'OrgAdmin' && (
+            <button
+              onClick={() => setIsFieldsOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
+              title="Manage custom fields"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Custom Fields
+            </button>
+          )}
+
           {isPrivileged && <AssignmentSettings />}
 
           <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
@@ -193,7 +255,7 @@ export const LeadsPage: React.FC = () => {
             </button>
           </div>
 
-          {isPrivileged && (
+          {isPrivileged && canBulkImport && (
             <button
               onClick={() => setIsImportOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
@@ -214,6 +276,26 @@ export const LeadsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* KPI summary strip */}
+      {report && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Total Leads', value: report.total_leads.toLocaleString(), icon: Users2, tint: 'text-brand-400' },
+            { label: 'Pipeline Value', value: formatMoney(report.total_value), icon: DollarSign, tint: 'text-emerald-400' },
+            { label: 'Conversion Rate', value: `${report.conversion_rate}%`, icon: TrendingUp, tint: 'text-indigo-400' },
+            { label: 'Avg. Score', value: Math.round(report.avg_score || 0).toString(), icon: Star, tint: 'text-amber-400' },
+          ].map((s) => (
+            <div key={s.label} className="glass-panel border border-slate-800/80 rounded-2xl p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <s.icon className={`w-3.5 h-3.5 ${s.tint}`} />
+                {s.label}
+              </div>
+              <p className="text-2xl font-bold text-slate-100 mt-1.5">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filters, Table, Pagination */}
       <div className="space-y-4">
@@ -281,6 +363,39 @@ export const LeadsPage: React.FC = () => {
             />
           </div>
 
+          {/* Dynamic custom-field filters (tenant-defined, filterable) */}
+          {leadCustomFields.filter((f) => f.is_active && f.filterable).map((f) => {
+            const val = filters.custom_fields[f.key] || '';
+            const update = (v: string) => {
+              const next = { ...filters.custom_fields };
+              if (v === '') delete next[f.key];
+              else next[f.key] = v;
+              setFilters({ custom_fields: next });
+            };
+            return (
+              <div key={f.id} className="w-full sm:w-44">
+                {f.field_type === 'select' ? (
+                  <select
+                    value={val}
+                    onChange={(e) => update(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                  >
+                    <option value="">{f.label}: All</option>
+                    {(f.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'}
+                    value={val}
+                    onChange={(e) => update(e.target.value)}
+                    placeholder={f.label}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                  />
+                )}
+              </div>
+            );
+          })}
+
           {/* Include archived toggle */}
           <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer select-none shrink-0">
             <input
@@ -296,23 +411,29 @@ export const LeadsPage: React.FC = () => {
           <SavedFilters currentFilters={filters} onApply={(def) => setFilters(def as any)} />
         </Filters>
 
-        <LeadTable 
-          onEditClick={handleEditClick} 
-          onRowClick={handleRowClick}
-          selectedLeadIds={selectedLeadIds}
-          onSelectLeads={setSelectedLeadIds}
-          hideCheckboxes={!isPrivileged}
-        />
-        
-        <Pagination
-          skip={pagination.skip}
-          limit={pagination.limit}
-          itemsCount={leads.length}
-          onPageChange={(skip) => setPagination({ skip })}
-        />
+        {view === 'table' ? (
+          <>
+            <LeadTable
+              onEditClick={handleEditClick}
+              onRowClick={handleRowClick}
+              selectedLeadIds={selectedLeadIds}
+              onSelectLeads={setSelectedLeadIds}
+              hideCheckboxes={!isPrivileged}
+            />
+
+            <Pagination
+              skip={pagination.skip}
+              limit={pagination.limit}
+              itemsCount={leads.length}
+              onPageChange={(skip) => setPagination({ skip })}
+            />
+          </>
+        ) : (
+          <LeadKanban onCardClick={handleRowClick} />
+        )}
       </div>
 
-      {isPrivileged && (
+      {isPrivileged && canBulkImport && (
         <div className="pt-6 border-t border-slate-800/60">
           <ImportHistoryTable />
         </div>
@@ -323,6 +444,9 @@ export const LeadsPage: React.FC = () => {
 
       {/* Import Modal */}
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onSuccess={fetchLeads} />
+
+      {/* Custom Fields Manager (OrgAdmin) */}
+      <LeadCustomFieldsManager isOpen={isFieldsOpen} onClose={() => setIsFieldsOpen(false)} />
 
       {/* Bulk Assign Modal */}
       <BulkAssignModal 
@@ -437,6 +561,15 @@ export const LeadsPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {canManualCall && agentState !== 'ACTIVE_CALLING' && detailLead.phone && (
+                  <button
+                    onClick={() => handleManualCall(detailLead.id)}
+                    title="Place a call to this lead"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-500/10 border border-brand-500/30 hover:bg-brand-500/20 text-xs font-semibold text-brand-300 rounded-xl transition-all cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5" /> Call
+                  </button>
+                )}
                 {isPrivileged && !detailLead.converted_contact_id && (
                   <button
                     onClick={() => handleConvert(detailLead)}
@@ -464,6 +597,12 @@ export const LeadsPage: React.FC = () => {
 
             {/* Scrollable details view */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {(callError || dialerError) && agentState !== 'ACTIVE_CALLING' && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                  {callError || dialerError}
+                </div>
+              )}
+
               {/* Active Call Control/Disposition */}
               {agentState === 'ACTIVE_CALLING' && currentLead?.id === detailLead.id && (
                 <ActiveCallDisposition />
@@ -541,15 +680,48 @@ export const LeadsPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Custom fields (tenant-defined) — always shown so the org's schema is
+                  visible on every lead, with "—" for values not filled in yet. */}
+              {(() => {
+                const activeCf = leadCustomFields.filter((f) => f.is_active && f.visible);
+                if (activeCf.length === 0) return null;
+                const cf = detailLead.custom_fields || {};
+                const fmt = (f: typeof activeCf[number]) => {
+                  const v = cf[f.key];
+                  if (v === undefined || v === null || v === '') return '—';
+                  if (f.field_type === 'checkbox') return v ? 'Yes' : 'No';
+                  return String(v);
+                };
+                return (
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Additional Details</p>
+                    <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+                      {activeCf.map((f) => {
+                        const v = cf[f.key];
+                        const empty = v === undefined || v === null || v === '';
+                        return (
+                          <div key={f.id}>
+                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{f.label}</p>
+                            <p className={`text-sm font-medium mt-0.5 break-words ${empty ? 'text-slate-500' : 'text-slate-200'}`}>
+                              {fmt(f)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/60">
                 {/* Notes logs */}
                 <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
                   <NotesPanel leadId={detailLead.id} />
                 </div>
 
-                {/* Activities timeline */}
+                {/* Unified activity timeline (notes + activities + audit + tasks + reminders) */}
                 <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
-                  <ActivityTimeline leadId={detailLead.id} />
+                  <LeadTimeline leadId={detailLead.id} />
                 </div>
               </div>
 

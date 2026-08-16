@@ -1,4 +1,6 @@
 import uuid
+import hmac
+import hashlib
 from datetime import datetime, timezone, date
 from decimal import Decimal
 from fastapi import HTTPException, status
@@ -26,6 +28,18 @@ def _d(v) -> Decimal:
     if v is None:
         return Decimal("0")
     return v if isinstance(v, Decimal) else Decimal(str(v))
+
+
+def sign_invoice_id(invoice_id) -> str:
+    """Unguessable HMAC signature for an invoice id — lets us expose a public,
+    no-login PDF link (shareable via WhatsApp) without a DB token column."""
+    from app.core.config import settings
+    return hmac.new(settings.JWT_SECRET_KEY.encode(), f"inv:{invoice_id}".encode(),
+                    hashlib.sha256).hexdigest()[:40]
+
+
+def verify_invoice_sig(invoice_id, sig: str) -> bool:
+    return hmac.compare_digest(sign_invoice_id(invoice_id), sig or "")
 
 
 def _compute_totals(items: list[dict], discount, tax) -> tuple[Decimal, Decimal]:
@@ -166,18 +180,48 @@ class CustomerService:
         else:
             invoice.status = "Paid"
 
+    async def _resolve_billing_company(self, actor: User, data: dict) -> uuid.UUID:
+        """Return a company_id for the invoice. If one is supplied, validate it;
+        otherwise resolve it from the contact (patient) — reusing the contact's
+        linked company or creating a per-patient billing company on the fly."""
+        if data.get("company_id"):
+            await self._get_company(actor, data["company_id"])
+            return data["company_id"]
+        contact_id = data.get("contact_id")
+        if not contact_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Provide a patient (contact_id) or a company_id to invoice")
+        from app.models.contact import Contact
+        contact = (await self.db.execute(select(Contact).filter(
+            Contact.id == contact_id, Contact.organization_id == actor.organization_id))).scalar_one_or_none()
+        if not contact:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        if contact.company_id:
+            return contact.company_id
+        name = f"{contact.first_name or ''} {contact.last_name or ''}".strip() or "Patient"
+        company = Company(organization_id=actor.organization_id, name=name,
+                          company_type="Customer", created_by=actor.id)
+        self.db.add(company)
+        await self.db.flush()
+        contact.company_id = company.id  # link so future invoices reuse it
+        self.db.add(contact)
+        return company.id
+
     async def create_invoice(self, actor: User, data: dict) -> CustomerInvoice:
-        await self._get_company(actor, data["company_id"])
+        from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+        settings_svc = OrgInvoiceSettingsService(self.db)
+        org_settings = await settings_svc.get_or_create(actor.organization_id)
+        company_id = await self._resolve_billing_company(actor, data)
         items = [dict(i) for i in data.get("items", [])]
         subtotal, total = _compute_totals(items, data.get("discount_amount", 0), data.get("tax_amount", 0))
         invoice = CustomerInvoice(
             organization_id=actor.organization_id,
-            company_id=data["company_id"],
+            company_id=company_id,
             contact_id=data.get("contact_id"),
             order_id=data.get("order_id"),
-            invoice_number=_num("INV"),
+            invoice_number=await settings_svc.allocate_invoice_number(actor.organization_id),
             status="Draft",
-            currency=data.get("currency", "USD"),
+            currency=data.get("currency") or org_settings.currency or "INR",
             issue_date=data.get("issue_date") or datetime.now(timezone.utc),
             due_date=data.get("due_date"),
             items=items,
@@ -251,6 +295,11 @@ class CustomerService:
                 setattr(invoice, key, data[key])
         # explicit status change (e.g. Send / Void) if provided
         if data.get("status"):
+            # Voiding an invoice is destructive (writes off the receivable) —
+            # restrict it to OrgAdmin/Manager even though staff can edit invoices.
+            if data["status"] == "Void" and actor.role not in ("OrgAdmin", "Manager"):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                    detail="Only an OrgAdmin or Manager can void an invoice")
             invoice.status = data["status"]
         self._recompute_invoice_status(invoice)
         self.db.add(invoice)
@@ -292,7 +341,71 @@ class CustomerService:
         invoice = await self.get_invoice(actor, invoice_id)
         company = await self._get_company(actor, invoice.company_id)
         from app.services.customer_invoice_pdf import build_invoice_pdf
-        return build_invoice_pdf(invoice, company)
+        from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+        settings = await OrgInvoiceSettingsService(self.db).get_or_create(actor.organization_id)
+        patient, consultant = await self._invoice_patient_and_consultant(invoice)
+        return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+
+    async def render_invoice_pdf_by_id(self, invoice_id: uuid.UUID) -> bytes:
+        """Render a PDF for the given invoice WITHOUT an authed actor. Only call
+        after the request has proven authorization (e.g. a valid HMAC signature)."""
+        invoice = (await self.db.execute(
+            select(CustomerInvoice).where(CustomerInvoice.id == invoice_id))).scalar_one_or_none()
+        if not invoice:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+        company = (await self.db.execute(
+            select(Company).where(Company.id == invoice.company_id))).scalar_one_or_none()
+        from app.services.customer_invoice_pdf import build_invoice_pdf
+        from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
+        settings = await OrgInvoiceSettingsService(self.db).get_or_create(invoice.organization_id)
+        patient, consultant = await self._invoice_patient_and_consultant(invoice)
+        return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+
+    async def whatsapp_share_info(self, actor: User, invoice_id: uuid.UUID) -> dict:
+        """Return the patient phone + public (signed) PDF URL so the client can
+        open WhatsApp with a link to the invoice."""
+        from app.core.config import settings as app_settings
+        invoice = await self.get_invoice(actor, invoice_id)
+        patient, _ = await self._invoice_patient_and_consultant(invoice)
+        phone_digits = "".join(ch for ch in ((patient or {}).get("phone") or "") if ch.isdigit())
+        base = (app_settings.FRONTEND_URL or "").rstrip("/")
+        sig = sign_invoice_id(invoice.id)
+        pdf_url = f"{base}{app_settings.API_V1_STR}/public/invoices/{invoice.id}/{sig}/pdf"
+        return {
+            "invoice_number": invoice.invoice_number,
+            "phone": phone_digits,
+            "pdf_url": pdf_url,
+            "total_amount": float(invoice.total_amount or 0),
+            "currency": invoice.currency,
+        }
+
+    async def _invoice_patient_and_consultant(self, invoice) -> tuple[dict | None, str | None]:
+        """Resolve the patient (name/age/gender/mobile) and consultant name for
+        the dental-style invoice layout. Falls back gracefully to the billing
+        company / invoice creator when the patient contact isn't linked."""
+        from app.models.contact import Contact
+        patient, consultant = None, None
+        contact = None
+        if invoice.contact_id:
+            contact = (await self.db.execute(
+                select(Contact).where(Contact.id == invoice.contact_id))).scalar_one_or_none()
+        if contact:
+            cf = contact.custom_fields or {}
+            patient = {
+                "name": f"{contact.first_name or ''} {contact.last_name or ''}".strip(),
+                "age": cf.get("age"),
+                "gender": cf.get("gender"),
+                "phone": contact.phone or "",
+            }
+            consultant = cf.get("consultant_name") or cf.get("primary_doctor")
+            uid = contact.assigned_user_id or invoice.created_by
+        else:
+            uid = invoice.created_by
+        if not consultant and uid:
+            u = (await self.db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
+            if u:
+                consultant = f"{u.first_name or ''} {u.last_name or ''}".strip() or None
+        return patient, consultant
 
     # ================= PAYMENTS =================
     async def record_payment(self, actor: User, invoice_id: uuid.UUID, data: dict) -> CustomerPayment:
@@ -300,6 +413,20 @@ class CustomerService:
         if invoice.status == "Void":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot record a payment on a void invoice")
         amount = _d(data["amount"])
+        # Reject payments that exceed the outstanding balance so amount_paid can
+        # never overshoot the total (which would drive balance_due negative and
+        # corrupt AR aging / outstanding-revenue reports). An explicit
+        # allow_overpayment flag opts into recording an advance / credit.
+        outstanding = _d(invoice.total_amount) - _d(invoice.amount_paid)
+        if not data.get("allow_overpayment") and amount > outstanding:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Payment of {invoice.currency} {float(amount):.2f} exceeds the outstanding "
+                    f"balance of {invoice.currency} {float(outstanding):.2f} on invoice "
+                    f"{invoice.invoice_number}. Set allow_overpayment to record an advance."
+                ),
+            )
         payment = CustomerPayment(
             organization_id=actor.organization_id,
             company_id=invoice.company_id,

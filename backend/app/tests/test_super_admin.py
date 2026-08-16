@@ -102,13 +102,17 @@ async def test_super_admin_tenant_operations(client: AsyncClient, setup_super_ad
     slugs = [t["slug"] for t in tenants]
     assert "test-tenant" in slugs
 
-    # 3. Delete tenant (cascading hard delete)
+    # 3. Delete tenant (soft delete)
     response_delete = await client.delete(f"/api/v1/super-admin/tenants/{org_id}", headers=data["headers"])
     assert response_delete.status_code == 200
     assert "deleted successfully" in response_delete.json()["detail"]
 
-    # Verify all records associated with the tenant were hard deleted!
-    assert (await db.get(Organization, org_id)) is None
-    assert (await db.execute(select(func.count(User.id)).where(User.organization_id == org_id))).scalar() == 0
-    assert (await db.execute(select(func.count(Company.id)).where(Company.organization_id == org_id))).scalar() == 0
-    assert (await db.execute(select(func.count(Lead.id)).where(Lead.organization_id == org_id))).scalar() == 0
+    # Verify the organization was soft-deleted and deactivated
+    org_after = await db.get(Organization, org_id)
+    assert org_after is not None
+    assert org_after.is_deleted is True
+    assert org_after.is_active is False
+
+    # Verify users under the organization were deactivated
+    users_active_cnt = (await db.execute(select(func.count(User.id)).where(User.organization_id == org_id, User.is_active == True))).scalar()
+    assert users_active_cnt == 0

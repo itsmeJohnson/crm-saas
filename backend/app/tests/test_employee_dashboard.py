@@ -101,6 +101,16 @@ async def test_employee_summary_scoped_to_self(client: AsyncClient, setup: dict,
     assert s["today_meetings_count"] == 1 and s["today_meetings"][0]["title"] == "Standup"
     assert s["open_tasks"] == 2 and s["overdue_tasks"] == 1
 
+    # Employee hero card fields (Phase 4) — present and self-scoped
+    for f in ("employee_name", "is_online", "check_in_at", "working_minutes", "calls_made_today",
+              "todays_follow_ups", "overdue_follow_ups", "new_leads", "interested_leads",
+              "meetings_today", "tasks_pending"):
+        assert f in s, f"missing hero field {f}"
+    assert s["calls_made_today"] == s["today_calls"]
+    assert s["meetings_today"] == s["today_meetings_count"]
+    assert s["tasks_pending"] == s["open_tasks"]
+    assert s["is_online"] is False and s["working_minutes"] == 0  # no attendance clock-in in this fixture
+
     # the manager's own summary sees only the manager's 1 lead (scoped, not team)
     sm = (await client.get("/api/v1/dashboard/employee", headers=data["h_mgr"])).json()
     assert sm["my_leads_total"] == 1

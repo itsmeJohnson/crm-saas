@@ -21,13 +21,16 @@ from app.middleware.permissions import require_active_user, require_role
 
 # Contact records are an OrgAdmin/Manager surface (matches the frontend route guard).
 _oa_or_mgr = require_role(["OrgAdmin", "Manager"])
+# Any active user (incl. Employee = clinical staff) may do read/write work.
+# Destructive + org-config ops stay on _oa_or_mgr (see individual routes).
+_rw = require_active_user
 
 router = APIRouter()
 
 @router.post("/", response_model=ContactResponse, status_code=status.HTTP_201_CREATED)
 async def create_contact(
     contact_in: ContactCreate,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new contact linkable to a company."""
@@ -36,7 +39,7 @@ async def create_contact(
 
 @router.get("/", response_model=List[ContactResponse])
 async def list_contacts(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -61,7 +64,7 @@ async def list_contacts(
 
 @router.get("/export")
 async def export_contacts(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
     search: str | None = Query(None),
@@ -95,7 +98,7 @@ async def export_contacts(
 
 @router.post("/import")
 async def import_contacts(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...),
 ):
@@ -109,7 +112,7 @@ async def import_contacts(
 
 @router.get("/duplicates", response_model=List[ContactResponse])
 async def find_duplicate_contacts(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     email: str | None = Query(None),
     phone: str | None = Query(None),
@@ -122,7 +125,7 @@ async def find_duplicate_contacts(
 @router.post("/bulk-update", response_model=ContactBulkResult)
 async def bulk_update_contacts(
     req: ContactBulkUpdateRequest,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Apply company/owner/tag changes to many contacts at once."""
@@ -144,7 +147,7 @@ async def bulk_delete_contacts(
 
 @router.get("/reports", response_model=ContactReportResponse)
 async def get_contact_reports(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
@@ -155,7 +158,7 @@ async def get_contact_reports(
 
 @router.get("/tags", response_model=List[str])
 async def list_contact_tags(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """List all distinct tags used across the org's contacts."""
@@ -176,7 +179,7 @@ async def merge_contacts(
 
 @router.get("/custom-fields", response_model=List[CustomFieldDefinitionResponse])
 async def list_custom_fields(
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """List custom-field definitions for contacts."""
@@ -216,7 +219,7 @@ async def delete_custom_field(
 @router.get("/{contact_id}", response_model=ContactResponse)
 async def get_contact(
     contact_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Retrieve detailed contact profile scoped to organization."""
@@ -227,7 +230,7 @@ async def get_contact(
 async def update_contact(
     contact_id: uuid.UUID,
     contact_in: ContactUpdate,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update properties of a scoped contact."""
@@ -247,7 +250,7 @@ async def delete_contact(
 @router.get("/{contact_id}/timeline", response_model=List[ContactTimelineEvent])
 async def get_contact_timeline(
     contact_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Unified chronological feed of notes, activities, and audit events."""
@@ -257,7 +260,7 @@ async def get_contact_timeline(
 @router.get("/{contact_id}/communications", response_model=List[ContactCommunication])
 async def get_contact_communications(
     contact_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Call/Email communication history for a contact."""
@@ -267,7 +270,7 @@ async def get_contact_communications(
 @router.get("/{contact_id}/attachments", response_model=List[ContactAttachmentResponse])
 async def list_contact_attachments(
     contact_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List files attached to a contact."""
@@ -277,7 +280,7 @@ async def list_contact_attachments(
 @router.post("/{contact_id}/attachments", response_model=ContactAttachmentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_contact_attachment(
     contact_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...)
 ):
@@ -303,7 +306,7 @@ async def delete_contact_attachment(
 @router.get("/{contact_id}/relationships", response_model=List[ContactRelationshipResponse])
 async def list_contact_relationships(
     contact_id: uuid.UUID,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List other contacts related to this one."""
@@ -314,7 +317,7 @@ async def list_contact_relationships(
 async def add_contact_relationship(
     contact_id: uuid.UUID,
     req: ContactRelationshipCreate,
-    actor: Annotated[User, Depends(_oa_or_mgr)],
+    actor: Annotated[User, Depends(_rw)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Link this contact to another (e.g. reports_to, colleague)."""

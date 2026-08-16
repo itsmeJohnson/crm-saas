@@ -9,6 +9,7 @@ vi.mock('../../services/dialerApi', () => ({
     updateState: vi.fn(),
     getState: vi.fn(),
     submitDisposition: vi.fn(),
+    callLead: vi.fn(),
   },
 }));
 
@@ -122,5 +123,30 @@ describe('dialerStore', () => {
     });
     expect(useDialerStore.getState().agentState).toBe('IDLE');
     expect(useDialerStore.getState().breakReason).toBeNull();
+  });
+
+  it('callSpecificLead places a call and goes ACTIVE_CALLING with that lead', async () => {
+    const lead = { id: 'lead-9', first_name: 'Called', last_name: 'Lead', phone: '+91********83' } as any;
+    vi.mocked(dialerApi.callLead).mockResolvedValueOnce(lead);
+
+    await useDialerStore.getState().callSpecificLead('lead-9', 'k-key', 'srn', '+91999');
+
+    expect(dialerApi.callLead).toHaveBeenCalledWith('lead-9', {
+      knowlarity_api_key: 'k-key',
+      knowlarity_srn: 'srn',
+      agent_phone_number: '+91999',
+    });
+    const s = useDialerStore.getState();
+    expect(s.agentState).toBe('ACTIVE_CALLING');
+    expect(s.callDirection).toBe('OUTBOUND');
+    expect(s.currentLead?.id).toBe('lead-9');
+  });
+
+  it('callSpecificLead surfaces the backend error and stays IDLE', async () => {
+    vi.mocked(dialerApi.callLead).mockRejectedValueOnce({ response: { data: { detail: 'Calling is not configured.' } } });
+    await expect(useDialerStore.getState().callSpecificLead('lead-9', '', '', '')).rejects.toBeTruthy();
+    const s = useDialerStore.getState();
+    expect(s.agentState).toBe('IDLE');
+    expect(s.error).toBe('Calling is not configured.');
   });
 });

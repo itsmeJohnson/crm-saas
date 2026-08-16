@@ -468,3 +468,18 @@ async def test_update_portal_settings(client: AsyncClient, setup_portal_data: di
     assert org.auto_renewal is False
     assert org.theme == "light"
 
+
+
+@pytest.mark.asyncio
+async def test_get_portal_usage(client: AsyncClient, setup_portal_data: dict):
+    """Regression: /portal/usage used func.count() while `func` was never
+    imported in portal.py, so the endpoint raised NameError (500) for every
+    OrgAdmin. Exercising it end-to-end is what catches a missing import."""
+    headers = setup_portal_data["headers"]
+    response = await client.get("/api/v1/portal/usage", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    for field in ("active_seats", "total_leads", "total_calls", "total_imports"):
+        assert field in data
+        assert isinstance(data[field], int)
+    assert data["active_seats"] >= 1

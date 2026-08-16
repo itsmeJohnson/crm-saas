@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { leadApi, LeadResponse } from '../services/leadApi';
 
+/** Serialize non-empty custom-field filters to a JSON string for the API, or undefined. */
+const serializeCustomFilters = (cf: Record<string, string>): string | undefined => {
+  const entries = Object.entries(cf).filter(([, v]) => v !== undefined && v !== null && v !== '');
+  return entries.length > 0 ? JSON.stringify(Object.fromEntries(entries)) : undefined;
+};
+
 interface Filters {
   search: string;
   status: string;
@@ -12,6 +18,7 @@ interface Filters {
   min_value: string;
   max_value: string;
   include_archived: boolean;
+  custom_fields: Record<string, string>;
 }
 
 interface Pagination {
@@ -55,6 +62,7 @@ export const useLeadStore = create<LeadState>((set, get) => ({
     min_value: '',
     max_value: '',
     include_archived: false,
+    custom_fields: {},
   },
   pagination: {
     skip: 0,
@@ -81,6 +89,7 @@ export const useLeadStore = create<LeadState>((set, get) => ({
       filters: {
         search: '', status: 'All', assigned_user_id: 'All', name: '', city: '',
         source: '', priority: 'All', min_value: '', max_value: '', include_archived: false,
+        custom_fields: {},
       },
       pagination: { skip: 0, limit: 20 },
     });
@@ -105,6 +114,7 @@ export const useLeadStore = create<LeadState>((set, get) => ({
         min_value: f.min_value !== '' ? Number(f.min_value) : undefined,
         max_value: f.max_value !== '' ? Number(f.max_value) : undefined,
         include_archived: f.include_archived || undefined,
+        custom_fields: serializeCustomFilters(f.custom_fields),
       };
       const data = await leadApi.getLeads(params);
       set({ leads: data, isLoading: false });

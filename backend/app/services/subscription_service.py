@@ -260,12 +260,19 @@ class SubscriptionService:
         if comm_settings.free_setup_on_annual and plan.billing_cycle_days >= 360:
             setup_charges = 0.0
 
-        # Determine Discount fallback
-        discount_percentage = float(plan.discount_percentage) if plan.discount_percentage is not None else float(comm_settings.default_discount_percentage)
-        if not comm_settings.allow_custom_discount:
+        # Discount: a plan's own promotional discount is authoritative (set by the
+        # SuperAdmin on the plan itself), so it applies directly and is NOT clamped
+        # by the org's manual-discount guards. Those guards still govern the
+        # fallback/default discount used when a plan carries no promo of its own.
+        plan_discount = float(plan.discount_percentage) if plan.discount_percentage is not None else 0.0
+        if plan_discount > 0.0:
+            discount_percentage = min(plan_discount, 100.0)
+        else:
             discount_percentage = float(comm_settings.default_discount_percentage)
-        if discount_percentage > float(comm_settings.maximum_discount_percentage):
-            discount_percentage = float(comm_settings.maximum_discount_percentage)
+            if not comm_settings.allow_custom_discount:
+                discount_percentage = float(comm_settings.default_discount_percentage)
+            if discount_percentage > float(comm_settings.maximum_discount_percentage):
+                discount_percentage = float(comm_settings.maximum_discount_percentage)
 
         # Determine GST fallback
         gst_percentage = float(plan.gst_percentage) if plan.gst_percentage is not None else float(comm_settings.default_gst)

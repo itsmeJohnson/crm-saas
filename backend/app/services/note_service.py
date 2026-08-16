@@ -11,10 +11,10 @@ from app.models.user import User
 from app.models.note import Note
 
 class NoteService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, organization_id: uuid.UUID):
         self.db = db
         self.note_repo = NoteRepository(db)
-        self.lead_repo = LeadRepository(db)
+        self.lead_repo = LeadRepository(db, organization_id)
         self.contact_repo = ContactRepository(db)
         self.company_repo = CompanyRepository(db)
         self.audit_service = AuditService(db)
@@ -31,7 +31,7 @@ class NoteService:
     async def _validate_references(self, organization_id: uuid.UUID, data: dict):
         lead_id = data.get("lead_id")
         if lead_id:
-            lead = await self.lead_repo.get_lead_by_id(organization_id, lead_id)
+            lead = await self.lead_repo.get_lead_by_id(lead_id)
             if not lead:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -93,7 +93,7 @@ class NoteService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
         if lead_id:
-            lead = await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+            lead = await self.lead_repo.get_lead_by_id(lead_id)
             if not lead:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lead not found")
 

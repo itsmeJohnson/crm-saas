@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { 
-  Building, Users, FileText, Edit, Plus, X, ShieldAlert, 
+import { Link } from 'react-router-dom';
+import {
+  Building, Users, FileText, Edit, Plus, X, ShieldAlert, ArrowLeft,
   Loader2, Calendar, DollarSign, CheckCircle2, AlertCircle, Clock, Trash2,
   Workflow, CheckSquare, Settings, Lock, Unlock, Check, Key, ArrowUpDown, FolderKanban,
   Upload, Mail, CreditCard, Image, Receipt, Percent, LayoutDashboard,
@@ -54,6 +55,7 @@ const NavItem: React.FC<{ icon: React.ElementType; label: string; active: boolea
 export const TenantsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>('tenants');
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
+  const [showDeletedTenants, setShowDeletedTenants] = useState(false);
   const [plans, setPlans] = useState<PlanResponse[]>([]);
   const [features, setFeatures] = useState<FeatureResponse[]>([]);
   const [mappings, setMappings] = useState<PlanFeatureResponse[]>([]);
@@ -105,13 +107,15 @@ export const TenantsPage: React.FC = () => {
   const [gatewayForms, setGatewayForms] = useState<Record<string, any>>({});
   const [expandedGateway, setExpandedGateway] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [showTenantPassword, setShowTenantPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const fetchAllData = async () => {
     setIsLoading(true); setGlobalError(null);
     try {
       switch (activeSection) {
         case 'dashboard': { const d = await superAdminApi.getDashboard(dashboardPeriod); setDashboard(d); break; }
-        case 'tenants': { const [d, p] = await Promise.all([superAdminApi.getTenants(), superAdminApi.getPlans()]); setTenants(d); setPlans(p); break; }
+        case 'tenants': { const [d, p] = await Promise.all([superAdminApi.getTenants(showDeletedTenants), superAdminApi.getPlans()]); setTenants(d); setPlans(p); break; }
         case 'plans': { const d = await superAdminApi.getPlans(); setPlans(d); break; }
         case 'features': {
           const [p,f,m] = await Promise.all([superAdminApi.getPlans(),superAdminApi.getFeatures(),superAdminApi.getPlanFeatures()]);
@@ -160,7 +164,17 @@ export const TenantsPage: React.FC = () => {
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { fetchAllData(); }, [activeSection, dashboardPeriod]);
+  useEffect(() => { fetchAllData(); }, [activeSection, dashboardPeriod, showDeletedTenants]);
+
+  const handleRestoreTenant = async (tenant: TenantResponse) => {
+    try {
+      await superAdminApi.restoreTenant(tenant.id);
+      showSuccess(`${tenant.name} restored — its users can log in again.`);
+      await fetchAllData();
+    } catch (e: any) {
+      setGlobalError(e?.response?.data?.detail || 'Failed to restore tenant.');
+    }
+  };
 
   const showSuccess = (msg: string) => { setSuccessMessage(msg); setTimeout(() => setSuccessMessage(null), 4000); };
 
@@ -200,6 +214,9 @@ export const TenantsPage: React.FC = () => {
       setSubValue('subscription_status', selectedTenant.subscription_status);
       setSubValue('max_users', selectedTenant.max_users);
       setSubValue('subscription_expires_at', selectedTenant.subscription_expires_at?.substring(0, 10) || '');
+      setSubValue('name', selectedTenant.name);
+      setSubValue('currency', selectedTenant.currency || 'INR');
+      setSubValue('timezone', selectedTenant.timezone || 'Asia/Kolkata');
     }
   }, [selectedTenant, activeModal, setSubValue]);
   const onCreateTenant = async (data: CreateTenantRequest) => {
@@ -245,7 +262,7 @@ export const TenantsPage: React.FC = () => {
     'currency', 'max_users', 'max_admins', 'max_managers', 'max_team_leads', 'max_employees',
     'storage_limit_gb', 'recording_retention_days', 'priority_support', 'api_access',
     'display_order', 'setup_charges', 'minimum_users', 'maximum_users', 'minimum_contract_months',
-    'trial_days', 'extra_user_price', 'discount_percentage', 'gst_percentage', 'plan_color',
+    'trial_days', 'extra_user_price', 'discount_percentage', 'promo_price', 'gst_percentage', 'plan_color',
     'plan_badge', 'popular_plan', 'recommended_plan', 'allow_upgrade', 'allow_downgrade',
     'allow_trial', 'allow_additional_seats', 'auto_renew', 'plan_active',
   ];
@@ -258,6 +275,7 @@ export const TenantsPage: React.FC = () => {
     maximum_users: Number(data.maximum_users), minimum_contract_months: Number(data.minimum_contract_months),
     trial_days: Number(data.trial_days || 0), extra_user_price: Number(data.extra_user_price || 0),
     discount_percentage: Number(data.discount_percentage || 0), gst_percentage: Number(data.gst_percentage || 0),
+    promo_price: (data.promo_price === null || (data.promo_price as any) === '' || data.promo_price === undefined) ? null : Number(data.promo_price),
     popular_plan: Boolean(data.popular_plan), recommended_plan: Boolean(data.recommended_plan),
     allow_upgrade: Boolean(data.allow_upgrade), allow_downgrade: Boolean(data.allow_downgrade),
     allow_trial: Boolean(data.allow_trial), allow_additional_seats: Boolean(data.allow_additional_seats),
@@ -420,7 +438,6 @@ export const TenantsPage: React.FC = () => {
   };
 
   const navItems: { key: SectionKey; icon: React.ElementType; label: string }[] = [
-    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { key: 'tenants', icon: Building, label: 'Tenants' },
     { key: 'plans', icon: FolderKanban, label: 'Plans' },
     { key: 'features', icon: Workflow, label: 'Features' },
@@ -443,6 +460,13 @@ export const TenantsPage: React.FC = () => {
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Super Admin</p>
           <h2 className="text-sm font-bold text-slate-200 mt-0.5">Control Center</h2>
         </div>
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border-b border-slate-800/70 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 shrink-0" />
+          Back to CRM
+        </Link>
         <div className="py-2 flex-1">
           {navItems.map(item => <NavItem key={item.key} icon={item.icon} label={item.label} active={activeSection === item.key} onClick={() => { setActiveSection(item.key); setGlobalError(null); }} />)}
         </div>
@@ -579,6 +603,14 @@ export const TenantsPage: React.FC = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Tenants List</h3>
+                <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeletedTenants(v => !v)}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${showDeletedTenants ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                >
+                  {showDeletedTenants ? 'Hide deactivated' : 'Show deactivated'}
+                </button>
                 <button
                   onClick={() => {
                     resetTenant();
@@ -590,6 +622,7 @@ export const TenantsPage: React.FC = () => {
                   <Plus className="w-3.5 h-3.5" />
                   Create Tenant
                 </button>
+                </div>
               </div>
 
               {tenants.length === 0 ? (
@@ -616,10 +649,15 @@ export const TenantsPage: React.FC = () => {
                         {tenants.map((tenant) => (
                           <tr key={tenant.id} className="hover:bg-slate-900/10 transition-colors">
                             <td className="px-6 py-4.5">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-200">{tenant.name}</p>
+                              <button
+                                type="button"
+                                onClick={() => openEditSubModal(tenant)}
+                                className="text-left group cursor-pointer"
+                                title="Edit tenant details"
+                              >
+                                <p className="text-sm font-semibold text-slate-200 group-hover:text-brand-400 transition-colors">{tenant.name}</p>
                                 <p className="text-xs text-slate-500">/{tenant.slug}</p>
-                              </div>
+                              </button>
                             </td>
                             <td className="px-6 py-4.5">
                               <span className={`inline-flex items-center gap-1 text-xs font-medium ${
@@ -636,7 +674,7 @@ export const TenantsPage: React.FC = () => {
                                 <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-brand-500/10 text-brand-400 border border-brand-500/20 uppercase tracking-wider">
                                   {tenant.subscription_plan}
                                 </span>
-                                <p className="text-[10px] text-slate-400 mt-1">Licensed Seats: {tenant.max_users}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Licensed Seats: {tenant.max_users} · {tenant.currency || 'INR'}</p>
                               </div>
                             </td>
                             <td className="px-6 py-4.5 text-xs text-slate-300">
@@ -665,6 +703,17 @@ export const TenantsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4.5 text-right">
                               <div className="flex items-center justify-end gap-2.5">
+                                {tenant.is_deleted ? (
+                                  <button
+                                    onClick={() => handleRestoreTenant(tenant)}
+                                    className="px-3 py-1.5 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                    title="Restore this deactivated tenant"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    Restore
+                                  </button>
+                                ) : (
+                                <>
                                 <button
                                   onClick={() => openEditSubModal(tenant)}
                                   className="px-2 py-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer"
@@ -709,6 +758,8 @@ export const TenantsPage: React.FC = () => {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
+                                </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -824,12 +875,37 @@ export const TenantsPage: React.FC = () => {
                         <p className="text-xs text-slate-400 line-clamp-2">{plan.description || 'No description provided.'}</p>
 
                         {/* Price block */}
-                        <div className="py-3 border-y border-slate-800/80">
-                          <p className="text-3xl font-black text-brand-400">
-                            {plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.monthly_price).toLocaleString('en-IN')}
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
-                        </div>
+                        {(() => {
+                          const sym = plan.currency === 'INR' ? '₹' : plan.currency;
+                          const price = Number(plan.monthly_price);
+                          const promo = plan.promo_price != null ? Number(plan.promo_price) : null;
+                          const hasPromo = promo != null && promo > 0 && promo < price;
+                          const pct = hasPromo
+                            ? Math.round(Number(plan.discount_percentage) || (100 - (promo! / price) * 100))
+                            : 0;
+                          return (
+                            <div className="py-3 border-y border-slate-800/80">
+                              {hasPromo ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-3xl font-black text-brand-400">
+                                    {sym}{promo!.toLocaleString('en-IN')}
+                                  </p>
+                                  <span className="text-base text-slate-500 line-through">
+                                    {sym}{price.toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
+                                    {pct}% OFF
+                                  </span>
+                                </div>
+                              ) : (
+                                <p className="text-3xl font-black text-brand-400">
+                                  {sym}{price.toLocaleString('en-IN')}
+                                </p>
+                              )}
+                              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
+                            </div>
+                          );
+                        })()}
 
                         {/* Plan details */}
                         <div className="space-y-1.5 pt-1">
@@ -2887,15 +2963,24 @@ export const TenantsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">New Password</label>
-                <input
-                  type="password"
-                  placeholder="Minimum 8 characters"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    placeholder="Minimum 8 characters"
+                    required
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors focus:outline-none"
+                  >
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
@@ -3086,7 +3171,7 @@ export const TenantsPage: React.FC = () => {
                     type="number"
                     {...regPlan('minimum_users', {
                       required: 'Minimum licensed seats is required',
-                      min: { value: 10, message: 'Minimum 10 licensed seats' }
+                      min: { value: 1, message: 'Minimum 1 licensed seat' }
                     })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
@@ -3143,6 +3228,18 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                   />
                   {planErrors.discount_percentage && <p className="text-[10px] text-red-400 mt-1">{planErrors.discount_percentage.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1.5">Promotional Price (offer)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...regPlan('promo_price', { min: 0 })}
+                    placeholder="Empty = no offer"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
+                  />
+                  <p className="text-[9px] text-slate-500 mt-1">Below the monthly price → shown struck-through with a % OFF badge.</p>
+                  {planErrors.promo_price && <p className="text-[10px] text-red-400 mt-1">{planErrors.promo_price.message}</p>}
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1.5">GST Tax % (0-100)</label>
@@ -3451,15 +3548,24 @@ export const TenantsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Admin Password</label>
-                    <input
-                      type="password"
-                      placeholder="Min 8 characters"
-                      {...regTenant('admin_password', { 
-                        required: 'Password is required',
-                        minLength: { value: 8, message: 'Password must be at least 8 characters' }
-                      })}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showTenantPassword ? 'text' : 'password'}
+                        placeholder="Min 8 characters"
+                        {...regTenant('admin_password', { 
+                          required: 'Password is required',
+                          minLength: { value: 8, message: 'Password must be at least 8 characters' }
+                        })}
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTenantPassword(!showTenantPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors focus:outline-none"
+                      >
+                        {showTenantPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {tenantErrors.admin_password && <p className="text-xs text-red-400 mt-1">{tenantErrors.admin_password.message}</p>}
                   </div>
                 </div>
@@ -3502,9 +3608,9 @@ export const TenantsPage: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
                   <Edit className="w-5 h-5 text-brand-400" />
-                  Subscription Settings
+                  Tenant Settings
                 </h3>
-                <p className="text-xs text-slate-400">Configure parameters for <strong>{selectedTenant.name}</strong>.</p>
+                <p className="text-xs text-slate-400">Configure plan, currency &amp; profile for <strong>{selectedTenant.name}</strong>.</p>
               </div>
               <button
                 onClick={() => setActiveModal(null)}
@@ -3521,6 +3627,15 @@ export const TenantsPage: React.FC = () => {
                   <span>{modalError}</span>
                 </div>
               )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Organization Name</label>
+                <input
+                  type="text"
+                  {...regSub('name')}
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                />
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Subscription Plan</label>
@@ -3574,6 +3689,31 @@ export const TenantsPage: React.FC = () => {
                   {...regSub('subscription_expires_at')}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Currency</label>
+                  <select
+                    {...regSub('currency')}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    {['INR', 'USD', 'EUR', 'GBP', 'AED', 'AUD', 'CAD', 'SGD', 'JPY']
+                      .concat(selectedTenant.currency && !['INR','USD','EUR','GBP','AED','AUD','CAD','SGD','JPY'].includes(selectedTenant.currency) ? [selectedTenant.currency] : [])
+                      .map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Timezone</label>
+                  <select
+                    {...regSub('timezone')}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    {['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'Australia/Sydney']
+                      .concat(selectedTenant.timezone && !['Asia/Kolkata','Asia/Dubai','Asia/Singapore','UTC','America/New_York','America/Los_Angeles','Europe/London','Europe/Berlin','Australia/Sydney'].includes(selectedTenant.timezone) ? [selectedTenant.timezone] : [])
+                      .map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">

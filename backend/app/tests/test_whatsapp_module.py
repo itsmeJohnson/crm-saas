@@ -89,10 +89,20 @@ async def _settings(db, org_id) -> WhatsAppSettings:
 
 async def _open_window(db, org_id, phone):
     """Simulate an inbound so the 24h window is open for that phone."""
+    settings = (await db.execute(select(WhatsAppSettings).filter(
+        WhatsAppSettings.organization_id == org_id))).scalars().first()
+    if not settings:
+        settings = WhatsAppSettings(
+            organization_id=org_id, provider="mock",
+            webhook_token="token", webhook_verify_token="verify"
+        )
+        db.add(settings)
+        await db.commit()
     conv = (await db.execute(select(WhatsAppConversation).filter(
-        WhatsAppConversation.organization_id == org_id, WhatsAppConversation.phone == phone))).scalars().first()
+        WhatsAppConversation.organization_id == org_id, WhatsAppConversation.phone == phone,
+        WhatsAppConversation.whatsapp_settings_id == settings.id))).scalars().first()
     if not conv:
-        conv = WhatsAppConversation(organization_id=org_id, phone=phone)
+        conv = WhatsAppConversation(organization_id=org_id, phone=phone, whatsapp_settings_id=settings.id)
         db.add(conv)
     conv.last_inbound_at = datetime.now(timezone.utc)
     conv.window_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
@@ -334,3 +344,508 @@ async def test_workflow_crud_accepts_wa_trigger_and_action(client: AsyncClient, 
         "name": "bad", "trigger_event": "whatsapp_delivered", "conditions": [], "actions": []},
         headers=data["h_admin"])
     assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_rotate_token(client: AsyncClient, setup: dict, db: AsyncSession, monkeypatch):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+    
+    from app.services.whatsapp_providers import MetaWhatsAppProvider
+    async def mock_health(*args, **kwargs):
+        return "connected"
+    monkeypatch.setattr(MetaWhatsAppProvider, "check_health", mock_health)
+    
+    r = await client.post(f"/api/v1/whatsapp/settings/{s.id}/rotate-token", json={"access_token": "new_permanent_token"}, headers=data["h_admin"])
+    assert r.status_code == 200
+    assert r.json()["health_status"] == "connected"
+
+
+@pytest.mark.asyncio
+async def test_set_default_settings(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+    
+    r = await client.post(f"/api/v1/whatsapp/settings/{s.id}/set-default", headers=data["h_admin"])
+    assert r.status_code == 200
+    assert r.json()["is_default"] is True
+
+
+@pytest.mark.asyncio
+async def test_exchange_signup_oauth(client: AsyncClient, setup: dict, db: AsyncSession, monkeypatch):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+    
+    from app.services.whatsapp_providers import MetaWhatsAppProvider
+    async def mock_exchange(*args, **kwargs):
+        return "mocked_user_token"
+    async def mock_wabas(*args, **kwargs):
+        return [{"id": "waba_12345", "name": "Test WABA"}]
+    async def mock_phones(*args, **kwargs):
+        return [{
+            "id": "phone_12345",
+            "display_phone_number": "+1555010001",
+            "verified_name": "Test Phone",
+            "quality_rating": "GREEN",
+            "messaging_limit_tier": "TIER_1K",
+            "display_name_status": "APPROVED"
+        }]
+        
+    monkeypatch.setattr(MetaWhatsAppProvider, "exchange_auth_code", mock_exchange)
+    monkeypatch.setattr(MetaWhatsAppProvider, "fetch_shared_wabas", mock_wabas)
+    monkeypatch.setattr(MetaWhatsAppProvider, "fetch_waba_phone_numbers", mock_phones)
+    
+    r = await client.post("/api/v1/whatsapp/signup/exchange", json={"code": "auth_code_from_facebook", "redirect_uri": "http://localhost:3000/callback"}, headers=data["h_admin"])
+    assert r.status_code == 200
+    res = r.json()
+    assert len(res) == 1
+    assert res[0]["phone_number_id"] == "phone_12345"
+    assert res[0]["business_account_id"] == "waba_12345"
+    assert res[0]["sender_number"] == "+1555010001"
+
+
+@pytest.mark.asyncio
+async def test_raw_body_signature_verification(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+    
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("my_super_secret")
+    db.add(s)
+    await db.commit()
+    
+    import hmac
+    import hashlib
+    import json
+    
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "waba_12345",
+                "changes": [
+                    {
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "+1555010001", "phone_number_id": "phone_12345"},
+                            "statuses": [
+                                {
+                                    "id": "wamid.ID1",
+                                    "status": "delivered",
+                                    "timestamp": "1672531199",
+                                    "recipient_id": "+919876511001"
+                                }
+                            ]
+                        },
+                        "field": "messages"
+                    }
+                ]
+            }
+        ]
+    }
+    
+    raw_body = json.dumps(payload, separators=(',', ':')).encode("utf-8")
+    sig = "sha256=" + hmac.new(b"my_super_secret", raw_body, hashlib.sha256).hexdigest()
+    
+    r = await client.post("/api/v1/whatsapp/webhooks", content=raw_body, headers={"X-Hub-Signature-256": sig})
+    assert r.status_code == 200
+    
+    r_bad = await client.post("/api/v1/whatsapp/webhooks", content=raw_body, headers={"X-Hub-Signature-256": "sha256=invalidhash"})
+    assert r_bad.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_monitoring_dashboard(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+    
+    r = await client.get("/api/v1/whatsapp/monitoring/dashboard", headers=data["h_admin"])
+    assert r.status_code == 200
+    res = r.json()
+    assert "connected_accounts" in res
+    assert "quality_ratings" in res
+    assert "messaging_limits" in res
+    assert "webhook_status" in res
+
+
+@pytest.mark.asyncio
+async def test_delete_whatsapp_settings(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_delete_123", webhook_token="token", webhook_verify_token="verify",
+        is_default=True
+    )
+    db.add(s)
+    await db.commit()
+
+    r = await client.delete(f"/api/v1/whatsapp/settings/{s.id}", headers=data["h_admin"])
+    assert r.status_code == 204
+
+    # Check that settings is soft deleted
+    await db.refresh(s)
+    assert s.is_deleted is True
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_manual_refresh(client: AsyncClient, setup: dict, db: AsyncSession, monkeypatch):
+    data = setup
+    from app.core.crypto import encrypt
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", business_account_id="waba_12345",
+        access_token=encrypt("EAAG_mock_ref"), webhook_token="token", webhook_verify_token="verify"
+    )
+    db.add(s)
+    await db.commit()
+
+    r = await client.post(f"/api/v1/whatsapp/settings/{s.id}/refresh", headers=data["h_admin"])
+    assert r.status_code == 200
+    assert r.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_diagnostics(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_12345", webhook_token="token", webhook_verify_token="verify",
+        webhook_url="https://localhost:8000/webhook"
+    )
+    db.add(s)
+    await db.commit()
+
+    r = await client.get(f"/api/v1/whatsapp/settings/{s.id}/diagnostics", headers=data["h_admin"])
+    assert r.status_code == 200
+    res = r.json()
+    assert res["webhook_reachable"] == "green"
+    assert "token_valid" in res
+    assert "phone_verified" in res
+    assert "graph_api_reachable" in res
+    assert "template_sync" in res
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_hourly_sync_cron(db: AsyncSession):
+    from app.cron.whatsapp_cron import run_whatsapp_hourly_sync
+    from app.core.crypto import encrypt
+    s = WhatsAppSettings(
+        organization_id=uuid.uuid4(), provider="meta",
+        phone_number_id="phone_cron_test", business_account_id="waba_cron",
+        access_token=encrypt("EAAG_mock_cron"), webhook_token="token", webhook_verify_token="verify",
+        is_active=True
+    )
+    db.add(s)
+    await db.commit()
+
+    # Stub session maker
+    class MockSession:
+        def __init__(self, db_session):
+            self.db = db_session
+        async def __aenter__(self):
+            return self.db
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    def mock_session_maker():
+        return MockSession(db)
+
+    # This should complete without exceptions
+    await run_whatsapp_hourly_sync(mock_session_maker)
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_missing_signature(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_1", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_1")
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_1", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_1"}}, "field": "messages"}]}]
+    }
+    
+    r = await client.post("/api/v1/whatsapp/webhooks", json=payload)
+    assert r.status_code == 401
+    
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    events = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_1"))).scalars().all()
+    assert len(events) == 0
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_malformed_signature(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_2", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_2")
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_2", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_2"}}, "field": "messages"}]}]
+    }
+
+    r = await client.post("/api/v1/whatsapp/webhooks", json=payload, headers={"X-Hub-Signature-256": "invalidformat123"})
+    assert r.status_code == 401
+
+    r2 = await client.post("/api/v1/whatsapp/webhooks", json=payload, headers={"X-Hub-Signature-256": "sha256="})
+    assert r2.status_code == 401
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    events = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_2"))).scalars().all()
+    assert len(events) == 0
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_invalid_signature(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_3", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_3")
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_3", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_3"}}, "field": "messages"}]}]
+    }
+
+    r = await client.post("/api/v1/whatsapp/webhooks", json=payload, headers={"X-Hub-Signature-256": "sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+    assert r.status_code == 401
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    events = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_3"))).scalars().all()
+    assert len(events) == 0
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_modified_payload(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_4", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_4")
+    db.add(s)
+    await db.commit()
+
+    payload_original = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_4", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_4"}}, "field": "messages"}]}]
+    }
+    payload_modified = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_4", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_4"}, "extra": "hacked"}, "field": "messages"}]}]
+    }
+
+    import hmac
+    import hashlib
+    import json
+    raw_body_original = json.dumps(payload_original, separators=(',', ':')).encode("utf-8")
+    sig_original = "sha256=" + hmac.new(b"sec_key_4", raw_body_original, hashlib.sha256).hexdigest()
+
+    r = await client.post("/api/v1/whatsapp/webhooks", content=json.dumps(payload_modified, separators=(',', ':')).encode("utf-8"), headers={"X-Hub-Signature-256": sig_original})
+    assert r.status_code == 401
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    events = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_4"))).scalars().all()
+    assert len(events) == 0
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_missing_tenant_secret(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_5", webhook_token="token", webhook_verify_token="verify",
+        webhook_secret_enc=None
+    )
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_5", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_5"}}, "field": "messages"}]}]
+    }
+
+    r = await client.post("/api/v1/whatsapp/webhooks", json=payload, headers={"X-Hub-Signature-256": "sha256=123456"})
+    assert r.status_code == 401
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    events = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_5"))).scalars().all()
+    assert len(events) == 0
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_valid_signature(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_6", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_6")
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "waba_sec_test_6", "changes": [{"value": {"messaging_product": "whatsapp", "metadata": {"phone_number_id": "phone_sec_test_6"}}, "field": "messages"}]}]
+    }
+
+    import hmac
+    import hashlib
+    import json
+    raw_body = json.dumps(payload, separators=(',', ':')).encode("utf-8")
+    sig = "sha256=" + hmac.new(b"sec_key_6", raw_body, hashlib.sha256).hexdigest()
+
+    r = await client.post("/api/v1/whatsapp/webhooks", content=raw_body, headers={"X-Hub-Signature-256": sig})
+    assert r.status_code == 200
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    events = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_6"))).scalars().all()
+    assert len(events) == 1
+    assert events[0].event_id == "waba_sec_test_6"
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_duplicate_event(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_7", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_7")
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "waba_sec_test_7",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {"phone_number_id": "phone_sec_test_7"},
+                    "messages": [{"from": "+919876511001", "id": "wamid.dup_1", "text": {"body": "duplicate text"}, "timestamp": "1672531199"}]
+                },
+                "field": "messages"
+            }]
+        }]
+    }
+
+    import hmac
+    import hashlib
+    import json
+    raw_body = json.dumps(payload, separators=(',', ':')).encode("utf-8")
+    sig = "sha256=" + hmac.new(b"sec_key_7", raw_body, hashlib.sha256).hexdigest()
+
+    r1 = await client.post("/api/v1/whatsapp/webhooks", content=raw_body, headers={"X-Hub-Signature-256": sig})
+    assert r1.status_code == 200
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    event = (await db.execute(select(WhatsAppWebhookEvent).filter(WhatsAppWebhookEvent.event_id == "waba_sec_test_7"))).scalars().first()
+    assert event is not None
+    event.status = "processed"
+    db.add(event)
+    await db.commit()
+
+    r2 = await client.post("/api/v1/whatsapp/webhooks", content=raw_body, headers={"X-Hub-Signature-256": sig})
+    assert r2.status_code == 200
+    assert "ignored" in r2.text or "logged" in r2.text
+
+    from app.models.whatsapp import WhatsAppMessage
+    msgs = (await db.execute(select(WhatsAppMessage).filter(WhatsAppMessage.wa_message_id == "wamid.dup_1"))).scalars().all()
+    assert len(msgs) == 1
+
+
+@pytest.mark.asyncio
+async def test_webhook_security_hardening_concurrent_duplicate_event(client: AsyncClient, setup: dict, db: AsyncSession):
+    data = setup
+    s = WhatsAppSettings(
+        organization_id=data["org"].id, provider="meta",
+        phone_number_id="phone_sec_test_8", webhook_token="token", webhook_verify_token="verify"
+    )
+    from app.core.crypto import encrypt
+    s.webhook_secret_enc = encrypt("sec_key_8")
+    db.add(s)
+    await db.commit()
+
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "waba_sec_test_8",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {"phone_number_id": "phone_sec_test_8"},
+                    "messages": [{"from": "+919876511001", "id": "wamid.concurrent_1", "text": {"body": "concurrent text"}, "timestamp": "1672531199"}]
+                },
+                "field": "messages"
+            }]
+        }]
+    }
+
+    import hmac
+    import hashlib
+    import json
+    raw_body = json.dumps(payload, separators=(',', ':')).encode("utf-8")
+    sig = "sha256=" + hmac.new(b"sec_key_8", raw_body, hashlib.sha256).hexdigest()
+
+    from app.models.whatsapp import WhatsAppWebhookEvent
+    pre_event = WhatsAppWebhookEvent(
+        organization_id=data["org"].id,
+        event_id="waba_sec_test_8",
+        event_type="messages",
+        payload=payload,
+        status="processed"
+    )
+    db.add(pre_event)
+    await db.commit()
+
+    from app.services.whatsapp_service import WhatsAppService
+    service = WhatsAppService(db)
+    res = await service.handle_webhook(payload, sig, raw_body)
+    assert res["status"] == "ignored"
+    assert "Duplicate" in res["reason"]

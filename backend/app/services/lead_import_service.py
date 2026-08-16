@@ -175,10 +175,10 @@ BUSINESS_TEMPLATES: Dict[str, Dict[str, Any]] = {
 
 
 class LeadImportService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, organization_id: uuid.UUID):
         self.db = db
         self.import_repo = LeadImportRepository(db)
-        self.lead_repo = LeadRepository(db)
+        self.lead_repo = LeadRepository(db, organization_id)
         self.user_repo = UserRepository(db)
         self.assignment_service = AssignmentService(db)
         self.audit_service = AuditService(db)
@@ -485,7 +485,7 @@ class LeadImportService:
 
         # Define email check function for validation engine
         async def check_existing_email(email: str) -> bool:
-            dup = await self.lead_repo.get_lead_by_email(actor.organization_id, email)
+            dup = await self.lead_repo.get_lead_by_email(email)
             return dup is not None
 
         # 2. Use Validation Engine to validate all rows
@@ -531,6 +531,27 @@ class LeadImportService:
 
         if not stage_id:
             # Seed default stages if they don't exist
+            from app.models.pipeline import Pipeline
+            
+            # Fetch or create default pipeline
+            p_query = select(Pipeline).filter(
+                Pipeline.organization_id == actor.organization_id,
+                Pipeline.is_default == True,
+                Pipeline.is_deleted == False
+            )
+            p_res = await self.db.execute(p_query)
+            pipeline = p_res.scalar()
+            if not pipeline:
+                pipeline = Pipeline(
+                    organization_id=actor.organization_id,
+                    name="Default Pipeline",
+                    description="Primary Sales Pipeline",
+                    is_default=True,
+                    is_active=True
+                )
+                self.db.add(pipeline)
+                await self.db.flush()
+
             stages = [
                 ("Fresh Leads", 1, True),
                 ("Contacted", 2, False),
@@ -541,6 +562,7 @@ class LeadImportService:
             for name, pos, is_default in stages:
                 stage = PipelineStage(
                     organization_id=actor.organization_id,
+                    pipeline_id=pipeline.id,
                     name=name,
                     order_position=pos,
                     is_system_default=is_default
@@ -551,6 +573,15 @@ class LeadImportService:
             # Refetch
             res = await self.db.execute(stage_query)
             stage_id = res.scalar()
+
+        # Load importable custom-field definitions once, so mapped custom columns
+        # can be routed into lead.custom_fields with the same validation the
+        # create/update paths use.
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import MetadataValidationEngine, MetadataValidationError
+        all_definitions = await CustomFieldService(self.db).list_definitions(actor, "lead")
+        import_definitions = [d for d in all_definitions if d.is_active and d.importable]
+        custom_keys = {d.key for d in import_definitions}
 
         # Insert valid rows
         imported_leads = []
@@ -585,6 +616,34 @@ class LeadImportService:
                 import_id=import_record.id,
                 stage_id=stage_id
             )
+
+            # Route mapped custom-field columns into custom_fields (validated).
+            if import_definitions:
+                custom_payload: Dict[str, Any] = {}
+                for ck in custom_keys:
+                    col = column_mapping.get(ck)
+                    if not col:
+                        continue
+                    raw_val = (raw_row.get(col, "") or "").strip()
+                    if raw_val != "":
+                        custom_payload[ck] = raw_val
+                try:
+                    sanitized_cf = await MetadataValidationEngine.validate_and_sanitize(
+                        self.db, Lead, actor.organization_id, import_definitions, custom_payload
+                    )
+                    if sanitized_cf:
+                        lead_obj.custom_fields = sanitized_cf
+                except MetadataValidationError as cf_err:
+                    reason = f"Custom field error: {cf_err}"
+                    errors_log.append({
+                        "row": item["row_index"],
+                        "email": mapped_values.get("email") or None,
+                        "reason": reason,
+                    })
+                    csv_writer.writerow([raw_row.get(h, "") for h in headers] + [reason])
+                    fail_count += 1
+                    continue
+
             self.db.add(lead_obj)
             imported_leads.append(lead_obj)
             success_count += 1

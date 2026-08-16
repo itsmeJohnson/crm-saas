@@ -72,6 +72,27 @@ class ContactService:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
+        # Block duplicate patients (same phone/email) unless explicitly overridden.
+        # `allow_duplicate` is a control flag, not a column — pop before persisting.
+        allow_duplicate = contact_data.pop("allow_duplicate", False)
+        if not allow_duplicate and (contact_data.get("email") or contact_data.get("phone")):
+            dupes = await self.contact_repo.find_duplicates(
+                actor.organization_id,
+                email=contact_data.get("email"),
+                phone=contact_data.get("phone"),
+            )
+            if dupes:
+                existing = dupes[0]
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "message": (f"A patient with this phone/email already exists: "
+                                    f"{existing.first_name} {existing.last_name}. "
+                                    f"Set allow_duplicate to create anyway."),
+                        "existing_id": str(existing.id),
+                    },
+                )
+
         # Validate company reference
         company_id = contact_data.get("company_id")
         if company_id:

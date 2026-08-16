@@ -20,6 +20,11 @@ export const PortalPlans: React.FC = () => {
 
   useEffect(() => {
     fetchPlans();
+    // Refetch when the tab regains focus so SuperAdmin price/plan changes show
+    // up without a manual reload.
+    const onFocus = () => fetchPlans();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   const fetchPlans = async () => {
@@ -192,7 +197,11 @@ export const PortalPlans: React.FC = () => {
       {/* Plans Comparison Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
         {plans.map((plan) => {
-          const monthlyRate = getCycleMonthlyRate(plan);
+          const baseMonthlyRate = getCycleMonthlyRate(plan);
+          // A plan's promotional discount applies to the effective (charged) rate.
+          const planDiscount = Number(plan.discount_percentage) || 0;
+          const monthlyRate = planDiscount > 0 ? baseMonthlyRate * (1 - planDiscount / 100) : baseMonthlyRate;
+          const hasDiscount = planDiscount > 0 && monthlyRate < baseMonthlyRate;
           const isPopular = plan.popular_plan;
           const isRecommended = plan.recommended_plan;
           const isCurrent = !!subscription && String(subscription.plan_id) === String(plan.id);
@@ -229,9 +238,15 @@ export const PortalPlans: React.FC = () => {
 
                 {/* Price Display */}
                 <div className="py-2 space-y-1">
-                  <div className="flex items-baseline gap-1">
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
                     <span className="text-2xl font-bold text-slate-100">₹{monthlyRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    {hasDiscount && (
+                      <span className="text-sm text-slate-500 line-through">₹{baseMonthlyRate.toLocaleString('en-IN')}</span>
+                    )}
                     <span className="text-[10px] text-slate-500 font-medium">/ seat / mo</span>
+                    {hasDiscount && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold uppercase tracking-wide">{Math.round(planDiscount)}% OFF</span>
+                    )}
                   </div>
                   {billingCycle !== 'monthly' && (
                     <p className="text-[9px] text-amber-400 font-semibold">
@@ -322,7 +337,9 @@ export const PortalPlans: React.FC = () => {
       {selectedPlan && (() => {
         const scheduled = willBeScheduled(selectedPlan);
         const currentSeatCount = subscription ? Math.max(subscription.users_purchased, selectedPlan.minimum_users) : selectedPlan.minimum_users;
-        const ratePerSeatPerMonth = getCycleMonthlyRate(selectedPlan);
+        const baseRatePerSeat = getCycleMonthlyRate(selectedPlan);
+        const selDiscount = Number(selectedPlan.discount_percentage) || 0;
+        const ratePerSeatPerMonth = selDiscount > 0 ? baseRatePerSeat * (1 - selDiscount / 100) : baseRatePerSeat;
         const tierPrice = ratePerSeatPerMonth * currentSeatCount * cycleMonths;
         const setupCharges = parseFloat(selectedPlan.setup_charges || 0.0);
         const gstAmount = tierPrice * 0.18;

@@ -44,6 +44,17 @@ async def list_users(
 
 # ── Static paths MUST come before /{user_id} to avoid shadowing ──────────────
 
+@router.get("/assignable", response_model=List[UserResponse])
+async def list_assignable_users(
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Users the actor may assign leads to / transfer from — org-wide (all roles)
+    for Managers/Admins, downline + self for Team Leaders. Powers the transfer
+    and bulk-assign pickers so the assign option is always available."""
+    return list(await UserService(db).list_assignable_users(actor))
+
+
 @router.get("/seat-utilization", response_model=SeatUtilizationResponse)
 async def get_seat_utilization(
     actor: Annotated[User, Depends(require_tl_or_above)],

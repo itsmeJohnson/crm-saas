@@ -59,10 +59,13 @@ class OrderResponse(BaseModel):
 
 # --- Invoices ---
 class InvoiceCreate(BaseModel):
-    company_id: uuid.UUID
+    # Either company_id or contact_id must be supplied. For patient-centric
+    # (dental) invoicing you can pass just the patient (contact_id) and the
+    # server resolves/creates the billing company automatically.
+    company_id: uuid.UUID | None = None
     contact_id: uuid.UUID | None = None
     order_id: uuid.UUID | None = None
-    currency: str = Field("USD", max_length=10)
+    currency: str | None = Field(None, max_length=10)  # None -> use tenant invoice settings currency
     issue_date: datetime | None = None
     due_date: datetime | None = None
     items: list[LineItem] = []
@@ -116,6 +119,10 @@ class PaymentCreate(BaseModel):
     reference: str | None = Field(None, max_length=120)
     paid_at: datetime | None = None
     notes: str | None = None
+    # By default a payment cannot exceed the invoice's outstanding balance
+    # (guards against negative balance_due / corrupted AR). Set true to
+    # deliberately record an overpayment (e.g. an advance / credit on account).
+    allow_overpayment: bool = False
 
 class PaymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

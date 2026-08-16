@@ -132,9 +132,9 @@ async def test_contact_service_cross_tenant(db: AsyncSession, setup_service_data
 @pytest.mark.asyncio
 async def test_cascading_soft_deletes(db: AsyncSession, setup_service_data: dict):
     data = setup_service_data
-    lead_service = LeadService(db)
-    activity_service = ActivityService(db)
-    note_service = NoteService(db)
+    lead_service = LeadService(db, data["org_a"].id)
+    activity_service = ActivityService(db, data["org_a"].id)
+    note_service = NoteService(db, data["org_a"].id)
 
     # 1. Create a lead
     lead = await lead_service.create_lead(
@@ -186,7 +186,7 @@ async def test_cascading_soft_deletes(db: AsyncSession, setup_service_data: dict
 @pytest.mark.asyncio
 async def test_note_validation(db: AsyncSession, setup_service_data: dict):
     data = setup_service_data
-    note_service = NoteService(db)
+    note_service = NoteService(db, data["org_a"].id)
 
     # Try creating note with no entity linked (should fail)
     with pytest.raises(HTTPException) as exc_info:
