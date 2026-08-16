@@ -59,6 +59,22 @@ object DentalColors {
     val StatusImplantBg = Color(0xFFE0F2FE)
     val StatusMissing = Color(0xFF94A3B8) // Muted gray
     val StatusMissingBg = Color(0xFFF1F5F9)
+
+    // Vibrant Avatar Tint Palette (for contacts & leads)
+    val AvatarColors = listOf(
+        Color(0xFF0D9488) to Color(0xFFCCFBF1), // Teal
+        Color(0xFF0284C7) to Color(0xFFE0F2FE), // Blue
+        Color(0xFF6366F1) to Color(0xFFEEF2FF), // Indigo
+        Color(0xFF8B5CF6) to Color(0xFFEDE9FE), // Purple
+        Color(0xFFEC4899) to Color(0xFFFCE7F3), // Pink
+        Color(0xFFF59E0B) to Color(0xFFFEF3C7), // Amber
+        Color(0xFF10B981) to Color(0xFFD1FAE5), // Emerald
+    )
+
+    fun getAvatarColor(name: String): Pair<Color, Color> {
+        val hash = kotlin.math.abs(name.hashCode())
+        return AvatarColors[hash % AvatarColors.size]
+    }
 }
 
 private val LightColors = lightColorScheme(

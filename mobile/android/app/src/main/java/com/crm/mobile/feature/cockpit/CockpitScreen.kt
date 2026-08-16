@@ -3,14 +3,18 @@ package com.crm.mobile.feature.cockpit
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -22,12 +26,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crm.mobile.core.design.DentalColors
+import com.crm.mobile.core.util.PhoneActions
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,10 +67,10 @@ data class CockpitForm(
 )
 
 data class CockpitUiState(
-    val loading: Boolean = true,
-    val saving: Boolean = false,
+    val loading: Boolean = false,
     val calling: Boolean = false,
     val callMessage: String? = null,
+    val saving: Boolean = false,
     val error: String? = null,
     val form: CockpitForm = CockpitForm(),
 )
@@ -79,43 +86,50 @@ class CockpitViewModel @Inject constructor(
     val stages: StateFlow<List<Stage>> =
         repo.stages.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _ui = MutableStateFlow(CockpitUiState())
+    private val _ui = MutableStateFlow(CockpitUiState(loading = true))
     val ui: StateFlow<CockpitUiState> = _ui.asStateFlow()
 
     init {
-        viewModelScope.launch { repo.refreshStages() }
         loadNext()
+        viewModelScope.launch { repo.refreshStages() }
     }
 
     fun loadNext() {
-        _ui.update { it.copy(loading = true, error = null, callMessage = null, form = CockpitForm()) }
+        _ui.update { it.copy(loading = true, error = null, form = CockpitForm(), callMessage = null) }
         viewModelScope.launch {
-            repo.nextLead().onSuccess { l ->
-                _lead.value = l
-                _ui.update { it.copy(loading = false) }
-            }.onFailure { e ->
-                _ui.update { it.copy(loading = false, error = e.toUserMessage()) }
-            }
+            repo.nextLead()
+                .onSuccess { l ->
+                    _lead.value = l
+                    _ui.update { it.copy(loading = false) }
+                }
+                .onFailure { e ->
+                    _ui.update { it.copy(loading = false, error = e.toUserMessage()) }
+                }
         }
     }
 
     fun placeCall() {
-        val id = _lead.value?.id ?: return
-        _ui.update { it.copy(calling = true, callMessage = null) }
+        val id = lead.value?.id ?: return
+        _ui.update { it.copy(calling = true, error = null) }
         viewModelScope.launch {
             val res = repo.call(id)
-            _ui.update { it.copy(calling = false, callMessage = res.message ?: "Call started") }
+            if (res.ok) {
+                _ui.update { it.copy(calling = false, callMessage = "Call initiated via telephony provider.") }
+            } else {
+                _ui.update { it.copy(calling = false, error = res.message ?: "Calling failed.") }
+            }
         }
     }
 
-    fun update(transform: (CockpitForm) -> CockpitForm) =
-        _ui.update { it.copy(form = transform(it.form), error = null) }
+    fun update(block: (CockpitForm) -> CockpitForm) {
+        _ui.update { it.copy(form = block(it.form), error = null) }
+    }
 
     fun save() {
-        val id = _lead.value?.id ?: return
+        val id = lead.value?.id ?: return
         val f = _ui.value.form
         val status = f.status ?: return _ui.update { it.copy(error = "Pick an outcome first.") }
-        if (f.remarks.isBlank()) return _ui.update { it.copy(error = "Remarks are required.") }
+
         if (status in STAGE_REQUIRED && f.stageId == null)
             return _ui.update { it.copy(error = "Select a pipeline stage for this outcome.") }
         if (status == FOLLOW_UP && f.whenPreset == null)
@@ -151,6 +165,7 @@ class CockpitViewModel @Inject constructor(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CockpitScreen(onMessage: (String) -> Unit = {}, vm: CockpitViewModel = hiltViewModel()) {
+    val context = LocalContext.current
     val lead by vm.lead.collectAsStateWithLifecycle()
     val stages by vm.stages.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -179,15 +194,53 @@ fun CockpitScreen(onMessage: (String) -> Unit = {}, vm: CockpitViewModel = hiltV
                 }
             }
 
-            Button(onClick = vm::placeCall, enabled = !ui.calling, modifier = Modifier.fillMaxWidth()) {
-                Text(if (ui.calling) "Calling…" else "Call customer")
-            }
-            ui.callMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            OutlinedButton(onClick = { onMessage(l.id) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Message (SMS / WhatsApp / Email)")
+            // 1-Tap SIM Call & WhatsApp actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = {
+                        PhoneActions.launchDialer(context, l.phone)
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DentalColors.Teal700
+                    ),
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("📞 SIM Call", fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = {
+                        PhoneActions.launchWhatsApp(
+                            context,
+                            l.phone,
+                            "Hello ${l.name}, following up regarding your enquiry: ${l.title}"
+                        )
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DentalColors.Teal600
+                    ),
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("💬 WhatsApp", fontWeight = FontWeight.Bold)
+                }
             }
 
-            SectionLabel("Outcome")
+            OutlinedButton(
+                onClick = vm::placeCall,
+                enabled = !ui.calling,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().height(40.dp)
+            ) {
+                Text(if (ui.calling) "Cloud Calling…" else "☁️ Cloud Telephony Call")
+            }
+            ui.callMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+
+            SectionLabel("Outcome / Disposition")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OUTBOUND_DISPOSITIONS.forEach { d ->
                     FilterChip(selected = ui.form.status == d, onClick = { vm.update { it.copy(status = d) } },

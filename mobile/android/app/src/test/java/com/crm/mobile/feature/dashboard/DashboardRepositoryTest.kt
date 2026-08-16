@@ -34,8 +34,8 @@ class DashboardRepositoryTest {
         }
         override suspend fun recentActivities(limit: Int) =
             RecentActivitiesDto(listOf(RecentActivityDto("a1", "Call", "Called Amit", "Completed", "2026-07-26T09:00:00Z")))
-        override suspend fun clockIn() = Unit
-        override suspend fun clockOut() = Unit
+        override suspend fun clockIn(body: ClockBody) = Unit
+        override suspend fun clockOut(body: ClockBody) = Unit
     }
 
     @Test

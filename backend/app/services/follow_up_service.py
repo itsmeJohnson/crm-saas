@@ -66,7 +66,7 @@ class FollowUpService:
     async def _get_lead_scoped(self, actor: User, lead_id: uuid.UUID) -> Lead:
         # reuse LeadService's ownership/scoping + 404 semantics
         from app.services.lead_service import LeadService
-        return await LeadService(self.db).get_lead(actor, lead_id)
+        return await LeadService(self.db, actor.organization_id).get_lead(actor, lead_id)
 
     async def _manager_of(self, owner_id: uuid.UUID) -> uuid.UUID | None:
         row = (await self.db.execute(select(User.reporting_to_id).filter(

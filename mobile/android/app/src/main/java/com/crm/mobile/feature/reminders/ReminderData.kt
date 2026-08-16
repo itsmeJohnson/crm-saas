@@ -48,9 +48,23 @@ data class ReminderDto(
 @JsonClass(generateAdapter = true)
 data class ReminderPatch(val remind_at: String)
 
+@JsonClass(generateAdapter = true)
+data class ReminderCreateReq(
+    val title: String,
+    val description: String? = null,
+    val priority: String = "Medium",
+    val status: String = "Pending",
+    val remind_at: String? = null,
+    val due_date: String? = null,
+    val lead_id: String? = null,
+)
+
 interface ReminderApi {
     @GET("tasks/")
     suspend fun list(@HttpQuery("limit") limit: Int = 200): List<ReminderDto>
+
+    @POST("tasks/")
+    suspend fun create(@Body body: ReminderCreateReq): ReminderDto
 
     @PATCH("tasks/{id}")
     suspend fun patch(@Path("id") id: String, @Body body: ReminderPatch): ReminderDto
@@ -163,6 +177,26 @@ class ReminderRepository @Inject constructor(
     suspend fun snooze(id: String, newRemindAtMillis: Long): Boolean = runCatching {
         api.patch(id, ReminderPatch(remind_at = Instant.ofEpochMilli(newRemindAtMillis).toString()))
         refresh(); true
+    }.getOrDefault(false)
+
+    suspend fun create(
+        title: String,
+        description: String? = null,
+        priority: String = "Medium",
+        remindAtIso: String,
+        leadId: String? = null
+    ): Boolean = runCatching {
+        val dto = api.create(ReminderCreateReq(
+            title = title,
+            description = description,
+            priority = priority,
+            status = "Pending",
+            remind_at = remindAtIso,
+            due_date = remindAtIso,
+            lead_id = leadId
+        ))
+        dao.upsertAll(listOf(dto.toEntity()))
+        true
     }.getOrDefault(false)
 
     suspend fun complete(id: String): Boolean =

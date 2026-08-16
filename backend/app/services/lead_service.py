@@ -15,9 +15,9 @@ from app.models.user import User
 from app.models.lead import Lead
 
 class LeadService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, organization_id: uuid.UUID):
         self.db = db
-        self.lead_repo = LeadRepository(db)
+        self.lead_repo = LeadRepository(db, organization_id)
         self.user_repo = UserRepository(db)
         self.activity_repo = ActivityRepository(db)
         self.note_repo = NoteRepository(db)
@@ -28,7 +28,7 @@ class LeadService:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
-        lead = await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+        lead = await self.lead_repo.get_lead_by_id(lead_id)
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
 
@@ -115,7 +115,7 @@ class LeadService:
                 priority=lead_data.get("priority"),
             )
 
-            lead = await self.lead_repo.create_lead(actor.organization_id, lead_data, actor.id)
+            lead = await self.lead_repo.create_lead(lead_data, actor.id)
 
             await self.audit_service.log_event(
                 organization_id=actor.organization_id,
@@ -149,7 +149,7 @@ class LeadService:
             pass
 
         await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_by_id(actor.organization_id, lead.id)
+        return await self.lead_repo.get_lead_by_id(lead.id)
 
     async def _resolve_scope(self, actor: User) -> set[uuid.UUID] | None:
         """Return the set of user ids whose leads the actor may see, or None for org-wide."""
@@ -236,7 +236,7 @@ class LeadService:
                 )
 
         return await self.lead_repo.paginate_leads(
-            actor.organization_id, skip, limit, search_query, status_filter, assigned_user_id, name, city,
+            skip, limit, search_query, status_filter, assigned_user_id, name, city,
             allowed_user_ids, source=source, stage_id=stage_id, priority=priority,
             min_value=min_value, max_value=max_value, created_from=created_from,
             created_to=created_to, include_archived=include_archived,
@@ -249,7 +249,7 @@ class LeadService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
         allowed_user_ids = await self._resolve_scope(actor)
         return await self.lead_repo.stream_leads_for_export(
-            actor.organization_id, allowed_user_ids=allowed_user_ids, **filters
+            allowed_user_ids=allowed_user_ids, **filters
         )
 
     async def find_duplicates(
@@ -265,7 +265,7 @@ class LeadService:
                 detail="Provide an email or phone to search for duplicates"
             )
         candidates = await self.lead_repo.find_duplicates(
-            actor.organization_id, email=email, phone=phone, exclude_lead_id=exclude_lead_id
+            email=email, phone=phone, exclude_lead_id=exclude_lead_id
         )
         # Apply visibility scoping for non-admins
         allowed_user_ids = await self._resolve_scope(actor)
@@ -290,13 +290,13 @@ class LeadService:
                 resource_id=str(lead_id),
             )
             await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_any_state(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_any_state(lead_id)
 
     async def restore_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         """Un-archive and/or un-delete a lead."""
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
-        lead = await self.lead_repo.get_lead_any_state(actor.organization_id, lead_id)
+        lead = await self.lead_repo.get_lead_any_state(lead_id)
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
         # Scope check for non-admins
@@ -322,7 +322,7 @@ class LeadService:
             resource_id=str(lead_id),
         )
         await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_any_state(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_any_state(lead_id)
 
     async def bulk_update(self, actor: User, lead_ids: list[uuid.UUID], fields: dict) -> dict:
         """Apply the same field updates to many scoped leads at once."""
@@ -361,7 +361,7 @@ class LeadService:
                 )
 
         allowed_user_ids = await self._resolve_scope(actor)
-        leads = await self.lead_repo.get_leads_for_update(actor.organization_id, lead_ids)
+        leads = await self.lead_repo.get_leads_for_update(lead_ids)
 
         updated_ids = []
         reassigned_count = 0
@@ -463,7 +463,7 @@ class LeadService:
             # that don't touch these fields are unaffected).
             await self._validate_org_references(actor, lead_data)
 
-            updated = await self.lead_repo.update_lead(actor.organization_id, lead_id, lead_data)
+            updated = await self.lead_repo.update_lead(lead_id, lead_data)
 
             # Recompute score if any scoring-relevant field changed
             if {"email", "phone", "company_name", "value", "source", "priority"} & set(lead_data.keys()):
@@ -505,7 +505,7 @@ class LeadService:
             )
 
         await DashboardService.invalidate_cache(actor.organization_id)
-        return await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_by_id(lead_id)
 
     async def soft_delete_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         if not actor.is_active:
@@ -513,7 +513,7 @@ class LeadService:
 
         lead = await self.get_lead(actor, lead_id)
 
-        deleted = await self.lead_repo.soft_delete_lead(actor.organization_id, lead_id)
+        deleted = await self.lead_repo.soft_delete_lead(lead_id)
 
         # Cascade soft-delete activities and notes
         await self.activity_repo.soft_delete_by_parent(actor.organization_id, "lead", lead_id)
@@ -776,7 +776,7 @@ class LeadService:
         )
         self.db.add(lead)
         await self.db.flush()
-        return await self.lead_repo.get_lead_by_id(actor.organization_id, lead_id)
+        return await self.lead_repo.get_lead_by_id(lead_id)
 
     async def get_timeline(self, actor: User, lead_id: uuid.UUID) -> list[dict]:
         """Merge notes, activities, and audit events for a lead into one chronological feed."""

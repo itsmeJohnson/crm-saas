@@ -59,6 +59,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    from app.core.tenant_context import TenantContext
+    TenantContext.set_tenant_id(user.organization_id)
+
     return user
 
 async def get_current_active_user(

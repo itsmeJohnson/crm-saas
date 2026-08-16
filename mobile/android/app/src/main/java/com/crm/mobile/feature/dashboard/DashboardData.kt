@@ -149,12 +149,10 @@ class DashboardRepository @Inject constructor(
         val recent = runCatching { api.recentActivities().items }.getOrDefault(emptyList())
         dao.upsert(s.toEntity(recent, activitiesAdapter))
         true
-    }.onFailure {
-        Log.e("DashboardRepo", "Refresh failed", it)
     }.getOrDefault(false)
 
-    suspend fun clockIn(): Boolean = runCatching { api.clockIn(); refresh(); true }.onFailure { Log.e("DashboardRepo", "Clock in failed", it) }.getOrDefault(false)
-    suspend fun clockOut(): Boolean = runCatching { api.clockOut(); refresh(); true }.onFailure { Log.e("DashboardRepo", "Clock out failed", it) }.getOrDefault(false)
+    suspend fun clockIn(): Boolean = runCatching { api.clockIn(); refresh(); true }.getOrDefault(false)
+    suspend fun clockOut(): Boolean = runCatching { api.clockOut(); refresh(); true }.getOrDefault(false)
 }
 
 private fun EmployeeSummaryDto.toEntity(

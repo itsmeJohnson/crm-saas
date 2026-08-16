@@ -718,20 +718,30 @@ class WhatsAppService:
 
         org_id = s.organization_id
 
-        # Webhook signature validation (if secret is configured in setting)
-        if signature and s.webhook_secret_enc:
-            decrypted_secret = decrypt(s.webhook_secret_enc)
-            if decrypted_secret:
-                import hmac
-                import hashlib
-                body_bytes = raw_body if raw_body is not None else json.dumps(payload, separators=(',', ':')).encode("utf-8")
-                expected_sig = "sha256=" + hmac.new(
-                    decrypted_secret.encode("utf-8"),
-                    body_bytes,
-                    hashlib.sha256
-                ).hexdigest()
-                if not hmac.compare_digest(expected_sig, signature):
-                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+        # Webhook signature validation - strictly enforced for registered tenants
+        if not signature or not signature.startswith("sha256="):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+
+        if not s.webhook_secret_enc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+
+        decrypted_secret = decrypt(s.webhook_secret_enc)
+        if not decrypted_secret:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+
+        if not raw_body:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+
+        import hmac
+        import hashlib
+        expected_sig = "sha256=" + hmac.new(
+            decrypted_secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_sig, signature):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
 
         # Idempotency checks
         from app.repositories.whatsapp_repository import WhatsAppWebhookEventRepository
@@ -740,17 +750,24 @@ class WhatsAppService:
         if existing_event and existing_event.status == "processed":
             return {"status": "ignored", "reason": "Duplicate webhook event ID."}
 
+        from sqlalchemy.exc import IntegrityError
+
         # Log event as pending in DB if not existing, or update it
         if not existing_event:
-            event = WhatsAppWebhookEvent(
-                organization_id=org_id,
-                event_id=event_id,
-                event_type="messages" if "messages" in str(payload) else "statuses",
-                payload=payload,
-                status="pending"
-            )
-            self.db.add(event)
-            await self.db.flush()
+            try:
+                async with self.db.begin_nested():
+                    event = WhatsAppWebhookEvent(
+                        organization_id=org_id,
+                        event_id=event_id,
+                        event_type="messages" if "messages" in str(payload) else "statuses",
+                        payload=payload,
+                        status="pending"
+                    )
+                    self.db.add(event)
+                    await self.db.flush()
+            except IntegrityError:
+                # Concurrent duplicate event registered at DB level
+                return {"status": "ignored", "reason": "Duplicate webhook event ID."}
         else:
             event = existing_event
 

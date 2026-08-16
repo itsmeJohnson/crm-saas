@@ -175,10 +175,10 @@ BUSINESS_TEMPLATES: Dict[str, Dict[str, Any]] = {
 
 
 class LeadImportService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, organization_id: uuid.UUID):
         self.db = db
         self.import_repo = LeadImportRepository(db)
-        self.lead_repo = LeadRepository(db)
+        self.lead_repo = LeadRepository(db, organization_id)
         self.user_repo = UserRepository(db)
         self.assignment_service = AssignmentService(db)
         self.audit_service = AuditService(db)
@@ -485,7 +485,7 @@ class LeadImportService:
 
         # Define email check function for validation engine
         async def check_existing_email(email: str) -> bool:
-            dup = await self.lead_repo.get_lead_by_email(actor.organization_id, email)
+            dup = await self.lead_repo.get_lead_by_email(email)
             return dup is not None
 
         # 2. Use Validation Engine to validate all rows

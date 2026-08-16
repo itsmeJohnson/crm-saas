@@ -4,20 +4,20 @@ from typing import Sequence, Tuple
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.lead import Lead
-from app.repositories.base import BaseRepository
+from app.repositories.base import TenantRepository
 
-class LeadRepository(BaseRepository[Lead]):
-    def __init__(self, db: AsyncSession):
-        super().__init__(Lead, db)
+class LeadRepository(TenantRepository[Lead]):
+    def __init__(self, db: AsyncSession, organization_id: uuid.UUID):
+        super().__init__(Lead, db, organization_id)
 
-    async def create_lead(self, organization_id: uuid.UUID, lead_data: dict, created_by: uuid.UUID) -> Lead:
-        lead_data["organization_id"] = organization_id
+    async def create_lead(self, lead_data: dict, created_by: uuid.UUID) -> Lead:
+        lead_data["organization_id"] = self.organization_id
         lead_data["created_by"] = created_by
 
         if "stage_id" not in lead_data or not lead_data["stage_id"]:
             from app.models.pipeline import PipelineStage
             stage_query = select(PipelineStage.id).filter(
-                PipelineStage.organization_id == organization_id,
+                PipelineStage.organization_id == self.organization_id,
                 PipelineStage.is_system_default == True,
                 PipelineStage.is_deleted == False
             ).limit(1)
@@ -26,7 +26,7 @@ class LeadRepository(BaseRepository[Lead]):
 
             if not stage_id:
                 stage_query_fallback = select(PipelineStage.id).filter(
-                    PipelineStage.organization_id == organization_id,
+                    PipelineStage.organization_id == self.organization_id,
                     PipelineStage.is_deleted == False
                 ).order_by(PipelineStage.order_position).limit(1)
                 res_fallback = await self.db.execute(stage_query_fallback)
@@ -40,20 +40,20 @@ class LeadRepository(BaseRepository[Lead]):
         refetched_res = await self.db.execute(refetched_query)
         return refetched_res.scalar_one()
 
-    async def get_lead_by_id(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
+    async def get_lead_by_id(self, lead_id: uuid.UUID) -> Lead | None:
         from sqlalchemy.orm import selectinload
         query = select(self.model).options(selectinload(self.model.stage)).filter(
             self.model.id == lead_id,
-            self.model.organization_id == organization_id,
+            self.model.organization_id == self.organization_id,
             self.model.is_deleted == False
         )
         result = await self.db.execute(query)
         return result.scalars().first()
 
-    async def get_lead_by_email(self, organization_id: uuid.UUID, email: str) -> Lead | None:
+    async def get_lead_by_email(self, email: str) -> Lead | None:
         query = select(self.model).filter(
             self.model.email == email,
-            self.model.organization_id == organization_id,
+            self.model.organization_id == self.organization_id,
             self.model.is_deleted == False
         )
         result = await self.db.execute(query)
@@ -62,7 +62,6 @@ class LeadRepository(BaseRepository[Lead]):
     def _apply_lead_filters(
         self,
         query,
-        organization_id: uuid.UUID,
         search_query: str | None = None,
         status: str | None = None,
         assigned_user_id: uuid.UUID | None = None,
@@ -81,7 +80,7 @@ class LeadRepository(BaseRepository[Lead]):
     ):
         """Apply the shared lead filter predicates. Used by both listing and export."""
         query = query.filter(
-            self.model.organization_id == organization_id,
+            self.model.organization_id == self.organization_id,
             self.model.is_deleted == False
         )
 
@@ -156,7 +155,6 @@ class LeadRepository(BaseRepository[Lead]):
 
     async def paginate_leads(
         self,
-        organization_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
         search_query: str | None = None,
@@ -177,7 +175,7 @@ class LeadRepository(BaseRepository[Lead]):
         custom_filters: dict | None = None,
     ) -> Tuple[Sequence[Lead], int]:
         query = self._apply_lead_filters(
-            select(self.model), organization_id, search_query, status, assigned_user_id,
+            select(self.model), search_query, status, assigned_user_id,
             name, city, allowed_user_ids, source, stage_id, priority, min_value, max_value,
             created_from, created_to, include_archived, custom_filters=custom_filters
         )
@@ -201,7 +199,6 @@ class LeadRepository(BaseRepository[Lead]):
 
     async def stream_leads_for_export(
         self,
-        organization_id: uuid.UUID,
         allowed_user_ids: set[uuid.UUID] | None = None,
         max_rows: int = 50000,
         **filters,
@@ -209,7 +206,7 @@ class LeadRepository(BaseRepository[Lead]):
         """Fetch leads matching filters for export, capped at max_rows."""
         from sqlalchemy.orm import selectinload
         query = self._apply_lead_filters(
-            select(self.model), organization_id, allowed_user_ids=allowed_user_ids, **filters
+            select(self.model), allowed_user_ids=allowed_user_ids, **filters
         )
         query = query.options(selectinload(self.model.stage)).order_by(self.model.created_at.desc()).limit(max_rows)
         result = await self.db.execute(query)
@@ -217,7 +214,6 @@ class LeadRepository(BaseRepository[Lead]):
 
     async def find_duplicates(
         self,
-        organization_id: uuid.UUID,
         email: str | None = None,
         phone: str | None = None,
         exclude_lead_id: uuid.UUID | None = None,
@@ -233,7 +229,7 @@ class LeadRepository(BaseRepository[Lead]):
 
         from sqlalchemy.orm import selectinload
         query = select(self.model).options(selectinload(self.model.stage)).filter(
-            self.model.organization_id == organization_id,
+            self.model.organization_id == self.organization_id,
             self.model.is_deleted == False,
             or_(*match_clauses)
         )
@@ -243,29 +239,29 @@ class LeadRepository(BaseRepository[Lead]):
         return result.scalars().all()
 
     async def get_leads_for_update(
-        self, organization_id: uuid.UUID, lead_ids: list[uuid.UUID]
+        self, lead_ids: list[uuid.UUID]
     ) -> Sequence[Lead]:
         """Fetch a set of non-deleted leads by id with row locks for bulk mutation."""
         query = select(self.model).filter(
             self.model.id.in_(lead_ids),
-            self.model.organization_id == organization_id,
+            self.model.organization_id == self.organization_id,
             self.model.is_deleted == False
         ).with_for_update().order_by(self.model.id)
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_lead_any_state(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
+    async def get_lead_any_state(self, lead_id: uuid.UUID) -> Lead | None:
         """Fetch a lead regardless of soft-delete/archived state (for restore flows)."""
         from sqlalchemy.orm import selectinload
         query = select(self.model).options(selectinload(self.model.stage)).filter(
             self.model.id == lead_id,
-            self.model.organization_id == organization_id
+            self.model.organization_id == self.organization_id
         )
         result = await self.db.execute(query)
         return result.scalars().first()
 
-    async def update_lead(self, organization_id: uuid.UUID, lead_id: uuid.UUID, lead_data: dict) -> Lead | None:
-        lead = await self.get_lead_by_id(organization_id, lead_id)
+    async def update_lead(self, lead_id: uuid.UUID, lead_data: dict) -> Lead | None:
+        lead = await self.get_lead_by_id(lead_id)
         if not lead:
             return None
         updated_lead = await self.update(lead, lead_data)
@@ -274,8 +270,8 @@ class LeadRepository(BaseRepository[Lead]):
         refetched_res = await self.db.execute(refetched_query)
         return refetched_res.scalar_one()
 
-    async def soft_delete_lead(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
-        lead = await self.get_lead_by_id(organization_id, lead_id)
+    async def soft_delete_lead(self, lead_id: uuid.UUID) -> Lead | None:
+        lead = await self.get_lead_by_id(lead_id)
         if not lead:
             return None
         lead.is_deleted = True

@@ -21,7 +21,7 @@ class LeadRepositoryTest {
 
     private class FakeDao(private var stored: MutableList<LeadEntity> = mutableListOf()) : LeadDao {
         var upserted: List<LeadEntity>? = null
-        override fun observeAll() = flowOf(stored.toList())
+        override fun observeAll() = kotlinx.coroutines.flow.flow { emit(stored.toList()) }
         override suspend fun upsertAll(leads: List<LeadEntity>) { upserted = leads; stored.addAll(leads) }
         override suspend fun latestUpdatedAt() = stored.maxOfOrNull { it.updatedAt ?: "" }?.ifBlank { null }
         override suspend fun clear() { stored.clear() }
@@ -36,6 +36,16 @@ class LeadRepositoryTest {
             seenCursor = updatedAfter
             if (fail) throw IOException("offline")
             return result
+        }
+
+        override suspend fun create(body: LeadCreateReq): LeadDto {
+            if (fail) throw IOException("offline")
+            return LeadDto(id = "new-1", title = body.title, first_name = body.first_name, phone = body.phone, status = body.status)
+        }
+
+        override suspend fun update(id: String, body: LeadUpdateReq): LeadDto {
+            if (fail) throw IOException("offline")
+            return LeadDto(id = id, title = "Updated", status = body.status ?: "New")
         }
     }
 

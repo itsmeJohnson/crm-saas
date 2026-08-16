@@ -44,7 +44,7 @@ async def create_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new lead opportunity."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     lead = await lead_service.create_lead(actor, lead_in.model_dump())
     
     # Auto assign if lead is created manually
@@ -86,7 +86,7 @@ async def list_leads(
         except (ValueError, TypeError):
             raise HTTPException(status_code=400, detail="custom_fields must be a valid JSON object")
 
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     records, _ = await lead_service.paginate_leads(
         actor, skip, limit, search, status, assigned_user_id, name, city,
         source=source, stage_id=stage_id, priority=priority, min_value=min_value,
@@ -116,7 +116,7 @@ async def export_leads(
     include_archived: bool = Query(False),
 ):
     """Export the caller's visible leads (matching the same filters as listing) as CSV or Excel."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     filters = {
         "search_query": search, "status": status, "assigned_user_id": assigned_user_id,
         "name": name, "city": city, "source": source, "stage_id": stage_id,
@@ -154,7 +154,7 @@ async def find_duplicate_leads(
     exclude_lead_id: uuid.UUID | None = Query(None),
 ):
     """Find existing leads that share the given email or phone within the organization."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return list(await lead_service.find_duplicates(actor, email=email, phone=phone, exclude_lead_id=exclude_lead_id))
 
 @router.post("/bulk-update", response_model=LeadBulkUpdateResponse)
@@ -164,7 +164,7 @@ async def bulk_update_leads(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Apply the same field changes to multiple scoped leads at once."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     fields = req.fields.model_dump(exclude_unset=True, exclude_none=True)
     result = await lead_service.bulk_update(actor, req.lead_ids, fields)
     return LeadBulkUpdateResponse(**result)
@@ -179,7 +179,7 @@ async def get_lead_reports(
     date_to: datetime | None = Query(None),
 ):
     """Tenant-scoped lead analytics: totals plus breakdowns by source, status, priority, stage, and owner."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_lead_report(actor, date_from=date_from, date_to=date_to)
 
 # --- Escalation config (OrgAdmin / Manager) ---
@@ -291,7 +291,7 @@ async def get_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Retrieve detailed lead opportunity scoped to organization."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_lead(actor, lead_id)
 
 @router.patch("/{lead_id}", response_model=LeadResponse)
@@ -302,7 +302,7 @@ async def update_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update properties of a scoped lead opportunity."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.update_lead(actor, lead_id, lead_in.model_dump(exclude_unset=True))
 
 @router.delete("/{lead_id}", response_model=LeadResponse)
@@ -312,7 +312,7 @@ async def delete_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Soft delete lead from organization database."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.soft_delete_lead(actor, lead_id)
 
 @router.post("/{lead_id}/archive", response_model=LeadResponse)
@@ -322,7 +322,7 @@ async def archive_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Archive a lead (hidden from default listings, retained for restore)."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.archive_lead(actor, lead_id)
 
 @router.post("/{lead_id}/restore", response_model=LeadResponse)
@@ -332,7 +332,7 @@ async def restore_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Restore an archived or soft-deleted lead back to active state."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.restore_lead(actor, lead_id)
 
 @router.post("/{lead_id}/recompute-score", response_model=LeadResponse)
@@ -342,7 +342,7 @@ async def recompute_lead_score(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Recompute the rule-based score for a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.recompute_score(actor, lead_id)
 
 @router.post("/{lead_id}/convert", response_model=LeadConvertResponse)
@@ -353,7 +353,7 @@ async def convert_lead(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Convert a lead into a Contact (+ optional Company); archives and links the lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     result = await lead_service.convert_lead(actor, lead_id, create_company=req.create_company)
     return LeadConvertResponse(**result)
 
@@ -364,7 +364,7 @@ async def list_lead_reminders(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List reminders set on a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return list(await lead_service.list_reminders(actor, lead_id))
 
 @router.post("/{lead_id}/reminders", response_model=LeadReminderResponse, status_code=status.HTTP_201_CREATED)
@@ -375,7 +375,7 @@ async def create_lead_reminder(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Schedule a reminder for a lead; fires an in-app notification when due."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.create_reminder(actor, lead_id, req.remind_at, req.note, req.user_id)
 
 @router.delete("/{lead_id}/reminders/{reminder_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -386,7 +386,7 @@ async def delete_lead_reminder(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Delete a lead reminder."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     await lead_service.delete_reminder(actor, lead_id, reminder_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -397,7 +397,7 @@ async def get_lead_timeline(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Unified chronological feed of notes, activities, and audit events for a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_timeline(actor, lead_id)
 
 @router.post("/{lead_id}/follow-up", status_code=status.HTTP_201_CREATED)
@@ -422,7 +422,7 @@ async def get_lead_audit(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Tenant-visible audit trail for a single lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.get_audit_trail(actor, lead_id)
 
 @router.get("/{lead_id}/attachments", response_model=List[LeadAttachmentResponse])
@@ -432,7 +432,7 @@ async def list_lead_attachments(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List files attached to a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.list_attachments(actor, lead_id)
 
 @router.post("/{lead_id}/attachments", response_model=LeadAttachmentResponse, status_code=status.HTTP_201_CREATED)
@@ -447,7 +447,7 @@ async def upload_lead_attachment(
     content = await file.read(MAX_UPLOAD + 1)
     if len(content) > MAX_UPLOAD:
         raise HTTPException(status_code=400, detail="File exceeds the limit of 5.0MB")
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.add_attachment(actor, lead_id, content, file.filename or "attachment")
 
 @router.delete("/{lead_id}/attachments/{stored_name}")
@@ -458,7 +458,7 @@ async def delete_lead_attachment(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Remove a file attached to a lead."""
-    lead_service = LeadService(db)
+    lead_service = LeadService(db, actor.organization_id)
     return await lead_service.delete_attachment(actor, lead_id, stored_name)
 
 # --- Bulk Lead Imports ---
@@ -501,7 +501,7 @@ async def upload_import_file(
     file: UploadFile = File(...)
 ):
     """Upload bulk lead CSV/Excel and retrieve mapping suggestions and preview."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
 
     from fastapi import HTTPException
     from app.core.storage import validate_and_sanitize_file
@@ -532,7 +532,7 @@ async def google_sheets_import_preview(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Fetch shared Google Sheets URL and retrieve mapping suggestions and preview."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     return await import_service.get_preview_from_google_sheets(req.url)
 
 @router.post("/import/process", response_model=LeadImportResponse, dependencies=[_gate_bulk_import])
@@ -542,7 +542,7 @@ async def process_import_batch(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Execute validation and lead creations based on mapped headers."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     return await import_service.process_import_batch(
         actor=actor,
         file_token=req.file_token,
@@ -562,7 +562,7 @@ async def list_import_history(
     limit: int = Query(50, ge=1, le=100)
 ):
     """List details of previous bulk lead imports."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     records = await import_service.import_repo.list_imports(actor.organization_id, skip, limit)
     return list(records)
 
@@ -573,7 +573,7 @@ async def download_failed_rows(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Download CSV file of failed validation rows for a specific import job."""
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, actor.organization_id)
     csv_report = await import_service.get_failed_rows_report(actor.organization_id, import_id)
     return Response(
         content=csv_report,

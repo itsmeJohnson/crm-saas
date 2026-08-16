@@ -35,11 +35,11 @@ def mock_redis(monkeypatch):
 async def import_setup(db: AsyncSession):
     org_repo = OrganizationRepository(db)
     user_repo = UserRepository(db)
-    lead_repo = LeadRepository(db)
 
     org = await org_repo.create({"name": "Import Org", "slug": "import-org"})
     await db.commit()
 
+    lead_repo = LeadRepository(db, org.id)
     actor = await user_repo.create_user(org.id, {
         "email": "actor@importorg.com",
         "hashed_password": "hashedpassword123",
@@ -50,7 +50,7 @@ async def import_setup(db: AsyncSession):
     })
 
     # Create pre-existing lead for duplicate testing
-    dup_lead = await lead_repo.create_lead(org.id, {
+    dup_lead = await lead_repo.create_lead({
         "first_name": "Double",
         "last_name": "Lead",
         "email": "duplicate@import.com",
@@ -104,8 +104,8 @@ async def test_template_generation():
 @pytest.mark.asyncio
 async def test_process_csv_import(db: AsyncSession, import_setup: dict):
     data = import_setup
-    import_service = LeadImportService(db)
-    lead_repo = LeadRepository(db)
+    import_service = LeadImportService(db, data["org"].id)
+    lead_repo = LeadRepository(db, data["org"].id)
 
     # Prepare Mock CSV content:
     # Row 1: Valid lead
@@ -168,7 +168,7 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
 
     # Assert database additions
     # Valid lead 1: johndoe@test.com
-    lead1 = await lead_repo.get_lead_by_email(data["org"].id, "johndoe@test.com")
+    lead1 = await lead_repo.get_lead_by_email( "johndoe@test.com")
     assert lead1 is not None
     assert lead1.first_name == "John"
     assert lead1.last_name == "Doe"
@@ -177,7 +177,7 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
     assert lead1.value == 12000.0
 
     # Valid lead 2: janesmith@test.com
-    lead2 = await lead_repo.get_lead_by_email(data["org"].id, "janesmith@test.com")
+    lead2 = await lead_repo.get_lead_by_email( "janesmith@test.com")
     assert lead2 is not None
     assert lead2.value == 80000.0
 
@@ -190,9 +190,9 @@ async def test_process_csv_import(db: AsyncSession, import_setup: dict):
 @pytest.mark.asyncio
 async def test_process_import_batch_assignment_modes(db: AsyncSession, import_setup: dict):
     data = import_setup
-    import_service = LeadImportService(db)
+    import_service = LeadImportService(db, data["org"].id)
     user_repo = UserRepository(db)
-    lead_repo = LeadRepository(db)
+    lead_repo = LeadRepository(db, data["org"].id)
 
     # Create active employee
     employee = await user_repo.create_user(data["org"].id, {
@@ -254,7 +254,7 @@ async def test_process_import_batch_assignment_modes(db: AsyncSession, import_se
     )
     assert import_log_1.status == "COMPLETED"
     
-    lead_1 = await lead_repo.get_lead_by_email(data["org"].id, "john_assign_1@test.com")
+    lead_1 = await lead_repo.get_lead_by_email( "john_assign_1@test.com")
     assert lead_1 is not None
     assert lead_1.assigned_user_id == employee.id
 
@@ -352,7 +352,7 @@ async def test_process_import_batch_assignment_modes(db: AsyncSession, import_se
     )
     assert import_log_5.status == "COMPLETED"
     
-    lead_5 = await lead_repo.get_lead_by_email(data["org"].id, "john_assign_5@test.com")
+    lead_5 = await lead_repo.get_lead_by_email( "john_assign_5@test.com")
     assert lead_5 is not None
     assert lead_5.assigned_user_id is None
 

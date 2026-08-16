@@ -29,6 +29,8 @@ async def require_active_user(
             mask_phone = True
             
     mask_phone_ctx.set(mask_phone)
+    from app.core.tenant_context import TenantContext
+    TenantContext.set_tenant_id(current_user.organization_id)
     return current_user
 
 class RoleRequired:

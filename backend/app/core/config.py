@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: str | None, info) -> str:
         if isinstance(v, str) and v:
             return v
+        data = info.data
         server = os.environ.get("POSTGRES_SERVER") or data.get("POSTGRES_SERVER", "localhost")
         user = os.environ.get("POSTGRES_USER") or data.get("POSTGRES_USER", "postgres")
         password = os.environ.get("POSTGRES_PASSWORD") or data.get("POSTGRES_PASSWORD", "postgres")

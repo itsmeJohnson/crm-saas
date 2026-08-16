@@ -123,32 +123,31 @@ async def test_contact_repository(db: AsyncSession, setup_tenant_data: dict):
 @pytest.mark.asyncio
 async def test_lead_repository(db: AsyncSession, setup_tenant_data: dict):
     data = setup_tenant_data
-    lead_repo = LeadRepository(db)
+    lead_repo = LeadRepository(db, data["org_a_id"])
 
     # Create
     lead_a = await lead_repo.create_lead(
-        organization_id=data["org_a_id"],
         lead_data={"title": "Acme Deal", "last_name": "Smith", "status": "New", "value": 10000.0},
         created_by=data["user_a_id"]
     )
     await db.commit()
 
     # Get by ID
-    assert await lead_repo.get_lead_by_id(data["org_a_id"], lead_a.id) is not None
-    assert await lead_repo.get_lead_by_id(data["org_b_id"], lead_a.id) is None
+    assert await lead_repo.get_lead_by_id(lead_a.id) is not None
+    assert await LeadRepository(db, data["org_b_id"]).get_lead_by_id(lead_a.id) is None
 
     # Paginate and Search/Filter
-    records, total = await lead_repo.paginate_leads(data["org_a_id"], skip=0, limit=10, search_query="Acme", status="New")
+    records, total = await lead_repo.paginate_leads(skip=0, limit=10, search_query="Acme", status="New")
     assert total == 1
     assert records[0].id == lead_a.id
 
     # Update
-    updated = await lead_repo.update_lead(data["org_a_id"], lead_a.id, {"status": "Qualified"})
+    updated = await lead_repo.update_lead(lead_a.id, {"status": "Qualified"})
     assert updated.status == "Qualified"
     await db.commit()
 
     # Soft Delete
-    deleted = await lead_repo.soft_delete_lead(data["org_a_id"], lead_a.id)
+    deleted = await lead_repo.soft_delete_lead(lead_a.id)
     assert deleted.is_deleted is True
     await db.commit()
 

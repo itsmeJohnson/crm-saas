@@ -70,9 +70,9 @@ async def test_pipeline_stages_seeding_and_constraints(db: AsyncSession):
 async def test_lead_stage_default_assignment(db: AsyncSession):
     org_repo = OrganizationRepository(db)
     user_repo = UserRepository(db)
-    lead_repo = LeadRepository(db)
     
     org = await org_repo.create({"name": "Lead Stage Org", "slug": "lead-stage-org"})
+    lead_repo = LeadRepository(db, org.id)
     user = await user_repo.create_user(org.id, {
         "email": "agent_pipeline@org.com",
         "hashed_password": "hash",
@@ -82,7 +82,7 @@ async def test_lead_stage_default_assignment(db: AsyncSession):
     await db.commit()
     
     # Create lead without stage_id
-    lead = await lead_repo.create_lead(org.id, {
+    lead = await lead_repo.create_lead({
         "first_name": "John",
         "last_name": "Doe",
         "title": "Software Lead"

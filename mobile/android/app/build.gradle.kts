@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.crm.mobile"
-        minSdk = 26          // biometric + modern crypto
+        minSdk = 24          // Wide device compatibility (Android 7.0+)
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
@@ -23,11 +23,43 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://crm.johnsonsoftwares.com/api/v1/\"")
     }
 
+    signingConfigs {
+        getByName("debug") {
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+        create("release") {
+            // Use standard debug signing for easy direct sideloading/installing without parse errors
+            val debugSigning = getByName("debug")
+            storeFile = debugSigning.storeFile
+            storePassword = debugSigning.storePassword
+            keyAlias = debugSigning.keyAlias
+            keyPassword = debugSigning.keyPassword
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -35,6 +67,7 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
     implementation(composeBom)
 

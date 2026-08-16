@@ -34,6 +34,10 @@ class ReminderRepositoryTest {
         override suspend fun list(limit: Int): List<ReminderDto> {
             if (failList) throw IOException("offline"); return rows
         }
+        override suspend fun create(body: ReminderCreateReq): ReminderDto {
+            if (failList) throw IOException("offline")
+            return ReminderDto("new-r", body.title, body.description, body.priority, body.status, body.due_date, body.remind_at, null, body.lead_id, "2026-07-26T09:00:00Z")
+        }
         override suspend fun patch(id: String, body: ReminderPatch): ReminderDto {
             lastPatchId = id; lastPatch = body
             return rows.first { it.id == id }.copy(remind_at = body.remind_at)

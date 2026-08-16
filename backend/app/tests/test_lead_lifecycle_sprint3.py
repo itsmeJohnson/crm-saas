@@ -67,11 +67,11 @@ async def _notif_count(db, user_id):
 
 async def test_timeline_includes_all_event_types(env, db):
     a = env
-    svc = LeadService(db)
+    svc = LeadService(db, a["org"].id)
     lead = await _make_lead(db, a["org"].id, a["stage_id"], a["admin"].id)  # no audit yet
 
     # Note
-    await NoteService(db).create_note(a["admin"], {"lead_id": lead.id, "content": "A note"})
+    await NoteService(db, a["org"].id).create_note(a["admin"], {"lead_id": lead.id, "content": "A note"})
     # Activity
     db.add(Activity(organization_id=a["org"].id, activity_type="Call", subject="Rang",
                     lead_id=lead.id, created_by=a["admin"].id, assigned_user_id=a["admin"].id))
@@ -110,7 +110,7 @@ async def test_timeline_scoping_unchanged(env, db):
     await db.flush()
     lead = await _make_lead(db, a["org"].id, a["stage_id"], a["admin"].id)
     with pytest.raises(HTTPException) as exc:
-        await LeadService(db).get_timeline(tele, lead.id)
+        await LeadService(db, a["org"].id).get_timeline(tele, lead.id)
     assert exc.value.status_code == 404
 
 
@@ -122,7 +122,7 @@ async def test_reassign_notifies_new_owner(env, db):
     a = env
     lead = await _make_lead(db, a["org"].id, a["stage_id"], a["admin"].id)
     assert len(await _notif_count(db, a["owner2"].id)) == 0
-    await LeadService(db).update_lead(a["admin"], lead.id, {"assigned_user_id": a["owner2"].id})
+    await LeadService(db, a["org"].id).update_lead(a["admin"], lead.id, {"assigned_user_id": a["owner2"].id})
     notes = await _notif_count(db, a["owner2"].id)
     assert len(notes) == 1
     assert "assigned" in notes[0].title.lower()
@@ -133,11 +133,11 @@ async def test_no_notify_when_owner_unchanged(env, db):
     a = env
     lead = await _make_lead(db, a["org"].id, a["stage_id"], a["admin"].id)
     # Update a non-owner field; assigned_user_id not in payload → no notification.
-    await LeadService(db).update_lead(a["admin"], lead.id, {"title": "Just a rename"})
+    await LeadService(db, a["org"].id).update_lead(a["admin"], lead.id, {"title": "Just a rename"})
     assert len(await _notif_count(db, a["admin"].id)) == 0
     assert len(await _notif_count(db, a["owner2"].id)) == 0
     # Re-send the SAME owner explicitly → still no change → no notification.
-    await LeadService(db).update_lead(a["admin"], lead.id, {"assigned_user_id": a["admin"].id})
+    await LeadService(db, a["org"].id).update_lead(a["admin"], lead.id, {"assigned_user_id": a["admin"].id})
     assert len(await _notif_count(db, a["admin"].id)) == 0
 
 
@@ -145,7 +145,7 @@ async def test_no_notify_on_self_assign(env, db):
     a = env
     # Lead owned by owner2; admin re-assigns it to admin (self) → no notification.
     lead = await _make_lead(db, a["org"].id, a["stage_id"], a["owner2"].id)
-    await LeadService(db).update_lead(a["admin"], lead.id, {"assigned_user_id": a["admin"].id})
+    await LeadService(db, a["org"].id).update_lead(a["admin"], lead.id, {"assigned_user_id": a["admin"].id})
     assert len(await _notif_count(db, a["admin"].id)) == 0
 
 
@@ -153,7 +153,7 @@ async def test_bulk_reassign_sends_single_notification(env, db):
     a = env
     l1 = await _make_lead(db, a["org"].id, a["stage_id"], a["admin"].id, title="L1")
     l2 = await _make_lead(db, a["org"].id, a["stage_id"], a["admin"].id, title="L2")
-    res = await LeadService(db).bulk_update(
+    res = await LeadService(db, a["org"].id).bulk_update(
         a["admin"], [l1.id, l2.id], {"assigned_user_id": a["owner2"].id})
     assert res["updated_count"] == 2
     notes = await _notif_count(db, a["owner2"].id)

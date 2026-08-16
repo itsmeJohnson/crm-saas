@@ -250,7 +250,7 @@ class LeadCaptureService:
             await self.db.commit()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Capture source owner is inactive; reassign the source owner")
 
-        lead = await LeadService(self.db).create_lead(owner, lead_data)
+        lead = await LeadService(self.db, owner.organization_id).create_lead(owner, lead_data)
 
         src.leads_captured = (src.leads_captured or 0) + 1
         src.last_received_at = datetime.now(timezone.utc)
