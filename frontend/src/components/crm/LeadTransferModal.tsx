@@ -42,8 +42,9 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
       const fetchEmployees = async () => {
         setIsLoadingEmployees(true);
         try {
-          // If Team Leader, this endpoint will return only their downlines
-          const data = await userApi.getUsers({ limit: 100, role: 'Employee', is_active: true });
+          // Assignable users: all roles for admins/managers; downline + self
+          // for team leaders — so the assign option is always present.
+          const data = await userApi.getAssignableUsers();
           setEmployees(data);
         } catch (err) {
           console.error('Failed to fetch employees', err);
@@ -53,7 +54,7 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
       };
 
       const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
-      if (user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL)) {
+      if (user && (user.role === 'SuperAdmin' || user.role === 'OrgAdmin' || user.role === 'Manager' || isTL)) {
         fetchEmployees();
       }
     }

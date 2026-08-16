@@ -1,7 +1,8 @@
 import React from 'react';
-import { Sparkles, Table } from 'lucide-react';
+import { Sparkles, Table, SlidersHorizontal } from 'lucide-react';
 import { ImportPreviewResponse } from '../../services/leadImportApi';
 import { UserResponse } from '../../services/userApi';
+import { useMetadataStore } from '../../store/metadataStore';
 
 interface MappingPreviewProps {
   previewData: ImportPreviewResponse;
@@ -30,6 +31,8 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
   employees,
   isLoadingEmployees,
 }) => {
+  const { customFields } = useMetadataStore();
+
   const fieldsConfig = [
     { key: 'title', label: 'Lead Title / Job Title', required: true, desc: 'Position name or title of the lead' },
     { key: 'last_name', label: 'Last Name', required: true, desc: 'Contact surname' },
@@ -40,6 +43,16 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
     { key: 'value', label: 'Deal Value', required: false, desc: 'Est. opportunity dollar value' },
     { key: 'source', label: 'Lead Source', required: false, desc: 'Original marketing channel' },
   ];
+
+  // Tenant-defined importable custom fields become mapping targets too.
+  const customFieldsConfig = customFields
+    .filter((f) => f.entity_type === 'lead' && f.is_active && f.importable)
+    .map((f) => ({
+      key: f.key,
+      label: f.label,
+      required: f.validation_rules?.required === true,
+      desc: f.description || `Custom ${f.field_type} field`,
+    }));
 
   const getConfidenceBadgeClass = (confidence: number) => {
     if (confidence >= 1.0) {
@@ -52,63 +65,79 @@ export const MappingPreview: React.FC<MappingPreviewProps> = ({
     return 'bg-slate-500/10 text-slate-400 border border-slate-500/20';
   };
 
+  const renderFieldCard = (field: { key: string; label: string; required: boolean; desc: string }) => {
+    const mappedCol = columnMapping[field.key] || '';
+    const suggestion = previewData.suggested_mapping[field.key];
+    const hasSuggestion = suggestion && suggestion.column;
+
+    return (
+      <div
+        key={field.key}
+        className="p-3.5 bg-slate-950/20 border border-slate-800/80 rounded-xl space-y-2.5 flex flex-col justify-between"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <span className="text-xs font-semibold text-slate-200 flex items-center gap-1">
+              {field.label}
+              {field.required && <span className="text-red-500 font-bold">*</span>}
+            </span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">{field.desc}</span>
+          </div>
+
+          {hasSuggestion && mappedCol === suggestion.column && (
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${getConfidenceBadgeClass(suggestion.confidence)}`}>
+              {suggestion.confidence >= 1.0 ? 'Exact' : suggestion.confidence >= 0.8 ? 'Alias' : 'Fuzzy'} ({(suggestion.confidence * 100).toFixed(0)}%)
+            </span>
+          )}
+        </div>
+
+        <select
+          value={mappedCol}
+          onChange={(e) => onMappingChange(field.key, e.target.value)}
+          className={`w-full px-3 py-2 bg-slate-900 border rounded-lg text-xs text-slate-300 focus:outline-none transition-all ${
+            field.required && !mappedCol
+              ? 'border-red-950 text-red-400/80 focus:border-red-500'
+              : 'border-slate-800 focus:border-brand-500/40'
+          }`}
+        >
+          <option value="">
+            {field.required ? 'Select Required Column...' : 'Skip Column / Don\'t Import'}
+          </option>
+          {previewData.headers.map((h) => (
+            <option key={h} value={h}>{h}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/* Fields Mapping Config */}
+      {/* Standard Fields Mapping Config */}
       <div>
         <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-brand-400" />
           Map File Headers to Lead Properties
         </h4>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {fieldsConfig.map((field) => {
-            const mappedCol = columnMapping[field.key] || '';
-            const suggestion = previewData.suggested_mapping[field.key];
-            const hasSuggestion = suggestion && suggestion.column;
-            
-            return (
-              <div 
-                key={field.key} 
-                className="p-3.5 bg-slate-950/20 border border-slate-800/80 rounded-xl space-y-2.5 flex flex-col justify-between"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1">
-                      {field.label}
-                      {field.required && <span className="text-red-500 font-bold">*</span>}
-                    </span>
-                    <span className="text-[10px] text-slate-500 block mt-0.5">{field.desc}</span>
-                  </div>
-
-                  {hasSuggestion && mappedCol === suggestion.column && (
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${getConfidenceBadgeClass(suggestion.confidence)}`}>
-                      {suggestion.confidence >= 1.0 ? 'Exact' : suggestion.confidence >= 0.8 ? 'Alias' : 'Fuzzy'} ({(suggestion.confidence * 100).toFixed(0)}%)
-                    </span>
-                  )}
-                </div>
-
-                <select
-                  value={mappedCol}
-                  onChange={(e) => onMappingChange(field.key, e.target.value)}
-                  className={`w-full px-3 py-2 bg-slate-900 border rounded-lg text-xs text-slate-300 focus:outline-none transition-all ${
-                    field.required && !mappedCol 
-                      ? 'border-red-950 text-red-400/80 focus:border-red-500' 
-                      : 'border-slate-800 focus:border-brand-500/40'
-                  }`}
-                >
-                  <option value="">
-                    {field.required ? 'Select Required Column...' : 'Skip Column / Don\'t Import'}
-                  </option>
-                  {previewData.headers.map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
+          {fieldsConfig.map(renderFieldCard)}
         </div>
       </div>
+
+      {/* Custom Fields Mapping (tenant-defined) */}
+      {customFieldsConfig.length > 0 && (
+        <div>
+          <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+            Custom Fields
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {customFieldsConfig.map(renderFieldCard)}
+          </div>
+        </div>
+      )}
 
       {/* Data Row Previews */}
       <div className="space-y-2">

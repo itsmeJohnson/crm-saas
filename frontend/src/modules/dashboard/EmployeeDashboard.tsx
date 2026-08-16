@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { dashboardApi, EmployeeSummary } from '../../services/dashboardApi';
-import { Sparkles, RefreshCw, FolderKanban, Phone, Users, ListTodo } from 'lucide-react';
+import { Sparkles, RefreshCw } from 'lucide-react';
 import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
+import { WorkQueueWidget } from '../../components/dashboard/WorkQueueWidget';
 import { MyLeadsWidget } from '../../components/dashboard/MyLeadsWidget';
 import { TodayScheduleWidget } from '../../components/dashboard/TodayScheduleWidget';
 import { AttendanceWidget } from '../../components/dashboard/AttendanceWidget';
@@ -14,6 +15,7 @@ import { DashboardNotificationsWidget } from '../../components/dashboard/Dashboa
 import { AnnouncementsWidget } from '../../components/dashboard/AnnouncementsWidget';
 import { QuickActionsWidget } from '../../components/dashboard/QuickActionsWidget';
 import { MyReportsWidget } from '../../components/dashboard/MyReportsWidget';
+import { EmployeeHeroCard } from '../../components/dashboard/EmployeeHeroCard';
 
 /**
  * Focused, role-based dashboard for individual contributors (Employee).
@@ -31,13 +33,6 @@ export const EmployeeDashboard: React.FC = () => {
     dashboardApi.getEmployeeSummary().then(setSummary).catch(() => {}).finally(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
-
-  const kpis = [
-    { label: 'My leads', value: summary?.my_leads_total ?? 0, icon: FolderKanban },
-    { label: 'Calls today', value: summary?.today_calls ?? 0, icon: Phone },
-    { label: 'Meetings today', value: summary?.today_meetings_count ?? 0, icon: Users },
-    { label: 'Open tasks', value: summary?.open_tasks ?? 0, icon: ListTodo, alert: (summary?.overdue_tasks ?? 0) > 0 ? `${summary?.overdue_tasks} overdue` : undefined },
-  ];
 
   return (
     <div className="space-y-6">
@@ -58,16 +53,8 @@ export const EmployeeDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {kpis.map((k) => (
-          <div key={k.label} className="glass-panel border border-slate-800/85 rounded-xl p-4">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1"><k.icon className="w-3 h-3 text-brand-400" /> {k.label}</p>
-            <p className="text-2xl font-bold text-slate-100 mt-1">{k.value}</p>
-            {k.alert && <p className="text-[10px] text-amber-400 mt-0.5">{k.alert}</p>}
-          </div>
-        ))}
-      </div>
+      {/* Employee hero card — large, prominent, immediately after login (Phase 4) */}
+      <EmployeeHeroCard summary={summary} name={user?.first_name || ''} loading={loading} />
 
       {/* Quick actions + Announcements */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -77,6 +64,7 @@ export const EmployeeDashboard: React.FC = () => {
 
       {/* Personal work widgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <WorkQueueWidget />
         <MyTasksWidget />
         <MyLeadsWidget data={summary} loading={loading} />
         <TodayScheduleWidget data={summary} loading={loading} />

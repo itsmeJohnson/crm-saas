@@ -1,4 +1,6 @@
-version: '3.8'
+# Pinned project name so the DB named volume (crm-saas_postgres_data) is reused
+# regardless of the folder name — moving the repo won't orphan the database.
+name: crm-saas
 
 services:
   db:
@@ -34,6 +36,7 @@ services:
       - POSTGRES_DB=crm
       - REDIS_HOST=redis
       - JWT_SECRET_KEY=dev_secret_key_1234567890_saas_johnson
+      - TELEPHONY_ENCRYPTION_KEY=YqUFhZmtAsiakLSb4rG4VTC5qW4UhTW92BzC1B4VGsk=
     ports:
       - "8000:8000"
     volumes:
@@ -50,6 +53,8 @@ services:
     restart: always
     ports:
       - "5173:5173"
+    environment:
+      - BACKEND_URL=http://backend:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules

@@ -47,7 +47,7 @@ class Organization(BaseModel):
     # Extra Portal Fields
     auto_renewal: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     theme: Mapped[str] = mapped_column(String(50), default="dark", nullable=False)
-
+    metadata_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     # Phase 3 - Extended organization fields
     country: Mapped[str] = mapped_column(String(100), default="India", nullable=False)

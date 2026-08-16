@@ -12,6 +12,7 @@ from app.schemas.lead import (
     LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
     LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
+    FollowUpCreate,
 )
 from app.schemas.saved_filter import SavedFilterCreate, SavedFilterUpdate, SavedFilterResponse
 from app.schemas.reports import LeadReportResponse
@@ -68,14 +69,27 @@ async def list_leads(
     created_from: datetime | None = Query(None),
     created_to: datetime | None = Query(None),
     include_archived: bool = Query(False),
+    updated_after: datetime | None = Query(None, description="Delta-sync cursor: only leads changed after this timestamp (offline mobile)."),
+    custom_fields: str | None = Query(None, description="JSON object of {custom_field_key: value} filters."),
 ):
     """List paginated, searchable leads scoped to the tenant organization."""
+    custom_filters: dict | None = None
+    if custom_fields:
+        import json
+        try:
+            parsed = json.loads(custom_fields)
+            if isinstance(parsed, dict):
+                custom_filters = {str(k): v for k, v in parsed.items() if v not in (None, "")}
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="custom_fields must be a valid JSON object")
+
     lead_service = LeadService(db)
     records, _ = await lead_service.paginate_leads(
         actor, skip, limit, search, status, assigned_user_id, name, city,
         source=source, stage_id=stage_id, priority=priority, min_value=min_value,
         max_value=max_value, created_from=created_from, created_to=created_to,
-        include_archived=include_archived,
+        include_archived=include_archived, updated_after=updated_after,
+        custom_filters=custom_filters,
     )
     return list(records)
 
@@ -107,14 +121,21 @@ async def export_leads(
         "created_from": created_from, "created_to": created_to, "include_archived": include_archived,
     }
     leads = await lead_service.export_leads(actor, filters)
+
+    # Append the org's exportable custom-field columns so each tenant's export
+    # reflects their own schema.
+    from app.services.custom_field_service import CustomFieldService
+    all_defs = await CustomFieldService(db).list_definitions(actor, "lead")
+    custom_defs = [d for d in all_defs if d.is_active and d.exportable]
+
     if format == "xlsx":
-        content = LeadService.build_export_xlsx(leads)
+        content = LeadService.build_export_xlsx(leads, custom_defs)
         return StreamingResponse(
             io.BytesIO(content),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=leads_export.xlsx"},
         )
-    csv_text = LeadService.build_export_csv(leads)
+    csv_text = LeadService.build_export_csv(leads, custom_defs)
     return StreamingResponse(
         io.StringIO(csv_text),
         media_type="text/csv",
@@ -376,6 +397,21 @@ async def get_lead_timeline(
     lead_service = LeadService(db)
     return await lead_service.get_timeline(actor, lead_id)
 
+@router.post("/{lead_id}/follow-up", status_code=status.HTTP_201_CREATED)
+async def log_follow_up(
+    lead_id: uuid.UUID,
+    req: FollowUpCreate,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Log a call/interaction outcome and schedule the next follow-up in one
+    shot. Orchestrates: timeline entry, follow-up task (+ reminder), optional
+    calendar event, manager notification, audit, and the follow_up_created
+    automation trigger."""
+    from app.services.follow_up_service import FollowUpService
+    return await FollowUpService(db).create_follow_up(actor, lead_id, req.model_dump())
+
+
 @router.get("/{lead_id}/audit", response_model=List[LeadAuditEvent])
 async def get_lead_audit(
     lead_id: uuid.UUID,
@@ -592,22 +628,23 @@ async def transfer_leads(
     audit_service = AuditService(db)
     notification_service = NotificationService(db)
 
-    # 1. Fetch actor downline ids recursively
-    downline_ids = await user_service.get_downline_user_ids(actor)
+    # 1. Users the actor may assign to / transfer from. Admins & managers get
+    #    org-wide authority; a team leader gets their downline plus themselves.
+    assignable_ids = await user_service.get_assignable_user_ids(actor)
 
     # 2. Validate source user id
-    if req.source_user_id != actor.id and req.source_user_id not in downline_ids:
+    if req.source_user_id not in assignable_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Source user is not yourself or in your downline reporting chain"
+            detail="Source user is not yourself or within your assignable users"
         )
 
     # 3. Validate destination user ids
     for dest_id in req.destination_user_ids:
-        if dest_id not in downline_ids:
+        if dest_id not in assignable_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Destination user {dest_id} is not in your downline reporting chain"
+                detail=f"Destination user {dest_id} is not within your assignable users"
             )
 
     # 4. Fetch destination users from database to ensure active status

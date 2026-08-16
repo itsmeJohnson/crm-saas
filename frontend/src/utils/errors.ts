@@ -7,6 +7,11 @@
  * responses through this before calling setError().
  */
 export function extractErrorMessage(err: any, fallback: string): string {
+  // A throttled request that exhausted its retries must say so plainly —
+  // otherwise rate limiting looks identical to genuinely empty data.
+  if (err?.isRateLimited || err?.response?.status === 429) {
+    return 'Too many requests right now — this view was rate limited. Please retry in a moment.';
+  }
   const detail = err?.response?.data?.detail;
   if (!detail) return fallback;
   if (typeof detail === 'string') return detail;

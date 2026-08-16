@@ -4,14 +4,17 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.session import UserSession
 from app.repositories.base import BaseRepository
+from app.core.security import hash_token
 
 class UserSessionRepository(BaseRepository[UserSession]):
     def __init__(self, db: AsyncSession):
         super().__init__(UserSession, db)
 
     async def get_by_refresh_token(self, refresh_token: str) -> UserSession | None:
+        # ADR-001: refresh tokens are stored as SHA-256 hashes. The client still
+        # sends the original token; we hash it before looking it up.
         query = select(self.model).filter(
-            self.model.refresh_token == refresh_token,
+            self.model.refresh_token == hash_token(refresh_token),
             self.model.is_revoked == False,
             self.model.expires_at > datetime.now(timezone.utc)
         )

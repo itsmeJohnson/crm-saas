@@ -167,6 +167,7 @@ const SmsSettingsPanel: React.FC = () => {
         sender_id: settings.sender_id || undefined,
         account_sid: settings.account_sid || undefined,
         auth_token: authToken || undefined,
+        sms_priority: settings.sms_priority || undefined,
         daily_limit: settings.daily_limit,
         is_active: settings.is_active,
         regenerate_webhook_token: regenerate,
@@ -197,8 +198,22 @@ const SmsSettingsPanel: React.FC = () => {
                   className="w-full bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm">
             <option value="mock">Mock (dev / no send)</option>
             <option value="twilio">Twilio</option>
+            <option value="bhash">BhashSMS</option>
           </select>
+          {settings.provider === 'bhash' && (
+            <p className="text-[11px] text-slate-500">Account SID = BhashSMS <b>user</b>, Auth Token = <b>pass</b>, Sender ID = approved <b>sender</b>.</p>
+          )}
         </label>
+        {settings.provider === 'bhash' && (
+          <label className="space-y-1">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Route / Priority</span>
+            <select value={settings.sms_priority || 'ndnd'} onChange={(e) => setSettings({ ...settings, sms_priority: e.target.value })}
+                    className="w-full bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm">
+              <option value="ndnd">Transactional (ndnd) — reaches DND numbers</option>
+              <option value="dnd">Promotional (dnd) — for promotional senders</option>
+            </select>
+          </label>
+        )}
         <label className="space-y-1">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sender ID / From</span>
           <input value={settings.sender_id || ''} onChange={(e) => setSettings({ ...settings, sender_id: e.target.value })}

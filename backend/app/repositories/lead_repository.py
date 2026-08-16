@@ -77,6 +77,7 @@ class LeadRepository(BaseRepository[Lead]):
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         include_archived: bool = False,
+        custom_filters: dict | None = None,
     ):
         """Apply the shared lead filter predicates. Used by both listing and export."""
         query = query.filter(
@@ -129,6 +130,14 @@ class LeadRepository(BaseRepository[Lead]):
             city_filter = f"%{city}%"
             query = query.filter(self.model.city.ilike(city_filter))
 
+        # Tenant-defined custom field filters: {key: value} matched against the
+        # JSON custom_fields column (substring, case-insensitive).
+        if custom_filters:
+            for key, val in custom_filters.items():
+                if val is None or val == "":
+                    continue
+                query = query.filter(self.model.custom_fields[key].as_string().ilike(f"%{val}%"))
+
         if search_query:
             search_filter = f"%{search_query}%"
             query = query.filter(
@@ -164,12 +173,18 @@ class LeadRepository(BaseRepository[Lead]):
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         include_archived: bool = False,
+        updated_after: datetime | None = None,
+        custom_filters: dict | None = None,
     ) -> Tuple[Sequence[Lead], int]:
         query = self._apply_lead_filters(
             select(self.model), organization_id, search_query, status, assigned_user_id,
             name, city, allowed_user_ids, source, stage_id, priority, min_value, max_value,
-            created_from, created_to, include_archived
+            created_from, created_to, include_archived, custom_filters=custom_filters
         )
+        # Incremental (delta) sync cursor for offline mobile clients: only rows
+        # changed since the client's last pull.
+        if updated_after is not None:
+            query = query.filter(self.model.updated_at > updated_after)
 
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())

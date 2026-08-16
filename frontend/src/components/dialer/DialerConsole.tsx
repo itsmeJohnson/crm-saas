@@ -18,6 +18,7 @@ import { useAuthStore } from '../../store/authStore';
 import { MaskedField } from '../common/MaskedField';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
+import { dashboardApi } from '../../services/dashboardApi';
 
 export const DialerConsole: React.FC = () => {
   const {
@@ -47,6 +48,12 @@ export const DialerConsole: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [remarks, setRemarks] = useState('');
   const [targetStageId, setTargetStageId] = useState('');
+  // Follow-up scheduling (shown when outcome needs a next touch — Phase 1)
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpTime, setFollowUpTime] = useState('');
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [reminderBefore, setReminderBefore] = useState(30); // minutes
+  const [followUpPriority, setFollowUpPriority] = useState('Medium');
   const [collectivePooling, setCollectivePooling] = useState(false);
   const [showBreakMenu, setShowBreakMenu] = useState(false);
 
@@ -56,9 +63,17 @@ export const DialerConsole: React.FC = () => {
   const [knowlaritySrn, setKnowlaritySrn] = useState(() => 
     typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_knowlarity_srn') || '') : ''
   );
-  const [agentPhoneNumber, setAgentPhoneNumber] = useState(() => 
+  const [agentPhoneNumber, setAgentPhoneNumber] = useState(() =>
     typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_agent_phone_number') || '') : ''
   );
+  // Telephony provider + MyOperator (OBD) credentials.
+  const ls = (k: string) => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) || '' : '');
+  const [provider, setProvider] = useState(() => ls('crm_telephony_provider') || 'knowlarity');
+  const [myopXApiKey, setMyopXApiKey] = useState(() => ls('crm_myop_x_api_key'));
+  const [myopSecretKey, setMyopSecretKey] = useState(() => ls('crm_myop_secret_key'));
+  const [myopCompanyId, setMyopCompanyId] = useState(() => ls('crm_myop_company_id'));
+  const [myopPublicIvrId, setMyopPublicIvrId] = useState(() => ls('crm_myop_public_ivr_id'));
+  const [myopType, setMyopType] = useState(() => ls('crm_myop_type') || '1');
   const [autoDial, setAutoDial] = useState(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('crm_auto_dial');
@@ -96,6 +111,16 @@ export const DialerConsole: React.FC = () => {
       localStorage.setItem('crm_agent_phone_number', agentPhoneNumber);
     }
   }, [agentPhoneNumber]);
+
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('crm_telephony_provider', provider);
+    localStorage.setItem('crm_myop_x_api_key', myopXApiKey);
+    localStorage.setItem('crm_myop_secret_key', myopSecretKey);
+    localStorage.setItem('crm_myop_company_id', myopCompanyId);
+    localStorage.setItem('crm_myop_public_ivr_id', myopPublicIvrId);
+    localStorage.setItem('crm_myop_type', myopType);
+  }, [provider, myopXApiKey, myopSecretKey, myopCompanyId, myopPublicIvrId, myopType]);
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -172,19 +197,30 @@ export const DialerConsole: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Provider-aware credential assembly for click-to-call.
+  const credsConfigured =
+    provider === 'myoperator'
+      ? Boolean(myopXApiKey && myopSecretKey && myopCompanyId && myopPublicIvrId)
+      : Boolean(knowlarityApiKey && agentPhoneNumber);
+
+  const buildCreds = () => ({
+    provider,
+    agent_phone_number: agentPhoneNumber || undefined,
+    knowlarity_api_key: knowlarityApiKey || undefined,
+    knowlarity_srn: knowlaritySrn || undefined,
+    myop_x_api_key: myopXApiKey || undefined,
+    myop_secret_key: myopSecretKey || undefined,
+    myop_company_id: myopCompanyId || undefined,
+    myop_public_ivr_id: myopPublicIvrId || undefined,
+    myop_type: myopType || '1',
+  });
+
   const handleStartDialing = async () => {
     setNextCallCountdown(null);
     try {
-      if (callingEnabled && knowlarityApiKey && agentPhoneNumber) {
-        await startCalling(
-          collectivePooling,
-          knowlarityApiKey,
-          knowlaritySrn || undefined,
-          agentPhoneNumber
-        );
-      } else {
-        await startCalling(collectivePooling);
-      }
+      // Credentials are org-level (Settings → Communication → Calling) and applied
+      // server-side. Agents never send them.
+      await startCalling(collectivePooling);
     } catch (err) {}
   };
 
@@ -206,16 +242,36 @@ export const DialerConsole: React.FC = () => {
     e.preventDefault();
     const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
     const isStageAllowed = ['Picked', 'Interested', 'Answered / Resolved', 'Callback Requested'].includes(selectedStatus || '');
-    if (!selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId)) {
+    const followUp = selectedStatus === 'Follow-up' || selectedStatus === 'Call Back Later';
+    if (!selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || (followUp && (!followUpDate || !followUpTime))) {
       return;
     }
     const breakReasonToApply = pendingBreakReason;
     try {
-      await submitDisposition({
-        status: selectedStatus,
-        remarks: remarks,
-        custom_pipeline_stage_id: isStageAllowed ? (targetStageId || undefined) : undefined
-      });
+      if (followUp && currentLead?.id) {
+        // Schedule the next follow-up in place: creates task + reminder + timeline
+        // + activity + calendar + notifies employee/manager (backend orchestration).
+        const nextAt = new Date(`${followUpDate}T${followUpTime}`).toISOString();
+        // Backend priority vocabulary is Low|Medium|High|Urgent; "Critical" maps to Urgent.
+        const priority = followUpPriority === 'Critical' ? 'Urgent' : followUpPriority;
+        await dashboardApi.logFollowUp(currentLead.id, {
+          outcome: selectedStatus,
+          follow_up_type: 'call',
+          remarks,
+          next_follow_up_at: nextAt,
+          priority,
+          reminder_minutes_before: reminderEnabled ? reminderBefore : null,
+        });
+        // reset follow-up fields
+        setFollowUpDate(''); setFollowUpTime(''); setReminderEnabled(true);
+        setReminderBefore(30); setFollowUpPriority('Medium');
+      } else {
+        await submitDisposition({
+          status: selectedStatus,
+          remarks: remarks,
+          custom_pipeline_stage_id: isStageAllowed ? (targetStageId || undefined) : undefined
+        });
+      }
 
       // Refresh dashboard data instantly on submission
       try {
@@ -237,10 +293,13 @@ export const DialerConsole: React.FC = () => {
   const breakOptions = ['Lunch', 'Tea', 'Meeting', 'General'];
   const dispositionOptions = callDirection === 'INBOUND'
     ? ['Answered / Resolved', 'Callback Requested', 'Interested', 'Not Interested', 'Spam / Junk']
-    : ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked'];
+    : ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked', 'Follow-up', 'Call Back Later'];
 
+  // Outcomes that imply a next touch — the cockpit schedules the follow-up in place.
+  const isFollowUpOutcome = selectedStatus === 'Follow-up' || selectedStatus === 'Call Back Later';
   const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
-  const isSubmitDisabled = !selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || isLoading;
+  const followUpIncomplete = isFollowUpOutcome && (!followUpDate || !followUpTime);
+  const isSubmitDisabled = !selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || followUpIncomplete || isLoading;
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -458,70 +517,9 @@ export const DialerConsole: React.FC = () => {
             )}
           </div>
 
-          {/* Outbound Telephony Settings — only for plans with integrated calling */}
-          {callingEnabled && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <button
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="w-full flex items-center justify-between font-semibold text-slate-100 focus:outline-none cursor-pointer"
-            >
-              <span className="flex items-center gap-2 text-sm uppercase tracking-wider text-indigo-400 font-bold">
-                <Settings className="w-4 h-4" />
-                Telephony Settings
-              </span>
-              <span className="text-slate-400 text-xs hover:text-slate-200 transition-colors">
-                {showSettings ? 'Hide' : 'Configure'}
-              </span>
-            </button>
-            
-            {showSettings && (
-              <div className="space-y-4 pt-4 border-t border-slate-800/60 animate-fade-in">
-                <div className="space-y-1.5">
-                  <label htmlFor="tele-api-key" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    Knowlarity API Key
-                  </label>
-                  <input
-                    id="tele-api-key"
-                    type="password"
-                    value={knowlarityApiKey}
-                    onChange={(e) => setKnowlarityApiKey(e.target.value)}
-                    placeholder="Enter API Key"
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-                
-                <div className="space-y-1.5">
-                  <label htmlFor="tele-srn" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    Caller ID (SRN)
-                  </label>
-                  <input
-                    id="tele-srn"
-                    type="text"
-                    value={knowlaritySrn}
-                    onChange={(e) => setKnowlaritySrn(e.target.value)}
-                    placeholder="e.g. +91XXXXXXXXXX"
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="tele-agent-num" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    Agent Phone Number
-                  </label>
-                  <input
-                    id="tele-agent-num"
-                    type="text"
-                    value={agentPhoneNumber}
-                    onChange={(e) => setAgentPhoneNumber(e.target.value)}
-                    placeholder="e.g. +91XXXXXXXXXX"
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-          )}
+          {/* Telephony credentials are configured once, org-wide, by an admin in
+              Settings → Communication → Calling — never per agent. Nothing to
+              set here; the backend applies the org config automatically. */}
         </div>
 
         {/* RIGHT CONTEXT PANEL (Cols 6-12) */}
@@ -607,11 +605,61 @@ export const DialerConsole: React.FC = () => {
                   </div>
                 )}
 
+                {/* Follow-up scheduler — shown for Follow-up / Call Back Later (Phase 1) */}
+                {isFollowUpOutcome && (
+                  <div className="space-y-4 p-4 bg-brand-500/5 border border-brand-500/15 rounded-xl animate-slide-down">
+                    <p className="text-xs font-bold text-brand-300 uppercase tracking-wider">Schedule Next Follow-up</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-400">Follow-up Date <span className="text-red-400">*</span></label>
+                        <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-400">Follow-up Time <span className="text-red-400">*</span></label>
+                        <input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-slate-400">Set a reminder</label>
+                      <button type="button" onClick={() => setReminderEnabled((v) => !v)}
+                        className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${reminderEnabled ? 'bg-emerald-500/70' : 'bg-slate-700'}`}>
+                        <span className={`block w-4 h-4 bg-white rounded-full transition-transform mt-0.5 ${reminderEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                    {reminderEnabled && (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-400">Remind me before</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[{ l: '15 Min', v: 15 }, { l: '30 Min', v: 30 }, { l: '1 Hour', v: 60 }, { l: '1 Day', v: 1440 }].map((o) => (
+                            <button key={o.v} type="button" onClick={() => setReminderBefore(o.v)}
+                              className={`py-2 text-xs font-medium rounded-lg border ${reminderBefore === o.v ? 'bg-brand-600 border-brand-500 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/60'}`}>
+                              {o.l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-400">Priority</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {['Low', 'Medium', 'High', 'Critical'].map((p) => (
+                          <button key={p} type="button" onClick={() => setFollowUpPriority(p)}
+                            className={`py-2 text-xs font-medium rounded-lg border ${followUpPriority === p ? 'bg-brand-600 border-brand-500 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/60'}`}>
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Call Remarks Textarea */}
                 <div className="space-y-2">
                   <label htmlFor="remarks" className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
                     <FileText className="w-4 h-4 text-indigo-400" />
-                    Call Notes & Remarks
+                    {isFollowUpOutcome ? 'Remarks' : 'Call Notes & Remarks'} <span className="text-red-400">*</span>
                   </label>
                   <textarea
                     id="remarks"

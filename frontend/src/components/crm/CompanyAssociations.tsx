@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { companyApi, CompanyContactSummary, CompanyLeadSummary, CompanyDealsSummary } from '../../services/companyApi';
 import { Users, Briefcase, TrendingUp, Trophy } from 'lucide-react';
+import { formatMoney } from '../../utils/currency';
 
-const currency = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+const currency = (n: number) => formatMoney(n);
 
 export const CompanyAssociations: React.FC<{ companyId: string }> = ({ companyId }) => {
   const [contacts, setContacts] = useState<CompanyContactSummary[]>([]);

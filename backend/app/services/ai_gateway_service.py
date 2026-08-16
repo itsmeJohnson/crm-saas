@@ -410,6 +410,29 @@ class AIGatewayService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Provide prompt, messages or template_key.")
 
+        # ---- AI Security & Governance guard: PII masking, prompt-injection
+        # protection, content filtering and model/role restrictions. Blocks raise;
+        # an internal governance fault must never take the gateway down.
+        try:
+            from app.services.ai_governance_service import AIGovernanceService, mask_pii, scan_pii
+            gov = AIGovernanceService(self.db)
+            probe = prompt or " ".join(str(m.get("content") or "") for m in (messages or [])
+                                       if m.get("role") == "user")
+            gov_report = await gov.enforce(actor, prompt=probe, system_prompt=system_prompt,
+                                           task_type=task_type, provider=provider, model=model)
+            if gov_report.get("action") == "masked":
+                system_prompt = gov_report.get("system_prompt")
+                if prompt:
+                    prompt = gov_report.get("prompt")
+                elif messages:
+                    findings = scan_pii(probe)
+                    messages = [{**m, "content": mask_pii(str(m.get("content") or ""), findings)}
+                                for m in messages]
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
         # Context Manager
         context_block = None
         if context_type and context_id:

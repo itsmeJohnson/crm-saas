@@ -6,9 +6,13 @@ import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './modules/auth/Login';
 import { Register } from './modules/auth/Register';
+import { LegalPage } from './pages/legal/LegalPage';
 import { Home } from './modules/dashboard/Home';
 import { Profile } from './modules/organization/Profile';
 import { UsersPage } from './pages/UsersPage';
+import { SettingsLayout, SettingsHome } from './pages/settings/SettingsLayout';
+import { SettingsCallingPage } from './pages/settings/SettingsCallingPage';
+import { IntegrationMarketplacePage } from './pages/settings/IntegrationMarketplacePage';
 import { LeadsPage } from './pages/LeadsPage';
 import { LeadReportsPage } from './pages/LeadReportsPage';
 import { LeadAutomationPage } from './pages/LeadAutomationPage';
@@ -69,6 +73,13 @@ import { CommIntelligencePage } from './pages/CommIntelligencePage';
 import { SalesIntelligencePage } from './pages/SalesIntelligencePage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { DocumentIntelligencePage } from './pages/DocumentIntelligencePage';
+import { PredictionEnginePage } from './pages/PredictionEnginePage';
+import { PromptStudioPage } from './pages/PromptStudioPage';
+import { AiGovernancePage } from './pages/AiGovernancePage';
+import { AiDeveloperPage } from './pages/AiDeveloperPage';
+import { IntegrationsPage } from './pages/IntegrationsPage';
+import { AiAnalyticsPage } from './pages/AiAnalyticsPage';
+import { RecommendationsPage } from './pages/RecommendationsPage';
 import { WorkflowAssistantPage } from './pages/WorkflowAssistantPage';
 import { WorkflowsPage } from './pages/WorkflowsPage';
 import { RulesPage } from './pages/RulesPage';
@@ -81,6 +92,7 @@ import { SLAPage } from './pages/SLAPage';
 import { EscalationPage } from './pages/EscalationPage';
 import { PipelineSettings } from './components/admin/PipelineSettings';
 import { TenantsPage } from './pages/TenantsPage';
+import { TrialRequestsPage } from './pages/TrialRequestsPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
 
 // Self Service Portal imports
@@ -99,6 +111,17 @@ import { PortalSupport } from './pages/portal/PortalSupport';
 import { PortalActivityLogs } from './pages/portal/PortalActivityLogs';
 import { PortalSettings } from './pages/portal/PortalSettings';
 
+// Dental Practice Modules
+import { PatientsPage } from './pages/dental/PatientsPage';
+import { AppointmentsPage } from './pages/dental/AppointmentsPage';
+import { TreatmentsPage } from './pages/dental/TreatmentsPage';
+import { BillingPage } from './pages/dental/BillingPage';
+import { FollowupsPage } from './pages/dental/FollowupsPage';
+import { DoctorsPage } from './pages/dental/DoctorsPage';
+import { StaffPage } from './pages/dental/StaffPage';
+import { DentalReportsPage } from './pages/dental/DentalReportsPage';
+import { MarketingPage } from './pages/dental/MarketingPage';
+import { DentalSettingsPage } from './pages/dental/DentalSettingsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,6 +145,10 @@ export const App: React.FC = () => {
             <Route path="/register" element={<Register />} />
           </Route>
 
+          {/* Public legal pages (no auth) */}
+          <Route path="/legal/:doc" element={<LegalPage />} />
+          <Route path="/legal" element={<LegalPage />} />
+
           {/* Protected Routes — single shared shell (AppLayout) for the whole app */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
@@ -131,6 +158,17 @@ export const App: React.FC = () => {
                   an OrgAdmin can reactivate). */}
               <Route element={<SubscriptionGateRoute />}>
                 <Route path="/" element={<Home />} />
+
+                {/* Dental Clinical Practice Routes */}
+                <Route path="/patients" element={<PatientsPage />} />
+                <Route path="/appointments" element={<AppointmentsPage />} />
+                <Route path="/treatments" element={<TreatmentsPage />} />
+                <Route path="/billing" element={<BillingPage />} />
+                <Route path="/follow-ups" element={<FollowupsPage />} />
+                <Route path="/doctors" element={<DoctorsPage />} />
+                <Route path="/staff" element={<StaffPage />} />
+                <Route path="/reports" element={<DentalReportsPage />} />
+                <Route path="/marketing" element={<MarketingPage />} />
 
                 {/* Tasks & Calendar — available to all active users */}
                 <Route path="/tasks" element={<TasksPage />} />
@@ -152,6 +190,14 @@ export const App: React.FC = () => {
                 <Route path="/campaigns" element={<CampaignsPage />} />
                 <Route path="/notifications" element={<NotificationCenterPage />} />
                 <Route path="/communication-analytics" element={<CommunicationAnalyticsPage />} />
+                {/* Settings module — SuperAdmin / OrgAdmin only (backend also enforces). */}
+                <Route element={<ProtectedRoute allowedRoles={['SuperAdmin', 'OrgAdmin']} />}>
+                  <Route path="/settings" element={<SettingsLayout />}>
+                    <Route index element={<SettingsHome />} />
+                    <Route path="integrations" element={<IntegrationMarketplacePage />} />
+                    <Route path="calling" element={<SettingsCallingPage />} />
+                  </Route>
+                </Route>
                 <Route element={<ProtectedRoute allowedRoles={['OrgAdmin', 'Manager']} />}>
                   <Route path="/departments" element={<DepartmentsPage />} />
                 </Route>
@@ -193,6 +239,13 @@ export const App: React.FC = () => {
                   <Route path="/sales-intelligence" element={<SalesIntelligencePage />} />
                   <Route path="/knowledge" element={<KnowledgeBasePage />} />
                   <Route path="/document-intelligence" element={<DocumentIntelligencePage />} />
+                  <Route path="/prediction-engine" element={<PredictionEnginePage />} />
+                  <Route path="/prompt-studio" element={<PromptStudioPage />} />
+                  <Route path="/ai-governance" element={<AiGovernancePage />} />
+                  <Route path="/ai-analytics" element={<AiAnalyticsPage />} />
+                  <Route path="/ai-developer" element={<AiDeveloperPage />} />
+                  <Route path="/integrations" element={<IntegrationsPage />} />
+                  <Route path="/recommendations" element={<RecommendationsPage />} />
                   <Route path="/workflow-assistant" element={<WorkflowAssistantPage />} />
                   <Route path="/automation-analytics" element={<AutomationAnalyticsPage />} />
                   <Route path="/workflows" element={<WorkflowsPage />} />
@@ -255,6 +308,7 @@ export const App: React.FC = () => {
                 {/* SuperAdmin only */}
                 <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
                   <Route path="/tenants" element={<TenantsPage />} />
+                  <Route path="/trial-requests" element={<TrialRequestsPage />} />
                 </Route>
               </Route>
 

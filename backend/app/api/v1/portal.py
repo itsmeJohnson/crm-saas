@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db

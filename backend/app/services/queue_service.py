@@ -190,9 +190,24 @@ class QueueService:
             return {"channel": "sms", "to": p.get("to_number")}
         if jt == "send_whatsapp":
             from app.services.whatsapp_service import WhatsAppService
-            await WhatsAppService(self.db).send_text(actor, {"body": p.get("body"),
-                                                             "to_number": p.get("to_number"), "lead_id": p.get("lead_id")})
-            return {"channel": "whatsapp", "to": p.get("to_number")}
+            if p.get("message_id") and p.get("action") != "download_media":
+                res = await WhatsAppService(self.db).process_outbox_send(
+                    uuid.UUID(p["message_id"]),
+                    language=p.get("language", "en_US"),
+                    variables=p.get("variables")
+                )
+                return {"channel": "whatsapp", "message_id": p["message_id"], "result": res}
+            elif p.get("action") == "download_media" and p.get("message_id"):
+                await WhatsAppService(self.db).download_and_persist_media(
+                    uuid.UUID(p["message_id"]),
+                    p["media_id"],
+                    p["file_name"]
+                )
+                return {"channel": "whatsapp", "action": "download_media", "media_id": p["media_id"]}
+            else:
+                await WhatsAppService(self.db).send_text(actor, {"body": p.get("body"),
+                                                                 "to_number": p.get("to_number"), "lead_id": p.get("lead_id")})
+                return {"channel": "whatsapp", "to": p.get("to_number")}
         from app.services.email_service_module import EmailModuleService
         await EmailModuleService(self.db).send(actor, {"subject": p.get("subject") or "Message",
                                                        "body": p.get("body"), "to": p.get("to"), "lead_id": p.get("lead_id")})

@@ -8,7 +8,7 @@ lead update path) so a rule cannot recursively re-trigger itself.
 """
 import uuid
 from decimal import Decimal
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workflow_rule import WorkflowRule
@@ -154,7 +154,7 @@ class WorkflowService:
         return all(_match_condition(entity, c, allowed) for c in (conditions or []))
 
     # --- CRUD ---
-    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected", "approval_requested", "approval_escalated", "okr_objective_completed", "okr_objective_at_risk"}
+    VALID_TRIGGERS = {"lead_created", "lead_updated", "contact_created", "contact_updated", "task_created", "task_updated", "call_logged", "call_disposition", "follow_up_created", "follow_up_missed", "meeting_scheduled", "site_visit_scheduled", "sms_received", "whatsapp_received", "email_received", "attendance_marked", "late_login", "leave_applied", "leave_approved", "shift_assigned", "goal_achieved", "approval_approved", "approval_rejected", "approval_requested", "approval_escalated", "okr_objective_completed", "okr_objective_at_risk"}
 
     def _validate_rule(self, conditions: list, actions: list, trigger_event: str) -> None:
         from fastapi import HTTPException, status
@@ -548,6 +548,47 @@ class WorkflowService:
                 return "notify_user"
         return None
 
+    async def _record_comm_failure(self, actor: User, lead: Lead, channel: str, error: Exception) -> None:
+        """Interested-only automation cost-control: an automated send that fails
+        (no credits/daily cap, closed WhatsApp window, provider outage) is LOGGED
+        and the org admins are NOTIFIED — once per org per hour so a broken
+        provider can't spam them — and is NEVER retried in a loop. Best-effort:
+        a failure here must not break rule evaluation."""
+        reason = str(error)[:300]
+        try:
+            from app.services.audit_service import AuditService
+            await AuditService(self.db).log_event(
+                organization_id=lead.organization_id, actor_user_id=getattr(actor, "id", None),
+                action="COMM_AUTOMATION_FAILED", resource_type="lead", resource_id=str(lead.id),
+                action_metadata={"channel": channel, "reason": reason})
+        except Exception:
+            pass
+        try:
+            from datetime import datetime, timezone, timedelta
+            from app.models.notification import Notification
+            from app.models.user import User as _User
+            from app.services.notification_service import NotificationService
+            since = datetime.now(timezone.utc) - timedelta(hours=1)
+            recent = (await self.db.execute(select(func.count(Notification.id)).filter(
+                Notification.organization_id == lead.organization_id,
+                Notification.title == "Automated message failed to send",
+                Notification.created_at >= since))).scalar() or 0
+            if recent:
+                return
+            admins = (await self.db.execute(select(_User).filter(
+                _User.organization_id == lead.organization_id, _User.role == "OrgAdmin",
+                _User.is_active == True, _User.is_deleted == False))).scalars().all()
+            notifier = NotificationService(self.db)
+            for a in admins:
+                await notifier.create_notification(
+                    organization_id=lead.organization_id, user_id=a.id, category="system",
+                    title="Automated message failed to send", priority="high",
+                    body=f'An automated {channel} could not be sent (e.g. "{lead.title}"): {reason}. '
+                         f'Check the provider credits and configuration.',
+                    link_url="/leads", action_metadata={"channel": channel, "reason": reason})
+        except Exception:
+            pass
+
     async def _apply_action(self, lead: Lead, action: dict, actor: User, rule: WorkflowRule) -> str | None:
         atype = action.get("type")
         if atype not in ACTION_TYPES:
@@ -625,7 +666,8 @@ class WorkflowService:
                     "lead_id": lead.id,
                 }, _skip_cap=True)
                 return "send_sms"
-            except Exception:
+            except Exception as e:
+                await self._record_comm_failure(actor, lead, "SMS", e)
                 return None
         if atype == "send_whatsapp" and action.get("message") and lead.phone:
             # Automated WhatsApp reply to the lead. Best-effort: a closed 24h window
@@ -638,7 +680,8 @@ class WorkflowService:
                     "lead_id": lead.id,
                 })
                 return "send_whatsapp"
-            except Exception:
+            except Exception as e:
+                await self._record_comm_failure(actor, lead, "WhatsApp", e)
                 return None
         if atype == "send_email" and action.get("message") and lead.email:
             # Automated email to the lead. Best-effort; swallow transport errors.
@@ -651,7 +694,8 @@ class WorkflowService:
                     "lead_id": lead.id,
                 })
                 return "send_email"
-            except Exception:
+            except Exception as e:
+                await self._record_comm_failure(actor, lead, "Email", e)
                 return None
         if atype == "assign_to_team" and action.get("team_id"):
             # Distribute the lead to the least-loaded active member of a team.

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { leadApi, LeadReport, LeadReportBucket } from '../services/leadApi';
 import { BarChart3, TrendingUp, Target, Star, Loader2 } from 'lucide-react';
+import { formatMoney } from '../utils/currency';
 
-const currency = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+const currency = (n: number) => formatMoney(n);
 
 const BreakdownCard: React.FC<{ title: string; buckets: { label: string; count: number; value: number }[] }> = ({
   title,

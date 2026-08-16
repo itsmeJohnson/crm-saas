@@ -71,8 +71,8 @@ import hashlib
 import secrets
 
 def generate_random_token() -> str:
-    """Generate a secure, random token."""
-    return secrets.token_urlsafe(32)
+    """Generate a secure, random 6-digit numeric verification code / OTP."""
+    return "".join(secrets.choice("0123456789") for _ in range(6))
 
 def hash_token(token: str) -> str:
     """Generate a SHA-256 hash of the token for secure DB storage."""

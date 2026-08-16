@@ -3,11 +3,30 @@ from enum import Enum
 from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, Field, model_validator
 
-class NextLeadRequest(BaseModel):
+class TelephonyCreds(BaseModel):
+    """Per-request calling credentials, provider-agnostic. `provider` selects the
+    outbound gateway; only that provider's fields need to be supplied. Kept as a
+    mixin so next-lead and call-lead share one shape."""
+    provider: Optional[str] = Field(default="knowlarity", description="Calling provider: 'knowlarity' or 'myoperator'.")
+    agent_phone_number: Optional[str] = Field(default=None, description="Agent phone number to bridge with the customer call (both providers).")
+    # Knowlarity
+    knowlarity_api_key: Optional[str] = Field(default=None, description="Knowlarity API key for the outbound call.")
+    knowlarity_srn: Optional[str] = Field(default=None, description="Knowlarity Caller ID (SRN) number.")
+    # MyOperator (Calling APIs → Endpoint Details + a Public IVR / OBD flow)
+    myop_x_api_key: Optional[str] = Field(default=None, description="MyOperator OBD x-api-key.")
+    myop_secret_key: Optional[str] = Field(default=None, description="MyOperator OBD secret-key / Authentication (also sent as secret_token).")
+    myop_company_id: Optional[str] = Field(default=None, description="MyOperator Company ID.")
+    myop_public_ivr_id: Optional[str] = Field(default=None, description="MyOperator Public IVR / outbound flow id (required to route OBD calls).")
+    myop_type: Optional[str] = Field(default="1", description="MyOperator OBD call type: '1' | '2' | '3'.")
+
+class NextLeadRequest(TelephonyCreds):
     collective_pooling: bool = Field(default=False, description="Whether to fetch unassigned leads from the TL's queue if no direct leads are assigned.")
-    knowlarity_api_key: Optional[str] = Field(default=None, description="Optional Knowlarity API key for outbound dialer calls.")
-    knowlarity_srn: Optional[str] = Field(default=None, description="Optional Knowlarity Caller ID (SRN) number.")
-    agent_phone_number: Optional[str] = Field(default=None, description="Optional Agent phone number to bridge with the customer call.")
+
+class CallLeadRequest(TelephonyCreds):
+    """Place a server-side click-to-call to ONE specific already-known lead (from
+    the Leads list), regardless of its status. Unlike next-lead this does not
+    fetch from the queue — the lead is chosen by the agent. The customer number
+    is dialed server-side so it is never exposed to a masked telecaller."""
 
 class AgentStateUpdate(BaseModel):
     state: Literal["IDLE", "ACTIVE_CALLING", "BREAK"] = Field(..., description="The state to transition to: 'IDLE', 'ACTIVE_CALLING', 'BREAK'")

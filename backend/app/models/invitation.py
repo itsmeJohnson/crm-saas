@@ -1,15 +1,21 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, ForeignKey, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 from app.models.base import Base
+from app.models.types import NormalizedEmail
+from app.core.email_utils import normalize_email
 
 class UserInvitation(Base):
     __tablename__ = "user_invitations"
 
+    @validates("email")
+    def validate_email(self, key, value):
+        return normalize_email(value)
+
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
-    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(NormalizedEmail(255), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(50), nullable=False)
     token: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

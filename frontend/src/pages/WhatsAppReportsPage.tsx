@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { whatsappApi, WaReport } from '../services/whatsappApi';
-import { MessageCircle, CheckCheck, Eye, XCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, CheckCheck, Eye, XCircle, Loader2, Clock, FileSpreadsheet, FileText } from 'lucide-react';
 
 const Bar: React.FC<{ title: string; buckets: { label: string; count: number }[] }> = ({ title, buckets }) => {
   const max = Math.max(1, ...buckets.map((b) => b.count));
@@ -25,14 +25,14 @@ const DayTrend: React.FC<{ buckets: { label: string; count: number }[] }> = ({ b
   const max = Math.max(1, ...recent.map((b) => b.count));
   return (
     <div className="glass-panel border border-slate-800/85 rounded-2xl p-5">
-      <h3 className="text-sm font-semibold text-slate-200 mb-4">Messages per Day</h3>
+      <h3 className="text-sm font-semibold text-slate-200 mb-4">Messages per Day (Last 14 Days)</h3>
       {recent.length === 0 ? <p className="text-xs text-slate-500">No data.</p> : (
-        <div className="flex items-end gap-1.5 h-28">
+        <div className="flex items-end gap-1.5 h-28 pt-2">
           {recent.map((b) => (
             <div key={b.label} className="flex-1 flex flex-col items-center gap-1" title={`${b.label}: ${b.count}`}>
-              <span className="text-[9px] text-slate-500">{b.count}</span>
+              <span className="text-[9px] text-slate-505">{b.count}</span>
               <div className="w-full bg-gradient-to-t from-emerald-500 to-teal-500 rounded-t-sm" style={{ height: `${(b.count / max) * 100}%`, minHeight: 2 }} />
-              <span className="text-[8px] text-slate-600">{b.label.slice(5)}</span>
+              <span className="text-[8px] text-slate-500">{b.label.slice(5)}</span>
             </div>
           ))}
         </div>
@@ -53,47 +53,65 @@ export const WhatsAppReportsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [range, setRange] = useState('30');
 
+  const days = RANGES.find((r) => r.key === range)?.days || 0;
+  const dateFrom = days ? new Date(Date.now() - days * 864e5).toISOString() : undefined;
+
   useEffect(() => {
     setIsLoading(true);
-    const days = RANGES.find((r) => r.key === range)?.days || 0;
-    const params = days ? { date_from: new Date(Date.now() - days * 864e5).toISOString() } : {};
+    const params = dateFrom ? { date_from: dateFrom } : {};
     whatsappApi.reports(params).then(setReport).catch(() => {}).finally(() => setIsLoading(false));
-  }, [range]);
+  }, [range, dateFrom]);
+
+  const triggerExport = (format: 'excel' | 'pdf') => {
+    const url = whatsappApi.exportReportsUrl(format, dateFrom, undefined);
+    window.open(url, '_blank');
+  };
 
   const stats = report ? [
-    { label: 'Total', value: String(report.total), icon: MessageCircle, color: 'text-emerald-400' },
+    { label: 'Total Volume', value: String(report.total), icon: MessageCircle, color: 'text-emerald-400' },
     { label: 'Delivery Rate', value: `${report.delivery_rate}% (${report.delivered}/${report.outbound})`, icon: CheckCheck, color: 'text-sky-400' },
-    { label: 'Read Rate', value: `${report.read_rate}% (${report.read}/${report.outbound})`, icon: Eye, color: 'text-brand-400' },
-    { label: 'Failed', value: String(report.failed), icon: XCircle, color: 'text-red-400' },
+    { label: 'Read Rate', value: `${report.read_rate}% (${report.read}/${report.outbound})`, icon: Eye, color: 'text-indigo-400' },
+    { label: 'Failed Deliveries', value: String(report.failed), icon: XCircle, color: 'text-rose-455' },
+    { label: 'Avg Response SLA', value: `${report.response_time_avg_sec}s`, icon: Clock, color: 'text-amber-400' },
   ] : [];
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-800/60 pb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-6 pb-16">
+      <div className="border-b border-slate-800/60 pb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">WhatsApp Reports</h1>
-          <p className="text-sm text-slate-400 mt-1">Delivery + read receipts, volume, and media breakdown.</p>
+          <p className="text-sm text-slate-400 mt-1">Delivery funnel, outbound success, response time latency metrics.</p>
         </div>
-        <select value={range} onChange={(e) => setRange(e.target.value)}
-                className="bg-slate-800/70 border border-slate-700/70 text-slate-300 py-2 px-3 rounded-lg text-sm">
-          {RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
-        </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <select value={range} onChange={(e) => setRange(e.target.value)}
+                  className="bg-slate-850 border border-slate-800 text-slate-300 py-2 px-3.5 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer">
+            {RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+          
+          <button onClick={() => triggerExport('excel')} className="inline-flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-200 py-2 px-3.5 rounded-xl text-sm transition font-medium cursor-pointer">
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Export Excel
+          </button>
+          <button onClick={() => triggerExport('pdf')} className="inline-flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-200 py-2 px-3.5 rounded-xl text-sm transition font-medium cursor-pointer">
+            <FileText className="w-4 h-4 text-rose-400" /> Export PDF
+          </button>
+        </div>
       </div>
+      
       {isLoading ? <div className="py-24 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin inline" /></div> : report ? (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {stats.map((s) => (
-              <div key={s.label} className="glass-panel border border-slate-800/85 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-2"><s.icon className={`w-4 h-4 ${s.color}`} /><span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{s.label}</span></div>
+              <div key={s.label} className="glass-panel border border-slate-800/85 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-2"><s.icon className={`w-4 h-4 ${s.color}`} /><span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">{s.label}</span></div>
                 <p className="text-xl font-bold text-slate-100">{s.value}</p>
               </div>
             ))}
           </div>
           <DayTrend buckets={report.by_day} />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Bar title="By Status" buckets={report.by_status} />
-            <Bar title="By Direction" buckets={report.by_direction} />
-            <Bar title="By Media Type" buckets={report.by_media_type} />
+            <Bar title="Volume by Status" buckets={report.by_status} />
+            <Bar title="Volume by Direction" buckets={report.by_direction} />
+            <Bar title="Volume by Media Type" buckets={report.by_media_type} />
           </div>
         </>
       ) : null}

@@ -119,3 +119,29 @@ async def require_tl_or_above(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You do not have enough privileges"
     )
+
+
+class TelephonyAccessDenied(Exception):
+    """Raised when a user may not access org telephony settings. An exception
+    handler (main.py) renders it to the exact contract body at HTTP 403:
+    {"success": false, "message": "You are not authorized to access telephony settings."}"""
+
+
+async def require_manage_telephony(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """Telephony settings are org-level and highly privileged. Allowed:
+      - SuperAdmin (organization owner) — always
+      - OrgAdmin — only if granted the 'integrations':'manage' permission
+    Everyone else (Employee, Manager, TeamLeader, HR, custom roles, …) is denied.
+    """
+    if not current_user.is_active:
+        raise TelephonyAccessDenied()
+    if current_user.role == "SuperAdmin":
+        return current_user
+    if current_user.role == "OrgAdmin":
+        from app.services.permission_service import PermissionService
+        if await PermissionService(db).check(current_user, "integrations", "manage"):
+            return current_user
+    raise TelephonyAccessDenied()

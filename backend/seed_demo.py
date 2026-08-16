@@ -57,6 +57,28 @@ FEATURES = [
     {"code": "TARGET_MANAGEMENT", "display_name": "Target Management", "category": "Analytics", "icon": "Target", "description": "Configure performance quotas and targets for agents"},
     {"code": "KPI_DASHBOARD", "display_name": "KPI Dashboard", "category": "Analytics", "icon": "TrendingUp", "description": "Review key business performance indicators"},
     {"code": "CONVERSION_ANALYTICS", "display_name": "Conversion Analytics", "category": "Analytics", "icon": "TrendingUp", "description": "Deep-dive conversion funnel visualization"},
+
+    # Competitive plans features mapping
+    {"code": "CONTACT_MANAGEMENT", "display_name": "Contact Management", "category": "CRM", "icon": "Users", "description": "Manage customer contact details and relationships"},
+    {"code": "SALES_PIPELINE", "display_name": "Sales Pipelines", "category": "CRM", "icon": "Workflow", "description": "Configure multiple pipelines and custom stages"},
+    {"code": "BULK_IMPORT", "display_name": "Bulk Lead Import", "category": "Leads", "icon": "Upload", "description": "Import leads from CSV files"},
+    {"code": "ROLE_BASED_ACCESS", "display_name": "Role-Based Access Control", "category": "Security", "icon": "ShieldAlert", "description": "Secure access via user roles and custom permissions"},
+    {"code": "DASHBOARD_REPORTS", "display_name": "Dashboard Reports", "category": "Analytics", "icon": "BarChart", "description": "Standard dashboard widgets and reporting"},
+    {"code": "FOLLOW_UP_TASKS", "display_name": "Follow-up Tasks", "category": "Productivity", "icon": "ListChecks", "description": "Create and schedule follow-up reminders"},
+    {"code": "LEAD_DISTRIBUTION", "display_name": "Lead Distribution", "category": "Leads", "icon": "Shuffle", "description": "Distribute leads automatically or manually"},
+    {"code": "LEAD_TRANSFERS", "display_name": "Lead Transfers", "category": "Leads", "icon": "ArrowRight", "description": "Transfer leads between team members"},
+    {"code": "ADVANCED_PIPELINE", "display_name": "Advanced Pipeline Management", "category": "CRM", "icon": "Workflow", "description": "Advanced stages, probabilities, and triggers"},
+    {"code": "ADVANCED_ANALYTICS", "display_name": "Advanced Analytics", "category": "Analytics", "icon": "TrendingUp", "description": "Advanced business intelligence reports and OKRs"},
+    {"code": "CUSTOM_PIPELINE", "display_name": "Custom Pipelines", "category": "CRM", "icon": "Workflow", "description": "Design infinite custom pipelines tailored to specific verticals"},
+    {"code": "CUSTOM_REPORTS", "display_name": "Custom Reports", "category": "Analytics", "icon": "FileText", "description": "Author custom reports using the report builder"},
+    {"code": "AI_CALL_SUMMARY", "display_name": "AI Call Summary", "category": "AI", "icon": "Sparkles", "description": "Automatically transcribe and summarize calling sessions"},
+    {"code": "AI_FOLLOW_UP", "display_name": "AI Next Follow-up", "category": "AI", "icon": "Sparkles", "description": "AI recommendation for follow-up timing and message template"},
+    {"code": "API_ACCESS", "display_name": "API & SDK Access", "category": "Integrations", "icon": "Key", "description": "Generate developer API keys and configure custom webhooks"},
+    {"code": "PRIORITY_SUPPORT", "display_name": "Priority Support", "category": "Support", "icon": "Headphones", "description": "24/7 priority support with SLA guarantee"},
+    {"code": "SMS_MESSAGING", "display_name": "SMS Messaging", "category": "Communications", "icon": "MessageSquare", "description": "Send SMS alerts and notifications"},
+    {"code": "WHATSAPP_MESSAGING", "display_name": "WhatsApp Messaging", "category": "Communications", "icon": "MessageCircle", "description": "Connect WhatsApp business accounts"},
+    {"code": "EMAIL_MESSAGING", "display_name": "Email Integration", "category": "Communications", "icon": "Mail", "description": "Send and track professional emails"},
+    {"code": "CAMPAIGN_MANAGEMENT", "display_name": "Campaign Management", "category": "Communications", "icon": "Megaphone", "description": "Design and execute blast campaigns"}
 ]
 
 async def seed():
@@ -98,17 +120,19 @@ async def seed():
         pwd_hash = get_password_hash("Password123")
         admin_user = User(
             organization_id=org.id,
-            email="admin@johnsonsoftwares.com",
+            email="contact@support.johnsonsoftwares.com",
             hashed_password=pwd_hash,
-            first_name="Johnson",
-            last_name="Softwares",
+            first_name="johnsonsoftwares",
+            last_name="",
             role="SuperAdmin",
             is_active=True,
             is_verified=True
         )
         session.add(admin_user)
         await session.flush()
-        logger.info(f"Created SuperAdmin User: admin@johnsonsoftwares.com (name: Johnson)")
+        logger.info(f"Created SuperAdmin User: contact@support.johnsonsoftwares.com (name: johnsonsoftwares)")
+
+
 
         # 4. Seed Dynamic Feature Registry
         logger.info("Seeding master feature registry...")

@@ -6,8 +6,9 @@ import {
 import { OrderModal, InvoiceModal, ContractModal, PaymentModal } from '../components/customers/CustomerModals';
 import { CustomerTimeline } from '../components/customers/CustomerTimeline';
 import { Search, X, Loader2, FileText, Send, Download, DollarSign, Plus } from 'lucide-react';
+import { formatMoney } from '../utils/currency';
 
-const currency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
+const currency = (n: number) => formatMoney(n);
 
 const statusColor = (s: string) =>
   s === 'Paid' ? 'text-emerald-300' : s === 'Overdue' ? 'text-red-300' : s === 'PartiallyPaid' ? 'text-amber-300' : 'text-slate-300';

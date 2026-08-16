@@ -26,11 +26,21 @@ class Lead(BaseModel):
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     import_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("lead_imports.id"), nullable=True, index=True)
+    pipeline_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("pipelines.id", ondelete="SET NULL"), nullable=True, index=True)
     stage_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pipeline_stages.id"), nullable=False, index=True)
     available_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     call_attempts_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    
+    # --- ARCHITECTURAL TRADEOFF NOTE ---
+    # PostgreSQL JSONB is chosen for 'custom_fields' to maximize implementation speed, 
+    # vertical flexibility, and database schema stability across 10,000+ organizations. 
+    # If advanced query/analytical reporting or workflow automation loads exceed the 
+    # capabilities of JSONB indexing, future versions may refactor this property to a 
+    # fully normalized value-storage table model (e.g. LeadCustomFieldValue).
+    custom_fields: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    
     attachments: Mapped[list | None] = mapped_column(JSON, nullable=True)  # list of {filename, url, size, uploaded_by, uploaded_at}
     converted_contact_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contacts.id"), nullable=True, index=True)
     converted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
@@ -42,4 +52,6 @@ class Lead(BaseModel):
 
     # Relationships
     import_batch: Mapped["LeadImport | None"] = relationship("LeadImport", back_populates="leads")
+    pipeline: Mapped["Pipeline | None"] = relationship("Pipeline", back_populates="leads")
     stage: Mapped["PipelineStage"] = relationship("PipelineStage", back_populates="leads")
+
