@@ -318,10 +318,17 @@ async def lifespan(app: FastAPI):
             "Set JWT_SECRET_KEY in your environment / .env file."
         )
 
-    # NOTE: Schema is managed by Alembic migrations (run via entrypoint.sh).
-    # Base.metadata.create_all is intentionally NOT called here in production.
-    # For local dev without Alembic, set RUN_CREATE_ALL=true in your .env.
-    if os.getenv("RUN_CREATE_ALL", "false").lower() == "true":
+    # WP-03A: verify the runtime DB role is unprivileged (fail-closed in production,
+    # warn-only in dev so a single-superuser local setup still boots). Guards against
+    # accidentally running the app with the migrator/owner/superuser account.
+    from app.core.database import verify_runtime_privileges
+    await verify_runtime_privileges()
+
+    # NOTE: Schema is managed by Alembic migrations, run as the crm_migrator role in a
+    # dedicated migration step (see docker-compose.prod.yml `migrate` service /
+    # ops/deploy.sh). Base.metadata.create_all is a local-dev-only escape hatch and is
+    # hard-blocked in production by Settings.validate_production_config.
+    if settings.RUN_CREATE_ALL:
         from app.models.base import Base
         from app.core.database import engine
         async with engine.begin() as conn:

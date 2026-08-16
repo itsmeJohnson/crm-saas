@@ -38,6 +38,32 @@ services:
     networks:
       - backend_net
 
+  # ── WP-03A: dedicated migration step (runs as the crm_migrator role) ─────────
+  # Runs `alembic upgrade head` ONCE and exits, BEFORE the application starts.
+  # Set MIGRATOR_DATABASE_URL to the crm_migrator connection string in .env to
+  # activate role separation; if left empty it falls back to the POSTGRES_* single
+  # role (backward compatible). The application container never runs migrations.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: crm-migrate-prod
+    entrypoint: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB must be set in .env}
+      - MIGRATOR_DATABASE_URL=${MIGRATOR_DATABASE_URL:-}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend_net
+
   backend:
     build:
       context: ./backend
@@ -49,6 +75,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER must be set in .env}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB must be set in .env}
+      # WP-03A: set RUNTIME_DATABASE_URL to the crm_runtime connection string in
+      # .env to activate role separation; empty = falls back to POSTGRES_* single role.
+      - RUNTIME_DATABASE_URL=${RUNTIME_DATABASE_URL:-}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
@@ -66,6 +95,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 15s

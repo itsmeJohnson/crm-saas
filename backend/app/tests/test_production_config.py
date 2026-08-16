@@ -3,8 +3,12 @@ from pydantic import ValidationError
 from app.core.config import Settings
 
 def test_production_profile_validation_success():
-    # Correct configuration should validate successfully
+    # Correct configuration should validate successfully.
+    # _env_file=None isolates from a developer's local .env (which may set
+    # RUN_CREATE_ALL=true, correctly rejected in production by WP-03A) so this
+    # happy-path test is deterministic across environments.
     settings = Settings(
+        _env_file=None,
         ENVIRONMENT="production",
         JWT_SECRET_KEY="a_very_secure_custom_secret_key_12345",
         POSTGRES_USER="custom_admin",

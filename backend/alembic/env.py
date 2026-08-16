@@ -15,7 +15,10 @@ from app.core.config import settings
 from app.models.base import Base
 import app.models
 
-config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
+# WP-03A: Alembic connects as the schema-owning crm_migrator role when
+# MIGRATOR_DATABASE_URL is configured; otherwise falls back to the legacy single
+# URL for single-role local development. It must NOT use the runtime role's URL.
+config.set_main_option("sqlalchemy.url", settings.migrator_database_uri)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
