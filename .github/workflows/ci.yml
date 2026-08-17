@@ -48,7 +48,7 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         env:
-          SQLALCHEMY_DATABASE_URI: sqlite+aiosqlite:///:memory:
+          SQLALCHEMY_DATABASE_URI: "sqlite+aiosqlite:///:memory:"
           REDIS_URL: redis://localhost:6379/0
           JWT_SECRET_KEY: ci_test_secret_key_not_for_production_1234567
           ENVIRONMENT: development
