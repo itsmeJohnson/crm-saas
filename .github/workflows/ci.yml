@@ -48,7 +48,7 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         env:
-          SQLALCHEMY_DATABASE_URI: sqlite+aiosqlite:///:memory:
+          SQLALCHEMY_DATABASE_URI: "sqlite+aiosqlite:///:memory:"
           REDIS_URL: redis://localhost:6379/0
           JWT_SECRET_KEY: ci_test_secret_key_not_for_production_1234567
           ENVIRONMENT: development
@@ -168,3 +168,85 @@ jobs:
         if: failure()
         run: |
           echo "❌ Deploy failed — check logs above"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 4: WP-03A — PostgreSQL database role separation (real Postgres)
+# Proves DB-level role isolation and that Alembic runs under the crm_migrator role.
+# Independent of deploy; does not gate deployment.
+# ─────────────────────────────────────────────────────────────────────────────
+  wp03a-db-roles:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      WP03A_TEST_DB_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: WP-03A role / privilege tests (real PostgreSQL)
+        working-directory: backend
+        run: pytest app/tests/test_wp03a_role_separation.py app/tests/test_wp03a_config_guard.py -v --tb=short
+
+      - name: Schema management runs under the crm_migrator role
+        # Proves the crm_migrator credential path works end-to-end: the migrator role
+        # (unprivileged: no superuser/createrole/bypassrls) builds the schema and
+        # Alembic manages the version table under MIGRATOR_DATABASE_URL. NOTE: an
+        # empty-DB `alembic upgrade head` is not used because the migration chain is
+        # not bootstrappable from zero (pre-existing: the base schema is created by
+        # ORM create_all, then Alembic applies increments — see WP-03A report).
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE crm_migrator LOGIN PASSWORD 'migpw' NOSUPERUSER NOCREATEROLE NOCREATEDB NOBYPASSRLS;"
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE crm_mig OWNER crm_migrator;"
+          cd backend
+          MIGRATOR_URL="postgresql+asyncpg://crm_migrator:migpw@localhost:5432/crm_mig"
+          python - <<'PY'
+          import asyncio
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.models.base import Base
+          import app.models  # register all models
+          async def main():
+              eng = create_async_engine("postgresql+asyncpg://crm_migrator:migpw@localhost:5432/crm_mig")
+              async with eng.begin() as c:
+                  await c.run_sync(Base.metadata.create_all)
+              await eng.dispose()
+              print("create_all OK as crm_migrator")
+          asyncio.run(main())
+          PY
+          MIGRATOR_DATABASE_URL="$MIGRATOR_URL" alembic stamp head
+          echo "-- migrator owns the tables; alembic_version is set --"
+          PGPASSWORD=migpw psql -h localhost -U crm_migrator -d crm_mig \
+            -c "SELECT count(*) AS tables_owned_by_migrator FROM pg_tables WHERE schemaname='public' AND tableowner='crm_migrator';" \
+            -c "SELECT version_num FROM alembic_version;"

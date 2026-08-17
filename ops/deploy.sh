@@ -31,10 +31,21 @@ docker compose up -d --build "${SERVICES[@]}"
 
 # Apply DB migrations (idempotent; no-op when already at head). Only when the
 # backend is part of this deploy.
+# WP-03A: run migrations in a DEDICATED step as the crm_migrator role via the
+# `migrate` service (docker-compose.prod.yml), NOT inside the runtime container.
+# Falls back to the legacy in-container run only if no migrate service is defined
+# (e.g. an older compose file), and warns that it runs as the runtime role.
 if printf '%s\n' "${SERVICES[@]}" | grep -qx backend; then
-  echo "==> [4/5] Applying DB migrations (alembic upgrade head)…"
-  sleep 4  # let the backend container settle
-  docker exec crm-backend alembic upgrade head
+  echo "==> [4/5] Applying DB migrations (dedicated migrator step)…"
+  sleep 4  # let the DB settle
+  if docker compose config --services 2>/dev/null | grep -qx migrate; then
+    docker compose run --rm migrate
+  else
+    echo "    ⚠ No 'migrate' service found — falling back to in-container alembic."
+    echo "      This runs as the RUNTIME role; provision crm_migrator + the migrate"
+    echo "      service to complete WP-03A role separation (see ops/roles/README.md)."
+    docker exec crm-backend alembic upgrade head
+  fi
 fi
 
 echo "==> [5/5] Waiting for backend health…"

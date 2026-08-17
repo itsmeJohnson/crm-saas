@@ -60,6 +60,21 @@ class Settings(BaseSettings):
         db = os.environ.get("POSTGRES_DB") or data.get("POSTGRES_DB", "crm")
         return f"postgresql+asyncpg://{user}:{password}@{server}/{db}"
 
+    # ── WP-03A: database role separation ──────────────────────────────────────
+    # Optional per-role connection URLs. When provided, the application runtime
+    # connects as the unprivileged `crm_runtime` role via RUNTIME_DATABASE_URL,
+    # while Alembic migrations connect as the schema-owning `crm_migrator` role
+    # via MIGRATOR_DATABASE_URL. When either is absent it falls back to
+    # SQLALCHEMY_DATABASE_URI, so existing single-role local development keeps
+    # working unchanged. See ops/roles/README.md.
+    RUNTIME_DATABASE_URL: str | None = None
+    MIGRATOR_DATABASE_URL: str | None = None
+
+    # Local-dev-only schema bootstrap via Base.metadata.create_all. Alembic is the
+    # sole schema authority; this escape hatch is hard-blocked in production by
+    # validate_production_config so the runtime role never needs DDL privileges.
+    RUN_CREATE_ALL: bool = False
+
     # Redis
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
@@ -118,6 +133,18 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"
 
+    @property
+    def runtime_database_uri(self) -> str:
+        """DB URL the FastAPI runtime / background jobs connect with.
+        Prefers the dedicated crm_runtime URL; falls back to the legacy single URL."""
+        return self.RUNTIME_DATABASE_URL or self.SQLALCHEMY_DATABASE_URI
+
+    @property
+    def migrator_database_uri(self) -> str:
+        """DB URL Alembic connects with. Prefers the schema-owning crm_migrator URL;
+        falls back to the legacy single URL for single-role local development."""
+        return self.MIGRATOR_DATABASE_URL or self.SQLALCHEMY_DATABASE_URI
+
     @model_validator(mode="after")
     def validate_production_config(self) -> "Settings":
         if self.ENVIRONMENT == "production":
@@ -128,6 +155,15 @@ class Settings(BaseSettings):
             if self.POSTGRES_PASSWORD == "postgres" or self.POSTGRES_USER == "postgres":
                 raise ValueError(
                     "Default PostgreSQL credentials (postgres/postgres) cannot be used in production environment."
+                )
+            # WP-03A: Alembic is the sole schema authority in production. Never let
+            # the application runtime issue DDL via create_all — that would require
+            # granting CREATE to crm_runtime and defeats role separation. Fail closed.
+            if self.RUN_CREATE_ALL:
+                raise ValueError(
+                    "RUN_CREATE_ALL must not be enabled in production. Schema is managed "
+                    "exclusively by Alembic (run as the crm_migrator role in a dedicated "
+                    "migration step). Unset RUN_CREATE_ALL and rely on 'alembic upgrade head'."
                 )
         return self
 
