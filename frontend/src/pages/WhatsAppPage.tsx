@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MessageCircle, Send, Loader2, Search, Check, CheckCheck, Clock, Paperclip,
-  FileText, Image as ImageIcon, Video, Mic, UserCheck, Zap, AlertTriangle, X,
-  Lock, Unlock, Tag, Trash2, Plus, Flag, AlertCircle, RefreshCw, UserPlus, Eye
+  FileText, Image as ImageIcon, Video, Mic, Zap, AlertTriangle, X,
+  Lock, Unlock, Tag, UserPlus, Eye
 } from 'lucide-react';
 import { whatsappApi, WaConversation, WaThread, WaMessage, QuickReply, WaLabel } from '../services/whatsappApi';
 import { communicationApi, CommTemplate } from '../services/communicationApi';
 import { userApi } from '../services/userApi';
 import { useAuthStore } from '../store/authStore';
 import { extractErrorMessage } from '../utils/errors';
+
+const SLA_TIME_MINUTES = 15;
 
 const StatusTick: React.FC<{ status: string }> = ({ status }) => {
   if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-400" />;

@@ -17,7 +17,7 @@ export interface CommStats {
   by_channel: { label: string; count: number }[]; by_direction: { label: string; count: number }[];
 }
 
-export interface CommTemplate { id: string; organization_id: string; name: string; channel: string; subject: string | null; body: string; created_at: string }
+export interface CommTemplate { id: string; organization_id: string; name: string; channel: string; subject: string | null; body: string; created_at: string; language?: string }
 
 export interface FeedFilters {
   lead_id?: string; contact_id?: string; company_id?: string; channel?: string; direction?: string;

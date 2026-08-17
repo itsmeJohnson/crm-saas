@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Receipt, Search, RefreshCw, Eye, DollarSign, CheckCircle2, AlertCircle, CreditCard, Plus, FileText, Download, MessageCircle
+  Receipt, Search, RefreshCw, Plus, Download, MessageCircle
 } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';
 import { RecordPaymentModal } from '../../components/dental/RecordPaymentModal';
 import { CreateInvoiceModal } from '../../components/dental/CreateInvoiceModal';
-import { PatientProfileModal } from '../../components/dental/PatientProfileModal';
+
 
 export const BillingPage: React.FC = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -48,8 +48,7 @@ export const BillingPage: React.FC = () => {
       alert('Could not download the invoice PDF.');
     }
   };
-  const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
 
   useEffect(() => {
     fetchInvoices();

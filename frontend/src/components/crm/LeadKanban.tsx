@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useLeadStore } from '../../store/leadStore';
 import { useMetadataStore } from '../../store/metadataStore';
 import { LeadResponse } from '../../services/leadApi';
-import { DollarSign, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 
 interface LeadKanbanProps {

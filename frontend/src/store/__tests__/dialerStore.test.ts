@@ -129,7 +129,11 @@ describe('dialerStore', () => {
     const lead = { id: 'lead-9', first_name: 'Called', last_name: 'Lead', phone: '+91********83' } as any;
     vi.mocked(dialerApi.callLead).mockResolvedValueOnce(lead);
 
-    await useDialerStore.getState().callSpecificLead('lead-9', 'k-key', 'srn', '+91999');
+    await useDialerStore.getState().callSpecificLead('lead-9', {
+      knowlarity_api_key: 'k-key',
+      knowlarity_srn: 'srn',
+      agent_phone_number: '+91999',
+    });
 
     expect(dialerApi.callLead).toHaveBeenCalledWith('lead-9', {
       knowlarity_api_key: 'k-key',
@@ -144,7 +148,11 @@ describe('dialerStore', () => {
 
   it('callSpecificLead surfaces the backend error and stays IDLE', async () => {
     vi.mocked(dialerApi.callLead).mockRejectedValueOnce({ response: { data: { detail: 'Calling is not configured.' } } });
-    await expect(useDialerStore.getState().callSpecificLead('lead-9', '', '', '')).rejects.toBeTruthy();
+    await expect(useDialerStore.getState().callSpecificLead('lead-9', {
+      knowlarity_api_key: '',
+      knowlarity_srn: '',
+      agent_phone_number: '',
+    })).rejects.toBeTruthy();
     const s = useDialerStore.getState();
     expect(s.agentState).toBe('IDLE');
     expect(s.error).toBe('Calling is not configured.');

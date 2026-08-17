@@ -9,12 +9,10 @@ import {
   Building, 
   FileText,
   UserCheck,
-  LogOut,
-  Settings
+  LogOut
 } from 'lucide-react';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
-import { useAuthStore } from '../../store/authStore';
 import { MaskedField } from '../common/MaskedField';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
@@ -38,9 +36,6 @@ export const DialerConsole: React.FC = () => {
   } = useDialerStore();
 
   const { stages, fetchStages } = usePipelineStore();
-  // Integrated click-to-call is a paid feature; without it the cockpit runs in
-  // manual mode (fetch lead → agent calls on own phone → log disposition).
-  const callingEnabled = useAuthStore((s) => s.features.includes('OUTBOUND_CALLING'));
 
   // Local state for break countdown (15 minutes = 900 seconds)
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(900);
@@ -57,23 +52,6 @@ export const DialerConsole: React.FC = () => {
   const [collectivePooling, setCollectivePooling] = useState(false);
   const [showBreakMenu, setShowBreakMenu] = useState(false);
 
-  const [knowlarityApiKey, setKnowlarityApiKey] = useState(() => 
-    typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_knowlarity_api_key') || '') : ''
-  );
-  const [knowlaritySrn, setKnowlaritySrn] = useState(() => 
-    typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_knowlarity_srn') || '') : ''
-  );
-  const [agentPhoneNumber, setAgentPhoneNumber] = useState(() =>
-    typeof localStorage !== 'undefined' ? (localStorage.getItem('crm_agent_phone_number') || '') : ''
-  );
-  // Telephony provider + MyOperator (OBD) credentials.
-  const ls = (k: string) => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) || '' : '');
-  const [provider, setProvider] = useState(() => ls('crm_telephony_provider') || 'knowlarity');
-  const [myopXApiKey, setMyopXApiKey] = useState(() => ls('crm_myop_x_api_key'));
-  const [myopSecretKey, setMyopSecretKey] = useState(() => ls('crm_myop_secret_key'));
-  const [myopCompanyId, setMyopCompanyId] = useState(() => ls('crm_myop_company_id'));
-  const [myopPublicIvrId, setMyopPublicIvrId] = useState(() => ls('crm_myop_public_ivr_id'));
-  const [myopType, setMyopType] = useState(() => ls('crm_myop_type') || '1');
   const [autoDial, setAutoDial] = useState(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('crm_auto_dial');
@@ -81,7 +59,6 @@ export const DialerConsole: React.FC = () => {
     }
     return true;
   });
-  const [showSettings, setShowSettings] = useState(false);
   // Power dialer: seconds until the next auto-dial fires (null = no pending call)
   const [nextCallCountdown, setNextCallCountdown] = useState<number | null>(null);
   const [powerDelay, setPowerDelay] = useState(() => {
@@ -94,33 +71,7 @@ export const DialerConsole: React.FC = () => {
   const [pendingBreakReason, setPendingBreakReason] = useState<string | null>(null);
   const [showActiveBreakMenu, setShowActiveBreakMenu] = useState(false);
 
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('crm_knowlarity_api_key', knowlarityApiKey);
-    }
-  }, [knowlarityApiKey]);
 
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('crm_knowlarity_srn', knowlaritySrn);
-    }
-  }, [knowlaritySrn]);
-
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('crm_agent_phone_number', agentPhoneNumber);
-    }
-  }, [agentPhoneNumber]);
-
-  useEffect(() => {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem('crm_telephony_provider', provider);
-    localStorage.setItem('crm_myop_x_api_key', myopXApiKey);
-    localStorage.setItem('crm_myop_secret_key', myopSecretKey);
-    localStorage.setItem('crm_myop_company_id', myopCompanyId);
-    localStorage.setItem('crm_myop_public_ivr_id', myopPublicIvrId);
-    localStorage.setItem('crm_myop_type', myopType);
-  }, [provider, myopXApiKey, myopSecretKey, myopCompanyId, myopPublicIvrId, myopType]);
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -197,23 +148,7 @@ export const DialerConsole: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Provider-aware credential assembly for click-to-call.
-  const credsConfigured =
-    provider === 'myoperator'
-      ? Boolean(myopXApiKey && myopSecretKey && myopCompanyId && myopPublicIvrId)
-      : Boolean(knowlarityApiKey && agentPhoneNumber);
 
-  const buildCreds = () => ({
-    provider,
-    agent_phone_number: agentPhoneNumber || undefined,
-    knowlarity_api_key: knowlarityApiKey || undefined,
-    knowlarity_srn: knowlaritySrn || undefined,
-    myop_x_api_key: myopXApiKey || undefined,
-    myop_secret_key: myopSecretKey || undefined,
-    myop_company_id: myopCompanyId || undefined,
-    myop_public_ivr_id: myopPublicIvrId || undefined,
-    myop_type: myopType || '1',
-  });
 
   const handleStartDialing = async () => {
     setNextCallCountdown(null);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Activity, Plus, Search, RefreshCw, Eye, Stethoscope, CheckCircle2
+  Activity, Plus, Search, RefreshCw, Stethoscope
 } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';

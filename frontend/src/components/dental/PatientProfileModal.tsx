@@ -20,7 +20,6 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
   patient,
   isOpen,
   onClose,
-  onRefresh,
   onBookAppointment,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'treatments' | 'billing' | 'communications' | 'followups' | 'notes'>('overview');
@@ -29,7 +28,7 @@ export const PatientProfileModal: React.FC<PatientProfileModalProps> = ({
   const [invoices, setInvoices] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [_isLoading, setIsLoading] = useState<boolean>(false);
   const [newNote, setNewNote] = useState<string>('');
 
   useEffect(() => {
