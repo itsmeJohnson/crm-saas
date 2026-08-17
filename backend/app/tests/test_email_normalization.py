@@ -346,7 +346,13 @@ async def test_migration_logic(db: AsyncSession):
     import importlib.util
     import sys
     
+    import os
     mig_path = "/app/alembic/versions/email_normalize_0001_add_centralized_email_normalization.py"
+    if not os.path.exists(mig_path):
+        mig_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "..", "alembic", "versions",
+            "email_normalize_0001_add_centralized_email_normalization.py"
+        ))
     spec = importlib.util.spec_from_file_location("email_normalize_0001", mig_path)
     mig_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mig_mod)
