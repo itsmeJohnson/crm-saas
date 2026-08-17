@@ -207,6 +207,10 @@ export const whatsappApi = {
     (await api.post<WaMessage>('/whatsapp/send-text', payload)).data,
   sendTemplate: async (payload: { template_id?: string; template_name?: string; body?: string; conversation_id?: string; to_number?: string; lead_id?: string; contact_id?: string; settings_id?: string; language?: string; variables?: string[] }) =>
     (await api.post<WaMessage>('/whatsapp/send-template', payload)).data,
+  sendMedia: async (payload: FormData) =>
+    (await api.post<WaMessage>('/whatsapp/send-media', payload, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })).data,
 
   promoteContact: async (contactId: string) =>
     (await api.post<{ status: string; lead_id: string; title: string }>(`/whatsapp/contacts/${contactId}/convert-lead`)).data,

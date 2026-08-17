@@ -61,8 +61,6 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     try {
       const patient = patients.find(p => p.id === selectedPatientId) || initialPatient;
       const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Patient';
-
-      const [hours, mins] = apptTime.split(':').map(Number);
       const startDt = new Date(`${apptDate}T${apptTime}:00Z`);
       const endDt = new Date(startDt.getTime() + durationMins * 60000);
 

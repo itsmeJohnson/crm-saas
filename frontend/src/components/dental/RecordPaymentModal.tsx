@@ -19,7 +19,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [amount, setAmount] = useState<number>(invoice ? Number(invoice.total_amount) - Number(invoice.amount_paid || 0) : 5000);
   const [method, setMethod] = useState<string>('UPI');
   const [reference, setReference] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
+  const notes = '';
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   if (!isOpen || !invoice) return null;

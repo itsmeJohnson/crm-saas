@@ -124,7 +124,6 @@ import { MarketingPage } from './pages/dental/MarketingPage';
 import { LeadCapturePage } from './pages/dental/LeadCapturePage';
 import { InvoiceSettingsPage } from './pages/dental/InvoiceSettingsPage';
 import { TreatmentCatalogPage } from './pages/dental/TreatmentCatalogPage';
-import { DentalSettingsPage } from './pages/dental/DentalSettingsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
