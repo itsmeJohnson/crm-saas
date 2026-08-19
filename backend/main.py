@@ -29,6 +29,7 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.health import router as active_health_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.metadata import router as metadata_router
+from app.api.v1.custom_objects import router as custom_objects_router
 from app.api.v1.dialer import router as dialer_router
 from app.api.v1.calling import router as calling_router
 from app.api.v1.settings_calling import router as settings_calling_router
@@ -438,6 +439,7 @@ app.include_router(dashboard_router,       prefix=f"{settings.API_V1_STR}/dashbo
 app.include_router(active_health_router,   prefix=f"{settings.API_V1_STR}/health",          tags=["health"])
 app.include_router(pipelines_router,       prefix=f"{settings.API_V1_STR}/pipelines",       tags=["pipelines"])
 app.include_router(metadata_router,        prefix=f"{settings.API_V1_STR}/metadata",        tags=["metadata"])
+app.include_router(custom_objects_router,  prefix=f"{settings.API_V1_STR}/objects",         tags=["custom-objects"])
 app.include_router(dialer_router,          prefix=f"{settings.API_V1_STR}/dialer",          tags=["dialer"])
 app.include_router(calling_router,         prefix=f"{settings.API_V1_STR}/calling",         tags=["calling"])
 app.include_router(settings_calling_router, prefix=f"{settings.API_V1_STR}/settings/calling", tags=["settings-telephony"])

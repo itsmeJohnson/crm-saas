@@ -112,29 +112,15 @@ class ContactRelationshipResponse(BaseModel):
 
 
 # --- Custom field definitions ---
-class CustomFieldDefinitionCreate(BaseModel):
-    key: str = Field(..., max_length=80, pattern=r"^[a-zA-Z0-9_]+$")
-    label: str = Field(..., max_length=150)
-    field_type: str = Field("text", max_length=30)
-    options: list[str] | None = None
-
-class CustomFieldDefinitionUpdate(BaseModel):
-    label: str | None = Field(None, max_length=150)
-    field_type: str | None = Field(None, max_length=30)
-    options: list[str] | None = None
-    is_active: bool | None = None
-
-class CustomFieldDefinitionResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    organization_id: uuid.UUID
-    entity_type: str
-    key: str
-    label: str
-    field_type: str
-    options: list[str] | None = None
-    is_active: bool
+# Re-export the canonical Custom Fields Engine schemas (Phase 4.1) so contacts
+# and metadata share ONE definition — options as {value,label}, the full field
+# type set, reserved-key/validation support. Kept here as names for backward
+# compatibility with existing `from app.schemas.contact import ...` callers.
+from app.schemas.custom_field import (  # noqa: E402,F401
+    CustomFieldDefinitionCreate,
+    CustomFieldDefinitionUpdate,
+    CustomFieldDefinitionResponse,
+)
 
 
 # --- Reports ---

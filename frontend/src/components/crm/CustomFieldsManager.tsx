@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { contactApi, CustomFieldDefinition } from '../../services/contactApi';
 import { X, Plus, Trash2 } from 'lucide-react';
 
-const FIELD_TYPES = ['text', 'number', 'date', 'select', 'checkbox'];
+const FIELD_TYPES = [
+  'text', 'textarea', 'number', 'currency', 'percentage', 'date', 'datetime',
+  'boolean', 'email', 'phone', 'url', 'select', 'multiselect',
+];
+const OPTION_TYPES = ['select', 'multiselect'];
 
 export const CustomFieldsManager: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
@@ -34,7 +38,9 @@ export const CustomFieldsManager: React.FC<{ isOpen: boolean; onClose: () => voi
         key: key.trim(),
         label: label.trim(),
         field_type: fieldType,
-        options: fieldType === 'select' ? options.split(',').map((o) => o.trim()).filter(Boolean) : undefined,
+        options: OPTION_TYPES.includes(fieldType)
+          ? options.split(',').map((o) => o.trim()).filter(Boolean)
+          : undefined,
       });
       setKey('');
       setLabel('');
@@ -61,14 +67,14 @@ export const CustomFieldsManager: React.FC<{ isOpen: boolean; onClose: () => voi
 
         <div className="space-y-2 p-3 bg-slate-950/40 border border-slate-800/70 rounded-xl">
           <div className="grid grid-cols-2 gap-2">
-            <input value={key} onChange={(e) => setKey(e.target.value.replace(/[^a-zA-Z0-9_]/g, '_'))} placeholder="key (e.g. loyalty)" className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200" />
+            <input value={key} onChange={(e) => setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} placeholder="key (e.g. loyalty)" className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200" />
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label" className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <select value={fieldType} onChange={(e) => setFieldType(e.target.value)} className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200">
               {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-            {fieldType === 'select' && (
+            {OPTION_TYPES.includes(fieldType) && (
               <input value={options} onChange={(e) => setOptions(e.target.value)} placeholder="comma,options" className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200" />
             )}
           </div>

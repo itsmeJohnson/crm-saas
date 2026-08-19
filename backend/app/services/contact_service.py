@@ -26,26 +26,55 @@ class ContactService:
         self.audit_service = AuditService(db)
         self.notification_service = NotificationService(db)
 
-    async def _validate_custom_fields(self, actor: User, custom_fields: dict | None) -> None:
-        """Reject custom_fields whose keys are not defined + active for the org."""
-        if not custom_fields:
+    async def _apply_custom_fields(
+        self,
+        actor: User,
+        contact_data: dict,
+        existing_contact: Contact | None = None,
+    ) -> None:
+        """Validate + sanitize contact custom fields with the SAME type-aware
+        MetadataValidationEngine used for Leads (G2), and write the sanitized
+        result back into ``contact_data['custom_fields']``.
+
+        On update, merges the incoming payload over the stored values so partial
+        updates keep untouched fields, and drops keys explicitly cleared with an
+        empty/None value (mirrors the Lead update semantics).
+        """
+        if "custom_fields" not in contact_data:
             return
-        from app.models.custom_field_definition import CustomFieldDefinition
-        res = await self.db.execute(
-            select(CustomFieldDefinition.key).filter(
-                CustomFieldDefinition.organization_id == actor.organization_id,
-                CustomFieldDefinition.entity_type == "contact",
-                CustomFieldDefinition.is_active == True,
-                CustomFieldDefinition.is_deleted == False,
-            )
+        from app.services.custom_field_service import CustomFieldService
+        from app.services.metadata_validation_engine import (
+            MetadataValidationEngine,
+            MetadataValidationError,
         )
-        valid_keys = {k for k in res.scalars().all()}
-        unknown = [k for k in custom_fields.keys() if k not in valid_keys]
-        if unknown:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown custom field(s): {', '.join(unknown)}. Define them first.",
+
+        cf_service = CustomFieldService(self.db)
+        definitions = await cf_service.list_definitions(actor, "contact")
+        incoming_cf = contact_data.get("custom_fields") or {}
+
+        if existing_contact is not None:
+            def_map = {d.key: d for d in definitions if d.is_active}
+            merged = dict(existing_contact.custom_fields or {})
+            for key, val in incoming_cf.items():
+                definition = def_map.get(key)
+                is_required = bool(definition and (definition.validation_rules or {}).get("required") is True)
+                if (val is None or val == "") and not is_required:
+                    merged.pop(key, None)
+                else:
+                    merged[key] = val
+            payload = merged
+            exclude_id = existing_contact.id
+        else:
+            payload = incoming_cf
+            exclude_id = None
+
+        try:
+            sanitized = await MetadataValidationEngine.validate_and_sanitize(
+                self.db, Contact, actor.organization_id, definitions, payload, exclude_id=exclude_id
             )
+        except MetadataValidationError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        contact_data["custom_fields"] = sanitized
 
     async def _notify_assignment(self, actor: User, contact: Contact) -> None:
         if contact.assigned_user_id and contact.assigned_user_id != actor.id:
@@ -113,7 +142,7 @@ class ContactService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
-        await self._validate_custom_fields(actor, contact_data.get("custom_fields"))
+        await self._apply_custom_fields(actor, contact_data)
 
         contact = await self.contact_repo.create_contact(actor.organization_id, contact_data, actor.id)
 
@@ -195,7 +224,7 @@ class ContactService:
                     detail="Assigned user not found or inactive in your organization"
                 )
 
-        await self._validate_custom_fields(actor, contact_data.get("custom_fields"))
+        await self._apply_custom_fields(actor, contact_data, existing_contact=contact)
 
         prev_assignee = contact.assigned_user_id
         updated = await self.contact_repo.update_contact(actor.organization_id, contact_id, contact_data)

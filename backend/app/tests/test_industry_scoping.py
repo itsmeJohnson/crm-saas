@@ -122,3 +122,13 @@ async def test_insurance_and_loan_recovery_templates(client: AsyncClient, db: As
     assert "patients" not in crm_config_rec["enabled_modules"]
     assert "treatments" not in crm_config_rec["enabled_modules"]
 
+    # Direct API access to a disabled Dental module must return an authorization
+    # failure (403) for BOTH non-dental verticals, not merely hide it from bootstrap.
+    r_ins = await client.get("/api/v1/treatment-catalog/", headers=headers_ins)
+    assert r_ins.status_code == 403
+    assert "not enabled" in r_ins.json().get("detail", "")
+
+    r_rec = await client.get("/api/v1/treatment-catalog/", headers=headers_rec)
+    assert r_rec.status_code == 403
+    assert "not enabled" in r_rec.json().get("detail", "")
+

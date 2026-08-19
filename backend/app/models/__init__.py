@@ -39,6 +39,7 @@ from app.models.lead_reminder import LeadReminder
 from app.models.escalation_config import EscalationConfig
 from app.models.workflow_rule import WorkflowRule
 from app.models.custom_field_definition import CustomFieldDefinition
+from app.models.custom_object import CustomObjectDefinition, CustomObjectRecord
 from app.models.contact_relationship import ContactRelationship
 from app.models.customer_order import CustomerOrder
 from app.models.customer_invoice import CustomerInvoice
@@ -154,6 +155,8 @@ __all__ = [
     "EscalationConfig",
     "WorkflowRule",
     "CustomFieldDefinition",
+    "CustomObjectDefinition",
+    "CustomObjectRecord",
     "ContactRelationship",
     "CustomerOrder",
     "CustomerInvoice",

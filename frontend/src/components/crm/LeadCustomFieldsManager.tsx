@@ -3,7 +3,11 @@ import { metadataApi, CustomFieldDefinition } from '../../services/metadataApi';
 import { useMetadataStore } from '../../store/metadataStore';
 import { X, Plus, Trash2, Loader2 } from 'lucide-react';
 
-const FIELD_TYPES = ['text', 'number', 'date', 'select', 'checkbox'];
+const FIELD_TYPES = [
+  'text', 'textarea', 'number', 'currency', 'percentage', 'date', 'datetime',
+  'boolean', 'email', 'phone', 'url', 'select', 'multiselect',
+];
+const OPTION_TYPES = ['select', 'multiselect'];
 
 export const LeadCustomFieldsManager: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const { refresh } = useMetadataStore();
@@ -40,7 +44,7 @@ export const LeadCustomFieldsManager: React.FC<{ isOpen: boolean; onClose: () =>
           key: key.trim().toLowerCase(),
           label: label.trim(),
           field_type: fieldType,
-          options: fieldType === 'select' ? options.split(',').map((o) => o.trim()).filter(Boolean) : undefined,
+          options: OPTION_TYPES.includes(fieldType) ? options.split(',').map((o) => o.trim()).filter(Boolean) : undefined,
           validation_rules: required ? { required: true } : undefined,
         },
         'lead',
@@ -86,7 +90,7 @@ export const LeadCustomFieldsManager: React.FC<{ isOpen: boolean; onClose: () =>
             <select value={fieldType} onChange={(e) => setFieldType(e.target.value)} className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200">
               {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-            {fieldType === 'select' && (
+            {OPTION_TYPES.includes(fieldType) && (
               <input value={options} onChange={(e) => setOptions(e.target.value)} placeholder="comma,separated,options" className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200" />
             )}
           </div>

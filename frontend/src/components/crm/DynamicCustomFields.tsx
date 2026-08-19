@@ -1,5 +1,5 @@
 import React from 'react';
-import { CustomFieldDefinition } from '../../services/metadataApi';
+import { CustomFieldDefinition, normalizeFieldOptions } from '../../services/metadataApi';
 
 interface DynamicCustomFieldsProps {
   definitions: CustomFieldDefinition[];
@@ -44,8 +44,19 @@ export const DynamicCustomFields: React.FC<DynamicCustomFieldsProps> = ({
     const required = isRequired(def);
     const disabled = def.read_only;
 
+    const options = normalizeFieldOptions(def.options);
+    const isBoolean = def.field_type === 'boolean' || def.field_type === 'checkbox';
+    // HTML input `type` for the simple textual variants.
+    const textInputType: Record<string, string> = {
+      email: 'email',
+      phone: 'tel',
+      url: 'url',
+      datetime: 'datetime-local',
+    };
+
     let control: React.ReactNode;
     switch (def.field_type) {
+      case 'boolean':
       case 'checkbox':
         control = (
           <label className="inline-flex items-center gap-2 cursor-pointer select-none">
@@ -60,6 +71,18 @@ export const DynamicCustomFields: React.FC<DynamicCustomFieldsProps> = ({
           </label>
         );
         break;
+      case 'textarea':
+        control = (
+          <textarea
+            value={val ?? ''}
+            disabled={disabled}
+            rows={3}
+            placeholder={def.placeholder || ''}
+            onChange={(e) => onChange(def.key, e.target.value)}
+            className={`${inputCls} resize-y ${err ? 'border-red-500/50' : ''}`}
+          />
+        );
+        break;
       case 'select':
         control = (
           <select
@@ -69,25 +92,69 @@ export const DynamicCustomFields: React.FC<DynamicCustomFieldsProps> = ({
             className={selectCls}
           >
             <option value="">{def.placeholder || 'Select…'}</option>
-            {(def.options || []).map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
         );
         break;
-      case 'number':
+      case 'multiselect': {
+        const selected: string[] = Array.isArray(val) ? val : val ? [val] : [];
+        const toggle = (optValue: string) => {
+          const next = selected.includes(optValue)
+            ? selected.filter((v) => v !== optValue)
+            : [...selected, optValue];
+          onChange(def.key, next);
+        };
         control = (
-          <input
-            type="number"
-            step="any"
-            value={val ?? ''}
-            disabled={disabled}
-            placeholder={def.placeholder || ''}
-            onChange={(e) => onChange(def.key, e.target.value === '' ? null : Number(e.target.value))}
-            className={`${inputCls} ${err ? 'border-red-500/50' : ''}`}
-          />
+          <div className="flex flex-wrap gap-2">
+            {options.map((opt) => {
+              const active = selected.includes(opt.value);
+              return (
+                <button
+                  type="button"
+                  key={opt.value}
+                  disabled={disabled}
+                  onClick={() => toggle(opt.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs border transition ${
+                    active
+                      ? 'bg-brand-500/20 border-brand-500/60 text-brand-200'
+                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        );
+        break;
+      }
+      case 'number':
+      case 'currency':
+      case 'percentage':
+        control = (
+          <div className="relative">
+            {def.field_type === 'currency' && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">₹</span>
+            )}
+            <input
+              type="number"
+              step="any"
+              value={val ?? ''}
+              disabled={disabled}
+              placeholder={def.placeholder || ''}
+              onChange={(e) => onChange(def.key, e.target.value === '' ? null : Number(e.target.value))}
+              className={`${inputCls} ${def.field_type === 'currency' ? 'pl-8' : ''} ${
+                def.field_type === 'percentage' ? 'pr-8' : ''
+              } ${err ? 'border-red-500/50' : ''}`}
+            />
+            {def.field_type === 'percentage' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+            )}
+          </div>
         );
         break;
       case 'date':
@@ -102,9 +169,10 @@ export const DynamicCustomFields: React.FC<DynamicCustomFieldsProps> = ({
         );
         break;
       default:
+        // text, textarea handled above; email/phone/url/datetime + text fall here.
         control = (
           <input
-            type="text"
+            type={textInputType[def.field_type] || 'text'}
             value={val ?? ''}
             disabled={disabled}
             placeholder={def.placeholder || ''}
@@ -116,7 +184,7 @@ export const DynamicCustomFields: React.FC<DynamicCustomFieldsProps> = ({
 
     return (
       <div key={def.id}>
-        {def.field_type !== 'checkbox' && (
+        {!isBoolean && (
           <label className={labelCls}>
             {def.label} {required && <span className="text-red-400">*</span>}
           </label>

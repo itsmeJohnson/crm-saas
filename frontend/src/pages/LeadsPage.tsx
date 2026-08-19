@@ -12,6 +12,7 @@ import { LeadReminders } from '../components/crm/LeadReminders';
 import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse, LeadReport } from '../services/leadApi';
+import { normalizeFieldOptions } from '../services/metadataApi';
 import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
@@ -381,7 +382,7 @@ export const LeadsPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
                   >
                     <option value="">{f.label}: All</option>
-                    {(f.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 ) : (
                   <input

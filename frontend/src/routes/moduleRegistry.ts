@@ -92,6 +92,7 @@ const SLAPage = lazy(() => import('../pages/SLAPage').then(m => ({ default: m.SL
 const EscalationPage = lazy(() => import('../pages/EscalationPage').then(m => ({ default: m.EscalationPage })));
 const PipelineSettings = lazy(() => import('../components/admin/PipelineSettings').then(m => ({ default: m.PipelineSettings })));
 const TenantsPage = lazy(() => import('../pages/TenantsPage').then(m => ({ default: m.TenantsPage })));
+const CustomObjectsPage = lazy(() => import('../pages/CustomObjectsPage').then(m => ({ default: m.CustomObjectsPage })));
 const TrialRequestsPage = lazy(() => import('../pages/TrialRequestsPage').then(m => ({ default: m.TrialRequestsPage })));
 
 // Lazy-loaded self-service portal components
@@ -394,6 +395,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/targets', component: TargetsPage },
       { path: '/approvals', component: ApprovalsPage },
       { path: '/roles', component: RolesPermissionsPage, roles: ['OrgAdmin'] },
+      { path: '/custom-objects', component: CustomObjectsPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Custom Objects', group: 'Administration', icon: Gauge } },
       { path: '/organization', component: Profile, roles: ['OrgAdmin'], sidebar: { name: 'Organization', icon: Building, group: 'Administration' } },
       { path: '/branches', component: BranchTerritoryPage, roles: ['OrgAdmin', 'Manager'] },
       // Billing Operations

@@ -38,19 +38,37 @@ async def bootstrap_metadata(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    # Fetch custom field definitions (utilizes caching)
+    # Fetch custom field definitions per supported entity (utilizes caching).
+    # `custom_fields` stays as the flat lead list for backward compatibility;
+    # `custom_fields_by_entity` is the per-entity map the frontend now consumes.
+    from app.core.reserved_fields import SUPPORTED_ENTITY_TYPES
     cf_service = CustomFieldService(db)
-    custom_fields = await cf_service.list_definitions(actor, "lead")
+    custom_fields_by_entity: dict[str, list] = {}
+    for entity in sorted(SUPPORTED_ENTITY_TYPES):
+        defs = await cf_service.list_definitions(actor, entity)
+        custom_fields_by_entity[entity] = [
+            CustomFieldDefinitionResponse.model_validate(cf) for cf in defs
+        ]
+    custom_fields = custom_fields_by_entity.get("lead", [])
 
     # Fetch pipelines and their stages (utilizes caching)
     pipelines = await list_pipelines(db, actor)
+
+    # Custom object definitions — eager (their FIELD defs load lazily per object
+    # via /metadata/custom-fields?entity_type=<key>, to keep bootstrap lean).
+    from app.services.custom_object_service import CustomObjectService
+    from app.schemas.custom_object import CustomObjectDefinitionResponse
+    objects = await CustomObjectService(db).list_objects(actor)
+    custom_objects = [CustomObjectDefinitionResponse.model_validate(o) for o in objects]
 
     # Resolve tenant config
     crm_config = await TenantConfigurationResolver(db).resolve_config(actor.organization_id)
 
     return {
         "metadata_version": org.metadata_version,
-        "custom_fields": [CustomFieldDefinitionResponse.model_validate(cf) for cf in custom_fields],
+        "custom_fields": custom_fields,
+        "custom_fields_by_entity": custom_fields_by_entity,
+        "custom_objects": custom_objects,
         "pipelines": [PipelineResponse.model_validate(p) for p in pipelines],
         "crm_config": crm_config
     }

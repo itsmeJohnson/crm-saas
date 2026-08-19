@@ -156,8 +156,12 @@ async def test_metadata_validation_engine_rules(db: AsyncSession, setup_test_org
     }, entity_type="lead")
 
     # 2. Number field with bounds
+    # NOTE: key changed from "score" → "credit_score" in Phase 4.1. "score" is a
+    # real first-class Lead column and is now a reserved custom-field key (G3), so
+    # a custom field may no longer shadow it. The test's intent (numeric min/max
+    # bounds) is unchanged; the key choice was incidental.
     cf_num = await cf_service.create_definition(admin_a, {
-        "key": "score",
+        "key": "credit_score",
         "label": "Lead Score",
         "field_type": "number",
         "validation_rules": {"min_value": 0, "max_value": 100}
@@ -201,7 +205,7 @@ async def test_metadata_validation_engine_rules(db: AsyncSession, setup_test_org
     # --- Test Passing Case ---
     payload = {
         "vip_code": "VIP-12",
-        "score": 45,
+        "credit_score": 45,
         "scheduled_date": "2026-08-04",
         "tier": "Gold",
         "unique_id": "U-999"
@@ -210,7 +214,7 @@ async def test_metadata_validation_engine_rules(db: AsyncSession, setup_test_org
         db, Lead, org_a.id, definitions, payload
     )
     assert sanitized["vip_code"] == "VIP-12"
-    assert sanitized["score"] == 45
+    assert sanitized["credit_score"] == 45
     assert sanitized["marketing_opt_in"] is True  # Injected default value!
 
     # --- Test Failing Pattern Case ---
@@ -221,7 +225,7 @@ async def test_metadata_validation_engine_rules(db: AsyncSession, setup_test_org
         )
 
     # --- Test Failing Min/Max Score Case ---
-    payload_bad_score = {"score": 150}
+    payload_bad_score = {"credit_score": 150}
     with pytest.raises(MetadataValidationError):
         await MetadataValidationEngine.validate_and_sanitize(
             db, Lead, org_a.id, definitions, payload_bad_score

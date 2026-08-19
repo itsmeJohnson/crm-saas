@@ -67,16 +67,10 @@ export interface ContactRelationship {
   related_contact_name: string | null;
 }
 
-export interface CustomFieldDefinition {
-  id: string;
-  organization_id: string;
-  entity_type: string;
-  key: string;
-  label: string;
-  field_type: string;
-  options: string[] | null;
-  is_active: boolean;
-}
+// Single source of truth for the custom-field definition shape (Phase 4.1):
+// re-export the canonical type so contacts, leads and the shared renderer agree.
+import type { CustomFieldDefinition, CustomFieldOptionInput } from './metadataApi';
+export type { CustomFieldDefinition, CustomFieldOptionInput } from './metadataApi';
 
 export interface ContactReportBucket {
   label: string;
@@ -225,7 +219,7 @@ export const contactApi = {
     return response.data;
   },
 
-  createCustomField: async (payload: { key: string; label: string; field_type?: string; options?: string[] }) => {
+  createCustomField: async (payload: { key: string; label: string; field_type?: string; options?: CustomFieldOptionInput[] }) => {
     const response = await api.post<CustomFieldDefinition>('/contacts/custom-fields', payload);
     return response.data;
   },

@@ -8,6 +8,8 @@ from app.models.custom_field_definition import CustomFieldDefinition
 from app.models.user import User
 from app.services.metadata_cache_service import MetadataCacheService
 from app.services.audit_service import AuditService
+from app.core.custom_field_types import is_valid_field_type, normalize_options, ALL_ACCEPTED_FIELD_TYPES
+from app.core.reserved_fields import is_supported_entity_type, is_reserved_key, SUPPORTED_ENTITY_TYPES
 
 
 class CustomFieldService:
@@ -97,9 +99,55 @@ class CustomFieldService:
         await MetadataCacheService.set_custom_fields(actor.organization_id, entity_type, cache_data)
         return definitions
 
+    async def _ensure_entity_type_allowed(self, entity_type: str, org_id) -> None:
+        """Entity-type allowlist (G4): a definition may target a Core entity
+        (lead/contact) OR an active custom-object key for this org (Phase 4.2)."""
+        if is_supported_entity_type(entity_type):
+            return
+        from app.models.custom_object import CustomObjectDefinition
+        exists = await self.db.execute(
+            select(CustomObjectDefinition.id).filter(
+                CustomObjectDefinition.organization_id == org_id,
+                CustomObjectDefinition.key == entity_type,
+                CustomObjectDefinition.is_active == True,
+                CustomObjectDefinition.is_deleted == False,
+            )
+        )
+        if not exists.scalar():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Custom fields are not supported for entity '{entity_type}'. "
+                       f"Supported: {', '.join(sorted(SUPPORTED_ENTITY_TYPES))} or an active custom object.",
+            )
+
+    def _validate_definition_input(self, entity_type: str, data: dict) -> None:
+        """Field-type registry (G1), reserved keys (G3), and select/multiselect
+        option normalisation (G5). Entity-type allowlist is checked separately
+        (async) in :meth:`create_definition`."""
+        field_type = data.get("field_type", "text")
+        if not is_valid_field_type(field_type):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported field type '{field_type}'. "
+                       f"Allowed: {', '.join(sorted(ALL_ACCEPTED_FIELD_TYPES))}.",
+            )
+        key = data.get("key")
+        if key and is_reserved_key(entity_type, key):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Custom field key '{key}' is reserved and cannot be used.",
+            )
+        if "options" in data and data.get("options") is not None:
+            try:
+                data["options"] = normalize_options(data["options"])
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid options: {e}")
+
     async def create_definition(self, actor: User, data: dict, entity_type: str = "contact") -> CustomFieldDefinition:
         self._ensure_admin(actor)
-        
+        await self._ensure_entity_type_allowed(entity_type, actor.organization_id)
+        self._validate_definition_input(entity_type, data)
+
         async with self.db.begin_nested():
             # enforce unique key per org+entity
             existing = await self.db.execute(
@@ -168,6 +216,12 @@ class CustomFieldService:
     async def update_definition(self, actor: User, definition_id: uuid.UUID, data: dict) -> CustomFieldDefinition:
         self._ensure_admin(actor)
         
+        if "options" in data and data.get("options") is not None:
+            try:
+                data["options"] = normalize_options(data["options"])
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid options: {e}")
+
         async with self.db.begin_nested():
             d = await self._get_owned(actor, definition_id)
             for key, val in data.items():

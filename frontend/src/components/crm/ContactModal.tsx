@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ContactResponse, contactApi, CustomFieldDefinition } from '../../services/contactApi';
+import { DynamicCustomFields } from './DynamicCustomFields';
 import { useContactStore } from '../../store/contactStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useUserStore } from '../../store/userStore';
@@ -242,37 +243,11 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           {definitions.length > 0 && (
             <div className="space-y-4 pt-2 border-t border-slate-800/60">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Custom Fields</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {definitions.map((def) => (
-                  <div key={def.id}>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">{def.label}</label>
-                    {def.field_type === 'select' && def.options ? (
-                      <select
-                        value={customValues[def.key] ?? ''}
-                        onChange={(e) => setCustomValues((p) => ({ ...p, [def.key]: e.target.value }))}
-                        className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
-                      >
-                        <option value="">—</option>
-                        {def.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : def.field_type === 'checkbox' ? (
-                      <input
-                        type="checkbox"
-                        checked={!!customValues[def.key]}
-                        onChange={(e) => setCustomValues((p) => ({ ...p, [def.key]: e.target.checked }))}
-                        className="accent-brand-500 w-5 h-5"
-                      />
-                    ) : (
-                      <input
-                        type={def.field_type === 'number' ? 'number' : def.field_type === 'date' ? 'date' : 'text'}
-                        value={customValues[def.key] ?? ''}
-                        onChange={(e) => setCustomValues((p) => ({ ...p, [def.key]: e.target.value }))}
-                        className="w-full px-4 py-3 rounded-xl glass-input"
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <DynamicCustomFields
+                definitions={definitions}
+                values={customValues}
+                onChange={(k, v) => setCustomValues((p) => ({ ...p, [k]: v }))}
+              />
             </div>
           )}
 

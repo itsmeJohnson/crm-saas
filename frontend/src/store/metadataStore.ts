@@ -1,10 +1,14 @@
 import { create } from 'zustand';
-import { metadataApi, CustomFieldDefinition, CrmConfig } from '../services/metadataApi';
+import { metadataApi, CustomFieldDefinition, CrmConfig, CustomObjectDefinitionLite } from '../services/metadataApi';
 import { Pipeline, PipelineStage } from '../services/pipelineApi';
 
 interface MetadataState {
   metadataVersion: number | null;
   customFields: CustomFieldDefinition[];
+  /** Per-entity definition map (Phase 4.1): { lead: [...], contact: [...] }. */
+  customFieldsByEntity: Record<string, CustomFieldDefinition[]>;
+  /** Custom object definitions (Phase 4.2), eager from bootstrap. */
+  customObjects: CustomObjectDefinitionLite[];
   pipelines: Pipeline[];
   crmConfig: CrmConfig | null;
   selectedPipelineId: string | null;
@@ -37,6 +41,8 @@ const sortStages = (stages: PipelineStage[]) =>
 export const useMetadataStore = create<MetadataState>((set, get) => ({
   metadataVersion: null,
   customFields: [],
+  customFieldsByEntity: {},
+  customObjects: [],
   pipelines: [],
   crmConfig: null,
   selectedPipelineId: null,
@@ -53,6 +59,8 @@ export const useMetadataStore = create<MetadataState>((set, get) => ({
       set({
         metadataVersion: data.metadata_version,
         customFields: data.custom_fields,
+        customFieldsByEntity: data.custom_fields_by_entity ?? { lead: data.custom_fields },
+        customObjects: data.custom_objects ?? [],
         pipelines,
         selectedPipelineId: defaultPipelineId(pipelines, get().selectedPipelineId),
         crmConfig: data.crm_config ?? {

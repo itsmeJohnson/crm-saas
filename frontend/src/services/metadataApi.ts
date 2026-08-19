@@ -1,7 +1,29 @@
 import { api } from './api';
 import { Pipeline } from './pipelineApi';
 
-export type CustomFieldType = 'text' | 'number' | 'date' | 'select' | 'checkbox';
+export type CustomFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'currency'
+  | 'percentage'
+  | 'date'
+  | 'datetime'
+  | 'boolean'
+  | 'email'
+  | 'phone'
+  | 'url'
+  | 'select'
+  | 'multiselect'
+  | 'checkbox'; // legacy alias of boolean, still accepted
+
+export interface CustomFieldOption {
+  value: string;
+  label: string;
+}
+
+/** Options may arrive as canonical {value,label} objects or legacy plain strings. */
+export type CustomFieldOptionInput = string | CustomFieldOption;
 
 export interface CustomFieldDefinition {
   id: string;
@@ -10,7 +32,7 @@ export interface CustomFieldDefinition {
   key: string;
   label: string;
   field_type: CustomFieldType | string;
-  options: string[] | null;
+  options: CustomFieldOptionInput[] | null;
   placeholder: string | null;
   description: string | null;
   default_value: any | null;
@@ -36,15 +58,45 @@ export interface CrmConfig {
 export interface MetadataBootstrap {
   metadata_version: number;
   custom_fields: CustomFieldDefinition[];
+  /** Per-entity definition map (Phase 4.1). Backward-compatible with `custom_fields`. */
+  custom_fields_by_entity?: Record<string, CustomFieldDefinition[]>;
+  /** Custom object definitions, eager-loaded (Phase 4.2). Field defs load lazily per object. */
+  custom_objects?: CustomObjectDefinitionLite[];
   pipelines: Pipeline[];
   crm_config?: CrmConfig;
 }
+
+/** Minimal object-definition shape carried in bootstrap. */
+export interface CustomObjectDefinitionLite {
+  id: string;
+  key: string;
+  label: string;
+  label_plural: string | null;
+  icon: string | null;
+  color: string | null;
+  display_field_key: string | null;
+  is_active: boolean;
+  is_system: boolean;
+}
+
+/** Coerce a definition's options (legacy strings or objects) to {value,label}[]. */
+export function normalizeFieldOptions(
+  options: CustomFieldOptionInput[] | null | undefined,
+): CustomFieldOption[] {
+  if (!options) return [];
+  return options.map((o) =>
+    typeof o === 'string' ? { value: o, label: o } : { value: o.value, label: o.label ?? o.value },
+  );
+}
+
+/** Field types that are backed by a fixed option list. */
+export const OPTION_FIELD_TYPES: CustomFieldType[] = ['select', 'multiselect'];
 
 export interface CustomFieldInput {
   key?: string;
   label?: string;
   field_type?: string;
-  options?: string[] | null;
+  options?: CustomFieldOptionInput[] | null;
   placeholder?: string | null;
   description?: string | null;
   default_value?: any | null;
