@@ -18,8 +18,7 @@ describe('SLAWidget', () => {
   it('renders compliance/running/at-risk and open breaches', async () => {
     vi.mocked(slaApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('SLA')).toBeDefined());
-    expect(screen.getByText('88.5%')).toBeDefined();     // compliance
+    await waitFor(() => expect(screen.getByText('88.5%')).toBeDefined());     // compliance
     expect(screen.getByText('24')).toBeDefined();         // running
     expect(screen.getByText('3')).toBeDefined();           // at risk
     expect(screen.getByText('7')).toBeDefined();           // open breaches

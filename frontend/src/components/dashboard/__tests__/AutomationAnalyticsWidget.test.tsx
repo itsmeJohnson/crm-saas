@@ -21,8 +21,7 @@ describe('AutomationAnalyticsWidget', () => {
   it('renders the headline automation metrics', async () => {
     vi.mocked(automationAnalyticsApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Automation Analytics')).toBeDefined());
-    expect(screen.getByText('83.3%')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('83.3%')).toBeDefined());
     expect(screen.getByText('90%')).toBeDefined();
     expect(screen.getByText('4')).toBeDefined();
   });

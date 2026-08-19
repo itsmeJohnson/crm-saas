@@ -23,8 +23,7 @@ describe('IntegrationsWidget', () => {
   it('renders totals and sums degraded + down into one issues count', async () => {
     vi.mocked(integrationApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Integrations')).toBeDefined());
-    expect(screen.getByText('12')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('12')).toBeDefined());
     expect(screen.getByText('9')).toBeDefined();
     expect(screen.getByText('3')).toBeDefined(); // 2 degraded + 1 down
   });

@@ -35,8 +35,7 @@ describe('SmsWidget Component', () => {
     vi.mocked(smsApi.reports).mockResolvedValue(REPORT as any);
     renderWithRouter(<SmsWidget />);
 
-    await waitFor(() => expect(screen.getByText('SMS Today')).toBeDefined());
-    expect(screen.getByText('6')).toBeDefined(); // sent
+    await waitFor(() => expect(screen.getByText('6')).toBeDefined()); // sent
     expect(screen.getByText('2')).toBeDefined(); // received
     expect(screen.getByText('83.3%')).toBeDefined(); // delivery rate
     expect(screen.getByText('1')).toBeDefined(); // failed

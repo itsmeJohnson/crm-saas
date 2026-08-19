@@ -182,23 +182,23 @@ class CustomerService:
 
     async def _resolve_billing_company(self, actor: User, data: dict) -> uuid.UUID:
         """Return a company_id for the invoice. If one is supplied, validate it;
-        otherwise resolve it from the contact (patient) — reusing the contact's
-        linked company or creating a per-patient billing company on the fly."""
+        otherwise resolve it from the contact — reusing the contact's
+        linked company or creating a per-contact billing company on the fly."""
         if data.get("company_id"):
             await self._get_company(actor, data["company_id"])
             return data["company_id"]
         contact_id = data.get("contact_id")
         if not contact_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail="Provide a patient (contact_id) or a company_id to invoice")
+                                detail="Provide a contact (contact_id) or a company_id to invoice")
         from app.models.contact import Contact
         contact = (await self.db.execute(select(Contact).filter(
             Contact.id == contact_id, Contact.organization_id == actor.organization_id))).scalar_one_or_none()
         if not contact:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")
         if contact.company_id:
             return contact.company_id
-        name = f"{contact.first_name or ''} {contact.last_name or ''}".strip() or "Patient"
+        name = f"{contact.first_name or ''} {contact.last_name or ''}".strip() or "Customer"
         company = Company(organization_id=actor.organization_id, name=name,
                           company_type="Customer", created_by=actor.id)
         self.db.add(company)
@@ -343,8 +343,8 @@ class CustomerService:
         from app.services.customer_invoice_pdf import build_invoice_pdf
         from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
         settings = await OrgInvoiceSettingsService(self.db).get_or_create(actor.organization_id)
-        patient, consultant = await self._invoice_patient_and_consultant(invoice)
-        return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+        contact_details, consultant = await self._invoice_contact_and_consultant(invoice)
+        return build_invoice_pdf(invoice, company, settings, contact_details=contact_details, consultant=consultant)
 
     async def render_invoice_pdf_by_id(self, invoice_id: uuid.UUID) -> bytes:
         """Render a PDF for the given invoice WITHOUT an authed actor. Only call
@@ -358,16 +358,16 @@ class CustomerService:
         from app.services.customer_invoice_pdf import build_invoice_pdf
         from app.services.org_invoice_settings_service import OrgInvoiceSettingsService
         settings = await OrgInvoiceSettingsService(self.db).get_or_create(invoice.organization_id)
-        patient, consultant = await self._invoice_patient_and_consultant(invoice)
-        return build_invoice_pdf(invoice, company, settings, patient=patient, consultant=consultant)
+        contact_details, consultant = await self._invoice_contact_and_consultant(invoice)
+        return build_invoice_pdf(invoice, company, settings, contact_details=contact_details, consultant=consultant)
 
     async def whatsapp_share_info(self, actor: User, invoice_id: uuid.UUID) -> dict:
-        """Return the patient phone + public (signed) PDF URL so the client can
+        """Return the contact phone + public (signed) PDF URL so the client can
         open WhatsApp with a link to the invoice."""
         from app.core.config import settings as app_settings
         invoice = await self.get_invoice(actor, invoice_id)
-        patient, _ = await self._invoice_patient_and_consultant(invoice)
-        phone_digits = "".join(ch for ch in ((patient or {}).get("phone") or "") if ch.isdigit())
+        contact_details, _ = await self._invoice_contact_and_consultant(invoice)
+        phone_digits = "".join(ch for ch in ((contact_details or {}).get("phone") or "") if ch.isdigit())
         base = (app_settings.FRONTEND_URL or "").rstrip("/")
         sig = sign_invoice_id(invoice.id)
         pdf_url = f"{base}{app_settings.API_V1_STR}/public/invoices/{invoice.id}/{sig}/pdf"
@@ -379,19 +379,19 @@ class CustomerService:
             "currency": invoice.currency,
         }
 
-    async def _invoice_patient_and_consultant(self, invoice) -> tuple[dict | None, str | None]:
-        """Resolve the patient (name/age/gender/mobile) and consultant name for
-        the dental-style invoice layout. Falls back gracefully to the billing
-        company / invoice creator when the patient contact isn't linked."""
+    async def _invoice_contact_and_consultant(self, invoice) -> tuple[dict | None, str | None]:
+        """Resolve the contact (name/age/gender/mobile) and consultant name for
+        the invoice layout. Falls back gracefully to the billing
+        company / invoice creator when the contact isn't linked."""
         from app.models.contact import Contact
-        patient, consultant = None, None
+        contact_details, consultant = None, None
         contact = None
         if invoice.contact_id:
             contact = (await self.db.execute(
                 select(Contact).where(Contact.id == invoice.contact_id))).scalar_one_or_none()
         if contact:
             cf = contact.custom_fields or {}
-            patient = {
+            contact_details = {
                 "name": f"{contact.first_name or ''} {contact.last_name or ''}".strip(),
                 "age": cf.get("age"),
                 "gender": cf.get("gender"),
@@ -405,7 +405,11 @@ class CustomerService:
             u = (await self.db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
             if u:
                 consultant = f"{u.first_name or ''} {u.last_name or ''}".strip() or None
-        return patient, consultant
+        return contact_details, consultant
+
+    # Legacy alias wrapper for backward compatibility
+    async def _invoice_patient_and_consultant(self, invoice) -> tuple[dict | None, str | None]:
+        return await self._invoice_contact_and_consultant(invoice)
 
     # ================= PAYMENTS =================
     async def record_payment(self, actor: User, invoice_id: uuid.UUID, data: dict) -> CustomerPayment:

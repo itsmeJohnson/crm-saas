@@ -86,7 +86,7 @@ class ContactService:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
-                        "message": (f"A patient with this phone/email already exists: "
+                        "message": (f"A contact with this phone/email already exists: "
                                     f"{existing.first_name} {existing.last_name}. "
                                     f"Set allow_duplicate to create anyway."),
                         "existing_id": str(existing.id),

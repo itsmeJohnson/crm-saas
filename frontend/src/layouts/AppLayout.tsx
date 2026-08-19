@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import { useMetadataStore } from '../store/metadataStore';
+import { MODULES_REGISTRY } from '../routes/moduleRegistry';
 import {
-  LayoutDashboard, LogOut, Building, Users, FolderKanban,
-  Sun, Moon, Menu, X, CreditCard, ChevronDown,
-  Gauge, Sparkles, FileText, Receipt, BarChart3, HardDrive, PhoneCall,
-  UserCog, Settings, Activity, ListChecks, CalendarDays, MessagesSquare,
-  MessageCircle, Megaphone, UsersRound, Clock, Stethoscope, Webhook, Settings2, GitBranch
+  LogOut, Sun, Moon, Menu, X, ChevronDown,
+  Stethoscope, Building, FolderKanban, Receipt, LayoutDashboard
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -26,6 +25,14 @@ export const AppLayout: React.FC = () => {
     navigate('/login');
   };
 
+  const { loaded: metadataLoaded, fetchBootstrap, crmConfig } = useMetadataStore();
+
+  useEffect(() => {
+    if (user && !metadataLoaded) {
+      fetchBootstrap().catch(() => {});
+    }
+  }, [user, metadataLoaded, fetchBootstrap]);
+
   const TRIAL_MODE = true;
 
   const NAV_GROUPS = [
@@ -33,52 +40,21 @@ export const AppLayout: React.FC = () => {
     'Growth & Analytics', 'Administration', 'Platform'
   ];
 
-  const allNavItems = [
-    // ── Clinical Operations ────────────────────────────────────────────────
-    { name: 'Dashboard',          path: '/',                  icon: LayoutDashboard,  section: 'workspace', group: 'Clinical Operations', trial: true },
-    { name: 'Leads & Enquiries',  path: '/leads',             icon: FolderKanban,     section: 'workspace', group: 'Clinical Operations', trial: true },
-    { name: 'Patients Directory', path: '/patients',          icon: Users,            section: 'workspace', group: 'Clinical Operations', trial: true },
-    { name: 'Appointments',       path: '/appointments',      icon: CalendarDays,     section: 'workspace', group: 'Clinical Operations', trial: true },
-    { name: 'Treatment Plans',    path: '/treatments',        icon: Activity,         section: 'workspace', group: 'Clinical Operations', trial: true },
-    { name: 'Billing & Invoices', path: '/billing',           icon: Receipt,          section: 'workspace', group: 'Clinical Operations', trial: true },
-
-    // ── Patient Engagement ─────────────────────────────────────────────────
-    { name: 'Follow-ups & Recalls', path: '/follow-ups',      icon: Clock,            section: 'workspace', group: 'Patient Engagement', trial: true },
-    { name: 'Communications',     path: '/communications',    icon: MessagesSquare,   section: 'workspace', group: 'Patient Engagement', trial: true },
-    { name: 'Tasks & Reminders',  path: '/tasks',             icon: ListChecks,       section: 'workspace', group: 'Patient Engagement', trial: true },
-    { name: 'WhatsApp Center',    path: '/whatsapp',          icon: MessageCircle,    section: 'workspace', group: 'Patient Engagement', trial: true },
-    { name: 'Phone Calling',      path: '/calling',           icon: PhoneCall,        section: 'workspace', group: 'Patient Engagement', trial: true },
-
-    // ── Clinic Management ──────────────────────────────────────────────────
-    { name: 'Dentists & Surgeons', path: '/doctors',          icon: Stethoscope,      section: 'workspace', group: 'Clinic Management', trial: true },
-    { name: 'Staff & Team',       path: '/staff',             icon: UsersRound,       section: 'workspace', group: 'Clinic Management', trial: true },
-    { name: 'Invoice Settings',   path: '/billing/settings',  icon: Settings2,        roles: ['OrgAdmin', 'Manager'], section: 'workspace', group: 'Clinic Management', trial: true },
-    { name: 'Pipelines',          path: '/pipelines',         icon: GitBranch,        roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE', section: 'workspace', group: 'Clinic Management', trial: true },
-    { name: 'Treatment Master',   path: '/treatments/master', icon: Stethoscope,      roles: ['OrgAdmin', 'Manager'], section: 'workspace', group: 'Clinic Management', trial: true },
-
-    // ── Growth & Analytics ─────────────────────────────────────────────────
-    { name: 'Clinical Reports',   path: '/reports',           icon: BarChart3,        section: 'workspace', group: 'Growth & Analytics', trial: true },
-    { name: 'Marketing ROI',      path: '/marketing',         icon: Megaphone,        section: 'workspace', group: 'Growth & Analytics', trial: true },
-    { name: 'Lead Capture',       path: '/lead-capture',      icon: Webhook,          roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', section: 'workspace', group: 'Growth & Analytics', trial: true },
-
-    // ── Administration ─────────────────────────────────────────────────────
-    { name: 'Clinic Settings',    path: '/settings',          icon: Settings,         roles: ['SuperAdmin', 'OrgAdmin'], section: 'workspace', group: 'Administration', trial: true },
-    { name: 'Organization',       path: '/organization',      icon: Building,         roles: ['OrgAdmin'], section: 'workspace', group: 'Administration', trial: true },
-
-    // ── Platform (SuperAdmin) ──────────────────────────────────────────────
-    { name: 'Tenants',            path: '/tenants',           icon: Building,         roles: ['SuperAdmin'], section: 'workspace', group: 'Platform', trial: true },
-    { name: 'Trial Requests',     path: '/trial-requests',    icon: Clock,            roles: ['SuperAdmin'], section: 'workspace', group: 'Platform', trial: true },
-
-    // ── Billing & Account (OrgAdmin only) ─────────────────────────────────
-    { name: 'Billing Overview',   path: '/portal/dashboard',  icon: Gauge,            roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Subscription',       path: '/portal/subscription', icon: CreditCard,     roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Plans',              path: '/portal/plans',      icon: Sparkles,         roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Invoices',           path: '/portal/invoices',   icon: FileText,         roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Payments',           path: '/portal/payments',   icon: Receipt,          roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Usage',              path: '/portal/usage',      icon: BarChart3,        roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Storage',            path: '/portal/storage',    icon: HardDrive,        roles: ['OrgAdmin'], section: 'billing' },
-    { name: 'Seat Licensing',     path: '/portal/users',      icon: UserCog,          roles: ['OrgAdmin'], section: 'billing' },
-  ];
+  const allNavItems = MODULES_REGISTRY.flatMap((mod) =>
+    mod.routes
+      .filter((r) => r.sidebar)
+      .map((r) => ({
+        name: r.sidebar!.name,
+        path: r.path,
+        icon: r.sidebar!.icon || mod.icon,
+        section: mod.section,
+        group: r.sidebar!.group || mod.group,
+        trial: mod.trial,
+        module: mod.key,
+        roles: r.roles,
+        featureCode: r.featureCode,
+      }))
+  );
 
   const features = useAuthStore((state) => state.features);
 
@@ -86,14 +62,19 @@ export const AppLayout: React.FC = () => {
     if (!user) return false;
     if (item.roles) {
       const hasRole = item.roles.includes(user.role);
-      const isTeamLeaderUsers = item.name === 'Team Members' && user.role === 'Employee' && user.is_team_leader;
+      const isTeamLeaderUsers = item.name === 'Staff & Team' && user.role === 'Employee' && user.is_team_leader;
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
-    if ((item as any).featureCode && user.role !== 'SuperAdmin') {
-      if (!features.includes((item as any).featureCode)) return false;
+    if (item.featureCode && user.role !== 'SuperAdmin') {
+      if (!features.includes(item.featureCode)) return false;
     }
-    if (TRIAL_MODE && user.role !== 'SuperAdmin' && item.section !== 'billing' && !(item as any).trial) {
+    if (TRIAL_MODE && user.role !== 'SuperAdmin' && item.section !== 'billing' && !item.trial) {
       return false;
+    }
+    // Gating by resolved modules config
+    if (crmConfig && item.module && user.role !== 'SuperAdmin') {
+      const alwaysEnabled = item.module === 'admin_core' || item.module === 'platform_core' || item.module === 'billing';
+      if (!alwaysEnabled && !crmConfig.enabled_modules.includes(item.module)) return false;
     }
     return true;
   });
@@ -120,13 +101,130 @@ export const AppLayout: React.FC = () => {
     .join('')
     .toUpperCase() || 'D';
 
-  const roleLabel: Record<string, string> = {
-    SuperAdmin: 'Super Admin',
-    OrgAdmin: 'Practice Admin',
-    Manager: 'Clinic Manager',
-    Employee: user?.is_team_leader ? 'Lead Dentist' : 'Attending Dentist',
+  // Dynamic Configuration Mapping based on template industry
+  const industry = crmConfig?.industry || 'healthcare_dental';
+
+  const groupTranslations: Record<string, Record<string, string>> = {
+    healthcare_dental: {
+      'Clinical Operations': 'Clinical Operations',
+      'Patient Engagement': 'Patient Engagement',
+      'Clinic Management': 'Clinic Management',
+    },
+    real_estate: {
+      'Clinical Operations': 'Property Operations',
+      'Patient Engagement': 'Client Engagement',
+      'Clinic Management': 'Agency Management',
+    },
+    insurance: {
+      'Clinical Operations': 'Policy Operations',
+      'Patient Engagement': 'Client Engagement',
+      'Clinic Management': 'Agency Management',
+    },
+    loan_recovery: {
+      'Clinical Operations': 'Portfolio Operations',
+      'Patient Engagement': 'Debtor Engagement',
+      'Clinic Management': 'Collections Management',
+    },
+    generic: {
+      'Clinical Operations': 'Sales Operations',
+      'Patient Engagement': 'Client Engagement',
+      'Clinic Management': 'Workspace Management',
+    }
   };
-  const displayRole = roleLabel[user?.role ?? ''] ?? user?.role ?? 'Doctor';
+
+  const itemTranslations: Record<string, Record<string, string>> = {
+    healthcare_dental: {
+      'Patients Directory': 'Patients Directory',
+      'Dentists & Surgeons': 'Dentists & Surgeons',
+      'Treatment Plans': 'Treatment Plans',
+      'Treatment Master': 'Treatment Master',
+      'Clinical Reports': 'Clinical Reports',
+      'Clinic Settings': 'Clinic Settings',
+    },
+    real_estate: {
+      'Patients Directory': 'Contacts Directory',
+      'Dentists & Surgeons': 'Agents & Brokers',
+      'Treatment Plans': 'Property Deals',
+      'Treatment Master': 'Services Master',
+      'Clinical Reports': 'Performance Reports',
+      'Clinic Settings': 'Agency Settings',
+    },
+    insurance: {
+      'Patients Directory': 'Policyholders Directory',
+      'Dentists & Surgeons': 'Agents & Underwriters',
+      'Treatment Plans': 'Insurance Policies',
+      'Treatment Master': 'Coverage Master',
+      'Clinical Reports': 'Loss Reports',
+      'Clinic Settings': 'Agency Settings',
+    },
+    loan_recovery: {
+      'Patients Directory': 'Debtors Directory',
+      'Dentists & Surgeons': 'Recovery Officers',
+      'Treatment Plans': 'Payment Agreements',
+      'Treatment Master': 'Recovery Catalogs',
+      'Clinical Reports': 'Collections Reports',
+      'Clinic Settings': 'Portfolio Settings',
+    },
+    generic: {
+      'Patients Directory': 'Contacts Directory',
+      'Dentists & Surgeons': 'Staff Directory',
+      'Treatment Plans': 'Sales Deals',
+      'Treatment Master': 'Product Catalog',
+      'Clinical Reports': 'Sales Reports',
+      'Clinic Settings': 'Workspace Settings',
+    }
+  };
+
+  const roleLabel: Record<string, Record<string, string>> = {
+    healthcare_dental: {
+      SuperAdmin: 'Super Admin',
+      OrgAdmin: 'Practice Admin',
+      Manager: 'Clinic Manager',
+      Employee: user?.is_team_leader ? 'Lead Dentist' : 'Attending Dentist',
+    },
+    real_estate: {
+      SuperAdmin: 'Super Admin',
+      OrgAdmin: 'Agency Owner',
+      Manager: 'Agency Manager',
+      Employee: user?.is_team_leader ? 'Lead Agent' : 'Sales Agent',
+    },
+    insurance: {
+      SuperAdmin: 'Super Admin',
+      OrgAdmin: 'Agency Owner',
+      Manager: 'Agency Manager',
+      Employee: user?.is_team_leader ? 'Lead Underwriter' : 'Insurance Agent',
+    },
+    generic: {
+      SuperAdmin: 'Super Admin',
+      OrgAdmin: 'Workspace Admin',
+      Manager: 'Manager',
+      Employee: user?.is_team_leader ? 'Lead Employee' : 'Staff Member',
+    }
+  };
+
+  const getGroupName = (g: string) => (groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g;
+  const getItemName = (n: string) => (itemTranslations[industry] ?? itemTranslations['generic'])[n] ?? n;
+  const getSubSuiteLabel = () => {
+    switch (industry) {
+      case 'healthcare_dental': return 'Dental Practice Suite';
+      case 'real_estate': return 'Real Estate Brokerage';
+      case 'insurance': return 'Insurance Agency Suite';
+      case 'loan_recovery': return 'Debt Collection Suite';
+      default: return 'Business Workspace';
+    }
+  };
+
+  const BrandIcon = () => {
+    switch (industry) {
+      case 'healthcare_dental': return <Stethoscope className="w-4 h-4" />;
+      case 'real_estate': return <Building className="w-4 h-4" />;
+      case 'insurance': return <FolderKanban className="w-4 h-4" />;
+      case 'loan_recovery': return <Receipt className="w-4 h-4" />;
+      default: return <LayoutDashboard className="w-4 h-4" />;
+    }
+  };
+
+  const displayRole = (roleLabel[industry] ?? roleLabel['generic'])[user?.role ?? ''] ?? user?.role ?? 'Staff';
 
   const sidebarContent = (
     <div className="flex flex-col h-full select-none">
@@ -134,14 +232,14 @@ export const AppLayout: React.FC = () => {
       <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold flex-shrink-0">
-            <Stethoscope className="w-4 h-4" />
+            {BrandIcon()}
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-slate-100 block truncate">
               {organization?.name || 'SmileCare Dental'}
             </span>
             <span className="text-[10px] text-slate-400 font-medium tracking-wide block">
-              Dental Practice Suite
+              {getSubSuiteLabel()}
             </span>
           </div>
         </div>
@@ -166,7 +264,7 @@ export const AppLayout: React.FC = () => {
                 onClick={() => toggleGroup(group)}
                 className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
               >
-                <span className={groupActive ? 'text-cyan-400' : ''}>{group}</span>
+                <span className={groupActive ? 'text-cyan-400' : ''}>{getGroupName(group)}</span>
                 <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isCollapsed ? '-rotate-90' : ''}`} />
               </button>
               {!isCollapsed && (
@@ -183,7 +281,7 @@ export const AppLayout: React.FC = () => {
                         className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
                       >
                         <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                        <span className="truncate">{item.name}</span>
+                        <span className="truncate">{getItemName(item.name)}</span>
                       </Link>
                     );
                   })}

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { metadataApi, CustomFieldDefinition } from '../services/metadataApi';
+import { metadataApi, CustomFieldDefinition, CrmConfig } from '../services/metadataApi';
 import { Pipeline, PipelineStage } from '../services/pipelineApi';
 
 interface MetadataState {
   metadataVersion: number | null;
   customFields: CustomFieldDefinition[];
   pipelines: Pipeline[];
+  crmConfig: CrmConfig | null;
   selectedPipelineId: string | null;
   isLoading: boolean;
   loaded: boolean;
@@ -37,6 +38,7 @@ export const useMetadataStore = create<MetadataState>((set, get) => ({
   metadataVersion: null,
   customFields: [],
   pipelines: [],
+  crmConfig: null,
   selectedPipelineId: null,
   isLoading: false,
   loaded: false,
@@ -53,6 +55,11 @@ export const useMetadataStore = create<MetadataState>((set, get) => ({
         customFields: data.custom_fields,
         pipelines,
         selectedPipelineId: defaultPipelineId(pipelines, get().selectedPipelineId),
+        crmConfig: data.crm_config ?? {
+          industry: 'healthcare_dental',
+          template: 'healthcare_dental',
+          enabled_modules: ['dashboard', 'leads', 'patients', 'appointments', 'treatments', 'treatment_plans', 'recall', 'dentists', 'clinical_reports', 'billing', 'communications', 'reports']
+        },
         isLoading: false,
         loaded: true,
       });

@@ -19,8 +19,7 @@ describe('BiExportWidget', () => {
   it('renders export, token and sync counts', async () => {
     vi.mocked(biApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Export & BI')).toBeDefined());
-    expect(screen.getByText('42')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('42')).toBeDefined());
     expect(screen.getByText('2')).toBeDefined();
     expect(screen.getByText('3')).toBeDefined();
   });

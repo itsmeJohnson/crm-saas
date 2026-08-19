@@ -27,10 +27,17 @@ export interface CustomFieldDefinition {
   updated_at: string;
 }
 
+export interface CrmConfig {
+  industry: string;
+  template: string;
+  enabled_modules: string[];
+}
+
 export interface MetadataBootstrap {
   metadata_version: number;
   custom_fields: CustomFieldDefinition[];
   pipelines: Pipeline[];
+  crm_config?: CrmConfig;
 }
 
 export interface CustomFieldInput {

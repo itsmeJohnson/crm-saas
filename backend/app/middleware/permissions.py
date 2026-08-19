@@ -60,14 +60,18 @@ async def resolve_feature_codes(user: User, db: AsyncSession) -> set:
     from app.models.feature import Feature
     from app.models.plan_feature import PlanFeature
     from app.models.tenant_subscription import TenantSubscription
-    import os
     from sqlalchemy import func
+    from app.core.config import settings
 
     # Check if the feature catalog is completely empty (unseeded test database)
     feature_count_res = await db.execute(select(func.count(Feature.id)))
     feature_count = feature_count_res.scalar() or 0
 
-    if feature_count == 0 and os.getenv("TESTING") == "true":
+    # SECURITY: this fallback grants ALL features and MUST be impossible outside the
+    # explicit test environment. Gate on the positive settings.is_testing
+    # (ENVIRONMENT == "testing") — never on a raw/negative env check — so it can never
+    # activate in staging/production even if TESTING=true is present.
+    if feature_count == 0 and settings.is_testing:
         return {
             "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS",
             "SALES_PIPELINE", "CLICK_TO_CALL", "BASIC_DASHBOARD", "DASHBOARD_REPORTS",
@@ -219,3 +223,28 @@ async def require_manage_telephony(
         if await PermissionService(db).check(current_user, "integrations", "manage"):
             return current_user
     raise TelephonyAccessDenied()
+
+
+def require_module(module_name: str):
+    async def dependency(
+        current_user: Annotated[User, Depends(require_active_user)],
+        db: Annotated[AsyncSession, Depends(get_db)]
+    ) -> None:
+        from app.core.industries import ALL_MODULES
+        if module_name not in ALL_MODULES:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Module '{module_name}' is not enabled for your organization"
+            )
+        if current_user.role == "SuperAdmin":
+            return
+        from app.services.tenant_config_service import TenantConfigurationResolver
+        resolver = TenantConfigurationResolver(db)
+        config = await resolver.resolve_config(current_user.organization_id)
+        enabled_modules = config.get("enabled_modules", [])
+        if module_name not in enabled_modules:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Module '{module_name}' is not enabled for your organization"
+            )
+    return dependency

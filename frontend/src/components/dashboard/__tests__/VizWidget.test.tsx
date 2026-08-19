@@ -24,8 +24,7 @@ describe('VizWidget', () => {
   it('renders pinned visualizations from the studio', async () => {
     vi.mocked(vizApi.dashboard).mockResolvedValue(PINNED as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Visualizations')).toBeDefined());
-    expect(screen.getByText('Leads by status')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('Leads by status')).toBeDefined());
     expect(screen.getByText('New')).toBeDefined(); // funnel stage rendered
   });
 

@@ -5,10 +5,15 @@ import { BrowserRouter } from 'react-router-dom';
 import React from 'react';
 import { AppLayout } from '../AppLayout';
 import { useAuthStore } from '../../store/authStore';
+import { useMetadataStore } from '../../store/metadataStore';
 
 // Mock Zustand Stores
 vi.mock('../../store/authStore', () => ({
   useAuthStore: vi.fn(),
+}));
+
+vi.mock('../../store/metadataStore', () => ({
+  useMetadataStore: vi.fn(),
 }));
 
 describe('AppLayout Component - Sidebar Role Visibility', () => {
@@ -19,6 +24,25 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
 
   const renderWithRouter = (ui: React.ReactElement) => {
     return render(<BrowserRouter>{ui}</BrowserRouter>);
+  };
+
+  const setupMetadataMock = () => {
+    vi.mocked(useMetadataStore).mockImplementation((selector: any) => {
+      const state = {
+        loaded: true,
+        crmConfig: {
+          industry: 'healthcare_dental',
+          template: 'healthcare_dental',
+          enabled_modules: [
+            'dashboard', 'leads', 'patients', 'appointments', 'treatments',
+            'treatment_plans', 'recall', 'dentists', 'clinical_reports',
+            'billing', 'communications', 'reports', 'admin_core', 'pipelines'
+          ]
+        },
+        fetchBootstrap: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    });
   };
 
   it('renders all links for OrgAdmin role', () => {
@@ -37,12 +61,13 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
       return selector ? selector(state) : state;
     });
 
+    setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
     expect(screen.getByText('Dashboard')).toBeDefined();
-    expect(screen.getByText('Leads')).toBeDefined();
+    expect(screen.getByText('Leads & Enquiries')).toBeDefined();
     expect(screen.getByText('Pipelines')).toBeDefined();
-    expect(screen.getByText('Team Members')).toBeDefined();
+    expect(screen.getByText('Staff & Team')).toBeDefined();
     expect(screen.getByText('Organization')).toBeDefined();
 
     // Billing & Account section is unified into the same sidebar for OrgAdmin.
@@ -67,11 +92,12 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
       return selector ? selector(state) : state;
     });
 
+    setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
     expect(screen.getByText('Dashboard')).toBeDefined();
-    expect(screen.getByText('Leads')).toBeDefined();
-    expect(screen.getByText('Team Members')).toBeDefined();
+    expect(screen.getByText('Leads & Enquiries')).toBeDefined();
+    expect(screen.getByText('Staff & Team')).toBeDefined();
     expect(screen.queryByText('Pipelines')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
 
@@ -96,12 +122,13 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
       return selector ? selector(state) : state;
     });
 
+    setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
     expect(screen.getByText('Dashboard')).toBeDefined();
-    expect(screen.getByText('Leads')).toBeDefined();
+    expect(screen.getByText('Leads & Enquiries')).toBeDefined();
+    expect(screen.getByText('Staff & Team')).toBeDefined();
     expect(screen.queryByText('Pipelines')).toBeNull();
-    expect(screen.queryByText('Team Members')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
     expect(screen.queryByText('Billing & Account')).toBeNull();
   });

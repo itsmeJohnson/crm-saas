@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Boolean, Integer, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
 
@@ -48,6 +48,11 @@ class Organization(BaseModel):
     auto_renewal: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     theme: Mapped[str] = mapped_column(String(50), default="dark", nullable=False)
     metadata_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    # Multi-Industry Config Extensions
+    industry: Mapped[str] = mapped_column(String(50), default="healthcare_dental", nullable=False)
+    business_template: Mapped[str] = mapped_column(String(50), default="healthcare_dental", nullable=False)
+    enabled_modules: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     # Phase 3 - Extended organization fields
     country: Mapped[str] = mapped_column(String(100), default="India", nullable=False)

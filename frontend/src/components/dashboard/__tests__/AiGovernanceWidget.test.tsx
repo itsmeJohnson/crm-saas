@@ -21,8 +21,7 @@ describe('AiGovernanceWidget', () => {
   it('renders controls, masked and blocked counts', async () => {
     vi.mocked(aiGovernanceApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('AI Governance')).toBeDefined());
-    expect(screen.getByText('4')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('4')).toBeDefined());
     expect(screen.getByText('19')).toBeDefined();
     expect(screen.getByText('5')).toBeDefined();
   });

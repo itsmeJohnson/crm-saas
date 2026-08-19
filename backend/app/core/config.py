@@ -134,6 +134,13 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT.lower() == "production"
 
     @property
+    def is_testing(self) -> bool:
+        """True only in the explicit test environment (conftest sets ENVIRONMENT=testing).
+        Positive allow-list used to gate the unseeded-Feature-table fallback so it can
+        never activate in staging/production, regardless of any other env vars."""
+        return self.ENVIRONMENT.lower() == "testing"
+
+    @property
     def runtime_database_uri(self) -> str:
         """DB URL the FastAPI runtime / background jobs connect with.
         Prefers the dedicated crm_runtime URL; falls back to the legacy single URL."""

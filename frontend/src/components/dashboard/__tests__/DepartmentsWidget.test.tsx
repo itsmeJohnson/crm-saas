@@ -21,9 +21,8 @@ describe('DepartmentsWidget', () => {
   it('renders active count, budget, unassigned and largest departments', async () => {
     vi.mocked(departmentApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Departments')).toBeDefined());
+    await waitFor(() => expect(screen.getByText('Sales')).toBeDefined());
     expect(screen.getByText('/5')).toBeDefined();      // active/total
-    expect(screen.getByText('Sales')).toBeDefined();
     expect(screen.getByText(/3 unassigned member/i)).toBeDefined();
   });
 

@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.user import User
-from app.middleware.permissions import require_active_user, require_role
+from app.middleware.permissions import require_active_user, require_role, require_module
 from app.schemas.treatment_catalog import (
     TreatmentCatalogCreate, TreatmentCatalogUpdate, TreatmentCatalogResponse,
 )
 from app.services.treatment_catalog_service import TreatmentCatalogService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_module("treatments"))])
 _admin = require_role(["OrgAdmin", "Manager"])
 _rw = require_active_user  # any active user can read the price list
 

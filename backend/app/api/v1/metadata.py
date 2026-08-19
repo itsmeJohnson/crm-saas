@@ -17,8 +17,10 @@ from app.services.custom_field_service import CustomFieldService
 from app.services.pipeline_service import list_pipelines
 from app.schemas.pipeline import PipelineResponse
 from app.services.metadata_cache_service import MetadataCacheService
+from app.services.tenant_config_service import TenantConfigurationResolver
 
 router = APIRouter()
+
 
 # ── Consolidated Metadata Bootstrap Endpoint ───────────────────────────────────
 
@@ -43,10 +45,14 @@ async def bootstrap_metadata(
     # Fetch pipelines and their stages (utilizes caching)
     pipelines = await list_pipelines(db, actor)
 
+    # Resolve tenant config
+    crm_config = await TenantConfigurationResolver(db).resolve_config(actor.organization_id)
+
     return {
         "metadata_version": org.metadata_version,
         "custom_fields": [CustomFieldDefinitionResponse.model_validate(cf) for cf in custom_fields],
-        "pipelines": [PipelineResponse.model_validate(p) for p in pipelines]
+        "pipelines": [PipelineResponse.model_validate(p) for p in pipelines],
+        "crm_config": crm_config
     }
 
 

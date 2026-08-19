@@ -99,7 +99,7 @@ def _meta_cell(label: str, value: str) -> str:
             f"<div style='font-weight:bold'>{escape(value or '-')}</div></td>")
 
 
-def _html(invoice, company, s=None, patient=None, consultant=None) -> str:
+def _html(invoice, company, s=None, patient=None, consultant=None, contact_details=None) -> str:
     sym = (getattr(s, "currency_symbol", None) or (invoice.currency + " "))
     name = _clinic_name(company, s)
     addr = escape(getattr(s, "address", "") or "").replace(chr(10), "<br/>")
@@ -107,7 +107,7 @@ def _html(invoice, company, s=None, patient=None, consultant=None) -> str:
     logo = (f"<img src='{escape(s.logo_url)}' style='max-height:54px;margin-bottom:6px'/>"
             if getattr(s, "logo_url", None) else "")
 
-    p = patient or {}
+    p = contact_details or patient or {}
     pname = p.get("name") or getattr(company, "name", "") or "-"
     age = p.get("age")
     gender = p.get("gender")
@@ -115,6 +115,7 @@ def _html(invoice, company, s=None, patient=None, consultant=None) -> str:
     mobile = p.get("phone") or "-"
 
     from datetime import datetime, timezone
+    printed = datetime.now(timezone.utc).strftime("%d %b %Y, %I:%M %p")
     printed = datetime.now(timezone.utc).strftime("%d %b %Y, %I:%M %p")
     bill_date = invoice.issue_date.strftime("%d %b %Y") if invoice.issue_date else "-"
 
@@ -200,11 +201,11 @@ def _html(invoice, company, s=None, patient=None, consultant=None) -> str:
     """
 
 
-def build_invoice_pdf(invoice, company, settings=None, patient=None, consultant=None) -> bytes:
+def build_invoice_pdf(invoice, company, settings=None, patient=None, consultant=None, contact_details=None) -> bytes:
     if not WEASYPRINT_AVAILABLE:
         return DUMMY_PDF_BYTES
     try:
-        return weasyprint.HTML(string=_html(invoice, company, settings, patient, consultant)).write_pdf()
+        return weasyprint.HTML(string=_html(invoice, company, settings, patient, consultant, contact_details)).write_pdf()
     except Exception as e:  # pragma: no cover
         logger.error("Customer invoice PDF render failed: %s", str(e))
         return DUMMY_PDF_BYTES

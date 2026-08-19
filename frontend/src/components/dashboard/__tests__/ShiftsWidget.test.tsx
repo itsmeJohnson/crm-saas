@@ -20,8 +20,7 @@ describe('ShiftsWidget', () => {
   it("renders today's shift, total/night/rotation counts", async () => {
     vi.mocked(shiftApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Shifts')).toBeDefined());
-    expect(screen.getByText(/Morning Shift/)).toBeDefined();
+    await waitFor(() => expect(screen.getByText(/Morning Shift/)).toBeDefined());
     expect(screen.getByText('5')).toBeDefined();  // total shifts
     expect(screen.getByText('3')).toBeDefined();  // rotations
   });

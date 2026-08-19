@@ -93,37 +93,51 @@ async def main():
         # ── 2. Hard-delete all other orgs and their data to prevent constraint failures ──
         from sqlalchemy import text
         
-        # 1. Clean tables referencing organizations (excluding users first)
-        tables_with_org_id = [
-            "activities", "notes", "leads", "contacts", "companies", "invoices", "support_tickets",
-            "performance_targets", "seat_assignment_history", "user_invitations", "lead_imports",
-            "pipeline_stages", "assignment_configs", "audit_logs", "tenant_subscriptions"
-        ]
-        for tbl in tables_with_org_id:
+        # Temporarily disable all foreign key constraints and triggers during purge
+        await db.execute(text("SET session_replication_role = 'replica';"))
+        
+        try:
+            # Dynamically discover all tables with user_id and delete records belonging to other tenants
+            res_user = await db.execute(text(
+                "SELECT table_name FROM information_schema.columns "
+                "WHERE column_name = 'user_id' AND table_schema = 'public'"
+            ))
+            tables_with_user = [row[0] for row in res_user.fetchall()]
+            for tbl in tables_with_user:
+                await db.execute(
+                    text(f"DELETE FROM {tbl} WHERE user_id IN (SELECT id FROM users WHERE organization_id != :safe_id)"),
+                    {"safe_id": safe_org_id}
+                )
+
+            # Dynamically discover all tables with organization_id and delete records belonging to other tenants
+            res_org = await db.execute(text(
+                "SELECT table_name FROM information_schema.columns "
+                "WHERE column_name = 'organization_id' AND table_schema = 'public'"
+            ))
+            tables_with_org = [row[0] for row in res_org.fetchall()]
+            for tbl in tables_with_org:
+                if tbl not in ["organizations", "users"]:
+                    await db.execute(
+                        text(f"DELETE FROM {tbl} WHERE organization_id != :safe_id"),
+                        {"safe_id": safe_org_id}
+                    )
+
+            # Clean users
             await db.execute(
-                text(f"DELETE FROM {tbl} WHERE organization_id != :safe_id"),
+                text("DELETE FROM users WHERE organization_id != :safe_id"),
                 {"safe_id": safe_org_id}
             )
-        
-        # 2. Clean user sessions before users
-        await db.execute(
-            text("DELETE FROM user_sessions WHERE user_id IN (SELECT id FROM users WHERE organization_id != :safe_id)"),
-            {"safe_id": safe_org_id}
-        )
-
-        # 3. Clean users
-        await db.execute(
-            text("DELETE FROM users WHERE organization_id != :safe_id"),
-            {"safe_id": safe_org_id}
-        )
-        
-        # 4. Clean organizations
-        await db.execute(
-            text("DELETE FROM organizations WHERE id != :safe_id"),
-            {"safe_id": safe_org_id}
-        )
-        print(f"Purged old organizations and related data.")
-        await db.commit()
+            
+            # Clean organizations
+            await db.execute(
+                text("DELETE FROM organizations WHERE id != :safe_id"),
+                {"safe_id": safe_org_id}
+            )
+            print(f"Purged old organizations and related data dynamically.")
+            await db.commit()
+        finally:
+            # Re-enable foreign key constraints and triggers
+            await db.execute(text("SET session_replication_role = 'origin';"))
 
         # ── 3. Create demo tenants ─────────────────────────────────────────
         for t in DEMO_TENANTS:

@@ -40,14 +40,18 @@ async def get_active_features(db: AsyncSession, org_id: str | uuid.UUID) -> list
             logger.warning(f"Error decoding features cache for tenant {org_id}: {e}")
 
     if active_features is None:
-        import os
         from sqlalchemy import func
-        
+        from app.core.config import settings
+
         # Check if the feature catalog is completely empty (unseeded test database)
         feature_count_res = await db.execute(select(func.count(Feature.id)))
         feature_count = feature_count_res.scalar() or 0
-        
-        if feature_count == 0 and os.getenv("TESTING") == "true":
+
+        # SECURITY: this fallback grants ALL features and MUST be impossible outside
+        # the explicit test environment. Gate on the positive settings.is_testing
+        # (ENVIRONMENT == "testing") — never on a raw/negative env check — so it can
+        # never activate in staging/production even if TESTING=true is present.
+        if feature_count == 0 and settings.is_testing:
             active_features = [
                 "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS",
                 "SALES_PIPELINE", "CLICK_TO_CALL", "BASIC_DASHBOARD", "DASHBOARD_REPORTS",

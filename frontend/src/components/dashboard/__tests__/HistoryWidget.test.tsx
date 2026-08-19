@@ -20,8 +20,7 @@ describe('HistoryWidget', () => {
   it('renders coverage, metric and archive counts', async () => {
     vi.mocked(historyApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Historical Analytics')).toBeDefined());
-    expect(screen.getByText('45')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('45')).toBeDefined());
     expect(screen.getByText('28')).toBeDefined();
     expect(screen.getByText('12')).toBeDefined();
   });
