@@ -71,6 +71,13 @@ export const AppLayout: React.FC = () => {
     if (TRIAL_MODE && user.role !== 'SuperAdmin' && item.section !== 'billing' && !item.trial) {
       return false;
     }
+    // Hide dental/clinical-only modules when the workspace is not that industry —
+    // applies to everyone INCLUDING SuperAdmin (whose module gating is otherwise
+    // bypassed below), so the owner's generic CRM has no medical leftovers.
+    const DENTAL_ONLY = ['patients', 'appointments', 'treatments', 'treatment_plans', 'recall', 'dentists', 'clinical_reports'];
+    if (item.module && (crmConfig?.industry || 'healthcare_dental') !== 'healthcare_dental' && DENTAL_ONLY.includes(item.module)) {
+      return false;
+    }
     // Gating by resolved modules config
     if (crmConfig && item.module && user.role !== 'SuperAdmin') {
       const alwaysEnabled = item.module === 'admin_core' || item.module === 'platform_core' || item.module === 'billing';
@@ -177,6 +184,8 @@ export const AppLayout: React.FC = () => {
       'Treatment Master': 'Product Catalog',
       'Clinical Reports': 'Call Reports',
       'Clinic Settings': 'Call Center Settings',
+      'Follow-ups & Recalls': 'Follow-ups',
+      'Appointments': 'Meetings',
     },
     generic: {
       'Patients Directory': 'Contacts Directory',
@@ -185,6 +194,8 @@ export const AppLayout: React.FC = () => {
       'Treatment Master': 'Product Catalog',
       'Clinical Reports': 'Sales Reports',
       'Clinic Settings': 'Workspace Settings',
+      'Follow-ups & Recalls': 'Follow-ups',
+      'Appointments': 'Meetings',
     }
   };
 
@@ -439,10 +450,10 @@ export const AppLayout: React.FC = () => {
             <div className="hidden sm:flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live OPD
+                {industry === 'healthcare_dental' ? 'Live OPD' : 'Live'}
               </span>
               <span className="text-xs text-slate-400">
-                Dr. Johnson Dev • Main Operatory
+                {industry === 'healthcare_dental' ? 'Dr. Johnson Dev • Main Operatory' : `${displayRole} • ${getSubSuiteLabel()}`}
               </span>
             </div>
           </div>
