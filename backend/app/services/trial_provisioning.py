@@ -63,7 +63,18 @@ async def provision_trial_tenant(db: AsyncSession, trial_req: TrialRequest,
         n += 1
         slug = f"{base}-{n}"
 
-    org = await org_repo.create({"name": trial_req.company_name, "slug": slug})
+    org_data = {"name": trial_req.company_name, "slug": slug}
+    # Apply the vertical chosen at signup (defaults to healthcare_dental).
+    chosen = getattr(trial_req, "industry", None)
+    if chosen:
+        from app.core.industries import IndustryType
+        try:
+            ind = IndustryType(chosen)
+            org_data["industry"] = ind.value
+            org_data["business_template"] = ind.value
+        except ValueError:
+            pass  # unknown industry -> fall back to model default
+    org = await org_repo.create(org_data)
 
     plan = await _pick_trial_plan(db)
 

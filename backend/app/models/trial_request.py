@@ -13,6 +13,7 @@ class TrialRequest(BaseModel):
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(NormalizedEmail(255), nullable=False, index=True)
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
+    industry: Mapped[str | None] = mapped_column(String(50), nullable=True)  # chosen vertical; None -> healthcare_dental
     status: Mapped[str] = mapped_column(String(50), default="PENDING", nullable=False, index=True)  # PENDING, APPROVED, REJECTED
 
     @validates("email")

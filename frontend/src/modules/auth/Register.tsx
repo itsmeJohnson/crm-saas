@@ -1,16 +1,26 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { api } from '../../services/api';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 
+const INDUSTRY_OPTIONS = [
+  { value: 'telecalling', label: 'Telecalling / Call Center' },
+  { value: 'healthcare_dental', label: 'Healthcare / Dental' },
+  { value: 'real_estate', label: 'Real Estate' },
+  { value: 'insurance', label: 'Insurance' },
+  { value: 'loan_recovery', label: 'Loan Recovery / Collections' },
+  { value: 'generic', label: 'Other / Generic CRM' },
+];
+
 const registerSchema = z.object({
   full_name: z.string().min(1, 'Full name is required'),
   company_name: z.string().min(2, 'Company name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   phone: z.string().min(5, 'Please enter a valid phone number'),
+  industry: z.string().min(1, 'Please choose your industry'),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
@@ -20,6 +30,8 @@ export const Register: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const presetIndustry = searchParams.get('industry') || 'telecalling';
 
   const {
     register,
@@ -27,6 +39,7 @@ export const Register: React.FC = () => {
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    defaultValues: { industry: presetIndustry },
   });
 
   const onSubmit = async (data: RegisterForm) => {
@@ -99,6 +112,20 @@ export const Register: React.FC = () => {
           placeholder="Acme Corp"
         />
         {errors.company_name && <p className="mt-1.5 text-xs text-red-400">{errors.company_name.message}</p>}
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Your Industry</label>
+        <select
+          {...register('industry')}
+          className={`w-full px-4 py-3 rounded-xl glass-input ${errors.industry ? 'border-red-500/50' : ''}`}
+        >
+          {INDUSTRY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <p className="mt-1.5 text-[10px] text-slate-500">Sets up your CRM dashboard for your business.</p>
+        {errors.industry && <p className="mt-1.5 text-xs text-red-400">{errors.industry.message}</p>}
       </div>
 
       <div>

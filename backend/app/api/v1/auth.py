@@ -124,6 +124,7 @@ async def trial_register(
         company_name=payload.company_name,
         email=payload.email,
         phone=payload.phone,
+        industry=payload.industry,
         status="PENDING"
     )
     db.add(trial_req)

@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './modules/auth/Login';
 import { Register } from './modules/auth/Register';
 import { LegalPage } from './pages/legal/LegalPage';
+import { PricingPage } from './pages/PricingPage';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
 import { MODULES_REGISTRY } from './routes/moduleRegistry';
 import { ModuleGuardRoute } from './components/common/ModuleGuardRoute';
@@ -37,6 +38,9 @@ export const App: React.FC = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
             </Route>
+
+            {/* Public marketing / pricing storefront (no auth) */}
+            <Route path="/pricing" element={<PricingPage />} />
 
             {/* Public legal pages (no auth) */}
             <Route path="/legal/:doc" element={<LegalPage />} />
