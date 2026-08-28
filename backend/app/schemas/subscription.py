@@ -70,7 +70,7 @@ class InvoiceResponse(BaseModel):
     plan_name: str | None = None
 
 class ReduceSeatsRequest(BaseModel):
-    new_seat_count: int = Field(..., ge=10, description="The new total seat count, must be at least 10.")
+    new_seat_count: int = Field(..., ge=3, description="The new total seat count, must be at least 3.")
 
 class ScheduledPlanChangeResponse(BaseModel):
     scheduled: bool = True

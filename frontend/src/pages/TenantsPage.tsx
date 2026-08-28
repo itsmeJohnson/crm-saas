@@ -25,7 +25,7 @@ const CommercialSummaryPanel: React.FC<{ regPlan?: any }> = (_props) => (
     <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl overflow-hidden text-xs">
       {[
         { label: 'Price Per Licensed Seat', hint: 'As entered above' },
-        { label: 'Minimum Initial Purchase', hint: '10 Licensed Seats' },
+        { label: 'Minimum Initial Purchase', hint: '3 Licensed Seats' },
         { label: 'Minimum Contract', hint: '3 Months' },
         { label: 'Starting Monthly Billing', hint: 'Price x Min Seats' },
         { label: 'GST', hint: 'Extra (as configured)' },
@@ -222,7 +222,7 @@ export const TenantsPage: React.FC = () => {
   const onCreateTenant = async (data: CreateTenantRequest) => {
     setIsModalLoading(true); setModalError(null);
     try {
-      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 10), contract_months: Number(data.contract_months || 3), plan_name: data.plan_name || plans[0]?.name || 'CoreCRM', billing_cycle: data.billing_cycle || 'monthly', is_trial: Boolean(data.is_trial) });
+      await superAdminApi.createTenant({ ...data, licensed_seats: Number(data.licensed_seats || 3), contract_months: Number(data.contract_months || 3), plan_name: data.plan_name || plans[0]?.name || 'CoreCRM', billing_cycle: data.billing_cycle || 'monthly', is_trial: Boolean(data.is_trial) });
       showSuccess(data.is_trial ? 'Tenant created on a 7-day trial.' : 'Tenant created.'); await fetchAllData(); resetTenant(); setActiveModal(null);
     } catch (e: any) { setModalError(e.response?.data?.detail || 'Failed'); }
     finally { setIsModalLoading(false); }
@@ -782,7 +782,7 @@ export const TenantsPage: React.FC = () => {
                 <button
                   onClick={() => {
                     resetPlan({
-                      minimum_users: 10,
+                      minimum_users: 3,
                       minimum_contract_months: 3,
                       allow_additional_seats: true,
                       currency: 'INR',
@@ -1818,7 +1818,7 @@ export const TenantsPage: React.FC = () => {
                           <input
                             type="number"
                             min="1"
-                            value={editedCommSettings.minimum_users || 10}
+                            value={editedCommSettings.minimum_users || 3}
                             onChange={(e) => setEditedCommSettings({ ...editedCommSettings, minimum_users: Number(e.target.value) })}
                             className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none"
                           />
@@ -2326,7 +2326,7 @@ export const TenantsPage: React.FC = () => {
                       <div className="space-y-1.5 pt-2 border-t border-slate-900/60">
                         <p className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider">Seats Pricing & Constraints</p>
                         <p className="text-slate-300 font-mono">
-                          Seat limits: <strong className="text-slate-100">{editedCommSettings.minimum_users || 10} - {editedCommSettings.maximum_users || 'Unlimited'}</strong>
+                          Seat limits: <strong className="text-slate-100">{editedCommSettings.minimum_users || 3} - {editedCommSettings.maximum_users || 'Unlimited'}</strong>
                         </p>
                         <p className="text-slate-300 font-mono">
                           Extra Seat charge: <strong className="text-slate-100">{editedCommSettings.currency_symbol || '₹'}{editedCommSettings.default_extra_user_price || 0.00}/month</strong>
@@ -3446,10 +3446,10 @@ export const TenantsPage: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Licensed Seats</label>
                   <input
                     type="number"
-                    defaultValue={10}
-                    {...regTenant('licensed_seats', { 
-                      required: 'Seats count is required', 
-                      min: { value: 10, message: 'Minimum purchase is 10 Licensed Seats' } 
+                    defaultValue={3}
+                    {...regTenant('licensed_seats', {
+                      required: 'Seats count is required',
+                      min: { value: 3, message: 'Minimum purchase is 3 Licensed Seats' }
                     })}
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                   />
@@ -3493,6 +3493,25 @@ export const TenantsPage: React.FC = () => {
                     <option value="quarterly">Quarterly (save ~4%)</option>
                     <option value="annual">Annual (save ~6%)</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Industry</label>
+                  <select
+                    {...regTenant('industry')}
+                    defaultValue="healthcare_dental"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                  >
+                    <option value="healthcare_dental">Healthcare / Dental</option>
+                    <option value="telecalling">Telecalling / Call Center</option>
+                    <option value="real_estate">Real Estate</option>
+                    <option value="insurance">Insurance</option>
+                    <option value="loan_recovery">Loan Recovery / Collections</option>
+                    <option value="generic">Generic CRM</option>
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">Sets the dashboard & modules for this tenant.</p>
                 </div>
               </div>
 

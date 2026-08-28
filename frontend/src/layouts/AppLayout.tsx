@@ -6,7 +6,7 @@ import { useMetadataStore } from '../store/metadataStore';
 import { MODULES_REGISTRY } from '../routes/moduleRegistry';
 import {
   LogOut, Sun, Moon, Menu, X, ChevronDown,
-  Stethoscope, Building, FolderKanban, Receipt, LayoutDashboard
+  Stethoscope, Building, FolderKanban, Receipt, LayoutDashboard, PhoneCall
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { NotificationBell } from '../components/notifications/NotificationBell';
@@ -125,6 +125,11 @@ export const AppLayout: React.FC = () => {
       'Patient Engagement': 'Debtor Engagement',
       'Clinic Management': 'Collections Management',
     },
+    telecalling: {
+      'Clinical Operations': 'Call Center Operations',
+      'Patient Engagement': 'Campaigns & Outreach',
+      'Clinic Management': 'Call Center Management',
+    },
     generic: {
       'Clinical Operations': 'Sales Operations',
       'Patient Engagement': 'Client Engagement',
@@ -165,6 +170,14 @@ export const AppLayout: React.FC = () => {
       'Clinical Reports': 'Collections Reports',
       'Clinic Settings': 'Portfolio Settings',
     },
+    telecalling: {
+      'Patients Directory': 'Contacts Directory',
+      'Dentists & Surgeons': 'Telecallers',
+      'Treatment Plans': 'Deals',
+      'Treatment Master': 'Product Catalog',
+      'Clinical Reports': 'Call Reports',
+      'Clinic Settings': 'Call Center Settings',
+    },
     generic: {
       'Patients Directory': 'Contacts Directory',
       'Dentists & Surgeons': 'Staff Directory',
@@ -194,6 +207,12 @@ export const AppLayout: React.FC = () => {
       Manager: 'Agency Manager',
       Employee: user?.is_team_leader ? 'Lead Underwriter' : 'Insurance Agent',
     },
+    telecalling: {
+      SuperAdmin: 'Super Admin',
+      OrgAdmin: 'Call Center Admin',
+      Manager: 'Floor Manager',
+      Employee: user?.is_team_leader ? 'Team Lead' : 'Telecaller',
+    },
     generic: {
       SuperAdmin: 'Super Admin',
       OrgAdmin: 'Workspace Admin',
@@ -210,6 +229,7 @@ export const AppLayout: React.FC = () => {
       case 'real_estate': return 'Real Estate Brokerage';
       case 'insurance': return 'Insurance Agency Suite';
       case 'loan_recovery': return 'Debt Collection Suite';
+      case 'telecalling': return 'Telecalling Suite';
       default: return 'Business Workspace';
     }
   };
@@ -220,6 +240,7 @@ export const AppLayout: React.FC = () => {
       case 'real_estate': return <Building className="w-4 h-4" />;
       case 'insurance': return <FolderKanban className="w-4 h-4" />;
       case 'loan_recovery': return <Receipt className="w-4 h-4" />;
+      case 'telecalling': return <PhoneCall className="w-4 h-4" />;
       default: return <LayoutDashboard className="w-4 h-4" />;
     }
   };

@@ -33,8 +33,35 @@ from app.services.auth_service import AuthService
 from app.schemas.auth import RegisterTenantRequest
 from app.schemas.trial_request import TrialRequestResponse
 
+from pydantic import BaseModel
+from app.core.industries import IndustryType, ALL_MODULES, BUSINESS_TEMPLATES
+
 router = APIRouter()
 require_super_admin = RoleChecker(["SuperAdmin"])
+
+
+class TenantIndustryResponse(BaseModel):
+    industry: str
+    business_template: str
+    enabled_modules: List[str]
+    available_industries: List[str]
+    all_modules: List[str]
+
+
+class TenantIndustryUpdate(BaseModel):
+    industry: str | None = None
+    enabled_modules: List[str] | None = None
+
+
+def _resolved_modules(org: Organization) -> List[str]:
+    """The org's effective module set: explicit override, else its template default."""
+    if org.enabled_modules is not None and isinstance(org.enabled_modules, list):
+        return list(org.enabled_modules)
+    try:
+        tmpl = IndustryType(org.business_template or org.industry)
+    except (ValueError, TypeError):
+        tmpl = IndustryType.HEALTHCARE_DENTAL
+    return sorted(BUSINESS_TEMPLATES.get(tmpl, set()))
 
 @router.get("/tenants", response_model=List[TenantResponse])
 async def list_tenants(
@@ -115,6 +142,72 @@ async def create_tenant(
         user_count=1,
         invoice_count=0
     )
+
+@router.get("/tenants/{org_id}/industry", response_model=TenantIndustryResponse)
+async def get_tenant_industry(
+    org_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Get a tenant's industry, template and effective enabled modules, plus the
+    catalog of available industries/modules for the picker."""
+    org = (await db.execute(select(Organization).where(
+        Organization.id == org_id, Organization.is_deleted == False))).scalars().first()
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    return TenantIndustryResponse(
+        industry=org.industry,
+        business_template=org.business_template,
+        enabled_modules=_resolved_modules(org),
+        available_industries=[i.value for i in IndustryType],
+        all_modules=sorted(ALL_MODULES),
+    )
+
+
+@router.patch("/tenants/{org_id}/industry", response_model=TenantIndustryResponse)
+async def update_tenant_industry(
+    org_id: uuid.UUID,
+    payload: TenantIndustryUpdate,
+    actor: Annotated[User, Depends(require_super_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Change a tenant's industry and/or its enabled modules. Setting `industry`
+    without `enabled_modules` resets the module set to that industry's template
+    default (enabled_modules override cleared)."""
+    org = (await db.execute(select(Organization).where(
+        Organization.id == org_id, Organization.is_deleted == False))).scalars().first()
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    if payload.industry is not None:
+        try:
+            ind = IndustryType(payload.industry)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Unknown industry. Valid: {[i.value for i in IndustryType]}")
+        org.industry = ind.value
+        org.business_template = ind.value
+        if payload.enabled_modules is None:
+            org.enabled_modules = None  # fall back to the new template's defaults
+
+    if payload.enabled_modules is not None:
+        invalid = [m for m in payload.enabled_modules if m not in ALL_MODULES]
+        if invalid:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Unknown modules: {invalid}")
+        org.enabled_modules = list(dict.fromkeys(payload.enabled_modules))
+
+    db.add(org)
+    await db.commit()
+    await db.refresh(org)
+    return TenantIndustryResponse(
+        industry=org.industry,
+        business_template=org.business_template,
+        enabled_modules=_resolved_modules(org),
+        available_industries=[i.value for i in IndustryType],
+        all_modules=sorted(ALL_MODULES),
+    )
+
 
 @router.get("/tenants/{org_id}/users", response_model=List[TenantUserResponse])
 async def list_tenant_users(

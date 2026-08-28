@@ -33,7 +33,7 @@ class Plan(BaseModel):
     api_access: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     setup_charges: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
-    minimum_users: Mapped[int] = mapped_column(Integer, default=10, nullable=False)  # Minimum Initial Licensed Seats (default 10)
+    minimum_users: Mapped[int] = mapped_column(Integer, default=3, nullable=False)  # Minimum Initial Licensed Seats (default 3)
     maximum_users: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)  # Maximum Supported Seats
     minimum_contract_months: Mapped[int] = mapped_column(Integer, default=3, nullable=False)  # Minimum Initial Contract (default 3 months)
     promo_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)

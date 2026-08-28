@@ -87,8 +87,8 @@ export const PortalSubscription: React.FC = () => {
     e.preventDefault();
     if (!sub) return;
 
-    if (newSeatCount < 10) {
-      setModalError("Seat count must be at least 10 Licensed Seats.");
+    if (newSeatCount < 3) {
+      setModalError("Seat count must be at least 3 Licensed Seats.");
       return;
     }
     if (newSeatCount >= sub.users_purchased) {
@@ -311,7 +311,7 @@ export const PortalSubscription: React.FC = () => {
             
             <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
               <span className="text-[9px] font-extrabold text-brand-400 uppercase tracking-widest">2. Initial Subscription</span>
-              <p className="text-[11px] text-slate-300">Every new organization must subscribe to a minimum of 10 Licensed Seats and a minimum 3 Months Contract. GST extra as applicable.</p>
+              <p className="text-[11px] text-slate-300">Every new organization must subscribe to a minimum of 3 Licensed Seats and a minimum 3 Months Contract. GST extra as applicable.</p>
             </div>
 
             <div className="p-3 bg-slate-905/30 rounded-xl space-y-1">
@@ -436,7 +436,7 @@ export const PortalSubscription: React.FC = () => {
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                 />
                 <p className="text-[10px] text-slate-500">
-                  Must be at least 10, cannot drop below active users ({sub.users_active}), and must be less than current count ({sub.users_purchased}).
+                  Must be at least 3, cannot drop below active users ({sub.users_active}), and must be less than current count ({sub.users_purchased}).
                 </p>
               </div>
 

@@ -110,6 +110,16 @@ export interface CreateTenantRequest {
   plan_name?: string;
   billing_cycle?: string;
   is_trial?: boolean;
+  industry?: string;
+  enabled_modules?: string[];
+}
+
+export interface TenantIndustry {
+  industry: string;
+  business_template: string;
+  enabled_modules: string[];
+  available_industries: string[];
+  all_modules: string[];
 }
 
 export const superAdminApi = {
@@ -125,6 +135,16 @@ export const superAdminApi = {
 
   getTenantUsers: async (orgId: string) => {
     const response = await api.get<TenantUserResponse[]>(`/super-admin/tenants/${orgId}/users`);
+    return response.data;
+  },
+
+  getTenantIndustry: async (orgId: string) => {
+    const response = await api.get<TenantIndustry>(`/super-admin/tenants/${orgId}/industry`);
+    return response.data;
+  },
+
+  updateTenantIndustry: async (orgId: string, payload: { industry?: string; enabled_modules?: string[] }) => {
+    const response = await api.patch<TenantIndustry>(`/super-admin/tenants/${orgId}/industry`, payload);
     return response.data;
   },
 

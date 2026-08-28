@@ -36,10 +36,10 @@ class AuthService:
             )
 
         # Validate constraints
-        if request.licensed_seats < 10:
+        if request.licensed_seats < 3:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Minimum initial purchase is 10 Licensed Seats."
+                detail="Minimum initial purchase is 3 Licensed Seats."
             )
         if request.contract_months < 3:
             raise HTTPException(
@@ -47,11 +47,31 @@ class AuthService:
                 detail="Minimum initial contract is 3 months."
             )
 
-        # Create organization
-        org = await self.org_repo.create({
+        # Create organization (with optional industry/module template)
+        org_data = {
             "name": request.company_name,
-            "slug": request.slug
-        })
+            "slug": request.slug,
+        }
+        if request.industry:
+            from app.core.industries import IndustryType, ALL_MODULES
+            try:
+                industry_enum = IndustryType(request.industry)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unknown industry '{request.industry}'. Valid: {[i.value for i in IndustryType]}",
+                )
+            org_data["industry"] = industry_enum.value
+            org_data["business_template"] = industry_enum.value
+            if request.enabled_modules is not None:
+                invalid = [m for m in request.enabled_modules if m not in ALL_MODULES]
+                if invalid:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Unknown modules: {invalid}",
+                    )
+                org_data["enabled_modules"] = list(dict.fromkeys(request.enabled_modules))
+        org = await self.org_repo.create(org_data)
 
         # Create owner user
         hashed_password = get_password_hash(request.admin_password)
@@ -76,9 +96,9 @@ class AuthService:
         from app.models.seat_history import SeatAssignmentHistory
         from app.models.payment import Payment
 
-        # Fetch the requested plan (case-insensitive; frontend sends lowercase slugs), falling back to Starter
+        # Fetch the requested plan (case-insensitive; frontend sends lowercase slugs), falling back to Connect
         from sqlalchemy import func as sa_func
-        requested_plan_name = request.plan_name or "Starter"
+        requested_plan_name = request.plan_name or "Connect"
         plan_stmt = select(Plan).where(
             sa_func.lower(Plan.name) == requested_plan_name.lower(),
             Plan.is_deleted == False
@@ -91,14 +111,14 @@ class AuthService:
             plan_res = await self.db.execute(plan_stmt)
             plan = plan_res.scalars().first()
             if not plan:
-                # Dynamically create and seed Professional plan on the fly (primarily for testing compatibility)
+                # Dynamically create and seed a Connect plan on the fly (primarily for testing compatibility)
                 plan = Plan(
-                    name="Professional",
-                    display_name="Professional",
-                    price_inr=1999.0,
-                    monthly_price=1999.0,
+                    name="Connect",
+                    display_name="Connect",
+                    price_inr=699.0,
+                    monthly_price=699.0,
                     max_users=1000,
-                    minimum_users=5,
+                    minimum_users=3,
                     maximum_users=1000,
                     minimum_contract_months=3,
                     extra_user_price=1999.0,

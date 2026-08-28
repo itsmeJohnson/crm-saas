@@ -196,7 +196,7 @@ class PortalService:
             for cycle in self._CYCLE_MONTHS
         }
 
-        minimum_users = plan.minimum_users if plan else 10
+        minimum_users = plan.minimum_users if plan else 3
         users_purchased = sub.users_purchased if sub else 0
         allow_additional = plan.allow_additional_seats if plan else True
         # Extra seats can only be bought on an active paid plan that has met its
@@ -771,10 +771,10 @@ class PortalService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="New seat count must be less than current purchased seats."
             )
-        if new_seat_count < 10:
+        if new_seat_count < 3:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot reduce below the minimum initial purchase of 10 Licensed Seats."
+                detail="Cannot reduce below the minimum initial purchase of 3 Licensed Seats."
             )
 
         # Count active users currently assigned seats

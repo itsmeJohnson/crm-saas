@@ -29,18 +29,18 @@ async def _pick_trial_plan(db: AsyncSession) -> Plan:
     all_plans = list((await db.execute(select(Plan).where(Plan.is_deleted == False))).scalars().all())
     plan = next((p for p in all_plans if getattr(p, "is_trial", False)), None)
     if not plan:
-        PREF = ["professional", "growth", "enterprise", "starter"]
+        PREF = ["convert", "scale", "enterprise", "connect"]
         featured = set((await db.execute(
             select(PlanFeature.plan_id).where(PlanFeature.enabled == True))).scalars().all())
         pool = [p for p in all_plans if p.id in featured] or all_plans
         plan = sorted(pool, key=lambda p: PREF.index((p.name or "").lower()) if (p.name or "").lower() in PREF else len(PREF))[0] if pool else None
     if not plan:
         plan = Plan(
-            name="Professional", display_name="Professional", price_inr=1999.0, monthly_price=1999.0,
+            name="Convert", display_name="Convert", price_inr=1299.0, monthly_price=1299.0,
             max_users=1000, minimum_users=3, maximum_users=1000, minimum_contract_months=3,
-            extra_user_price=1999.0, allow_additional_seats=True, storage_limit_gb=10,
+            extra_user_price=1299.0, allow_additional_seats=True, storage_limit_gb=10,
             recording_retention_days=90, priority_support=True, api_access=False,
-            is_active=True, plan_active=True, is_trial=True, trial_days=14, features={},
+            is_active=True, plan_active=True, is_trial=True, trial_days=7, features={},
         )
         db.add(plan)
         await db.flush()

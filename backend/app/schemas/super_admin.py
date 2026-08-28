@@ -73,7 +73,7 @@ class PlanCreate(BaseModel):
     api_access: bool = False
     display_order: int = 0
     setup_charges: float = 0.0
-    minimum_users: int = Field(10, ge=1, description="Minimum Initial Licensed Seats")
+    minimum_users: int = Field(3, ge=1, description="Minimum Initial Licensed Seats")
     maximum_users: int = 1000
     minimum_contract_months: int = Field(3, ge=1, description="Minimum Initial Contract (months)")
     trial_days: int = 0

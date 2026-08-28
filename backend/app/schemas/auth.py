@@ -13,11 +13,16 @@ class RegisterTenantRequest(BaseModel):
     admin_password: str = Field(..., min_length=8)
     first_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, max_length=100)
-    licensed_seats: int = Field(10, ge=10, description="Number of purchased user licenses, minimum 10.")
+    licensed_seats: int = Field(3, ge=3, description="Number of purchased user licenses, minimum 3.")
     contract_months: int = Field(3, ge=3, description="Contract length in months, minimum 3.")
     plan_name: str | None = None
     billing_cycle: str = "monthly"
     is_trial: bool = False
+    # Multi-industry: when omitted, defaults to healthcare_dental (backward compat).
+    # `industry` also sets business_template; `enabled_modules` overrides the
+    # template's default module set when provided.
+    industry: str | None = None
+    enabled_modules: list[str] | None = None
 
 class Token(BaseModel):
     access_token: str

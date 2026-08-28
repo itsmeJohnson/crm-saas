@@ -5,6 +5,7 @@ class IndustryType(str, Enum):
     REAL_ESTATE = "real_estate"
     INSURANCE = "insurance"
     LOAN_RECOVERY = "loan_recovery"
+    TELECALLING = "telecalling"
     GENERIC = "generic"
 
 # All available modules in the CRM platform (including Core and Industry-Specific)
@@ -88,6 +89,24 @@ BUSINESS_TEMPLATES = {
         "follow_ups",
         "billing",
         "communications",
+        "reports",
+    },
+    IndustryType.TELECALLING: {
+        # Telecalling / call-center agency: outbound lead engagement over the
+        # communications channels (calling, SMS, WhatsApp, campaigns, voice
+        # broadcast). No dental/clinical modules.
+        "dashboard",
+        "leads",
+        "contacts",
+        "companies",
+        "customers",
+        "opportunities",
+        "pipelines",
+        "activities",
+        "tasks",
+        "follow_ups",
+        "communications",
+        "billing",
         "reports",
     },
     IndustryType.GENERIC: {
