@@ -7,9 +7,41 @@ export interface SmsSettings {
   account_sid: string | null;
   sender_id: string | null;
   sms_priority: string;
+  sms_type: string;
+  default_template_id: string | null;
   webhook_token: string | null;
   daily_limit: number;
   is_active: boolean;
+}
+
+export interface SmsBalance {
+  success: boolean;
+  amount: number | null;
+  currency: string | null;
+  message: string | null;
+}
+
+export interface SenderIdItem {
+  sender_id: string | null;
+  country: string | null;
+  status: string | null;
+}
+
+export interface SenderIdList {
+  success: boolean;
+  items: SenderIdItem[];
+  message: string | null;
+}
+
+export interface OtpVerification {
+  id: string;
+  number_masked: string;
+  purpose: string | null;
+  status: string;
+  attempts: number;
+  max_attempts: number;
+  expires_at: string | null;
+  verified_at: string | null;
 }
 
 export interface SmsItem {
@@ -88,9 +120,24 @@ export const smsApi = {
 
   retry: async (activityId: string) => (await api.post<SmsItem>(`/sms/${activityId}/retry`)).data,
 
+  refreshStatus: async (activityId: string) =>
+    (await api.post<SmsItem>(`/sms/${activityId}/refresh-status`)).data,
+
   messages: async (filters: SmsHistoryFilters = {}) =>
     (await api.get<SmsHistory>('/sms/messages', { params: filters })).data,
 
   reports: async (params: { date_from?: string; date_to?: string } = {}) =>
     (await api.get<SmsReport>('/sms/reports', { params })).data,
+
+  // BulkSMSPlans account info
+  balance: async () => (await api.get<SmsBalance>('/sms/settings/balance')).data,
+  senderIds: async () => (await api.get<SenderIdList>('/sms/settings/sender-ids')).data,
+  requestSenderId: async (payload: { sender: string; country?: string; remarks?: string }) =>
+    (await api.post<{ success: boolean; message: string | null }>('/sms/settings/sender-ids', payload)).data,
+
+  // OTP verification (BulkSMSPlans verify / verify_status)
+  otpSend: async (payload: { number?: string; purpose?: string; message?: string; lead_id?: string; contact_id?: string; ttl_minutes?: number; max_attempts?: number }) =>
+    (await api.post<OtpVerification>('/sms/otp/send', payload)).data,
+  otpVerify: async (payload: { verification_id: string; otp: string }) =>
+    (await api.post<OtpVerification>('/sms/otp/verify', payload)).data,
 };

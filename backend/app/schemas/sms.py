@@ -12,6 +12,8 @@ class SmsSettingsResponse(BaseModel):
     account_sid: Optional[str] = None
     sender_id: Optional[str] = None
     sms_priority: str = "ndnd"
+    sms_type: str = "Transactional"
+    default_template_id: Optional[str] = None
     webhook_token: Optional[str] = None
     daily_limit: int
     is_active: bool
@@ -24,9 +26,42 @@ class SmsSettingsUpdate(BaseModel):
     auth_token: Optional[str] = Field(None, max_length=255)
     sender_id: Optional[str] = Field(None, max_length=32)
     sms_priority: Optional[str] = Field(None, pattern="^(ndnd|dnd)$")
+    sms_type: Optional[str] = Field(None, pattern="^(Transactional|Promotional|OTP)$")
+    default_template_id: Optional[str] = Field(None, max_length=64)
     daily_limit: Optional[int] = Field(None, ge=0, le=100000)
     is_active: Optional[bool] = None
     regenerate_webhook_token: bool = False
+
+
+# ---- Provider account info (BulkSMSPlans etc.) ----
+class SmsBalanceResponse(BaseModel):
+    success: bool
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    message: Optional[str] = None
+
+
+class SenderIdItem(BaseModel):
+    sender_id: Optional[str] = None
+    country: Optional[str] = None
+    status: Optional[str] = None
+
+
+class SenderIdListResponse(BaseModel):
+    success: bool
+    items: List[SenderIdItem] = []
+    message: Optional[str] = None
+
+
+class SenderIdRequest(BaseModel):
+    sender: str = Field(..., min_length=1, max_length=32)
+    country: str = Field("India", max_length=64)
+    remarks: Optional[str] = Field(None, max_length=255)
+
+
+class SenderIdRequestResult(BaseModel):
+    success: bool
+    message: Optional[str] = None
 
 
 class SmsSendRequest(BaseModel):
@@ -97,6 +132,33 @@ class SmsReportResponse(BaseModel):
     by_status: List[ReportBucket]
     by_direction: List[ReportBucket]
     by_day: List[ReportBucket]
+
+
+# ---- OTP verification ----
+class OtpSendRequest(BaseModel):
+    number: Optional[str] = Field(None, max_length=32)
+    purpose: Optional[str] = Field(None, max_length=50)
+    message: Optional[str] = Field(None, max_length=500)  # must contain {{otp}}
+    lead_id: Optional[uuid.UUID] = None
+    contact_id: Optional[uuid.UUID] = None
+    ttl_minutes: Optional[int] = Field(None, ge=1, le=60)
+    max_attempts: Optional[int] = Field(None, ge=1, le=10)
+
+
+class OtpVerifyRequest(BaseModel):
+    verification_id: uuid.UUID
+    otp: str = Field(..., min_length=1, max_length=12)
+
+
+class OtpResponse(BaseModel):
+    id: str
+    number_masked: str
+    purpose: Optional[str] = None
+    status: str
+    attempts: int
+    max_attempts: int
+    expires_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
 
 
 # ---- Webhook payloads (token-secured; no auth) ----

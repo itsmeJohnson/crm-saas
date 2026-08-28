@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   MessageSquare, Send, Loader2, Search, RefreshCw, Users, Settings as SettingsIcon,
-  Inbox, ArrowUpRight, ArrowDownLeft, Check, Copy,
+  Inbox, ArrowUpRight, ArrowDownLeft, Check, Copy, ShieldCheck,
 } from 'lucide-react';
 import { smsApi, SmsItem, SmsSettings } from '../services/smsApi';
 import { useAuthStore } from '../store/authStore';
@@ -148,6 +148,84 @@ const BulkCompose: React.FC<{ onSent: () => void }> = ({ onSent }) => {
   );
 };
 
+/* ── BulkSMSPlans account panel: live balance + sender-ID list/request ── */
+const BulkSmsAccountPanel: React.FC = () => {
+  const [balance, setBalance] = useState<string | null>(null);
+  const [senders, setSenders] = useState<{ sender_id: string | null; country: string | null; status: string | null }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [newSender, setNewSender] = useState('');
+  const [requesting, setRequesting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setNote(null);
+    try {
+      const [bal, list] = await Promise.all([smsApi.balance(), smsApi.senderIds()]);
+      setBalance(bal.success && bal.amount != null ? `${bal.amount} ${bal.currency || ''}`.trim() : (bal.message || 'Unavailable'));
+      setSenders(list.success ? list.items : []);
+      if (!list.success && list.message) setNote(list.message);
+    } catch (err: any) {
+      setNote(extractErrorMessage(err, 'Failed to load account info'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const request = async () => {
+    if (!newSender.trim()) return;
+    setRequesting(true); setNote(null);
+    try {
+      const res = await smsApi.requestSenderId({ sender: newSender.trim() });
+      setNote(res.message || (res.success ? 'Sender ID requested.' : 'Request failed.'));
+      setNewSender('');
+      if (res.success) load();
+    } catch (err: any) {
+      setNote(extractErrorMessage(err, 'Failed to request sender ID'));
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-slate-800/60">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">BulkSMSPlans account</span>
+        <button onClick={load} disabled={loading}
+                className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-brand-400 cursor-pointer">
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
+      </div>
+      <div className="text-sm text-slate-300">Balance: <span className="font-semibold text-emerald-400">{balance ?? '—'}</span></div>
+      {note && <div className="text-[11px] text-amber-400">{note}</div>}
+      <div className="space-y-1.5">
+        <span className="text-[11px] text-slate-500">Sender IDs</span>
+        {senders.length === 0 ? (
+          <div className="text-[11px] text-slate-500">No sender IDs found.</div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {senders.map((s, i) => (
+              <span key={i} className="inline-flex items-center gap-1 bg-slate-800/70 border border-slate-700/60 rounded-lg px-2 py-1 text-xs text-slate-300">
+                <b>{s.sender_id}</b>
+                <span className={s.status === 'Approved' ? 'text-emerald-400' : 'text-amber-400'}>{s.status}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <input value={newSender} onChange={(e) => setNewSender(e.target.value)} placeholder="Request new sender ID (e.g. CRMTXT)"
+               className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm" />
+        <button onClick={request} disabled={requesting || !newSender.trim()}
+                className="inline-flex items-center gap-1 bg-slate-800/80 border border-slate-700/60 text-slate-200 py-2 px-3 rounded-lg text-sm disabled:opacity-40 cursor-pointer">
+          {requesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Request
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /* ── Provider settings (OrgAdmin) ── */
 const SmsSettingsPanel: React.FC = () => {
   const [settings, setSettings] = useState<SmsSettings | null>(null);
@@ -168,6 +246,8 @@ const SmsSettingsPanel: React.FC = () => {
         account_sid: settings.account_sid || undefined,
         auth_token: authToken || undefined,
         sms_priority: settings.sms_priority || undefined,
+        sms_type: settings.sms_type || undefined,
+        default_template_id: settings.default_template_id || undefined,
         daily_limit: settings.daily_limit,
         is_active: settings.is_active,
         regenerate_webhook_token: regenerate,
@@ -199,9 +279,13 @@ const SmsSettingsPanel: React.FC = () => {
             <option value="mock">Mock (dev / no send)</option>
             <option value="twilio">Twilio</option>
             <option value="bhash">BhashSMS</option>
+            <option value="bulksmsplans">BulkSMSPlans</option>
           </select>
           {settings.provider === 'bhash' && (
             <p className="text-[11px] text-slate-500">Account SID = BhashSMS <b>user</b>, Auth Token = <b>pass</b>, Sender ID = approved <b>sender</b>.</p>
+          )}
+          {settings.provider === 'bulksmsplans' && (
+            <p className="text-[11px] text-slate-500">Account SID = BulkSMSPlans <b>api_id</b>, Auth Token = <b>api_password</b>, Sender ID = approved DLT <b>sender</b>.</p>
           )}
         </label>
         {settings.provider === 'bhash' && (
@@ -213,6 +297,24 @@ const SmsSettingsPanel: React.FC = () => {
               <option value="dnd">Promotional (dnd) — for promotional senders</option>
             </select>
           </label>
+        )}
+        {settings.provider === 'bulksmsplans' && (
+          <>
+            <label className="space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">SMS Type</span>
+              <select value={settings.sms_type || 'Transactional'} onChange={(e) => setSettings({ ...settings, sms_type: e.target.value })}
+                      className="w-full bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm">
+                <option value="Transactional">Transactional</option>
+                <option value="Promotional">Promotional</option>
+                <option value="OTP">OTP</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">DLT Template ID (optional)</span>
+              <input value={settings.default_template_id || ''} onChange={(e) => setSettings({ ...settings, default_template_id: e.target.value })}
+                     placeholder="Registered template id" className="w-full bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm" />
+            </label>
+          </>
         )}
         <label className="space-y-1">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sender ID / From</span>
@@ -239,6 +341,8 @@ const SmsSettingsPanel: React.FC = () => {
           <span className="text-sm text-slate-300">Active</span>
         </label>
       </div>
+
+      {settings.provider === 'bulksmsplans' && settings.is_active && <BulkSmsAccountPanel />}
 
       <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Webhook token (for inbound + delivery callbacks)</span>
@@ -297,6 +401,13 @@ const History: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const retry = async (id: string) => {
     try {
       const updated = await smsApi.retry(id);
+      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    } catch { /* keep row as-is on failure */ }
+  };
+
+  const refreshStatus = async (id: string) => {
+    try {
+      const updated = await smsApi.refreshStatus(id);
       setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
     } catch { /* keep row as-is on failure */ }
   };
@@ -364,6 +475,12 @@ const History: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
                           <RefreshCw className="w-3 h-3" /> Retry
                         </button>
                       )}
+                      {it.direction === 'OUTBOUND' && (it.sms_status === 'sent' || it.sms_status === 'queued' || it.sms_status === 'pending') && (
+                        <button onClick={() => refreshStatus(it.id)} title="Check delivery status"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60 hover:text-brand-400 cursor-pointer">
+                          <RefreshCw className="w-3 h-3" /> Status
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -385,7 +502,78 @@ const History: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   );
 };
 
-type Tab = 'compose' | 'history' | 'bulk' | 'settings';
+/* ── OTP verification tool (send code → verify) ── */
+const OtpVerifyPanel: React.FC = () => {
+  const [number, setNumber] = useState('');
+  const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [masked, setMasked] = useState('');
+  const [otp, setOtp] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const send = async () => {
+    if (!number.trim()) return;
+    setBusy(true); setMsg(null); setStatus(null);
+    try {
+      const rec = await smsApi.otpSend({ number: number.trim(), purpose: 'manual' });
+      setVerificationId(rec.id); setMasked(rec.number_masked); setStatus(rec.status);
+      setMsg(`Code sent to ${rec.number_masked}.`);
+    } catch (err: any) {
+      setMsg(extractErrorMessage(err, 'Failed to send code'));
+    } finally { setBusy(false); }
+  };
+
+  const verify = async () => {
+    if (!verificationId || !otp.trim()) return;
+    setBusy(true); setMsg(null);
+    try {
+      const rec = await smsApi.otpVerify({ verification_id: verificationId, otp: otp.trim() });
+      setStatus(rec.status);
+      setMsg(rec.status === 'verified' ? '✓ Number verified.' : 'Verification updated.');
+    } catch (err: any) {
+      setMsg(extractErrorMessage(err, 'Invalid code'));
+    } finally { setBusy(false); }
+  };
+
+  const reset = () => { setVerificationId(null); setOtp(''); setStatus(null); setMsg(null); setNumber(''); setMasked(''); };
+
+  return (
+    <div className="glass-panel border border-slate-800/85 rounded-2xl p-5 space-y-4 max-w-lg">
+      <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-brand-400" /> Verify a phone number</h3>
+      <p className="text-[11px] text-slate-500">Sends a one-time code via the SMS gateway (requires the BulkSMSPlans provider). The gateway generates and validates the code.</p>
+      {msg && <div className={`p-3 border rounded-lg text-xs ${status === 'verified' ? 'bg-emerald-900/30 border-emerald-700/50 text-emerald-300' : 'bg-slate-800/60 border-slate-700/60 text-slate-300'}`}>{msg}</div>}
+
+      {!verificationId ? (
+        <div className="flex items-center gap-2">
+          <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Phone number, e.g. 9620194983"
+                 className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm" />
+          <button onClick={send} disabled={busy || !number.trim()}
+                  className="inline-flex items-center gap-1 bg-gradient-to-r from-brand-500 to-indigo-500 text-white font-medium py-2 px-4 rounded-lg text-sm disabled:opacity-40 cursor-pointer">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send code
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="text-xs text-slate-400">Code sent to <b className="text-slate-200">{masked}</b> · status: <b className={status === 'verified' ? 'text-emerald-400' : 'text-amber-400'}>{status}</b></div>
+          {status !== 'verified' && (
+            <div className="flex items-center gap-2">
+              <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter code" inputMode="numeric"
+                     className="flex-1 bg-slate-800/70 border border-slate-700/70 text-slate-200 py-2 px-3 rounded-lg text-sm tracking-widest" />
+              <button onClick={verify} disabled={busy || !otp.trim()}
+                      className="inline-flex items-center gap-1 bg-gradient-to-r from-brand-500 to-indigo-500 text-white font-medium py-2 px-4 rounded-lg text-sm disabled:opacity-40 cursor-pointer">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Verify
+              </button>
+            </div>
+          )}
+          <button onClick={reset} className="text-xs text-slate-400 hover:text-brand-400 cursor-pointer">Start over</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+type Tab = 'compose' | 'history' | 'bulk' | 'otp' | 'settings';
 
 export const SmsPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -397,6 +585,7 @@ export const SmsPage: React.FC = () => {
     { key: 'compose', label: 'Compose', icon: Send },
     { key: 'history', label: 'History', icon: Inbox },
     { key: 'bulk', label: 'Bulk', icon: Users },
+    { key: 'otp', label: 'Verify', icon: ShieldCheck },
     ...(isAdmin ? [{ key: 'settings' as Tab, label: 'Settings', icon: SettingsIcon }] : []),
   ];
 
@@ -422,6 +611,7 @@ export const SmsPage: React.FC = () => {
       {tab === 'compose' && <Compose onSent={() => setRefreshKey((k) => k + 1)} />}
       {tab === 'history' && <History refreshKey={refreshKey} />}
       {tab === 'bulk' && <BulkCompose onSent={() => setRefreshKey((k) => k + 1)} />}
+      {tab === 'otp' && <OtpVerifyPanel />}
       {tab === 'settings' && isAdmin && <SmsSettingsPanel />}
     </div>
   );

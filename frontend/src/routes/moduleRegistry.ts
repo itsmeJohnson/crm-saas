@@ -30,6 +30,7 @@ const CallingPage = lazy(() => import('../pages/CallingPage').then(m => ({ defau
 const CallingReportsPage = lazy(() => import('../pages/CallingReportsPage').then(m => ({ default: m.CallingReportsPage })));
 const SmsPage = lazy(() => import('../pages/SmsPage').then(m => ({ default: m.SmsPage })));
 const SmsReportsPage = lazy(() => import('../pages/SmsReportsPage').then(m => ({ default: m.SmsReportsPage })));
+const VoicePage = lazy(() => import('../pages/VoicePage').then(m => ({ default: m.VoicePage })));
 const WhatsAppPage = lazy(() => import('../pages/WhatsAppPage').then(m => ({ default: m.WhatsAppPage })));
 const WhatsAppSettingsPage = lazy(() => import('../pages/WhatsAppSettingsPage').then(m => ({ default: m.WhatsAppSettingsPage })));
 const WhatsAppReportsPage = lazy(() => import('../pages/WhatsAppReportsPage').then(m => ({ default: m.WhatsAppReportsPage })));
@@ -93,6 +94,7 @@ const EscalationPage = lazy(() => import('../pages/EscalationPage').then(m => ({
 const PipelineSettings = lazy(() => import('../components/admin/PipelineSettings').then(m => ({ default: m.PipelineSettings })));
 const TenantsPage = lazy(() => import('../pages/TenantsPage').then(m => ({ default: m.TenantsPage })));
 const CustomObjectsPage = lazy(() => import('../pages/CustomObjectsPage').then(m => ({ default: m.CustomObjectsPage })));
+const FormBuilderPage = lazy(() => import('../pages/FormBuilderPage').then(m => ({ default: m.FormBuilderPage })));
 const TrialRequestsPage = lazy(() => import('../pages/TrialRequestsPage').then(m => ({ default: m.TrialRequestsPage })));
 
 // Lazy-loaded self-service portal components
@@ -271,6 +273,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/calling/reports', component: CallingReportsPage },
       { path: '/sms', component: SmsPage },
       { path: '/sms/reports', component: SmsReportsPage },
+      { path: '/voice', component: VoicePage, sidebar: { name: 'Voice Broadcast', icon: Megaphone } },
       { path: '/whatsapp', component: WhatsAppPage, sidebar: { name: 'WhatsApp Center', icon: MessageCircle } },
       { path: '/whatsapp/reports', component: WhatsAppReportsPage },
       { path: '/whatsapp/settings', component: WhatsAppSettingsPage, roles: ['OrgAdmin'] },
@@ -396,6 +399,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/approvals', component: ApprovalsPage },
       { path: '/roles', component: RolesPermissionsPage, roles: ['OrgAdmin'] },
       { path: '/custom-objects', component: CustomObjectsPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Custom Objects', group: 'Administration', icon: Gauge } },
+      { path: '/forms', component: FormBuilderPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Dynamic Forms', group: 'Administration', icon: Gauge } },
       { path: '/organization', component: Profile, roles: ['OrgAdmin'], sidebar: { name: 'Organization', icon: Building, group: 'Administration' } },
       { path: '/branches', component: BranchTerritoryPage, roles: ['OrgAdmin', 'Manager'] },
       // Billing Operations

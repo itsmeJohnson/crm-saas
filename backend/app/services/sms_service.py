@@ -56,7 +56,8 @@ class SmsService:
         if actor.role not in ("SuperAdmin", "OrgAdmin"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only an OrgAdmin can change SMS settings.")
         s = await self.get_settings(actor, create=True)
-        for k in ("provider", "account_sid", "auth_token", "sender_id", "sms_priority", "daily_limit", "is_active"):
+        for k in ("provider", "account_sid", "auth_token", "sender_id", "sms_priority",
+                  "sms_type", "default_template_id", "daily_limit", "is_active"):
             if k in data and data[k] is not None:
                 setattr(s, k, data[k])
         if data.get("regenerate_webhook_token") or not s.webhook_token:
@@ -317,6 +318,96 @@ class SmsService:
         return {"status": "received", "activity_id": str(act.id),
                 "lead_id": str(lead.id) if lead else None,
                 "contact_id": str(contact.id) if contact else None}
+
+    # ---------- Delivery reports (poll-based providers, e.g. BulkSMSPlans) ----------
+    # Non-terminal outbound statuses worth re-polling from the gateway.
+    POLL_STATUSES = {"sent", "queued", "pending", "submitted"}
+
+    async def _poll_one(self, provider, act: Activity) -> bool:
+        """Poll one activity's delivery report if the provider supports polling.
+        Returns True when the row was changed."""
+        if not hasattr(provider, "delivery_report") or not act.sms_provider_id:
+            return False
+        rep = await provider.delivery_report(act.sms_provider_id)
+        if not rep.get("found"):
+            return False
+        changed = False
+        mapped = rep.get("status")
+        if mapped and mapped != act.sms_status:
+            act.sms_status = mapped
+            if mapped in DELIVERED_STATUSES:
+                act.status = "Completed"
+            elif mapped in (FAILED_STATUSES | {"failed"}):
+                act.status = "Failed"
+            changed = True
+        err = rep.get("error")
+        if err and str(err) != (act.sms_error or ""):
+            act.sms_error = str(err)[:500]
+            changed = True
+        return changed
+
+    async def refresh_status(self, actor: User, activity_id: uuid.UUID) -> Activity:
+        """Manually re-poll a single outbound SMS's delivery status from the provider."""
+        act = await self._get_sms(actor, activity_id)
+        provider = get_provider(await self.get_settings(actor, create=True))
+        if await self._poll_one(provider, act):
+            self.db.add(act)
+            await self.db.flush()
+        return act
+
+    async def poll_delivery_reports(self, organization_id: uuid.UUID | None = None,
+                                    lookback_hours: int = 72) -> int:
+        """Cron: poll DLR for outbound SMS still in a non-terminal state, for orgs
+        whose provider supports polling (e.g. BulkSMSPlans). Returns count updated."""
+        since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
+        q = select(Activity).filter(
+            Activity.is_deleted == False, Activity.activity_type == "SMS",
+            Activity.call_direction == "OUTBOUND", Activity.sms_provider_id.isnot(None),
+            Activity.sms_status.in_(list(self.POLL_STATUSES)), Activity.created_at >= since)
+        if organization_id:
+            q = q.filter(Activity.organization_id == organization_id)
+        acts = list((await self.db.execute(q)).scalars().all())
+        provider_cache: dict = {}
+        updated = 0
+        for act in acts:
+            oid = act.organization_id
+            if oid not in provider_cache:
+                res = await self.db.execute(select(SmsSettings).filter(
+                    SmsSettings.organization_id == oid, SmsSettings.is_deleted == False))
+                provider_cache[oid] = get_provider(res.scalars().first())
+            provider = provider_cache[oid]
+            if not hasattr(provider, "delivery_report"):
+                continue
+            try:
+                if await self._poll_one(provider, act):
+                    self.db.add(act)
+                    updated += 1
+            except Exception:
+                continue
+        await self.db.flush()
+        return updated
+
+    # ---------- Provider account info (BulkSMSPlans etc.) ----------
+    async def check_balance(self, actor: User) -> dict:
+        provider = get_provider(await self.get_settings(actor, create=True))
+        if not hasattr(provider, "check_balance"):
+            return {"success": False, "message": f"Balance check not supported by provider '{provider.name}'."}
+        return await provider.check_balance()
+
+    async def list_sender_ids(self, actor: User) -> dict:
+        provider = get_provider(await self.get_settings(actor, create=True))
+        if not hasattr(provider, "list_sender_ids"):
+            return {"success": False, "items": [],
+                    "message": f"Sender-ID management not supported by provider '{provider.name}'."}
+        return await provider.list_sender_ids()
+
+    async def request_sender_id(self, actor: User, sender: str, country: str, remarks: str | None) -> dict:
+        if actor.role not in ("SuperAdmin", "OrgAdmin"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only an OrgAdmin can request sender IDs.")
+        provider = get_provider(await self.get_settings(actor, create=True))
+        if not hasattr(provider, "request_sender_id"):
+            return {"success": False, "message": f"Sender-ID management not supported by provider '{provider.name}'."}
+        return await provider.request_sender_id(sender, country=country, remarks=remarks)
 
     # ---------- History / reports ----------
     def _scope(self, q, actor: User):

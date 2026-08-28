@@ -40,6 +40,7 @@ from app.models.escalation_config import EscalationConfig
 from app.models.workflow_rule import WorkflowRule
 from app.models.custom_field_definition import CustomFieldDefinition
 from app.models.custom_object import CustomObjectDefinition, CustomObjectRecord
+from app.models.form_definition import FormDefinition
 from app.models.contact_relationship import ContactRelationship
 from app.models.customer_order import CustomerOrder
 from app.models.customer_invoice import CustomerInvoice
@@ -51,6 +52,8 @@ from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
 from app.models.sms_settings import SmsSettings
+from app.models.otp_verification import OtpVerification
+from app.models.voice_broadcast import VoiceBroadcast, VoiceBroadcastRecipient
 from app.models.telephony_settings import TelephonySettings
 from app.models.whatsapp import (
     WhatsAppSettings, WhatsAppConversation, WhatsAppQuickReply,
@@ -157,6 +160,7 @@ __all__ = [
     "CustomFieldDefinition",
     "CustomObjectDefinition",
     "CustomObjectRecord",
+    "FormDefinition",
     "ContactRelationship",
     "CustomerOrder",
     "CustomerInvoice",
@@ -172,6 +176,9 @@ __all__ = [
     "CommunicationFlag",
     "CommunicationTemplateVersion",
     "SmsSettings",
+    "OtpVerification",
+    "VoiceBroadcast",
+    "VoiceBroadcastRecipient",
     "WhatsAppSettings",
     "WhatsAppConversation",
     "WhatsAppQuickReply",

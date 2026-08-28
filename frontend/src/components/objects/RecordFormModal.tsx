@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { metadataApi, CustomFieldDefinition } from '../../services/metadataApi';
 import { objectApi, CustomObjectRecord } from '../../services/objectApi';
-import { DynamicCustomFields } from '../crm/DynamicCustomFields';
+import { formApi, FormDefinition, pickForm } from '../../services/formApi';
+import { FormRenderer } from '../forms/FormRenderer';
 
 interface Props {
   objectKey: string;
@@ -17,6 +18,7 @@ interface Props {
  *  renderer driven by the object's own field definitions (loaded lazily). */
 export const RecordFormModal: React.FC<Props> = ({ objectKey, objectLabel, record, isOpen, onClose, onSaved }) => {
   const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
+  const [form, setForm] = useState<FormDefinition | null>(null);
   const [values, setValues] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,9 @@ export const RecordFormModal: React.FC<Props> = ({ objectKey, objectLabel, recor
     setError(null);
     setErrors({});
     metadataApi.listCustomFields(objectKey).then((d) => setDefinitions(d.filter((f) => f.is_active))).catch(() => {});
+    // Use a Dynamic Form when one is configured; otherwise fall back to the
+    // default layout (all visible+active fields). Failure to load = fallback.
+    formApi.listForms(objectKey).then((forms) => setForm(pickForm(forms))).catch(() => setForm(null));
   }, [isOpen, objectKey, record]);
 
   if (!isOpen) return null;
@@ -59,8 +64,9 @@ export const RecordFormModal: React.FC<Props> = ({ objectKey, objectLabel, recor
         {definitions.length === 0 ? (
           <p className="text-xs text-slate-500">No fields defined for this object yet. Add fields first.</p>
         ) : (
-          <DynamicCustomFields
+          <FormRenderer
             definitions={definitions}
+            form={form}
             values={values}
             errors={errors}
             onChange={(k, v) => setValues((p) => ({ ...p, [k]: v }))}

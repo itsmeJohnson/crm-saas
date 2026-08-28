@@ -10,8 +10,11 @@ from app.schemas.sms import (
     SmsSettingsResponse, SmsSettingsUpdate, SmsSendRequest, SmsItem,
     SmsBulkRequest, SmsBulkResult, SmsHistoryResponse, SmsReportResponse,
     SmsStatusWebhook, SmsInboundWebhook,
+    SmsBalanceResponse, SenderIdListResponse, SenderIdRequest, SenderIdRequestResult,
+    OtpSendRequest, OtpVerifyRequest, OtpResponse,
 )
 from app.services.sms_service import SmsService
+from app.services.otp_service import OtpService
 from app.middleware.permissions import require_active_user
 from app.dependencies.feature_guard import tenant_has_feature
 
@@ -71,6 +74,42 @@ async def retry_sms(activity_id: uuid.UUID, actor: Annotated[User, Depends(requi
     return service._item(act, names)
 
 
+@router.post("/{activity_id}/refresh-status", response_model=SmsItem)
+async def refresh_sms_status(activity_id: uuid.UUID, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Re-poll a message's delivery status from the provider (poll-based gateways
+    like BulkSMSPlans that have no delivery webhook)."""
+    await _require_sms_feature(actor, db)
+    service = SmsService(db)
+    act = await service.refresh_status(actor, activity_id)
+    names = await service._names({act.assigned_user_id or act.created_by})
+    return service._item(act, names)
+
+
+# ---------- Provider account info (BulkSMSPlans etc.) ----------
+@router.get("/settings/balance", response_model=SmsBalanceResponse)
+async def sms_balance(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Current provider account balance (BulkSMSPlans). OrgAdmin/Manager only."""
+    if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized.")
+    return await SmsService(db).check_balance(actor)
+
+
+@router.get("/settings/sender-ids", response_model=SenderIdListResponse)
+async def sms_sender_ids(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """List the provider's approved/pending sender IDs. OrgAdmin/Manager only."""
+    if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized.")
+    return await SmsService(db).list_sender_ids(actor)
+
+
+@router.post("/settings/sender-ids", response_model=SenderIdRequestResult)
+async def sms_request_sender_id(req: SenderIdRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Submit a new sender-ID approval request to the provider (OrgAdmin only)."""
+    return await SmsService(db).request_sender_id(actor, req.sender, req.country, req.remarks)
+
+
 # ---------- History / reports ----------
 @router.get("/messages", response_model=SmsHistoryResponse)
 async def sms_messages(
@@ -91,6 +130,32 @@ async def sms_reports(
 ):
     """SMS analytics: sent/delivered/failed/inbound, delivery rate, segments, by status/direction/day."""
     return await SmsService(db).reports(actor, date_from=date_from, date_to=date_to)
+
+
+# ---------- OTP verification ----------
+def _otp_item(rec) -> dict:
+    num = rec.number or ""
+    masked = ("•" * max(0, len(num) - 4)) + num[-4:] if num else ""
+    return {"id": str(rec.id), "number_masked": masked, "purpose": rec.purpose,
+            "status": rec.status, "attempts": rec.attempts, "max_attempts": rec.max_attempts,
+            "expires_at": rec.expires_at, "verified_at": rec.verified_at}
+
+
+@router.post("/otp/send", response_model=OtpResponse, status_code=status.HTTP_201_CREATED)
+async def otp_send(req: OtpSendRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Send a verification OTP to a number (or a linked lead/contact). The gateway
+    generates the code; returns a verification id to complete via /otp/verify."""
+    await _require_sms_feature(actor, db)
+    rec = await OtpService(db).send(actor, req.model_dump())
+    return _otp_item(rec)
+
+
+@router.post("/otp/verify", response_model=OtpResponse)
+async def otp_verify(req: OtpVerifyRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    """Verify a user-entered OTP for a prior /otp/send. 400 on invalid/expired."""
+    await _require_sms_feature(actor, db)
+    rec = await OtpService(db).verify(actor, req.verification_id, req.otp)
+    return _otp_item(rec)
 
 
 # ---------- Webhooks (token-secured; no auth dependency) ----------

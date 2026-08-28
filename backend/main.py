@@ -30,10 +30,12 @@ from app.api.v1.health import router as active_health_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.metadata import router as metadata_router
 from app.api.v1.custom_objects import router as custom_objects_router
+from app.api.v1.forms import router as forms_router
 from app.api.v1.dialer import router as dialer_router
 from app.api.v1.calling import router as calling_router
 from app.api.v1.settings_calling import router as settings_calling_router
 from app.api.v1.sms import router as sms_router
+from app.api.v1.voice import router as voice_router
 from app.api.v1.whatsapp import router as whatsapp_router
 from app.api.v1.email import router as email_router
 from app.api.v1.templates import router as templates_router
@@ -106,7 +108,7 @@ from app.cron.subscription_cron import run_daily_subscription_check
 from app.cron.lead_cron import run_lead_automation_check
 from app.cron.customer_cron import run_customer_dunning_check
 from app.cron.calling_cron import run_missed_call_check
-from app.cron.sms_cron import run_sms_retry_check
+from app.cron.sms_cron import run_sms_retry_check, run_sms_dlr_poll
 from app.cron.email_cron import run_email_sync
 from app.cron.campaign_cron import run_campaign_check
 from app.cron.automation_cron import run_automation_cycle
@@ -169,6 +171,7 @@ async def subscription_cron_scheduler():
                     await run_customer_dunning_check(async_session_maker)
                     await run_missed_call_check(async_session_maker)
                     await run_sms_retry_check(async_session_maker)
+                    await run_sms_dlr_poll(async_session_maker)
                     await run_email_sync(async_session_maker)
                     await run_campaign_check(async_session_maker)
                     # Automation Engine: SLA scan + scheduled reports (tracked, per-org)
@@ -440,10 +443,12 @@ app.include_router(active_health_router,   prefix=f"{settings.API_V1_STR}/health
 app.include_router(pipelines_router,       prefix=f"{settings.API_V1_STR}/pipelines",       tags=["pipelines"])
 app.include_router(metadata_router,        prefix=f"{settings.API_V1_STR}/metadata",        tags=["metadata"])
 app.include_router(custom_objects_router,  prefix=f"{settings.API_V1_STR}/objects",         tags=["custom-objects"])
+app.include_router(forms_router,           prefix=f"{settings.API_V1_STR}/forms",           tags=["forms"])
 app.include_router(dialer_router,          prefix=f"{settings.API_V1_STR}/dialer",          tags=["dialer"])
 app.include_router(calling_router,         prefix=f"{settings.API_V1_STR}/calling",         tags=["calling"])
 app.include_router(settings_calling_router, prefix=f"{settings.API_V1_STR}/settings/calling", tags=["settings-telephony"])
 app.include_router(sms_router,             prefix=f"{settings.API_V1_STR}/sms",             tags=["sms"])
+app.include_router(voice_router,           prefix=f"{settings.API_V1_STR}/voice",           tags=["voice"])
 app.include_router(whatsapp_router,        prefix=f"{settings.API_V1_STR}/whatsapp",        tags=["whatsapp"])
 app.include_router(email_router,           prefix=f"{settings.API_V1_STR}/email",           tags=["email"])
 app.include_router(templates_router,       prefix=f"{settings.API_V1_STR}/templates",       tags=["templates"])

@@ -124,9 +124,13 @@ def test_custom_fields_engine_imports_no_industry_modules():
         BACKEND_APP / "services" / "custom_object_record_service.py",
         BACKEND_APP / "models" / "custom_field_definition.py",
         BACKEND_APP / "models" / "custom_object.py",
+        BACKEND_APP / "models" / "form_definition.py",
         BACKEND_APP / "schemas" / "custom_field.py",
         BACKEND_APP / "schemas" / "custom_object.py",
+        BACKEND_APP / "schemas" / "form_definition.py",
+        BACKEND_APP / "services" / "form_service.py",
         BACKEND_APP / "api" / "v1" / "custom_objects.py",
+        BACKEND_APP / "api" / "v1" / "forms.py",
     ]
     industry_import = re.compile(
         r"import.*(treatment_catalog|dental|patient|appointment|dentist|clinical|"
