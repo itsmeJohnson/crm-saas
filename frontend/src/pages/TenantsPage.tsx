@@ -908,11 +908,26 @@ export const TenantsPage: React.FC = () => {
                         })()}
 
                         {/* Plan details */}
+                        {(() => { const flat = plan.billing_mode === 'flat'; const unlimited = (plan.max_users ?? 0) >= 9999; return (
                         <div className="space-y-1.5 pt-1">
                           <p className="text-xs text-slate-300 flex items-center gap-2">
                             <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                            <span>Starts From: <strong>{plan.minimum_users ?? plan.max_users} Licensed Seats</strong></span>
+                            {flat
+                              ? <span>Users: <strong>{unlimited ? 'Unlimited' : `Up to ${plan.max_users}`}</strong></span>
+                              : <span>Starts From: <strong>{plan.minimum_users ?? plan.max_users} Licensed Seats</strong></span>}
                           </p>
+                          {flat && (
+                            <>
+                              <p className="text-xs text-slate-300 flex items-center gap-2">
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span>Leads: <strong>{plan.lead_cap ? Number(plan.lead_cap).toLocaleString('en-IN') : 'Unlimited'}</strong></span>
+                              </p>
+                              <p className="text-xs text-slate-300 flex items-center gap-2">
+                                <Building className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <span>Websites: <strong>{plan.website_limit ?? 1}</strong></span>
+                              </p>
+                            </>
+                          )}
                           <p className="text-xs text-slate-300 flex items-center gap-2">
                             <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                             <span>Minimum Contract: <strong>{plan.minimum_contract_months} Months</strong></span>
@@ -925,23 +940,39 @@ export const TenantsPage: React.FC = () => {
                             <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                             <span>Call Recording Retention: <strong>{plan.recording_retention_days} Days</strong></span>
                           </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <DollarSign className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                            <span>Additional Seat Price: <strong>{plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.extra_user_price ?? 0).toLocaleString('en-IN')}</strong></span>
-                          </p>
-                          <p className="text-xs text-slate-300 flex items-center gap-2">
-                            <Check className={`w-3.5 h-3.5 shrink-0 ${plan.allow_additional_seats ? 'text-emerald-500' : 'text-slate-600'}`} />
-                            <span>Additional Seats: <strong>{plan.allow_additional_seats ? 'Allowed' : 'Not Allowed'}</strong></span>
-                          </p>
+                          {!flat && (
+                            <>
+                              <p className="text-xs text-slate-300 flex items-center gap-2">
+                                <DollarSign className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <span>Additional Seat Price: <strong>{plan.currency === 'INR' ? '₹' : plan.currency}{Number(plan.extra_user_price ?? 0).toLocaleString('en-IN')}</strong></span>
+                              </p>
+                              <p className="text-xs text-slate-300 flex items-center gap-2">
+                                <Check className={`w-3.5 h-3.5 shrink-0 ${plan.allow_additional_seats ? 'text-emerald-500' : 'text-slate-600'}`} />
+                                <span>Additional Seats: <strong>{plan.allow_additional_seats ? 'Allowed' : 'Not Allowed'}</strong></span>
+                              </p>
+                            </>
+                          )}
                         </div>
+                        ); })()}
 
                         {/* Billing Policy */}
                         <div className="mt-3 p-3 bg-slate-900/60 border border-slate-800/60 rounded-xl text-[10px] text-slate-400 space-y-1">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Billing Policy</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Per Licensed Seat</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Purchase: {plan.minimum_users ?? plan.max_users} Seats</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Contract: {plan.minimum_contract_months} Months</p>
-                          <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{plan.allow_additional_seats ? 'Additional Seats can be purchased anytime' : 'Additional Seats not available'}</p>
+                          {plan.billing_mode === 'flat' ? (
+                            <>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Flat monthly — per agency (no per-seat cost)</p>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{(plan.max_users ?? 0) >= 9999 ? 'Unlimited users included' : `Up to ${plan.max_users} users included`}</p>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{plan.lead_cap ? `${Number(plan.lead_cap).toLocaleString('en-IN')} leads` : 'Unlimited leads'} · {plan.website_limit ?? 1} website{(plan.website_limit ?? 1) > 1 ? 's' : ''}</p>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Contract: {plan.minimum_contract_months} Months</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Per Licensed Seat</p>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Purchase: {plan.minimum_users ?? plan.max_users} Seats</p>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />Minimum Initial Contract: {plan.minimum_contract_months} Months</p>
+                              <p className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{plan.allow_additional_seats ? 'Additional Seats can be purchased anytime' : 'Additional Seats not available'}</p>
+                            </>
+                          )}
                         </div>
                       </div>
 

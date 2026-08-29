@@ -41,7 +41,7 @@ PLANS = [
     {
         "name": "Launch", "display_order": 1,
         "monthly_price": 9999.0, "billing_mode": "flat",
-        "lead_cap": 2500, "website_limit": 1,
+        "lead_cap": 2500, "website_limit": 1, "storage_limit_gb": 10, "recording_retention_days": 30,
         "setup_charges": 0.0, "max_users": 10, "minimum_users": 1, "maximum_users": 10,
         "is_trial": False, "trial_days": None,
         "popular_plan": False, "plan_badge": None,
@@ -50,7 +50,7 @@ PLANS = [
     {
         "name": "Growth", "display_order": 2,
         "monthly_price": 19999.0, "billing_mode": "flat",
-        "lead_cap": 10000, "website_limit": 2,
+        "lead_cap": 10000, "website_limit": 2, "storage_limit_gb": 25, "recording_retention_days": 90,
         "setup_charges": 0.0, "max_users": 30, "minimum_users": 1, "maximum_users": 30,
         "is_trial": False, "trial_days": None,
         "popular_plan": True, "plan_badge": "Most Popular",
@@ -59,7 +59,7 @@ PLANS = [
     {
         "name": "Scale", "display_order": 3,
         "monthly_price": 34999.0, "billing_mode": "flat",
-        "lead_cap": None, "website_limit": 5,
+        "lead_cap": None, "website_limit": 5, "storage_limit_gb": 100, "recording_retention_days": 180,
         "setup_charges": 0.0, "max_users": 9999, "minimum_users": 1, "maximum_users": 9999,
         "is_trial": False, "trial_days": None,
         "popular_plan": False, "plan_badge": None,
@@ -136,6 +136,12 @@ async def seed():
                 billing_mode=plan_data.get("billing_mode", "per_seat"),
                 lead_cap=plan_data.get("lead_cap"),
                 website_limit=plan_data.get("website_limit", 1),
+                storage_limit_gb=plan_data.get("storage_limit_gb", 10),
+                recording_retention_days=plan_data.get("recording_retention_days", 30),
+                extra_user_price=0.0,
+                allow_additional_seats=False,
+                priority_support="PRIORITY_SUPPORT" in PLAN_FEATURES[plan_data["name"].lower()],
+                api_access="API_ACCESS" in PLAN_FEATURES[plan_data["name"].lower()],
                 plan_active=True,
                 is_deleted=False,
             )
