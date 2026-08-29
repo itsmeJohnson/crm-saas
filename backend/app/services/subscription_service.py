@@ -165,13 +165,26 @@ class SubscriptionService:
         # Get current usage
         usage = await self.get_tenant_usage(organization_id)
 
-        # Verify overall total limit based on users_purchased (Licensed Seats)
-        limit = sub.users_purchased
-        if usage["total_users"] >= limit:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No available seats. Your subscription has a limit of {limit} Licensed Seats. Please purchase additional seats or replace an existing inactive employee."
-            )
+        # Total-user limit. Flat (per-agency) plans allow unlimited users up to the
+        # plan's max_users cap (set high => effectively unlimited); per-seat plans cap
+        # by the purchased Licensed Seats.
+        plan = None
+        if getattr(sub, "plan_id", None):
+            plan = (await self.db.execute(select(Plan).where(Plan.id == sub.plan_id))).scalars().first()
+        if plan is not None and getattr(plan, "billing_mode", "per_seat") == "flat":
+            limit = int(plan.max_users or 9999)
+            if usage["total_users"] >= limit:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"User limit reached. This plan allows up to {limit} users."
+                )
+        else:
+            limit = sub.users_purchased
+            if usage["total_users"] >= limit:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"No available seats. Your subscription has a limit of {limit} Licensed Seats. Please purchase additional seats or replace an existing inactive employee."
+                )
 
         if role not in ["OrgAdmin", "Manager", "Employee"]:
             raise HTTPException(
