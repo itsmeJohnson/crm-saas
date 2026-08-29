@@ -24,7 +24,8 @@ ALL_MODULES = {
     "communications",
     "billing",
     "reports",
-    
+    "analytics_suite",
+
     # Dental-Specific Industry Modules
     "patients",
     "appointments",
@@ -108,6 +109,7 @@ BUSINESS_TEMPLATES = {
         "communications",
         "billing",
         "reports",
+        "analytics_suite",
     },
     IndustryType.GENERIC: {
         "dashboard",
@@ -122,5 +124,6 @@ BUSINESS_TEMPLATES = {
         "billing",
         "communications",
         "reports",
+        "analytics_suite",
     },
 }
