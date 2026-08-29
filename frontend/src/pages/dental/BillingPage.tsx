@@ -6,9 +6,11 @@ import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';
 import { RecordPaymentModal } from '../../components/dental/RecordPaymentModal';
 import { CreateInvoiceModal } from '../../components/dental/CreateInvoiceModal';
+import { useMetadataStore } from '../../store/metadataStore';
 
 
 export const BillingPage: React.FC = () => {
+  const isDental = (useMetadataStore((s) => s.crmConfig?.industry) || 'healthcare_dental') === 'healthcare_dental';
   const [invoices, setInvoices] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -85,16 +87,16 @@ export const BillingPage: React.FC = () => {
     <div className="space-y-6 select-none">
       {/* Header Bento */}
       <div className="bento-card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 flex-shrink-0">
-            <Receipt className="w-6 h-6" />
-          </div>
+        <div className="flex items-center gap-2.5">
+          <Receipt className="w-5 h-5 text-brand-400 flex-shrink-0" />
           <div>
-            <h1 className="text-xl font-black text-slate-100">
-              Patient Invoicing, Billing &amp; Receipts
+            <h1 className="text-xl font-semibold text-slate-100">
+              {isDental ? 'Patient Invoicing, Billing & Receipts' : 'Billing & Invoices'}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Procedure invoices, point-of-sale collections &amp; accounts receivable tracking.
+              {isDental
+                ? 'Procedure invoices, point-of-sale collections & accounts receivable tracking.'
+                : 'Invoices, payments and accounts receivable tracking.'}
             </p>
           </div>
         </div>
@@ -115,7 +117,7 @@ export const BillingPage: React.FC = () => {
         <div className="bento-card p-5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Billed</span>
           <div className="text-2xl font-black text-slate-100 mt-1">{formatMoney(totalInvoiced)}</div>
-          <span className="text-[10px] text-cyan-400 font-semibold mt-1 inline-block">{invoices.length} Clinical Invoices</span>
+          <span className="text-[10px] text-cyan-400 font-semibold mt-1 inline-block">{invoices.length} {isDental ? 'Clinical Invoices' : 'Invoices'}</span>
         </div>
 
         <div className="bento-card p-5">
@@ -139,7 +141,7 @@ export const BillingPage: React.FC = () => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by invoice number, procedure description..."
+            placeholder={isDental ? 'Search by invoice number, procedure description...' : 'Search by invoice number, description...'}
             className="neo-input w-full pr-4 py-2.5 text-xs"
             style={{ paddingLeft: '2.4rem' }}
           />
@@ -169,7 +171,7 @@ export const BillingPage: React.FC = () => {
             <thead>
               <tr className="bg-[var(--bg-inset)] border-b border-slate-800/40 text-slate-400 uppercase tracking-wider font-bold text-[10px]">
                 <th className="px-6 py-4">Invoice #</th>
-                <th className="px-4 py-4">Procedure Description</th>
+                <th className="px-4 py-4">{isDental ? 'Procedure Description' : 'Description'}</th>
                 <th className="px-4 py-4">Date Issued</th>
                 <th className="px-4 py-4">Total Amount</th>
                 <th className="px-4 py-4">Paid</th>
@@ -183,7 +185,7 @@ export const BillingPage: React.FC = () => {
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-400">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto text-cyan-400 mb-2" />
-                    Loading clinical invoices...
+                    {isDental ? 'Loading clinical invoices...' : 'Loading invoices...'}
                   </td>
                 </tr>
               ) : filteredInvoices.length === 0 ? (
@@ -208,7 +210,7 @@ export const BillingPage: React.FC = () => {
                         {inv.invoice_number}
                       </td>
                       <td className="px-4 py-4 font-bold text-slate-100">
-                        {item.description || 'Clinical Procedure Fee'}
+                        {item.description || (isDental ? 'Clinical Procedure Fee' : 'Service Fee')}
                       </td>
                       <td className="px-4 py-4 text-slate-400">
                         {inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('en-IN') : '08 Aug 2026'}

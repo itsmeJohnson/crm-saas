@@ -3,8 +3,10 @@ import {
   Users, RefreshCw
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useMetadataStore } from '../../store/metadataStore';
 
 export const StaffPage: React.FC = () => {
+  const isDental = (useMetadataStore((s) => s.crmConfig?.industry) || 'healthcare_dental') === 'healthcare_dental';
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,12 +31,14 @@ export const StaffPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
         <div>
-          <h1 className="text-2xl font-black text-slate-100 flex items-center gap-2">
-            <Users className="w-6 h-6 text-brand-400" />
-            Clinic Staff & Operational Team
+          <h1 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
+            <Users className="w-5 h-5 text-brand-400" />
+            {isDental ? 'Clinic Staff & Operational Team' : 'Staff & Team'}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Receptionists, patient coordinators, dental hygienists, clinic managers & staff permissions.
+            {isDental
+              ? 'Receptionists, patient coordinators, dental hygienists, clinic managers & staff permissions.'
+              : 'Your team members, roles and access permissions.'}
           </p>
         </div>
       </div>
@@ -73,10 +77,14 @@ export const StaffPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-slate-300 font-medium">
-                      {u.email?.includes('reception') ? 'Head Receptionist'
-                        : u.email?.includes('manager') ? 'Clinic Operations Manager'
-                        : u.email?.includes('dr.') ? 'Attending Dental Surgeon'
-                        : 'Practice Administrator'}
+                      {isDental
+                        ? (u.email?.includes('reception') ? 'Head Receptionist'
+                          : u.email?.includes('manager') ? 'Clinic Operations Manager'
+                          : u.email?.includes('dr.') ? 'Attending Dental Surgeon'
+                          : 'Practice Administrator')
+                        : (u.email?.includes('manager') ? 'Operations Manager'
+                          : u.role === 'SuperAdmin' ? 'Administrator'
+                          : 'Team Member')}
                     </td>
                     <td className="px-4 py-4 text-slate-300">{u.phone || '+91 9820445566'}</td>
                     <td className="px-4 py-4 text-slate-400">{u.email}</td>

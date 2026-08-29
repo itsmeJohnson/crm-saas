@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Megaphone, Target, RefreshCw } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { api } from '../../services/api';
+import { useMetadataStore } from '../../store/metadataStore';
 
 const CONVERTED = new Set(['converted', 'won', 'closed_won', 'treatment started', 'treatment completed / converted']);
 const LOST = new Set(['lost', 'lost / not interested', 'closed_lost']);
 const NEW = new Set(['new', 'new enquiry', 'new lead']);
 
 export const MarketingPage: React.FC = () => {
+  const isDental = (useMetadataStore((s) => s.crmConfig?.industry) || 'healthcare_dental') === 'healthcare_dental';
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<any[]>([]);
 
@@ -55,12 +57,14 @@ export const MarketingPage: React.FC = () => {
     <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
         <div>
-          <h1 className="text-2xl font-black text-slate-100 flex items-center gap-2">
-            <Megaphone className="w-6 h-6 text-brand-400" />
-            Dental Marketing &amp; Lead Acquisition Analytics
+          <h1 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
+            <Megaphone className="w-5 h-5 text-brand-400" />
+            {isDental ? 'Dental Marketing & Lead Acquisition Analytics' : 'Marketing & Lead Acquisition Analytics'}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Lead sources (Google, Instagram, Referrals, Walk-ins), conversion rates &amp; acquired treatment value — from your live leads.
+            {isDental
+              ? 'Lead sources (Google, Instagram, Referrals, Walk-ins), conversion rates & acquired treatment value — from your live leads.'
+              : 'Lead sources (Google, Instagram, Referrals, Campaigns), conversion rates & acquired deal value — from your live leads.'}
           </p>
         </div>
         <button onClick={load} disabled={loading} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 disabled:opacity-50">
@@ -69,9 +73,9 @@ export const MarketingPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi label="Total Marketing Inquiries" value={String(totalLeads)} sub="Multi-channel patient acquisition" color="text-slate-100" />
-        <Kpi label="Converted Patients" value={String(totalPatients)} sub={`${convRate}% Conversion Rate`} color="text-emerald-400" />
-        <Kpi label="Acquired Treatment Value" value={formatMoney(totalRevenue)} sub="Value of converted leads" color="text-brand-400" />
+        <Kpi label="Total Marketing Inquiries" value={String(totalLeads)} sub={isDental ? 'Multi-channel patient acquisition' : 'Multi-channel lead acquisition'} color="text-slate-100" />
+        <Kpi label={isDental ? 'Converted Patients' : 'Converted Leads'} value={String(totalPatients)} sub={`${convRate}% Conversion Rate`} color="text-emerald-400" />
+        <Kpi label={isDental ? 'Acquired Treatment Value' : 'Acquired Deal Value'} value={formatMoney(totalRevenue)} sub="Value of converted leads" color="text-brand-400" />
         <Kpi label="Campaign ROAS / Multiplier" value="—" sub="Add ad spend per channel to compute" color="text-purple-400" />
       </div>
 
@@ -93,7 +97,7 @@ export const MarketingPage: React.FC = () => {
                   <th className="px-6 py-4">Source Channel</th>
                   <th className="px-4 py-4">Inquiries</th>
                   <th className="px-4 py-4">Engaged / Booked</th>
-                  <th className="px-4 py-4">Converted Patients</th>
+                  <th className="px-4 py-4">{isDental ? 'Converted Patients' : 'Converted Leads'}</th>
                   <th className="px-4 py-4">Conversion Rate</th>
                   <th className="px-4 py-4">Ad Spend</th>
                   <th className="px-6 py-4 text-right">Generated Treatment Revenue</th>
