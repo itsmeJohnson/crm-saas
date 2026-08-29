@@ -48,6 +48,14 @@ class Plan(BaseModel):
     plan_badge: Mapped[str | None] = mapped_column(String(100), nullable=True)
     popular_plan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     recommended_plan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Billing mode: 'per_seat' (invoice = monthly_price x seats) or 'flat'
+    # (invoice = monthly_price, seats unlimited). Agency plans are 'flat'.
+    billing_mode: Mapped[str] = mapped_column(String(20), default="per_seat", nullable=False)
+    # Max leads the tenant may hold (soft cap); NULL = unlimited.
+    lead_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # How many websites/landing sites the plan allows (Website Engine).
+    website_limit: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     allow_upgrade: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_downgrade: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_trial: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

@@ -85,6 +85,9 @@ class PlanCreate(BaseModel):
     plan_badge: str | None = None
     popular_plan: bool = False
     recommended_plan: bool = False
+    billing_mode: str = "per_seat"
+    lead_cap: int | None = None
+    website_limit: int = 1
     allow_upgrade: bool = True
     allow_downgrade: bool = True
     allow_trial: bool = True
@@ -147,6 +150,9 @@ class PlanUpdate(BaseModel):
     plan_badge: str | None = None
     popular_plan: bool | None = None
     recommended_plan: bool | None = None
+    billing_mode: str | None = None
+    lead_cap: int | None = None
+    website_limit: int | None = None
     allow_upgrade: bool | None = None
     allow_downgrade: bool | None = None
     allow_trial: bool | None = None
@@ -187,6 +193,9 @@ class PlanResponse(BaseModel):
     plan_badge: str | None = None
     popular_plan: bool
     recommended_plan: bool
+    billing_mode: str = "per_seat"
+    lead_cap: int | None = None
+    website_limit: int = 1
     allow_upgrade: bool
     allow_downgrade: bool
     allow_trial: bool

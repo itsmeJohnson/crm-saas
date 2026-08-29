@@ -478,6 +478,9 @@ export interface PlanCreatePayload {
   plan_badge?: string;
   popular_plan: boolean;
   recommended_plan: boolean;
+  billing_mode?: string;
+  lead_cap?: number | null;
+  website_limit?: number;
   allow_upgrade: boolean;
   allow_downgrade: boolean;
   allow_trial: boolean;

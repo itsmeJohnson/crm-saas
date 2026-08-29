@@ -253,7 +253,8 @@ class SubscriptionService:
             sub.users_purchased_next = None
 
         price_per_seat = float(plan.monthly_price if plan.monthly_price > 0 else plan.price_inr)
-        amount = price_per_seat * sub.users_purchased
+        # Flat (per-agency) plans: fixed monthly price; per-seat plans multiply by seats.
+        amount = price_per_seat if getattr(plan, "billing_mode", "per_seat") == "flat" else price_per_seat * sub.users_purchased
         
         # Determine Setup Charge fallback
         setup_charges = float(plan.setup_charges) if plan.setup_charges is not None else float(comm_settings.default_setup_charge)

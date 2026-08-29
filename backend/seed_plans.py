@@ -6,11 +6,11 @@ Pricing is on TWO independent axes:
   • Seats  = how many telecallers  -> per-seat price, minimum 3 seats
   • Tier   = which capabilities    -> the feature bundle below
 
-Tiers (per seat / month, INR):
-  Connect   Rs.699/seat/mo   | Call, track, follow up (telecalling essentials)
-  Convert   Rs.1,299/seat/mo | + auto-distribution, recording, campaigns, voice broadcast, manager analytics   (POPULAR / trial)
-  Scale     Rs.1,999/seat/mo | + AI call summaries, advanced analytics, API, priority support
-  Custom    (Enterprise)     | Everything + white-label, custom objects/verticals, KYC/bank APIs, dedicated SLA — contact sales
+Agency Growth Platform - FLAT per-agency pricing (unlimited users), INR/month:
+  Launch  Rs.9,999/mo  | 2,500 leads, 1 pipeline, CRM + email automation, basic analytics
+  Growth  Rs.19,999/mo | 10,000 leads, multi-pipeline, advanced automation, UTM, campaigns/voice, advanced analytics, 2 sites  (POPULAR)
+  Scale   Rs.34,999/mo | unlimited leads, AI summaries, full analytics, API, 5+ sites, white-label optional
+billing_mode='flat' => invoice = monthly_price (seats ignored). lead_cap gates lead volume.
 
 This script is idempotent AND authoritative:
   • It creates/updates exactly the four plans below (Connect/Convert/Scale/Enterprise).
@@ -39,69 +39,61 @@ ANNUAL_DISCOUNT = 0.15      # 15% off for 12-month commitment
 # ── Plan definitions (per-seat monthly rate; quarterly/annual computed below) ──
 PLANS = [
     {
-        "name": "Connect", "display_order": 1,
-        "monthly_price": 699.0,
-        "setup_charges": 0.0, "max_users": 25, "minimum_users": 3, "maximum_users": 25,
+        "name": "Launch", "display_order": 1,
+        "monthly_price": 9999.0, "billing_mode": "flat",
+        "lead_cap": 2500, "website_limit": 1,
+        "setup_charges": 0.0, "max_users": 9999, "minimum_users": 1, "maximum_users": 9999,
         "is_trial": False, "trial_days": None,
         "popular_plan": False, "plan_badge": None,
-        "description": "Telecalling essentials: leads, click-to-call with dispositions, follow-ups & reminders, WhatsApp + SMS, and a basic dashboard. Everything a calling team needs to call, track and follow up.",
+        "description": "Agency Growth Platform - Launch. Unlimited users, up to 2,500 leads, 1 pipeline, CRM + email automation, basic analytics. Everything to run your lead-to-close process in one place.",
     },
     {
-        "name": "Convert", "display_order": 2,
-        "monthly_price": 1299.0,
-        "setup_charges": 0.0, "max_users": 100, "minimum_users": 3, "maximum_users": 100,
-        "is_trial": True, "trial_days": 7,
+        "name": "Growth", "display_order": 2,
+        "monthly_price": 19999.0, "billing_mode": "flat",
+        "lead_cap": 10000, "website_limit": 2,
+        "setup_charges": 0.0, "max_users": 9999, "minimum_users": 1, "maximum_users": 9999,
+        "is_trial": False, "trial_days": None,
         "popular_plan": True, "plan_badge": "Most Popular",
-        "description": "Everything in Connect plus automatic lead distribution, call recording, campaigns & voice broadcast, custom pipelines, and manager/conversion analytics. Automate the work and measure conversion. (7-day free trial.)",
+        "description": "Agency Growth Platform - Growth. Unlimited users, up to 10,000 leads, multiple pipelines, advanced automation & workflows, UTM attribution, lead scoring, campaigns & voice broadcast, advanced analytics, 2 websites, priority support.",
     },
     {
         "name": "Scale", "display_order": 3,
-        "monthly_price": 1999.0,
-        "setup_charges": 0.0, "max_users": 500, "minimum_users": 3, "maximum_users": 500,
+        "monthly_price": 34999.0, "billing_mode": "flat",
+        "lead_cap": None, "website_limit": 5,
+        "setup_charges": 0.0, "max_users": 9999, "minimum_users": 1, "maximum_users": 9999,
         "is_trial": False, "trial_days": None,
         "popular_plan": False, "plan_badge": None,
-        "description": "Everything in Convert plus AI call summaries & follow-up, advanced analytics + custom reports, team monitoring, API access and priority support. For teams scaling their calling engine.",
-    },
-    {
-        "name": "Enterprise", "display_order": 4,
-        "monthly_price": 2999.0,  # starting-from; real deals are negotiated
-        "setup_charges": 25000.0, "max_users": 9999, "minimum_users": 3, "maximum_users": 9999,
-        "is_trial": False, "trial_days": None,
-        "popular_plan": False, "plan_badge": "Custom",
-        "description": "Custom pricing. Everything in Scale plus white-label branding, custom objects & verticals (e.g. loan lenders, recruitment/onboarding), KYC/bank-API integrations, dedicated onboarding and SLA. Contact sales.",
+        "description": "Agency Growth Platform - Scale. Unlimited users & leads, multiple pipelines, AI call summaries & follow-up, full analytics, API access, 5+ websites, custom workflows, white-label optional, priority support.",
     },
 ]
 
 # ── Feature allocation (cumulative up the ladder) ─────────────────────────
-CONNECT = [
+LAUNCH = [
     "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS", "SALES_PIPELINE",
     "CLICK_TO_CALL", "OUTBOUND_CALLING", "CALL_DISPOSITION",
-    "SMS_MESSAGING", "WHATSAPP_MESSAGING",
+    "SMS_MESSAGING", "WHATSAPP_MESSAGING", "EMAIL_MESSAGING",
     "BASIC_DASHBOARD", "DASHBOARD_REPORTS", "ROLE_BASED_ACCESS", "BULK_IMPORT",
+    "LEAD_CAPTURE",
 ]
-CONVERT = CONNECT + [
+GROWTH = LAUNCH + [
     "CALL_RECORDING", "INBOUND_CALLING",
     "LEAD_DISTRIBUTION", "SMART_DISTRIBUTION", "BULK_ASSIGNMENT",
     "CUSTOM_PIPELINE", "CAMPAIGN_MANAGEMENT", "VOICE_BROADCAST",
-    "EMAIL_MESSAGING", "GOOGLE_SHEETS_IMPORT", "LEAD_CAPTURE",
+    "GOOGLE_SHEETS_IMPORT",
     "KPI_DASHBOARD", "MANAGER_DASHBOARD", "TEAM_LEADER_DASHBOARD",
     "TARGET_MANAGEMENT", "CONVERSION_ANALYTICS",
+    "ADVANCED_ANALYTICS", "CUSTOM_REPORTS", "PRIORITY_SUPPORT",
 ]
-SCALE = CONVERT + [
-    "AI_CALL_SUMMARY", "AI_FOLLOW_UP",
-    "ADVANCED_ANALYTICS", "CUSTOM_REPORTS", "ADVANCED_PIPELINE",
+SCALE = GROWTH + [
+    "AI_CALL_SUMMARY", "AI_FOLLOW_UP", "ADVANCED_PIPELINE",
     "TEAM_MONITORING", "LEAD_TRANSFERS", "BULK_TRANSFER",
-    "API_ACCESS", "PRIORITY_SUPPORT",
-]
-ENTERPRISE = SCALE + [
-    "WHITE_LABEL",
+    "API_ACCESS", "WHITE_LABEL",
 ]
 
 PLAN_FEATURES = {
-    "connect": CONNECT,
-    "convert": CONVERT,
+    "launch": LAUNCH,
+    "growth": GROWTH,
     "scale": SCALE,
-    "enterprise": ENTERPRISE,
 }
 
 # Human-friendly names/categories for features that need nicer labels.
@@ -141,18 +133,22 @@ async def seed():
                 allow_trial=plan_data["is_trial"],
                 popular_plan=plan_data.get("popular_plan", False),
                 plan_badge=plan_data.get("plan_badge"),
+                billing_mode=plan_data.get("billing_mode", "per_seat"),
+                lead_cap=plan_data.get("lead_cap"),
+                website_limit=plan_data.get("website_limit", 1),
                 plan_active=True,
                 is_deleted=False,
             )
+            unit = "/mo (flat, unlimited users)" if fields["billing_mode"] == "flat" else "/seat/mo"
             if plan is None:
                 plan = Plan(name=name, **fields)
                 db.add(plan)
                 await db.flush()
-                print(f"  Created plan: {name}  (Rs.{monthly:.0f}/seat/mo)")
+                print(f"  Created plan: {name}  (Rs.{monthly:.0f}{unit})")
             else:
                 for k, v in fields.items():
                     setattr(plan, k, v)
-                print(f"  Updated plan: {name}  (Rs.{monthly:.0f}/seat/mo)")
+                print(f"  Updated plan: {name}  (Rs.{monthly:.0f}{unit})")
 
             desired = set(PLAN_FEATURES[name.lower()])
 

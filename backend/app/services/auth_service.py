@@ -212,7 +212,12 @@ class AuthService:
             invoice_num = f"{prefix}-REG-{uuid.uuid4().hex[:8].upper()}-{int(now_utc.timestamp())}"
 
             price_per_seat = float(plan.monthly_price if plan.monthly_price > 0 else plan.price_inr)
-            base_amount = price_per_seat * request.licensed_seats
+            # Flat (per-agency) plans charge a fixed monthly price regardless of seats;
+            # per-seat plans multiply by the licensed seat count.
+            if getattr(plan, "billing_mode", "per_seat") == "flat":
+                base_amount = price_per_seat
+            else:
+                base_amount = price_per_seat * request.licensed_seats
 
             gst_rate = float(comm_settings.default_gst)
             if comm_settings.gst_inclusive:

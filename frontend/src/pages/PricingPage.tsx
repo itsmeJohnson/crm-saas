@@ -29,47 +29,48 @@ type Tier = {
 
 const TIERS: Tier[] = [
   {
-    name: 'Connect', price: '₹699', cadence: '/ seat / mo',
-    tagline: 'Call, track, follow up.',
+    name: 'Launch', price: '₹9,999', cadence: '/ month',
+    tagline: 'Your whole team, one system.',
     features: [
-      'Lead management + bulk import',
-      'Click-to-call with dispositions',
-      'Follow-ups & reminders',
-      'WhatsApp + SMS',
-      'Basic dashboard & reports',
+      'Unlimited users',
+      'Up to 2,500 leads',
+      '1 pipeline · CRM + email automation',
+      'WhatsApp + SMS + calling',
+      'Basic analytics · 1 website',
     ],
   },
   {
-    name: 'Convert', price: '₹1,299', cadence: '/ seat / mo',
-    tagline: 'Automate & campaign.', popular: true,
+    name: 'Growth', price: '₹19,999', cadence: '/ month',
+    tagline: 'Automate & attribute.', popular: true,
     features: [
-      'Everything in Connect',
-      'Auto lead distribution + call recording',
-      'Campaigns + Voice broadcast (OBD/TTS)',
-      'Custom pipelines',
-      'Manager & conversion analytics',
+      'Everything in Launch',
+      'Up to 10,000 leads · multiple pipelines',
+      'Advanced automation & workflows',
+      'UTM attribution + lead scoring',
+      'Campaigns + Voice broadcast · 2 websites',
+      'Advanced analytics · priority support',
     ],
   },
   {
-    name: 'Scale', price: '₹1,999', cadence: '/ seat / mo',
-    tagline: 'AI, insights & API.',
+    name: 'Scale', price: '₹34,999', cadence: '/ month',
+    tagline: 'AI, API & unlimited.',
     features: [
-      'Everything in Convert',
-      'AI call summaries & scoring',
-      'Advanced analytics + custom reports',
-      'API access',
-      'Priority support',
+      'Everything in Growth',
+      'Unlimited leads',
+      'AI call summaries & follow-up',
+      'API access · 5+ websites',
+      'White-label optional',
     ],
   },
   {
-    name: 'Custom', price: "Let's talk", cadence: 'tailored to you', custom: true,
-    tagline: 'Built for your vertical.',
+    name: 'Implementation', price: 'One-time', cadence: 'website + setup', custom: true,
+    tagline: 'We build & configure it for you.',
     features: [
-      'Everything in Scale',
-      'White-label branding',
-      'Custom objects & verticals',
-      'KYC / bank-API integrations',
-      'Dedicated onboarding + SLA',
+      'Professional lead-gen website',
+      'CRM setup + pipeline configuration',
+      'Automation & website integration',
+      'Onboarding + training',
+      'From ₹3.5L (talk to sales)',
     ],
   },
 ];
@@ -95,13 +96,13 @@ export const PricingPage: React.FC = () => {
       {/* Hero */}
       <section className="text-center max-w-3xl mx-auto px-6 pt-16 pb-10">
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-300 bg-brand-500/10 border border-brand-500/20 rounded-full px-3 py-1 mb-5">
-          <Sparkles className="w-3.5 h-3.5" /> Telecalling CRM built for Indian teams
+          <Sparkles className="w-3.5 h-3.5" /> Agency Growth Platform
         </span>
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-          The CRM that makes your callers <span className="bg-gradient-to-r from-brand-400 to-indigo-400 bg-clip-text text-transparent">close more</span>.
+          Your website shouldn't just look good. <span className="bg-gradient-to-r from-brand-400 to-indigo-400 bg-clip-text text-transparent">It should sell.</span>
         </h1>
         <p className="text-slate-400 mt-5 text-lg">
-          Leads, click-to-call, follow-ups, WhatsApp/SMS, voice broadcast and AI call summaries — one workspace, priced per caller. Start free, no card required.
+          Website + CRM + Automation + Analytics — one revenue system. Capture every lead, know where it came from, and automate follow-up across your pipeline. Flat monthly, unlimited users.
         </p>
         <div className="mt-7 flex items-center justify-center gap-3">
           <Link to={signup()} className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold px-6 py-3 rounded-xl">
@@ -160,7 +161,7 @@ export const PricingPage: React.FC = () => {
           ))}
         </div>
         <p className="text-center text-xs text-slate-500 mt-6">
-          All plans: per-seat, minimum 3 seats, minimum 3-month contract. Quarterly −5%, annual −15%. GST extra. Cancel anytime.
+          All plans are flat monthly with unlimited users. Minimum 3-month contract. Quarterly −5%, annual −15%. GST extra. One-time website + implementation setup billed separately. Cancel anytime.
         </p>
       </section>
 

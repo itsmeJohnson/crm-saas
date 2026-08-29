@@ -902,7 +902,7 @@ export const TenantsPage: React.FC = () => {
                                   {sym}{price.toLocaleString('en-IN')}
                                 </p>
                               )}
-                              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Per Licensed Seat &nbsp;/&nbsp; Per Month</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">{plan.billing_mode === 'flat' ? 'Flat / Month · Unlimited users' : 'Per Licensed Seat / Per Month'}</p>
                             </div>
                           );
                         })()}
@@ -3478,7 +3478,7 @@ export const TenantsPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
                   >
                     {plans.map((p) => (
-                      <option key={p.id} value={p.name}>{p.display_name || p.name} — ₹{Number(p.monthly_price).toLocaleString('en-IN')}/seat/mo</option>
+                      <option key={p.id} value={p.name}>{p.display_name || p.name} — ₹{Number(p.monthly_price).toLocaleString('en-IN')}{p.billing_mode === 'flat' ? '/mo' : '/seat/mo'}</option>
                     ))}
                   </select>
                 </div>
@@ -3667,7 +3667,7 @@ export const TenantsPage: React.FC = () => {
                     <option value={selectedTenant.subscription_plan}>{selectedTenant.subscription_plan} (current)</option>
                   )}
                   {plans.map((p) => (
-                    <option key={p.id} value={p.name}>{p.display_name || p.name} — ₹{Number(p.monthly_price).toLocaleString('en-IN')}/seat/mo</option>
+                    <option key={p.id} value={p.name}>{p.display_name || p.name} — ₹{Number(p.monthly_price).toLocaleString('en-IN')}{p.billing_mode === 'flat' ? '/mo' : '/seat/mo'}</option>
                   ))}
                 </select>
               </div>
