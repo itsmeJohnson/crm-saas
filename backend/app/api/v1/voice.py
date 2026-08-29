@@ -15,10 +15,8 @@ from app.dependencies.feature_guard import get_active_features
 
 router = APIRouter()
 
-# Voice broadcasting is entitled by the dedicated VOICE_BROADCAST feature, but we
-# also honour SMS_MESSAGING so tenants already on the SMS/BulkSMSPlans plan keep
-# working before the plan catalog is re-seeded with the new feature.
-VOICE_FEATURES = ("VOICE_BROADCAST", "SMS_MESSAGING")
+# Voice broadcasting is a Convert+ tier feature, entitled by VOICE_BROADCAST.
+VOICE_FEATURES = ("VOICE_BROADCAST",)
 
 
 async def _require_feature(actor: User, db: AsyncSession):
