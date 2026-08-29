@@ -32,7 +32,7 @@ const TIERS: Tier[] = [
     name: 'Launch', price: '₹9,999', cadence: '/ month',
     tagline: 'Your whole team, one system.',
     features: [
-      'Unlimited users',
+      'Up to 10 users',
       'Up to 2,500 leads',
       '1 pipeline · CRM + email automation',
       'WhatsApp + SMS + calling',
@@ -43,7 +43,7 @@ const TIERS: Tier[] = [
     name: 'Growth', price: '₹19,999', cadence: '/ month',
     tagline: 'Automate & attribute.', popular: true,
     features: [
-      'Everything in Launch',
+      'Everything in Launch · up to 30 users',
       'Up to 10,000 leads · multiple pipelines',
       'Advanced automation & workflows',
       'UTM attribution + lead scoring',
@@ -55,7 +55,7 @@ const TIERS: Tier[] = [
     name: 'Scale', price: '₹34,999', cadence: '/ month',
     tagline: 'AI, API & unlimited.',
     features: [
-      'Everything in Growth',
+      'Everything in Growth · unlimited users',
       'Unlimited leads',
       'AI call summaries & follow-up',
       'API access · 5+ websites',
@@ -102,7 +102,7 @@ export const PricingPage: React.FC = () => {
           Your website shouldn't just look good. <span className="bg-gradient-to-r from-brand-400 to-indigo-400 bg-clip-text text-transparent">It should sell.</span>
         </h1>
         <p className="text-slate-400 mt-5 text-lg">
-          Website + CRM + Automation + Analytics — one revenue system. Capture every lead, know where it came from, and automate follow-up across your pipeline. Flat monthly, unlimited users.
+          Website + CRM + Automation + Analytics — one revenue system. Capture every lead, know where it came from, and automate follow-up across your pipeline. Flat monthly — no per-seat tax.
         </p>
         <div className="mt-7 flex items-center justify-center gap-3">
           <Link to={signup()} className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold px-6 py-3 rounded-xl">
@@ -161,7 +161,7 @@ export const PricingPage: React.FC = () => {
           ))}
         </div>
         <p className="text-center text-xs text-slate-500 mt-6">
-          All plans are flat monthly with unlimited users. Minimum 3-month contract. Quarterly −5%, annual −15%. GST extra. One-time website + implementation setup billed separately. Cancel anytime.
+          Flat monthly, no per-seat pricing. Minimum 3-month contract. Quarterly −5%, annual −15%. GST extra. One-time website + implementation setup billed separately. Cancel anytime.
         </p>
       </section>
 

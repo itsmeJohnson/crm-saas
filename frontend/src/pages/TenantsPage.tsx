@@ -902,7 +902,7 @@ export const TenantsPage: React.FC = () => {
                                   {sym}{price.toLocaleString('en-IN')}
                                 </p>
                               )}
-                              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">{plan.billing_mode === 'flat' ? 'Flat / Month · Unlimited users' : 'Per Licensed Seat / Per Month'}</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">{plan.billing_mode === 'flat' ? `Flat / Month · ${(plan.max_users ?? 0) >= 9999 ? 'Unlimited' : plan.max_users} users` : 'Per Licensed Seat / Per Month'}</p>
                             </div>
                           );
                         })()}
