@@ -52,6 +52,7 @@ from app.models.task_dependency import TaskDependency
 from app.models.calendar_event import CalendarEvent, Holiday, WorkingHoursConfig
 from app.models.communication import CommunicationTemplate, CommunicationFlag, CommunicationTemplateVersion
 from app.models.sms_settings import SmsSettings
+from app.models.landing_page import LandingPage
 from app.models.otp_verification import OtpVerification
 from app.models.voice_broadcast import VoiceBroadcast, VoiceBroadcastRecipient
 from app.models.telephony_settings import TelephonySettings
@@ -176,6 +177,7 @@ __all__ = [
     "CommunicationFlag",
     "CommunicationTemplateVersion",
     "SmsSettings",
+    "LandingPage",
     "OtpVerification",
     "VoiceBroadcast",
     "VoiceBroadcastRecipient",

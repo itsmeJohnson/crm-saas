@@ -20,6 +20,7 @@ from app.api.v1.calendar import router as calendar_router
 from app.api.v1.communications import router as communications_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.lead_capture import router as lead_capture_router
+from app.api.v1.landing_pages import router as landing_pages_router, public_router as landing_public_router
 from app.api.v1.public_invoices import router as public_invoices_router
 from app.api.v1.treatment_catalog import router as treatment_catalog_router
 from app.api.v1.product_catalog import router as product_catalog_router
@@ -438,6 +439,8 @@ app.include_router(calendar_router,        prefix=f"{settings.API_V1_STR}/calend
 app.include_router(communications_router,  prefix=f"{settings.API_V1_STR}/communications",  tags=["communications"])
 app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads",           tags=["leads"], dependencies=_rbac("leads"))
 app.include_router(lead_capture_router,    prefix=f"{settings.API_V1_STR}/lead-capture",    tags=["lead-capture"])
+app.include_router(landing_pages_router,    prefix=f"{settings.API_V1_STR}/landing-pages",    tags=["landing-pages"])
+app.include_router(landing_public_router,   prefix=f"{settings.API_V1_STR}/public/landing",   tags=["public-landing"])
 app.include_router(public_invoices_router, prefix=f"{settings.API_V1_STR}/public",           tags=["public"])
 app.include_router(treatment_catalog_router, prefix=f"{settings.API_V1_STR}/treatment-catalog", tags=["treatment-catalog"])
 app.include_router(product_catalog_router, prefix=f"{settings.API_V1_STR}/product-catalog", tags=["product-catalog"])

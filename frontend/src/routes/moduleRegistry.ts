@@ -124,6 +124,7 @@ const StaffPage = lazy(() => import('../pages/dental/StaffPage').then(m => ({ de
 const DentalReportsPage = lazy(() => import('../pages/dental/DentalReportsPage').then(m => ({ default: m.DentalReportsPage })));
 const MarketingPage = lazy(() => import('../pages/dental/MarketingPage').then(m => ({ default: m.MarketingPage })));
 const LeadCapturePage = lazy(() => import('../pages/dental/LeadCapturePage').then(m => ({ default: m.LeadCapturePage })));
+const LandingPagesPage = lazy(() => import('../pages/LandingPagesPage').then(m => ({ default: m.LandingPagesPage })));
 const InvoiceSettingsPage = lazy(() => import('../pages/dental/InvoiceSettingsPage').then(m => ({ default: m.InvoiceSettingsPage })));
 const TreatmentCatalogPage = lazy(() => import('../pages/dental/TreatmentCatalogPage').then(m => ({ default: m.TreatmentCatalogPage })));
 
@@ -173,7 +174,8 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/leads', component: LeadsPage, featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Leads & Enquiries' } },
       { path: '/leads/reports', component: LeadReportsPage, featureCode: 'LEAD_MANAGEMENT' },
       { path: '/leads/automation', component: LeadAutomationPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
-      { path: '/lead-capture', component: LeadCapturePage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Lead Capture', icon: Webhook, group: 'Growth & Analytics' } }
+      { path: '/lead-capture', component: LeadCapturePage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Lead Capture', icon: Webhook, group: 'Growth & Analytics' } },
+      { path: '/websites', component: LandingPagesPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Websites', icon: Building, group: 'Growth & Analytics' } }
     ]
   },
   {
