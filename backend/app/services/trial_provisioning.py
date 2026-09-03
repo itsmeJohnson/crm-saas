@@ -40,7 +40,7 @@ async def _pick_trial_plan(db: AsyncSession) -> Plan:
             max_users=1000, minimum_users=3, maximum_users=1000, minimum_contract_months=3,
             extra_user_price=1299.0, allow_additional_seats=True, storage_limit_gb=10,
             recording_retention_days=90, priority_support=True, api_access=False,
-            is_active=True, plan_active=True, is_trial=True, trial_days=7, features={},
+            is_active=True, plan_active=True, is_trial=True, trial_days=14, features={},
         )
         db.add(plan)
         await db.flush()

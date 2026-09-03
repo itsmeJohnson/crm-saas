@@ -75,7 +75,13 @@ async def setup_users(db: AsyncSession):
     }
 
 @pytest.mark.asyncio
-async def test_trial_registration_public_flow(client: AsyncClient, db: AsyncSession):
+async def test_trial_registration_public_flow(client: AsyncClient, db: AsyncSession, monkeypatch):
+    # This test covers the MANUAL-approval path (request received -> PENDING -> under
+    # review). Pin TRIAL_AUTO_APPROVE off so it doesn't depend on the ambient default
+    # (which is True; the auto-provision path is covered by test_trial_requests_approval_flow).
+    import app.core.config as config_mod
+    monkeypatch.setattr(config_mod.settings, "TRIAL_AUTO_APPROVE", False)
+
     payload = {
         "full_name": "  Alice Johnson  ",
         "company_name": "Alice Inc.",

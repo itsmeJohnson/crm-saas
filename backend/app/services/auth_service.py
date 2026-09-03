@@ -130,7 +130,7 @@ class AuthService:
                     is_active=True,
                     plan_active=True,
                     is_trial=True,
-                    trial_days=7,
+                    trial_days=14,
                     features={}
                 )
                 self.db.add(plan)
@@ -140,7 +140,7 @@ class AuthService:
 
         # A new tenant may start on a free trial: they get full access for the
         # trial window and must activate (pay) a plan before it ends to continue.
-        trial_days = plan.trial_days if (plan.trial_days and plan.trial_days > 0) else 7
+        trial_days = plan.trial_days if (plan.trial_days and plan.trial_days > 0) else 14
         if request.is_trial:
             trial_end = now_utc + timedelta(days=trial_days)
             sub_status = "trial"
