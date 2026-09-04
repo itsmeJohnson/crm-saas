@@ -105,6 +105,17 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str | None = None    # Overrides EMAILS_FROM_NAME if set
     EMAILS_FROM_EMAIL: str = "contact@support.johnsonsoftwares.com"
     EMAILS_FROM_NAME: str = "Johnson Softwares CRM"
+    # Recipient domains that must never receive real mail. Outbound sends to
+    # these are dropped (logged, not raised) at the send_email choke point.
+    # Rationale: test/seed fixtures provisioned against a live DB (e.g.
+    # bob@boblogistics.com) otherwise get re-emailed on every run of the
+    # subscription/trial crons, producing a stream of MAILER-DAEMON bounces
+    # (Hostinger relays outbound through MailChannels). RFC 2606 / RFC 6761
+    # reserved domains and TLDs are always blocked in code, independent of this
+    # list; add any further real-but-undeliverable domains here (comma-separated).
+    EMAIL_SUPPRESSED_DOMAINS: Annotated[
+        List[str], BeforeValidator(parse_cors)
+    ] = ["boblogistics.com"]
 
     # MFA
     MFA_ISSUER: str = "Johnson Softwares CRM"
