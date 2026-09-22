@@ -940,6 +940,13 @@ class WhatsAppService:
         caller = (from_number or "").strip()
         last10 = caller[-10:] if len(caller) >= 10 else caller
 
+        # Restaurant vertical: honour STOP/START opt-out for dine-in guests (best-effort).
+        try:
+            from app.services.restaurant_service import RestaurantService
+            await RestaurantService(self.db).apply_inbound_optout(org_id, caller, body or "")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Restaurant opt-out hook failed: %s", e)
+
         # Match phone against Lead, Contact, or WhatsAppContact
         lead = None
         contact = None
@@ -1048,6 +1055,20 @@ class WhatsAppService:
             body=f"WhatsApp from {name or caller}: {body[:80]}",
             link_url=f"/whatsapp?conversationId={conv.id}"
         )
+
+        # Broadcast the inbound message over the existing WS channel (same shape
+        # as outbound sends) so open chats append it live AND the global inbound
+        # notifier can auto-open the conversation and raise a desktop alert. The
+        # message carries direction=INBOUND, which the notifier keys off.
+        await ws_manager.broadcast_to_organization({
+            "type": "whatsapp_message",
+            "conversation_id": str(conv.id),
+            "message": self._msg_item(msg),
+            # Extra fields (ignored by the thread view) used by the global
+            # inbound notifier to label the desktop/popup alert.
+            "display_name": name or caller,
+            "from_number": caller,
+        }, org_id, self.db)
 
         # Trigger auto-reply on first inbound message
         if s.auto_reply_enabled and s.auto_reply_message and first_inbound:

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { whatsappRealtime } from '../../services/whatsappRealtime';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useDialerStore } from '../../store/dialerStore';
@@ -25,65 +26,37 @@ export const InboundCallPopup: React.FC = () => {
   useEffect(() => {
     if (!user || !features.includes('INBOUND_CALLING')) return;
 
-    // Connect to backend WebSocket endpoint for telephony alerts
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host; // Usually localhost (proxied via Nginx)
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/telephony/ws/${user.id}`;
+    // Subscribe to the shared realtime socket (one connection per user, shared
+    // with the WhatsApp page and the global WhatsApp inbound notifier).
+    whatsappRealtime.connect(user.id);
+    const unsubscribe = whatsappRealtime.subscribe((data) => {
+      try {
+        if (data && data.event === 'inbound_call') {
+          setActiveCall(data as InboundCallEvent);
 
-    let socket: WebSocket;
-    let reconnectTimeout: NodeJS.Timeout;
-
-    const connectWS = () => {
-      socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => {
-        console.log("Connected to CRM telephony alert socket.");
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data && data.event === 'inbound_call') {
-            setActiveCall(data as InboundCallEvent);
-            
-            // Optional: Play a calling ring/ping audio notification
-            try {
-              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-              const osc = audioCtx.createOscillator();
-              const gain = audioCtx.createGain();
-              osc.connect(gain);
-              gain.connect(audioCtx.destination);
-              osc.type = 'sine';
-              osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
-              gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-              osc.start();
-              osc.stop(audioCtx.currentTime + 0.35);
-            } catch (e) {
-              console.warn("Audio Context block:", e);
-            }
+          // Optional: Play a calling ring/ping audio notification
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.35);
+          } catch (e) {
+            console.warn("Audio Context block:", e);
           }
-        } catch (e) {
-          console.error("Failed to parse telephony WebSocket message:", e);
         }
-      };
-
-      socket.onclose = () => {
-        console.log("Telephony socket closed. Attempting reconnect in 5 seconds...");
-        reconnectTimeout = setTimeout(() => {
-          connectWS();
-        }, 5000);
-      };
-
-      socket.onerror = (err) => {
-        console.error("Telephony alert socket error:", err);
-      };
-    };
-
-    connectWS();
+      } catch (e) {
+        console.error("Failed to handle telephony socket message:", e);
+      }
+    });
 
     return () => {
-      if (socket) socket.close();
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      unsubscribe();
     };
   }, [user, features]);
 

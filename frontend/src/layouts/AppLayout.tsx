@@ -9,6 +9,8 @@ import {
   Stethoscope, Building, FolderKanban, Receipt, LayoutDashboard, PhoneCall
 } from 'lucide-react';
 import { InboundCallPopup } from '../components/crm/InboundCallPopup';
+import { WhatsAppLiveNotifier } from '../components/communications/WhatsAppLiveNotifier';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 
@@ -382,6 +384,7 @@ export const AppLayout: React.FC = () => {
   if (isPlatformConsole) {
     return (
       <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
+        <ReadOnlyBanner />
         <InboundCallPopup />
         <header className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2 min-w-0">
@@ -417,6 +420,7 @@ export const AppLayout: React.FC = () => {
   return (
     <div className="flex h-screen overflow-hidden flex-col md:flex-row bg-[var(--bg-app)] text-[var(--text-primary)]">
       <InboundCallPopup />
+      <WhatsAppLiveNotifier />
 
       {/* ── Desktop Minimalist Sidebar ── */}
       <aside className="hidden md:flex md:w-56 crm-sidebar flex-col z-20 flex-shrink-0">

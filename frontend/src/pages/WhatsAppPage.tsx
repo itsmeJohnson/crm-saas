@@ -4,10 +4,12 @@ import {
   FileText, Image as ImageIcon, Video, Mic, Zap, AlertTriangle, X,
   Lock, Unlock, Tag, UserPlus, Eye
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { whatsappApi, WaConversation, WaThread, WaMessage, QuickReply, WaLabel } from '../services/whatsappApi';
 import { communicationApi, CommTemplate } from '../services/communicationApi';
 import { userApi } from '../services/userApi';
 import { useAuthStore } from '../store/authStore';
+import { whatsappRealtime } from '../services/whatsappRealtime';
 import { extractErrorMessage } from '../utils/errors';
 
 const SLA_TIME_MINUTES = 15;
@@ -102,23 +104,25 @@ export const WhatsAppPage: React.FC = () => {
     return () => clearTimeout(t);
   }, [loadList, search]);
 
-  // Real-time updates via WebSocket integration
+  // Deep-link / notifier auto-open: open the conversation named in the URL
+  // (?conversationId=...), e.g. when the user clicks the global inbound popup.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const cid = searchParams.get('conversationId');
+    if (cid && cid !== activeId) {
+      openConversation(cid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Real-time updates via the shared WhatsApp WebSocket (one connection,
+  // multiplexed to this page and the global inbound notifier).
   useEffect(() => {
     if (!user) return;
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/telephony/ws/${user.id}`;
-    
-    let socket: WebSocket;
-    let reconnectTimeout: any;
+    whatsappRealtime.connect(user.id);
 
-    const connect = () => {
-      socket = new WebSocket(wsUrl);
-      
-      socket.onmessage = (event) => {
+    const unsubscribe = whatsappRealtime.subscribe((data) => {
         try {
-          const data = JSON.parse(event.data);
-          
           if (data.type === 'whatsapp_message') {
             const newMsg = data.message;
             if (activeId === data.conversation_id) {
@@ -213,18 +217,10 @@ export const WhatsAppPage: React.FC = () => {
         } catch (e) {
           console.error("Failed to parse websocket message", e);
         }
-      };
-
-      socket.onclose = () => {
-        reconnectTimeout = setTimeout(connect, 3000);
-      };
-    };
-
-    connect();
+    });
 
     return () => {
-      if (socket) socket.close();
-      clearTimeout(reconnectTimeout);
+      unsubscribe();
     };
   }, [activeId, user, loadList]);
 
