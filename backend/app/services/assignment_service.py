@@ -63,23 +63,37 @@ class AssignmentService:
         if not active_employees:
             return None
 
-        # Determine index of the next assignee
-        next_user = active_employees[0]
-        if config.last_assigned_user_id:
-            try:
-                last_index = next(
-                    i for i, u in enumerate(active_employees) 
-                    if u.id == config.last_assigned_user_id
-                )
-                next_index = (last_index + 1) % len(active_employees)
-                next_user = active_employees[next_index]
-            except StopIteration:
-                # Last assigned user is no longer active/present, fall back to first user
-                next_user = active_employees[0]
+        # Branch-wise routing: when the lead belongs to a branch and that branch
+        # has active reps, rotate only within the branch using an independent
+        # per-branch cursor. Otherwise fall back to the org-wide pool and cursor.
+        branch_key = str(lead.branch_id) if lead.branch_id else None
+        pool = active_employees
+        cursor_user_id = config.last_assigned_user_id
+        branch_scoped = False
+        if branch_key:
+            branch_pool = [u for u in active_employees if getattr(u, "branch_id", None) == lead.branch_id]
+            if branch_pool:
+                pool = branch_pool
+                cursor_user_id = (config.branch_cursors or {}).get(branch_key)
+                branch_scoped = True
 
-        # Apply assignment
+        # Determine the next assignee within the chosen pool (round-robin).
+        next_user = pool[0]
+        if cursor_user_id:
+            try:
+                last_index = next(i for i, u in enumerate(pool) if str(u.id) == str(cursor_user_id))
+                next_user = pool[(last_index + 1) % len(pool)]
+            except StopIteration:
+                # Cursor points at someone no longer in the pool — restart at the top.
+                next_user = pool[0]
+
+        # Apply assignment and advance the relevant cursor.
         lead.assigned_user_id = next_user.id
         config.last_assigned_user_id = next_user.id
+        if branch_scoped:
+            cursors = dict(config.branch_cursors or {})
+            cursors[branch_key] = str(next_user.id)
+            config.branch_cursors = cursors  # reassign so SQLAlchemy tracks the JSON change
         self.db.add(lead)
         self.db.add(config)
         await self.db.flush()
@@ -94,7 +108,9 @@ class AssignmentService:
             action_metadata={
                 "assigned_user_id": str(next_user.id),
                 "assigned_email": next_user.email,
-                "reason": "auto_assignment"
+                "reason": "auto_assignment",
+                "branch_id": branch_key,
+                "branch_scoped": branch_scoped,
             }
         )
 

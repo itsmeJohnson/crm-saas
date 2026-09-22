@@ -76,6 +76,22 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Department not found in this organization.")
 
+    async def _validate_branch(self, organization_id: uuid.UUID, data: dict) -> None:
+        """If a branch_id is supplied, ensure it belongs to this org (or is None)."""
+        if "branch_id" not in data or data["branch_id"] is None:
+            return
+        branch_id = data["branch_id"]
+        if isinstance(branch_id, str):
+            branch_id = uuid.UUID(branch_id)
+            data["branch_id"] = branch_id
+        from app.models.branch import Branch
+        ok = (await self.db.execute(select(Branch.id).filter(
+            Branch.id == branch_id, Branch.organization_id == organization_id,
+            Branch.is_deleted == False))).scalar()
+        if not ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Branch not found in this organization.")
+
     async def _validate_custom_role(self, organization_id: uuid.UUID, data: dict) -> None:
         """If a custom_role_id is supplied, ensure it belongs to this org (or is None)."""
         if "custom_role_id" not in data or data["custom_role_id"] is None:
@@ -344,6 +360,7 @@ class UserService:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
 
         await self._validate_department(actor.organization_id, update_data)
+        await self._validate_branch(actor.organization_id, update_data)
         await self._validate_custom_role(actor.organization_id, update_data)
 
         updated = await self.user_repo.update_user(actor.organization_id, user_id, update_data)
