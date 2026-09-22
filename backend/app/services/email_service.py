@@ -9,6 +9,36 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# RFC 2606 / RFC 6761 reserved TLDs and second-level domains — never deliverable.
+# Sends to these are dropped at the choke point below so bogus test/seed
+# recipients don't generate an endless stream of MAILER-DAEMON bounces.
+_RESERVED_TLDS = (".test", ".example", ".invalid", ".localhost")
+_RESERVED_DOMAINS = ("example.com", "example.net", "example.org")
+
+
+def _is_suppressed_recipient(to_email: str) -> bool:
+    """True when `to_email` must never receive real mail: a malformed address, an
+    RFC-reserved test domain/TLD, or an operator-configured suppressed domain
+    (settings.EMAIL_SUPPRESSED_DOMAINS). Matching is case-insensitive and covers
+    subdomains. Prevents provisioned test/seed accounts (e.g. bob@boblogistics.com)
+    from being re-emailed on a loop by recurring crons and bouncing every run."""
+    domain = (to_email or "").rsplit("@", 1)[-1].strip().lower().rstrip(".")
+    if not domain or "." not in domain:
+        return True  # malformed / no usable domain — nothing to deliver to
+    if domain.endswith(_RESERVED_TLDS):
+        return True
+
+    def _matches(blocked: str) -> bool:
+        blocked = blocked.strip().lower()
+        return bool(blocked) and (domain == blocked or domain.endswith("." + blocked))
+
+    if any(_matches(b) for b in _RESERVED_DOMAINS):
+        return True
+    if any(_matches(b) for b in settings.EMAIL_SUPPRESSED_DOMAINS):
+        return True
+    return False
+
+
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
 
 # Ensure directory exists
@@ -21,6 +51,29 @@ def send_email(to_email: str, subject: str, template_name: str, context: dict) -
     Renders an HTML email template and sends it via SMTP if configured,
     otherwise logs the email content to stdout/logger.
     """
+    # Root guard: NEVER send real mail from the test environment, even when
+    # SMTP_HOST is populated. The test suite creates users with placeholder
+    # addresses (new_manager@crm.com, new_employee@org-a.com, …) and does not
+    # mock this function; if a scheduled/CI test run inherits a real SMTP_HOST it
+    # would fire welcome emails to those dead addresses and generate nightly
+    # MAILER-DAEMON bounces. Gating on ENVIRONMENT (conftest sets it to "testing")
+    # is correct because the mock-mode check below only triggers on an *empty*
+    # SMTP_HOST, which is not guaranteed under test.
+    if settings.is_testing:
+        logger.info("[EMAIL MOCK - testing env] Suppressed real send to %r (subject=%r)", to_email, subject)
+        return
+
+    # Guard: never attempt delivery to reserved/test or operator-suppressed
+    # domains. Test/seed accounts (e.g. bob@boblogistics.com) provisioned against
+    # a live DB would otherwise be re-emailed by recurring crons and bounce on
+    # every run. Drop silently (log, don't raise) so callers are unaffected.
+    if _is_suppressed_recipient(to_email):
+        logger.warning(
+            "[EMAIL SUPPRESSED] Skipping non-deliverable recipient %r (subject=%r)",
+            to_email, subject,
+        )
+        return
+
     try:
         # Load and render template
         template = jinja_env.get_template(template_name)
