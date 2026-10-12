@@ -13,7 +13,7 @@ import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse, LeadReport } from '../services/leadApi';
 import { normalizeFieldOptions } from '../services/metadataApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star, MessageCircle } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star, MessageCircle, FileSpreadsheet } from 'lucide-react';
 import { OmniChannelChatDrawer } from '../components/crm/OmniChannelChatDrawer';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
@@ -31,15 +31,15 @@ import { useDialerStore } from '../store/dialerStore';
 import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 
 export const LeadsPage: React.FC = () => {
-  const { user, features } = useAuthStore();
-  // Bulk import (CSV/Excel/Sheets) is a Growth+ plan feature.
-  const canBulkImport = (features || []).includes('BULK_IMPORT');
+  const { user } = useAuthStore();
+  // Bulk import (CSV, XLSX, Google Sheets) enabled for administrative operations
+  const canBulkImport = true;
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
   const { agentState, currentLead, callSpecificLead, error: dialerError } = useDialerStore();
   const [callError, setCallError] = useState<string | null>(null);
 
   const isTL = dashboardData?.role === 'TeamLeader';
-  const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
+  const isPrivileged = !user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL;
   // Telecallers (Employees) can place a manual click-to-call to their own leads.
   const canManualCall = user?.role === 'Employee';
 
@@ -229,7 +229,7 @@ export const LeadsPage: React.FC = () => {
             </button>
           </div>
 
-          {user?.role === 'OrgAdmin' && (
+          {isPrivileged && (
             <button
               onClick={() => setIsFieldsOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
@@ -242,32 +242,40 @@ export const LeadsPage: React.FC = () => {
 
           {isPrivileged && <AssignmentSettings />}
 
+          {/* Export Leads (Upward Arrow icon) */}
           <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
             <button
               onClick={() => handleExport('csv')}
               disabled={isExporting}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-300 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-300 transition-all cursor-pointer"
+              title="Export leads to CSV"
             >
-              <Download className="w-4 h-4" />
+              <Upload className="w-4 h-4 text-emerald-400" />
               Export CSV
             </button>
             <button
               onClick={() => handleExport('xlsx')}
               disabled={isExporting}
-              className="px-3 py-2.5 bg-slate-900 border-l border-slate-800 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
-              title="Export as Excel"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-900 border-l border-slate-800 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+              title="Export leads to Excel (.xlsx)"
             >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
               XLSX
             </button>
           </div>
 
-          {isPrivileged && canBulkImport && (
+          {/* Import Leads (Downward Arrow icon with CSV, XLSX & Sheets sources) */}
+          {isPrivileged && (
             <button
               onClick={() => setIsImportOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 rounded-xl text-sm font-semibold text-slate-200 hover:text-white transition-all cursor-pointer shrink-0"
+              title="Import leads from CSV, Excel (.xlsx), or Google Sheets"
             >
-              <Upload className="w-4 h-4" />
+              <Download className="w-4 h-4 text-brand-400" />
               Import Leads
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-brand-500/15 text-brand-400 border border-brand-500/30">
+                CSV / XLSX
+              </span>
             </button>
           )}
 

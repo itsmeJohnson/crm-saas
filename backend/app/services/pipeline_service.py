@@ -129,6 +129,52 @@ async def list_pipelines(db: AsyncSession, actor: User) -> list[Pipeline]:
     )
     pipelines = list(res.scalars().all())
 
+    if not pipelines and actor.organization_id:
+        def_pipeline = await _get_or_create_default_pipeline(db, actor.organization_id)
+        # Link any orphaned stages for this org
+        await db.execute(
+            update(PipelineStage)
+            .where(
+                PipelineStage.organization_id == actor.organization_id,
+                PipelineStage.pipeline_id.is_(None)
+            )
+            .values(pipeline_id=def_pipeline.id)
+        )
+        await db.flush()
+        # Verify stages exist
+        existing_stages = (await db.execute(
+            select(PipelineStage).filter(PipelineStage.pipeline_id == def_pipeline.id)
+        )).scalars().all()
+        if not existing_stages:
+            default_stage_names = [
+                ("Fresh Leads", 1, "#3B82F6"),
+                ("Contacted", 2, "#F59E0B"),
+                ("Followup", 3, "#8B5CF6"),
+                ("Dropped", 4, "#64748B"),
+                ("Converted", 5, "#10B981")
+            ]
+            for sname, pos, color in default_stage_names:
+                stg = PipelineStage(
+                    organization_id=actor.organization_id,
+                    pipeline_id=def_pipeline.id,
+                    name=sname,
+                    order_position=pos,
+                    color=color,
+                    is_system_default=(pos == 1),
+                    is_won=(sname == "Converted"),
+                    is_lost=(sname == "Dropped")
+                )
+                db.add(stg)
+            await db.flush()
+        await db.commit()
+        res = await db.execute(
+            select(Pipeline).filter(
+                Pipeline.organization_id == actor.organization_id,
+                Pipeline.is_deleted == False
+            ).order_by(Pipeline.created_at.asc())
+        )
+        pipelines = list(res.scalars().all())
+
     await MetadataCacheService.set_pipelines(
         actor.organization_id, [_pipeline_to_cache(p) for p in pipelines]
     )

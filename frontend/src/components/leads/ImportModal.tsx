@@ -84,7 +84,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       };
 
       const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
-      if (user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL)) {
+      if (!user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL) {
         fetchEmployees();
       }
     } else {
@@ -104,7 +104,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
   }, [isOpen, user]);
 
   const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
-  const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
+  const isPrivileged = !user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL;
 
   if (!isOpen) return null;
 
