@@ -200,42 +200,55 @@ export const LeadsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/60 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
-            Leads
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-100">
+              Leads
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-400 border border-brand-500/30">
+              Live Pipeline
+            </span>
+          </div>
           <p className="text-sm text-slate-400 mt-1">
             Monitor sales opportunities, deal values, and log interactions to drive conversions.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* View toggle: Table / Kanban */}
-          <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
+          <div className="flex items-center p-1 bg-slate-950 border border-slate-700/80 rounded-xl shadow-2xs shrink-0">
             <button
               onClick={() => setView('table')}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold transition-all cursor-pointer ${view === 'table' ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                view === 'table'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
               title="Table view"
             >
-              <List className="w-4 h-4" /> Table
+              <List className="w-3.5 h-3.5" /> Table
             </button>
             <button
               onClick={() => setView('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold border-l border-slate-800 transition-all cursor-pointer ${view === 'kanban' ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                view === 'kanban'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
               title="Kanban board"
             >
-              <LayoutGrid className="w-4 h-4" /> Board
+              <LayoutGrid className="w-3.5 h-3.5" /> Board
             </button>
           </div>
 
           {isPrivileged && (
             <button
               onClick={() => setIsFieldsOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 rounded-xl text-sm font-semibold text-slate-300 transition-all cursor-pointer shrink-0"
+              className="flex items-center justify-center gap-2 px-3.5 py-2 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 rounded-xl text-sm font-semibold text-slate-200 hover:text-slate-100 shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
               title="Manage custom fields"
             >
-              <SlidersHorizontal className="w-4 h-4" />
+              <SlidersHorizontal className="w-4 h-4 text-slate-400" />
               Custom Fields
             </button>
           )}
@@ -243,11 +256,11 @@ export const LeadsPage: React.FC = () => {
           {isPrivileged && <AssignmentSettings />}
 
           {/* Export Leads (Upward Arrow icon) */}
-          <div className="flex items-center rounded-xl overflow-hidden border border-slate-800 shrink-0">
+          <div className="flex items-center rounded-xl overflow-hidden border border-slate-700/80 bg-slate-900 shadow-2xs shrink-0">
             <button
               onClick={() => handleExport('csv')}
               disabled={isExporting}
-              className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-300 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 hover:bg-slate-800 disabled:opacity-50 text-sm font-semibold text-slate-200 hover:text-emerald-400 transition-all cursor-pointer"
               title="Export leads to CSV"
             >
               <Upload className="w-4 h-4 text-emerald-400" />
@@ -256,7 +269,7 @@ export const LeadsPage: React.FC = () => {
             <button
               onClick={() => handleExport('xlsx')}
               disabled={isExporting}
-              className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-900 border-l border-slate-800 hover:bg-slate-900/80 active:bg-slate-900/50 disabled:opacity-50 text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 border-l border-slate-700/80 hover:bg-slate-800 disabled:opacity-50 text-sm font-semibold text-slate-300 hover:text-emerald-400 transition-all cursor-pointer"
               title="Export leads to Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
@@ -264,15 +277,17 @@ export const LeadsPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Import Leads (Downward Arrow icon with CSV, XLSX & Sheets sources) */}
+          {/* Import Leads (Downward Arrow icon with CSV, XLSX & Sheets sources - NO TEXT CLIPPING/HIDING) */}
           {isPrivileged && (
             <button
               onClick={() => setIsImportOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 active:bg-slate-900/50 rounded-xl text-sm font-semibold text-slate-200 hover:text-white transition-all cursor-pointer shrink-0"
+              className="group flex items-center justify-center gap-2 px-3.5 py-2 bg-slate-900 border border-slate-700/80 hover:border-brand-500/60 hover:bg-slate-800 rounded-xl text-sm font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
               title="Import leads from CSV, Excel (.xlsx), or Google Sheets"
             >
-              <Download className="w-4 h-4 text-brand-400" />
-              Import Leads
+              <Download className="w-4 h-4 text-brand-400 group-hover:translate-y-0.5 transition-transform shrink-0" />
+              <span className="text-slate-200 group-hover:text-brand-400 transition-colors">
+                Import Leads
+              </span>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-brand-500/15 text-brand-400 border border-brand-500/30">
                 CSV / XLSX
               </span>
@@ -282,30 +297,73 @@ export const LeadsPage: React.FC = () => {
           {isPrivileged && (
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer shrink-0"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-600 via-indigo-600 to-brand-500 hover:from-brand-500 hover:to-indigo-500 active:scale-[0.98] text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-brand-500/25 hover:shadow-lg hover:shadow-brand-500/35 cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 stroke-[2.5]" />
               Add Lead
             </button>
           )}
         </div>
       </div>
 
-      {/* KPI summary strip */}
+      {/* KPI summary strip with rich elevation and accents */}
       {report && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {[
-            { label: 'Total Leads', value: report.total_leads.toLocaleString(), icon: Users2, tint: 'text-brand-400' },
-            { label: 'Pipeline Value', value: formatMoney(report.total_value), icon: DollarSign, tint: 'text-emerald-400' },
-            { label: 'Conversion Rate', value: `${report.conversion_rate}%`, icon: TrendingUp, tint: 'text-indigo-400' },
-            { label: 'Avg. Score', value: Math.round(report.avg_score || 0).toString(), icon: Star, tint: 'text-amber-400' },
+            {
+              label: 'Total Leads',
+              value: report.total_leads.toLocaleString(),
+              icon: Users2,
+              accent: 'from-blue-500/20 via-blue-500/5 to-transparent',
+              iconBg: 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20',
+              badge: 'Pipeline Deals'
+            },
+            {
+              label: 'Pipeline Value',
+              value: formatMoney(report.total_value),
+              icon: DollarSign,
+              accent: 'from-emerald-500/20 via-emerald-500/5 to-transparent',
+              iconBg: 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20',
+              badge: 'Active Value'
+            },
+            {
+              label: 'Conversion Rate',
+              value: `${report.conversion_rate}%`,
+              icon: TrendingUp,
+              accent: 'from-indigo-500/20 via-indigo-500/5 to-transparent',
+              iconBg: 'bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20',
+              badge: 'Win Velocity'
+            },
+            {
+              label: 'Avg. Score',
+              value: Math.round(report.avg_score || 0).toString(),
+              icon: Star,
+              accent: 'from-amber-500/20 via-amber-500/5 to-transparent',
+              iconBg: 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20',
+              badge: 'AI Propensity'
+            },
           ].map((s) => (
-            <div key={s.label} className="glass-panel border border-slate-800/80 rounded-2xl p-4">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                <s.icon className={`w-3.5 h-3.5 ${s.tint}`} />
-                {s.label}
+            <div
+              key={s.label}
+              className="relative overflow-hidden bg-slate-900 border border-slate-700/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-slate-600 transition-all duration-200 group"
+            >
+              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${s.accent} rounded-bl-full pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity`} />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  {s.label}
+                </span>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.iconBg} shadow-2xs`}>
+                  <s.icon className="w-4 h-4" />
+                </div>
               </div>
-              <p className="text-2xl font-bold text-slate-100 mt-1.5">{s.value}</p>
+              <div className="mt-2.5 flex items-baseline justify-between">
+                <p className="text-2xl lg:text-3xl font-extrabold text-slate-100 tracking-tight">
+                  {s.value}
+                </p>
+                <span className="text-[10px] font-medium text-slate-400">
+                  {s.badge}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -320,11 +378,11 @@ export const LeadsPage: React.FC = () => {
           onReset={resetFilters}
         >
           {/* Status filter dropdown */}
-          <div className="w-full sm:w-48">
+          <div className="w-full sm:w-44">
             <select
               value={filters.status}
               onChange={(e) => setFilters({ status: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
             >
               <option value="All">All Statuses</option>
               <option value="New">New</option>
@@ -336,11 +394,11 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Owner filter dropdown */}
-          <div className="w-full sm:w-48">
+          <div className="w-full sm:w-44">
             <select
               value={filters.assigned_user_id}
               onChange={(e) => setFilters({ assigned_user_id: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
             >
               <option value="All">All Owners</option>
               {activeUsers.map(u => (
@@ -352,11 +410,11 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Priority filter dropdown */}
-          <div className="w-full sm:w-40">
+          <div className="w-full sm:w-36">
             <select
               value={filters.priority}
               onChange={(e) => setFilters({ priority: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
             >
               <option value="All">All Priorities</option>
               <option value="Low">Low</option>
@@ -367,13 +425,13 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Source filter */}
-          <div className="w-full sm:w-40">
+          <div className="w-full sm:w-36">
             <input
               type="text"
               value={filters.source}
               onChange={(e) => setFilters({ source: e.target.value })}
               placeholder="Source"
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
             />
           </div>
 
@@ -392,7 +450,7 @@ export const LeadsPage: React.FC = () => {
                   <select
                     value={val}
                     onChange={(e) => update(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
                   >
                     <option value="">{f.label}: All</option>
                     {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -403,7 +461,7 @@ export const LeadsPage: React.FC = () => {
                     value={val}
                     onChange={(e) => update(e.target.value)}
                     placeholder={f.label}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
                   />
                 )}
               </div>
@@ -411,12 +469,12 @@ export const LeadsPage: React.FC = () => {
           })}
 
           {/* Include archived toggle */}
-          <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer select-none shrink-0">
+          <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
             <input
               type="checkbox"
               checked={filters.include_archived}
               onChange={(e) => setFilters({ include_archived: e.target.checked })}
-              className="accent-brand-500"
+              className="accent-brand-500 rounded"
             />
             Show archived
           </label>
