@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import { useLeadStore } from '../../store/leadStore';
 import { useUserStore } from '../../store/userStore';
 import { LeadResponse } from '../../services/leadApi';
-import { Edit3, Trash2, Loader2, AlertCircle, Inbox, Building2, Flame } from 'lucide-react';
+import { Edit3, Trash2, Loader2, AlertCircle, Inbox, Building2, Flame, MessageCircle } from 'lucide-react';
+import { whatsappHref } from '../../utils/whatsapp';
 import { MaskedField } from '../common/MaskedField';
 import { formatMoney } from '../../utils/currency';
 import { useAuthStore } from '../../store/authStore';
@@ -255,6 +256,18 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   {!isEmployee && (
                     <td className="px-5 py-3.5 text-right align-middle">
                       <div className="flex items-center justify-end gap-2">
+                        {whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim()) && (
+                          <a
+                            href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Chat on WhatsApp"
+                            className="p-2 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        )}
                         <button
                           onClick={(e) => handleEdit(e, lead)}
                           title="Edit lead"
@@ -321,25 +334,50 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   </div>
                   <div className="flex items-center justify-between mt-2.5">
                     {ownerBadge(lead)}
-                    {!isEmployee && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={(e) => handleEdit(e, lead)}
-                          className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 cursor-pointer"
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim()) && (
+                        <a
+                          href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Chat on WhatsApp"
+                          className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
                         >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => handleDelete(e, lead)}
-                          className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
+                          <MessageCircle className="w-4 h-4" />
+                        </a>
+                      )}
+                      {!isEmployee && (
+                        <>
+                          <button
+                            onClick={(e) => handleEdit(e, lead)}
+                            className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 cursor-pointer"
+                            title="Edit lead"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDelete(e, lead)}
+                            className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"
+                            title="Delete lead"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-2 text-xs text-slate-400">
+                  <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
                     <MaskedField value={lead.phone} />
+                    {lead.phone && (
+                      <a
+                        href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                      >
+                        Call
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

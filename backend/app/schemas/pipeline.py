@@ -39,7 +39,7 @@ class PipelineStageResponse(BaseModel):
 
     id: uuid.UUID
     organization_id: uuid.UUID
-    pipeline_id: uuid.UUID
+    pipeline_id: uuid.UUID | None = None
     name: str
     order_position: int
     is_system_default: bool

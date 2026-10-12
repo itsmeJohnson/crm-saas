@@ -102,26 +102,26 @@ export const SettingsCallingPage: React.FC = () => {
   );
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="max-w-3xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
           <Phone className="w-5 h-5" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-100">Calling — MyOperator</h1>
-          <p className="text-sm text-slate-400 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Organization-level. Encrypted at rest. Employees never see these credentials.
+          <p className="text-xs sm:text-sm text-slate-400 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Organization-level. Encrypted at rest.
           </p>
         </div>
       </div>
 
       {banner && (
         <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${banner.ok ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
-          {banner.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />} {banner.msg}
+          {banner.ok ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />} {banner.msg}
         </div>
       )}
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {textField('Company ID', 'company_id', 'e.g. 6a675bc2efc87963')}
           {textField('Public IVR ID', 'public_ivr_id', 'From MyOperator outbound flow')}
@@ -157,16 +157,16 @@ export const SettingsCallingPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <button onClick={save} disabled={saving}
-          className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-semibold py-2.5 px-5 rounded-xl text-sm">
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-semibold py-2.5 px-5 rounded-xl text-sm">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Save Configuration
         </button>
         <button onClick={test} disabled={testing}
-          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold py-2.5 px-5 rounded-xl text-sm">
+          className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold py-2.5 px-5 rounded-xl text-sm">
           {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Test Connection
         </button>
-        {cfg?.is_connected && <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Connected</span>}
+        {cfg?.is_connected && <span className="text-xs text-emerald-400 flex items-center justify-center gap-1 py-1"><CheckCircle className="w-3.5 h-3.5" /> Connected</span>}
       </div>
     </div>
   );

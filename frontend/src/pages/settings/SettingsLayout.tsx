@@ -27,31 +27,160 @@ const SECTIONS: { title: string; items: { label: string; to?: string; soon?: boo
   ] },
 ];
 
-export const SettingsLayout: React.FC = () => (
-  <div className="flex min-h-full">
-    <aside className="w-64 shrink-0 border-r border-slate-800 bg-slate-950/40 p-4 space-y-5">
-      <div className="flex items-center gap-2 text-slate-100 font-bold px-2">
-        <SettingsIcon className="w-5 h-5 text-indigo-400" /> Settings
-      </div>
-      {SECTIONS.map((sec) => (
-        <div key={sec.title} className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-2">{sec.title}</p>
-          {sec.items.map((it) => it.soon || !it.to ? (
-            <div key={it.label} className="px-3 py-1.5 text-sm text-slate-600 cursor-not-allowed flex items-center justify-between">
-              {it.label} <span className="text-[9px] uppercase bg-slate-800 text-slate-500 rounded px-1.5 py-0.5">soon</span>
-            </div>
-          ) : (
-            <NavLink key={it.label} to={it.to}
-              className={({ isActive }) => `block px-3 py-1.5 rounded-lg text-sm transition-colors ${isActive ? 'bg-indigo-600/20 text-indigo-300 font-semibold' : 'text-slate-300 hover:bg-slate-800/60'}`}>
-              {it.label}
-            </NavLink>
-          ))}
+export const SettingsLayout: React.FC = () => {
+  const [mobileSectionOpen, setMobileSectionOpen] = React.useState(false);
+
+  return (
+    <div className="flex flex-col md:flex-row min-h-full">
+      {/* Mobile Settings Navigation Header */}
+      <div className="md:hidden border-b border-[var(--border-color)] bg-[var(--bg-subtle)] p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[var(--text-primary)] font-bold text-sm">
+            <SettingsIcon className="w-4 h-4 text-indigo-400" /> Settings Menu
+          </div>
+          <button
+            onClick={() => setMobileSectionOpen((prev) => !prev)}
+            className="text-xs px-2.5 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          >
+            {mobileSectionOpen ? 'Close Menu' : 'Browse Settings ▾'}
+          </button>
         </div>
-      ))}
-    </aside>
-    <main className="flex-1 min-w-0"><Outlet /></main>
-  </div>
-);
+
+        {/* Quick mobile horizontal tabs for primary categories */}
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-xs">
+          <NavLink
+            to="/settings/calling"
+            className={({ isActive }) =>
+              `shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 font-semibold'
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`
+            }
+          >
+            Calling / Telephony
+          </NavLink>
+          <NavLink
+            to="/whatsapp/settings"
+            className={({ isActive }) =>
+              `shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 font-semibold'
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`
+            }
+          >
+            WhatsApp
+          </NavLink>
+          <NavLink
+            to="/sms"
+            className={({ isActive }) =>
+              `shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 font-semibold'
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`
+            }
+          >
+            SMS
+          </NavLink>
+          <NavLink
+            to="/settings/integrations"
+            className={({ isActive }) =>
+              `shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 font-semibold'
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`
+            }
+          >
+            Integrations
+          </NavLink>
+          <NavLink
+            to="/subscription"
+            className={({ isActive }) =>
+              `shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 font-semibold'
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`
+            }
+          >
+            Subscription
+          </NavLink>
+        </div>
+
+        {/* Collapsible full menu drawer on mobile */}
+        {mobileSectionOpen && (
+          <div className="pt-2 border-t border-[var(--border-color)] grid grid-cols-2 gap-3 text-xs">
+            {SECTIONS.map((sec) => (
+              <div key={sec.title} className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{sec.title}</p>
+                {sec.items.map((it) =>
+                  it.soon || !it.to ? (
+                    <div key={it.label} className="py-1 text-[11px] text-[var(--text-muted)] flex items-center justify-between">
+                      <span className="truncate">{it.label}</span>
+                      <span className="text-[8px] uppercase bg-slate-800/80 text-slate-500 rounded px-1">soon</span>
+                    </div>
+                  ) : (
+                    <NavLink
+                      key={it.label}
+                      to={it.to}
+                      onClick={() => setMobileSectionOpen(false)}
+                      className={({ isActive }) =>
+                        `block py-1 text-[11px] truncate transition-colors ${
+                          isActive ? 'text-indigo-400 font-semibold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`
+                      }
+                    >
+                      {it.label}
+                    </NavLink>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:block w-64 shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-subtle)] p-4 space-y-5">
+        <div className="flex items-center gap-2 text-[var(--text-primary)] font-bold px-2">
+          <SettingsIcon className="w-5 h-5 text-indigo-400" /> Settings
+        </div>
+        {SECTIONS.map((sec) => (
+          <div key={sec.title} className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] px-2">{sec.title}</p>
+            {sec.items.map((it) =>
+              it.soon || !it.to ? (
+                <div key={it.label} className="px-3 py-1.5 text-sm text-[var(--text-muted)] cursor-not-allowed flex items-center justify-between">
+                  {it.label} <span className="text-[9px] uppercase bg-slate-800/80 text-slate-500 rounded px-1.5 py-0.5">soon</span>
+                </div>
+              ) : (
+                <NavLink
+                  key={it.label}
+                  to={it.to}
+                  className={({ isActive }) =>
+                    `block px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      isActive ? 'bg-indigo-600/20 text-indigo-300 font-semibold' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]'
+                    }`
+                  }
+                >
+                  {it.label}
+                </NavLink>
+              )
+            )}
+          </div>
+        ))}
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 min-w-0">
+        <Outlet />
+      </main>
+    </div>
+  );
+};
 
 /** Landing card when hitting /settings with no sub-page selected. */
 export const SettingsHome: React.FC = () => (

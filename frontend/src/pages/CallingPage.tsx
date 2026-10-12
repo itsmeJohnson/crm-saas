@@ -278,49 +278,94 @@ export const CallingPage: React.FC = () => {
             <p className="text-slate-400 text-sm">No calls match the current filters.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800/80 text-left text-[11px] uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3 font-semibold">Call</th>
-                  <th className="px-4 py-3 font-semibold">Lead</th>
-                  <th className="px-4 py-3 font-semibold">Agent</th>
-                  <th className="px-4 py-3 font-semibold">Disposition</th>
-                  <th className="px-4 py-3 font-semibold">Duration</th>
-                  <th className="px-4 py-3 font-semibold">Tags</th>
-                  <th className="px-4 py-3 font-semibold">Recording</th>
-                  <th className="px-4 py-3 font-semibold">When</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-800/40 hover:bg-slate-900/40">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <DirectionIcon item={item} />
-                        <span className="text-slate-300 truncate max-w-[200px]" title={item.subject}>{item.subject}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{item.lead_title || '—'}</td>
-                    <td className="px-4 py-3 text-slate-400">{item.agent_name || '—'}</td>
-                    <td className="px-4 py-3">
+          <>
+            {/* Mobile Cards (screens < md) */}
+            <div className="md:hidden divide-y divide-slate-800/60">
+              {items.map((item) => (
+                <div key={item.id} className="p-4 space-y-2.5 hover:bg-slate-900/40 transition">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <DirectionIcon item={item} />
+                      <span className="text-sm font-semibold text-slate-200 truncate">{item.subject}</span>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400 shrink-0">{formatDuration(item.duration)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="truncate">Lead: <strong className="text-slate-200 font-medium">{item.lead_title || '—'}</strong></span>
+                    <span className="shrink-0">Agent: <strong className="text-slate-300 font-medium">{item.agent_name || '—'}</strong></span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <div>
                       {item.status === 'Missed' ? (
-                        <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-red-500/10 text-red-400 border border-red-500/20">Missed</span>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-red-500/10 text-red-400 border border-red-500/20">Missed</span>
                       ) : item.disposition ? (
-                        <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60">{item.disposition}</span>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-800 text-slate-300 border border-slate-700">{item.disposition}</span>
                       ) : (
-                        <span className="text-slate-600 text-xs">{item.status}</span>
+                        <span className="text-slate-500 text-xs">{item.status}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400 font-mono text-xs">{formatDuration(item.duration)}</td>
-                    <td className="px-4 py-3"><TagEditor item={item} onSaved={onTagsSaved} /></td>
-                    <td className="px-4 py-3"><RecordingCell url={item.recording_url} /></td>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(item.timestamp).toLocaleString()}</td>
+                    </div>
+                    <span className="text-[11px] text-slate-500">{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/40">
+                    <div className="flex-1 min-w-0">
+                      <TagEditor item={item} onSaved={onTagsSaved} />
+                    </div>
+                    <div className="shrink-0">
+                      <RecordingCell url={item.recording_url} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (screens >= md) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-800/80 text-left text-[11px] uppercase tracking-wider text-slate-500">
+                    <th className="px-4 py-3 font-semibold">Call</th>
+                    <th className="px-4 py-3 font-semibold">Lead</th>
+                    <th className="px-4 py-3 font-semibold">Agent</th>
+                    <th className="px-4 py-3 font-semibold">Disposition</th>
+                    <th className="px-4 py-3 font-semibold">Duration</th>
+                    <th className="px-4 py-3 font-semibold">Tags</th>
+                    <th className="px-4 py-3 font-semibold">Recording</th>
+                    <th className="px-4 py-3 font-semibold">When</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b border-slate-800/40 hover:bg-slate-900/40">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <DirectionIcon item={item} />
+                          <span className="text-slate-300 truncate max-w-[200px]" title={item.subject}>{item.subject}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">{item.lead_title || '—'}</td>
+                      <td className="px-4 py-3 text-slate-400">{item.agent_name || '—'}</td>
+                      <td className="px-4 py-3">
+                        {item.status === 'Missed' ? (
+                          <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-red-500/10 text-red-400 border border-red-500/20">Missed</span>
+                        ) : item.disposition ? (
+                          <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60">{item.disposition}</span>
+                        ) : (
+                          <span className="text-slate-600 text-xs">{item.status}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 font-mono text-xs">{formatDuration(item.duration)}</td>
+                      <td className="px-4 py-3"><TagEditor item={item} onSaved={onTagsSaved} /></td>
+                      <td className="px-4 py-3"><RecordingCell url={item.recording_url} /></td>
+                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(item.timestamp).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Pagination */}

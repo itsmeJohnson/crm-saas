@@ -1,0 +1,59 @@
+# ── Multi-stage Build for Source Code Protection (Cython Binary Compilation) ──
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir cython setuptools
+
+# Copy source code and compile into native .so Linux binary objects
+COPY . .
+RUN python compile_cython.py
+
+# ── Final Runtime Stage (Zero Source Code) ───────────────────────────────────
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH=/home/appuser/.local/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Run as non-root user
+RUN groupadd -g 1000 appgroup && \
+    useradd -r -u 1000 -g appgroup -m appuser
+
+# Copy installed pip wheels from builder
+COPY --from=builder --chown=appuser:appgroup /root/.local /home/appuser/.local
+
+# Copy ONLY compiled app (containing .so files, __init__.py, alembic, entrypoint)
+COPY --from=builder --chown=appuser:appgroup /app/app /app/app
+COPY --from=builder --chown=appuser:appgroup /app/alembic /app/alembic
+COPY --from=builder --chown=appuser:appgroup /app/alembic.ini /app/alembic.ini
+COPY --from=builder --chown=appuser:appgroup /app/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder --chown=appuser:appgroup /app/main.py /app/main.py
+
+RUN chmod +x /app/entrypoint.sh
+RUN mkdir -p /app/uploads/branding && chown -R appuser:appgroup /app/uploads
+
+USER appuser
+
+EXPOSE 8000
+
+ENTRYPOINT ["/app/entrypoint.sh"]

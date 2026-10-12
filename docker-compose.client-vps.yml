@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: crm-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crm_production}
+      POSTGRES_USER: ${POSTGRES_USER:-crm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm_user} -d ${POSTGRES_DB:-crm_production}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm-internal
+
+  # ── Redis Cache & Task Broker ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: crm-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Redis password is required}"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm-internal
+
+  # ── CRM Backend (Protected Compiled Binary Image) ────────────────────────
+  backend:
+    image: ${CRM_IMAGE_REGISTRY:-ghcr.io/johnsonsoftwares}/crm-backend:${CRM_IMAGE_TAG:-latest}
+    container_name: crm-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - crm-uploads:/app/uploads
+    networks:
+      - crm-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── CRM Frontend & Reverse Proxy (Compiled Static Build) ─────────────────
+  frontend:
+    image: ${CRM_IMAGE_REGISTRY:-ghcr.io/johnsonsoftwares}/crm-frontend:${CRM_IMAGE_TAG:-latest}
+    container_name: crm-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/certbot:/var/www/certbot:ro
+    networks:
+      - crm-internal
+
+volumes:
+  pgdata:
+  redisdata:
+  crm-uploads:
+
+networks:
+  crm-internal:
+    driver: bridge

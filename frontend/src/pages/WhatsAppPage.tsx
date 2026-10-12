@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MessageCircle, Send, Loader2, Search, Check, CheckCheck, Clock, Paperclip,
   FileText, Image as ImageIcon, Video, Mic, Zap, AlertTriangle, X,
-  Lock, Unlock, Tag, UserPlus, Eye
+  Lock, Unlock, Tag, UserPlus, Eye, ArrowLeft
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { whatsappApi, WaConversation, WaThread, WaMessage, QuickReply, WaLabel } from '../services/whatsappApi';
@@ -399,7 +399,7 @@ export const WhatsAppPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[580px]">
         {/* Sidebar Filters & List */}
-        <div className="glass-panel border border-slate-800/85 rounded-2xl flex flex-col overflow-hidden">
+        <div className={`glass-panel border border-slate-800/85 rounded-2xl flex flex-col overflow-hidden ${activeId ? 'hidden lg:flex' : 'flex'}`}>
           <div className="p-3 border-b border-slate-800/60 space-y-2.5">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -466,7 +466,7 @@ export const WhatsAppPage: React.FC = () => {
         </div>
 
         {/* Central Chat Thread Panel */}
-        <div className="lg:col-span-3 glass-panel border border-slate-800/85 rounded-2xl flex flex-col overflow-hidden">
+        <div className={`lg:col-span-3 glass-panel border border-slate-800/85 rounded-2xl flex flex-col overflow-hidden ${!activeId ? 'hidden lg:flex' : 'flex'}`}>
           {!thread ? (
             <div className="flex-1 flex items-center justify-center text-slate-500 text-sm bg-slate-950/5">
               <div className="text-center"><MessageCircle className="w-12 h-12 mx-auto mb-3 text-slate-700" />Choose a client conversation to begin</div>
@@ -474,17 +474,26 @@ export const WhatsAppPage: React.FC = () => {
           ) : (
             <>
               {/* Thread header */}
-              <div className="p-4 border-b border-slate-800/60 flex flex-wrap items-center justify-between gap-4 bg-slate-950/10">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-slate-200 truncate">{thread.conversation.display_name || thread.conversation.phone}</p>
-                    {thread.conversation.whatsapp_contact_id && (
-                      <button onClick={promoteToLead} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase tracking-wider hover:bg-emerald-500/20 transition cursor-pointer">
-                        <UserPlus className="w-3 h-3" /> Promote to Lead
-                      </button>
-                    )}
+              <div className="p-3 sm:p-4 border-b border-slate-800/60 flex flex-wrap items-center justify-between gap-3 bg-slate-950/10">
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    onClick={() => { setActiveId(null); setThread(null); }}
+                    className="lg:hidden p-1.5 -ml-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                    title="Back to conversations"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-emerald-400" />
+                  </button>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-slate-200 truncate">{thread.conversation.display_name || thread.conversation.phone}</p>
+                      {thread.conversation.whatsapp_contact_id && (
+                        <button onClick={promoteToLead} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase tracking-wider hover:bg-emerald-500/20 transition cursor-pointer">
+                          <UserPlus className="w-3 h-3" /> Promote to Lead
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">{thread.conversation.phone}</p>
                   </div>
-                  <p className="text-[11px] text-slate-500">{thread.conversation.phone}</p>
                 </div>
                 
                 {/* Actions: lock compose, tag, assign, status */}
