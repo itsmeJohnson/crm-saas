@@ -1,10 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useLeadStore } from '../../store/leadStore';
 import { useUserStore } from '../../store/userStore';
 import { LeadResponse } from '../../services/leadApi';
-import { Edit3, Trash2, Loader2, AlertCircle, Inbox, Building2, Flame, MessageCircle } from 'lucide-react';
-import { whatsappHref } from '../../utils/whatsapp';
-import { MaskedField } from '../common/MaskedField';
+import { Edit3, Trash2, Loader2, AlertCircle, Inbox, Building2, MessageCircle, Phone, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { useAuthStore } from '../../store/authStore';
 
@@ -15,9 +13,9 @@ interface LeadTableProps {
   onSelectLeads: (ids: string[]) => void;
   hideCheckboxes?: boolean;
   onChatClick?: (lead: LeadResponse, channel?: 'whatsapp' | 'sms') => void;
+  onCallClick?: (leadId: string) => void;
 }
 
-/** Compact relative time, e.g. "Today", "3d ago", "2mo ago". */
 const relativeTime = (iso?: string): string => {
   if (!iso) return '—';
   const then = new Date(iso).getTime();
@@ -36,21 +34,14 @@ const relativeTime = (iso?: string): string => {
 const initialsOf = (a?: string | null, b?: string | null, fallback = '?'): string =>
   ([a?.[0], b?.[0]].filter(Boolean).join('') || fallback).toUpperCase();
 
-const PRIORITY_STYLES: Record<string, string> = {
-  Urgent: 'text-red-400',
-  High: 'text-amber-400',
-  Medium: 'text-slate-400',
-  Low: 'text-slate-500',
+const PRIORITY_ORDER: Record<string, number> = {
+  Urgent: 4,
+  High: 3,
+  Medium: 2,
+  Low: 1,
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  New: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  Contacted: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  Qualified: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  Nurturing: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  Picked: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  Lost: 'bg-slate-800 text-slate-400 border-slate-700',
-};
+type SortKey = 'title' | 'stage' | 'value' | 'priority' | 'owner' | 'created_at';
 
 export const LeadTable: React.FC<LeadTableProps> = ({
   onEditClick,
@@ -59,19 +50,62 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   onSelectLeads,
   hideCheckboxes = false,
   onChatClick,
+  onCallClick,
 }) => {
   const { leads, isLoading, error, deleteLead } = useLeadStore();
   const { users, fetchUsers } = useUserStore();
   const { user } = useAuthStore();
   const isEmployee = user?.role === 'Employee';
 
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
   useEffect(() => {
     if (users.length === 0) fetchUsers();
   }, []);
 
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortOrder('asc');
+    }
+  };
+
+  const ownerFor = (lead: LeadResponse) => users.find((u) => u.id === lead.assigned_user_id);
+  const ownerName = (lead: LeadResponse) => {
+    const o = ownerFor(lead);
+    return o ? `${o.first_name || ''} ${o.last_name || ''}`.trim() || o.email : 'Unassigned';
+  };
+
+  const sortedLeads = useMemo(() => {
+    const list = [...leads];
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'title') {
+        cmp = (a.title || '').localeCompare(b.title || '');
+      } else if (sortKey === 'stage') {
+        const stageA = a.stage?.name || a.status || '';
+        const stageB = b.stage?.name || b.status || '';
+        cmp = stageA.localeCompare(stageB);
+      } else if (sortKey === 'value') {
+        cmp = (a.value || 0) - (b.value || 0);
+      } else if (sortKey === 'priority') {
+        cmp = (PRIORITY_ORDER[a.priority] || 0) - (PRIORITY_ORDER[b.priority] || 0);
+      } else if (sortKey === 'owner') {
+        cmp = ownerName(a).localeCompare(ownerName(b));
+      } else if (sortKey === 'created_at') {
+        cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  }, [leads, sortKey, sortOrder, users]);
+
   const handleDelete = async (e: React.MouseEvent, lead: LeadResponse) => {
     e.stopPropagation();
-    if (window.confirm(`Delete lead "${lead.title}"? Related activities and notes are soft-deleted too.`)) {
+    if (window.confirm(`Delete lead "${lead.title}"? Related activities and notes will be archived.`)) {
       try {
         await deleteLead(lead.id);
       } catch (err: any) {
@@ -85,151 +119,206 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     onEditClick(lead);
   };
 
-  const ownerFor = (lead: LeadResponse) => users.find((u) => u.id === lead.assigned_user_id);
-  const ownerName = (lead: LeadResponse) => {
-    const o = ownerFor(lead);
-    return o ? `${o.first_name || ''} ${o.last_name || ''}`.trim() || o.email : 'Unassigned';
-  };
-
-  // Progress pill: prefer the tenant's pipeline stage (with its colour); fall back to status.
   const stagePill = (lead: LeadResponse) => {
-    if (lead.stage?.name) {
-      const color = lead.stage.color || '#6366f1';
-      return (
-        <span
-          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800/60 text-slate-200 border border-slate-700/60"
-          title={lead.stage.name}
-        >
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-          {lead.stage.name}
-        </span>
-      );
-    }
-    const cls = STATUS_STYLES[lead.status] || 'bg-slate-800 text-slate-300 border-slate-700';
+    const name = lead.stage?.name || lead.status;
+    const color = lead.stage?.color || (name === 'Converted' ? '#10B981' : name === 'Lost' ? '#EF4444' : '#6366F1');
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
-        {lead.status}
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800/80 text-slate-200 border border-slate-700/80 shadow-2xs"
+        title={name}
+      >
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        {name}
       </span>
     );
   };
 
-  const priorityPill = (priority: string) => (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-      <Flame className={`w-3.5 h-3.5 ${PRIORITY_STYLES[priority] || 'text-slate-400'}`} />
-      <span className="text-slate-300">{priority}</span>
-    </span>
-  );
+  const priorityPill = (priority: string) => {
+    const isUrgent = priority === 'Urgent';
+    const isHigh = priority === 'High';
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+        <span
+          className={`w-1.5 h-1.5 rounded-full ${
+            isUrgent ? 'bg-rose-500' : isHigh ? 'bg-amber-500' : priority === 'Low' ? 'bg-slate-500' : 'bg-blue-500'
+          }`}
+        />
+        <span className="text-slate-300">{priority || 'Medium'}</span>
+      </span>
+    );
+  };
 
   const ownerBadge = (lead: LeadResponse) => {
     const o = ownerFor(lead);
     return (
       <div className="flex items-center gap-2 min-w-0">
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${o ? 'bg-brand-500/15 text-brand-300 border border-brand-500/25' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${o ? 'bg-brand-500/15 text-brand-300 border border-brand-500/25' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
           {o ? initialsOf(o.first_name, o.last_name, 'U') : '—'}
         </div>
-        <span className="text-sm text-slate-300 truncate">{ownerName(lead)}</span>
+        <span className="text-xs text-slate-300 truncate">{ownerName(lead)}</span>
       </div>
+    );
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3 text-slate-500 opacity-60" />;
+    return sortOrder === 'asc' ? (
+      <ChevronUp className="w-3 h-3 text-brand-400" />
+    ) : (
+      <ChevronDown className="w-3 h-3 text-brand-400" />
     );
   };
 
   if (isLoading && leads.length === 0) {
     return (
-      <div className="glass-panel p-16 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center text-slate-400">
+      <div className="p-16 rounded-2xl border border-slate-800/80 bg-slate-900/60 flex flex-col items-center justify-center text-slate-400">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
-        <p className="text-sm">Loading leads…</p>
+        <p className="text-sm font-medium">Loading leads…</p>
       </div>
     );
   }
 
   if (error && leads.length === 0) {
     return (
-      <div className="glass-panel p-12 rounded-2xl border border-red-900/30 bg-red-950/10 flex flex-col items-center justify-center text-red-400">
+      <div className="p-12 rounded-2xl border border-red-900/30 bg-red-950/10 flex flex-col items-center justify-center text-red-400">
         <AlertCircle className="w-8 h-8 mb-2" />
-        <p className="font-semibold mb-2">Error Loading Leads</p>
-        <p className="text-sm text-red-400/80">{error}</p>
+        <p className="font-semibold mb-1">Error Loading Leads</p>
+        <p className="text-xs text-red-400/80">{error}</p>
       </div>
     );
   }
 
   if (leads.length === 0) {
     return (
-      <div className="glass-panel rounded-2xl border border-slate-800/80 py-16 px-6 flex flex-col items-center justify-center text-center">
-        <div className="w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4">
-          <Inbox className="w-7 h-7 text-brand-400" />
+      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 py-16 px-6 flex flex-col items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-3">
+          <Inbox className="w-6 h-6 text-brand-400" />
         </div>
-        <p className="text-base font-semibold text-slate-200">No leads yet</p>
-        <p className="text-sm text-slate-400 mt-1 max-w-sm">
-          Add your first opportunity or import a list to start tracking deals through your pipeline.
+        <p className="text-sm font-bold text-slate-200">No leads found</p>
+        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+          Try clearing your filters or create a new lead opportunity to start your pipeline.
         </p>
       </div>
     );
   }
 
-  const allSelected = leads.length > 0 && selectedLeadIds.length === leads.length;
-  const toggleAll = (checked: boolean) => onSelectLeads(checked ? leads.map((l) => l.id) : []);
+  const allSelected = sortedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length;
+  const toggleAll = (checked: boolean) => onSelectLeads(checked ? sortedLeads.map((l) => l.id) : []);
   const toggleOne = (id: string, checked: boolean) =>
     onSelectLeads(checked ? [...selectedLeadIds, id] : selectedLeadIds.filter((x) => x !== id));
 
   return (
-    <div className="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden">
-      {/* ── Desktop / tablet: table ── */}
+    <div className="bg-slate-900/60 rounded-xl border border-slate-800/80 overflow-hidden shadow-2xs">
+      {/* Desktop / Tablet Table */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[820px]">
+        <table className="w-full text-left border-collapse min-w-[850px]">
           <thead>
-            <tr className="border-b border-slate-800/80 bg-slate-900/40">
+            <tr className="border-b border-slate-800/90 bg-slate-950/60">
               {!hideCheckboxes && (
-                <th className="w-12 px-5 py-3.5">
+                <th className="w-10 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={allSelected}
                     onChange={(e) => toggleAll(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
                   />
                 </th>
               )}
-              <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Lead</th>
-              <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Stage</th>
-              <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Value</th>
-              <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Priority</th>
-              <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Owner</th>
-              <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Created</th>
+              <th
+                onClick={() => handleSort('title')}
+                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Lead</span>
+                  {renderSortIcon('title')}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort('stage')}
+                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Stage</span>
+                  {renderSortIcon('stage')}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort('value')}
+                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-right cursor-pointer hover:text-slate-200 select-none"
+              >
+                <div className="flex items-center justify-end gap-1.5">
+                  <span>Value</span>
+                  {renderSortIcon('value')}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort('priority')}
+                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Priority</span>
+                  {renderSortIcon('priority')}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort('owner')}
+                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Owner</span>
+                  {renderSortIcon('owner')}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort('created_at')}
+                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Created</span>
+                  {renderSortIcon('created_at')}
+                </div>
+              </th>
               {!isEmployee && (
-                <th className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-right">
+                  Actions
+                </th>
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/65">
-            {leads.map((lead) => {
+          <tbody className="divide-y divide-slate-800/70">
+            {sortedLeads.map((lead) => {
               const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
               return (
                 <tr
                   key={lead.id}
                   onClick={() => onRowClick(lead)}
-                  className="hover:bg-slate-900/30 transition-colors cursor-pointer"
+                  className="hover:bg-slate-900/80 transition-colors cursor-pointer group"
                 >
                   {!hideCheckboxes && (
-                    <td className="w-12 px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                    <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedLeadIds.includes(lead.id)}
                         onChange={(e) => toggleOne(lead.id, e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
                       />
                     </td>
                   )}
 
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/25 flex items-center justify-center font-bold text-brand-300 text-sm shrink-0">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                         {initialsOf(lead.title?.[0], lead.title?.[1], 'LD')}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-200 truncate">{lead.title}</p>
-                        <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-slate-400 mt-0.5">
+                        <p className="text-xs font-bold text-slate-100 group-hover:text-brand-400 transition-colors truncate">
+                          {lead.title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-400 mt-0.5">
                           {contactFullName && <span className="text-slate-300 truncate">{contactFullName}</span>}
                           {contactFullName && lead.company_name && <span className="text-slate-600">•</span>}
                           {lead.company_name && (
-                            <span className="inline-flex items-center gap-1 truncate">
+                            <span className="inline-flex items-center gap-1 truncate text-slate-400">
                               <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
                               {lead.company_name}
                             </span>
@@ -239,61 +328,58 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     </div>
                   </td>
 
-                  <td className="px-5 py-3.5 align-middle">{stagePill(lead)}</td>
+                  <td className="px-4 py-3 align-middle">{stagePill(lead)}</td>
 
-                  <td className="px-5 py-3.5 align-middle text-right">
-                    <span className="text-sm font-semibold text-slate-200">
+                  <td className="px-4 py-3 align-middle text-right font-mono">
+                    <span className="text-xs font-bold text-slate-200">
                       {lead.value !== null ? formatMoney(lead.value) : '—'}
                     </span>
                   </td>
 
-                  <td className="px-5 py-3.5 align-middle">{priorityPill(lead.priority)}</td>
+                  <td className="px-4 py-3 align-middle">{priorityPill(lead.priority)}</td>
 
-                  <td className="px-5 py-3.5 align-middle">{ownerBadge(lead)}</td>
+                  <td className="px-4 py-3 align-middle">{ownerBadge(lead)}</td>
 
-                  <td className="px-5 py-3.5 align-middle">
+                  <td className="px-4 py-3 align-middle">
                     <span className="text-xs text-slate-400 whitespace-nowrap">{relativeTime(lead.created_at)}</span>
                   </td>
 
                   {!isEmployee && (
-                    <td className="px-5 py-3.5 text-right align-middle">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3 text-right align-middle" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
                         {lead.phone && (
-                          onChatClick ? (
+                          <>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); onChatClick(lead, 'whatsapp'); }}
-                              title="Open WhatsApp & SMS Chat Window"
-                              className="p-2 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                              onClick={() => onCallClick?.(lead.id)}
+                              title={`Call ${lead.phone}`}
+                              className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
                             >
-                              <MessageCircle className="w-4 h-4" />
+                              <Phone className="w-3.5 h-3.5" />
                             </button>
-                          ) : (
-                            <a
-                              href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              title="Chat on WhatsApp"
-                              className="p-2 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                            <button
+                              type="button"
+                              onClick={() => onChatClick?.(lead, 'whatsapp')}
+                              title="WhatsApp / SMS chat"
+                              className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
                             >
-                              <MessageCircle className="w-4 h-4" />
-                            </a>
-                          )
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={(e) => handleEdit(e, lead)}
                           title="Edit lead"
-                          className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-lg text-slate-300 transition-all cursor-pointer"
+                          className="p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-lg text-slate-300 transition-all cursor-pointer"
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={(e) => handleDelete(e, lead)}
                           title="Delete lead"
-                          className="p-2 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
+                          className="p-1.5 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -305,104 +391,54 @@ export const LeadTable: React.FC<LeadTableProps> = ({
         </table>
       </div>
 
-      {/* ── Mobile: card list ── */}
-      <div className="md:hidden divide-y divide-slate-800/65">
-        {leads.map((lead) => {
+      {/* Mobile: card list */}
+      <div className="md:hidden divide-y divide-slate-800/70">
+        {sortedLeads.map((lead) => {
           const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
           return (
             <div
               key={lead.id}
               onClick={() => onRowClick(lead)}
-              className="p-4 active:bg-slate-900/40 transition-colors cursor-pointer"
+              className="p-3.5 active:bg-slate-900/60 transition-colors cursor-pointer"
             >
-              <div className="flex items-start gap-3">
-                {!hideCheckboxes && (
-                  <input
-                    type="checkbox"
-                    checked={selectedLeadIds.includes(lead.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => toggleOne(lead.id, e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer shrink-0"
-                  />
-                )}
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/25 flex items-center justify-center font-bold text-brand-300 text-sm shrink-0">
-                  {initialsOf(lead.title?.[0], lead.title?.[1], 'LD')}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {!hideCheckboxes && (
+                    <input
+                      type="checkbox"
+                      checked={selectedLeadIds.includes(lead.id)}
+                      onChange={(e) => { e.stopPropagation(); toggleOne(lead.id, e.target.checked); }}
+                      className="w-3.5 h-3.5 rounded border-slate-700 text-brand-500 bg-slate-950"
+                    />
+                  )}
+                  <div>
+                    <p className="text-xs font-bold text-slate-100">{lead.title}</p>
+                    <p className="text-[11px] text-slate-400">{lead.company_name || contactFullName}</p>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-200 truncate">{lead.title}</p>
-                    <span className="text-sm font-semibold text-slate-200 shrink-0">
-                      {lead.value !== null ? formatMoney(lead.value) : ''}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 truncate mt-0.5">
-                    {contactFullName}
-                    {contactFullName && lead.company_name ? ' • ' : ''}
-                    {lead.company_name}
-                  </p>
-                  <div className="flex items-center flex-wrap gap-2 mt-2">
-                    {stagePill(lead)}
-                    {priorityPill(lead.priority)}
-                    <span className="text-[11px] text-slate-500 ml-auto">{relativeTime(lead.created_at)}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-2.5">
-                    {ownerBadge(lead)}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {lead.phone && (
-                        onChatClick ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onChatClick(lead, 'whatsapp'); }}
-                            title="Open WhatsApp & SMS Chat"
-                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <a
-                            href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="Chat on WhatsApp"
-                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                          </a>
-                        )
-                      )}
-                      {!isEmployee && (
-                        <>
-                          <button
-                            onClick={(e) => handleEdit(e, lead)}
-                            className="p-1.5 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-300 cursor-pointer"
-                            title="Edit lead"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => handleDelete(e, lead)}
-                            className="p-1.5 border border-slate-800 hover:bg-red-500/10 text-red-400 rounded-lg cursor-pointer"
-                            title="Delete lead"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
-                    <MaskedField value={lead.phone} />
-                    {lead.phone && (
-                      <a
-                        href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                      >
-                        Call
-                      </a>
-                    )}
-                  </div>
+                <div className="text-right font-mono">
+                  <span className="text-xs font-bold text-emerald-400">
+                    {lead.value !== null ? formatMoney(lead.value) : '—'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-800/60">
+                <div className="flex items-center gap-2">
+                  {stagePill(lead)}
+                  {priorityPill(lead.priority)}
+                </div>
+                <div className="flex items-center gap-2">
+                  {lead.phone && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onCallClick?.(lead.id); }}
+                      className="p-1 text-emerald-400"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <span className="text-[11px] text-slate-400">{relativeTime(lead.created_at)}</span>
                 </div>
               </div>
             </div>

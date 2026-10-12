@@ -13,12 +13,15 @@ import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse, LeadReport } from '../services/leadApi';
 import { normalizeFieldOptions } from '../services/metadataApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star, MessageCircle, FileSpreadsheet, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, TrendingUp, MessageCircle, FileSpreadsheet, MoreHorizontal, ChevronDown, ChevronUp, Clock, Target, AlertTriangle, CheckCircle2, PhoneCall } from 'lucide-react';
 import { OmniChannelChatDrawer } from '../components/crm/OmniChannelChatDrawer';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
 import { formatMoney } from '../utils/currency';
 import { LeadKanban } from '../components/crm/LeadKanban';
+import { FilterChip } from '../components/crm/Filters';
+import { calculateSalesKPIs } from '../utils/salesMetrics';
+import { noteApi } from '../services/noteApi';
 import { LeadCustomFieldsManager } from '../components/crm/LeadCustomFieldsManager';
 import { ImportModal } from '../components/leads/ImportModal';
 import { AssignmentSettings } from '../components/leads/AssignmentSettings';
@@ -140,10 +143,101 @@ export const LeadsPage: React.FC = () => {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const [showMetrics, setShowMetrics] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(true);
   const [report, setReport] = useState<LeadReport | null>(null);
+  const [dispositionFeedback, setDispositionFeedback] = useState<string | null>(null);
   const { customFields, fetchBootstrap } = useMetadataStore();
   const leadCustomFields = customFields.filter((f) => f.entity_type === 'lead');
+
+  const salesKPIs = React.useMemo(() => calculateSalesKPIs(leads), [leads]);
+
+  const activeChips: FilterChip[] = React.useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (filters.search) {
+      chips.push({
+        id: 'search',
+        label: 'Search',
+        value: filters.search,
+        onRemove: () => setFilters({ search: '' }),
+      });
+    }
+    if (filters.status && filters.status !== 'All') {
+      chips.push({
+        id: 'status',
+        label: 'Status',
+        value: filters.status,
+        onRemove: () => setFilters({ status: 'All' }),
+      });
+    }
+    if (filters.assigned_user_id && filters.assigned_user_id !== 'All') {
+      const owner = users.find((u) => u.id === filters.assigned_user_id);
+      const ownerName = owner
+        ? `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || owner.email
+        : filters.assigned_user_id;
+      chips.push({
+        id: 'assigned_user_id',
+        label: 'Owner',
+        value: ownerName,
+        onRemove: () => setFilters({ assigned_user_id: 'All' }),
+      });
+    }
+    if (filters.priority && filters.priority !== 'All') {
+      chips.push({
+        id: 'priority',
+        label: 'Priority',
+        value: filters.priority,
+        onRemove: () => setFilters({ priority: 'All' }),
+      });
+    }
+    if (filters.source) {
+      chips.push({
+        id: 'source',
+        label: 'Source',
+        value: filters.source,
+        onRemove: () => setFilters({ source: '' }),
+      });
+    }
+    if (filters.include_archived) {
+      chips.push({
+        id: 'archived',
+        label: 'Archived',
+        value: 'Included',
+        onRemove: () => setFilters({ include_archived: false }),
+      });
+    }
+    if (filters.custom_fields) {
+      for (const [key, val] of Object.entries(filters.custom_fields)) {
+        if (val) {
+          const fieldMeta = leadCustomFields.find((f) => f.key === key);
+          chips.push({
+            id: `cf-${key}`,
+            label: fieldMeta?.label || key,
+            value: String(val),
+            onRemove: () => {
+              const next = { ...filters.custom_fields };
+              delete next[key];
+              setFilters({ custom_fields: next });
+            },
+          });
+        }
+      }
+    }
+    return chips;
+  }, [filters, users, leadCustomFields, setFilters]);
+
+  const handleLogDisposition = async (outcome: string) => {
+    if (!detailLead) return;
+    try {
+      await noteApi.createNote({
+        lead_id: detailLead.id,
+        content: `[Call Outcome: ${outcome}] Logged via Telecalling Quick Disposition`,
+      });
+      setDispositionFeedback(`Logged "${outcome}" successfully`);
+      setTimeout(() => setDispositionFeedback(null), 3000);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to log call outcome');
+    }
+  };
 
   // Org-wide KPI summary (accurate totals, independent of the paginated table).
   useEffect(() => {
@@ -207,7 +301,7 @@ export const LeadsPage: React.FC = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight text-slate-100">
-              Leads
+              Leads & Enquiries
             </h1>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/80 font-mono">
               {report?.total_leads ?? leads.length}
@@ -241,22 +335,20 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Compact Metrics Toggle Pill */}
-          {report && (
-            <button
-              onClick={() => setShowMetrics(!showMetrics)}
-              className="flex items-center gap-2 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all cursor-pointer shadow-2xs"
-              title="Toggle detailed KPI cards"
-            >
-              <span className="text-emerald-400 font-semibold">{formatMoney(report.total_value)}</span>
-              <span className="text-slate-500">·</span>
-              <span>{report.conversion_rate}% Win</span>
-              {showMetrics ? (
-                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              )}
-            </button>
-          )}
+          <button
+            onClick={() => setShowMetrics(!showMetrics)}
+            className="flex items-center gap-2 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all cursor-pointer shadow-2xs"
+            title="Toggle detailed KPI cards"
+          >
+            <span className="text-emerald-400 font-semibold">{formatMoney(salesKPIs.activePipelineValue)}</span>
+            <span className="text-slate-500">·</span>
+            <span>{salesKPIs.winRate}% Win</span>
+            {showMetrics ? (
+              <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            )}
+          </button>
         </div>
 
         {/* Right: Actions */}
@@ -343,74 +435,127 @@ export const LeadsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Primary CTA: Add Lead */}
+          {/* Primary CTA: Add Deal */}
           {isPrivileged && (
             <button
               onClick={() => setIsCreateOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 active:scale-[0.98] text-white rounded-lg text-xs font-semibold transition-all shadow-xs shadow-brand-500/20 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              Add Lead
+              Add Deal
             </button>
           )}
         </div>
       </div>
 
-      {/* Collapsible Detailed KPI Summary Strip */}
-      {report && showMetrics && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200">
-          {[
-            {
-              label: 'Total Leads',
-              value: report.total_leads.toLocaleString(),
-              icon: Users2,
-              iconBg: 'bg-blue-500/10 text-blue-400',
-              badge: 'Pipeline'
-            },
-            {
-              label: 'Pipeline Value',
-              value: formatMoney(report.total_value),
-              icon: DollarSign,
-              iconBg: 'bg-emerald-500/10 text-emerald-400',
-              badge: 'Active Deals'
-            },
-            {
-              label: 'Conversion Rate',
-              value: `${report.conversion_rate}%`,
-              icon: TrendingUp,
-              iconBg: 'bg-indigo-500/10 text-indigo-400',
-              badge: 'Win Velocity'
-            },
-            {
-              label: 'Avg. Score',
-              value: Math.round(report.avg_score || 0).toString(),
-              icon: Star,
-              iconBg: 'bg-amber-500/10 text-amber-400',
-              badge: 'Lead Score'
-            },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-slate-400">
-                  {s.label}
-                </span>
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${s.iconBg}`}>
-                  <s.icon className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="mt-1 flex items-baseline justify-between">
-                <p className="text-xl font-bold text-slate-100 tracking-tight">
-                  {s.value}
-                </p>
-                <span className="text-[10px] text-slate-500">
-                  {s.badge}
-                </span>
+      {/* 5 Enterprise Sales KPI Cards */}
+      {showMetrics && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 animate-in fade-in duration-200">
+          {/* 1. Active Pipeline Value */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Active Pipeline
+              </span>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <DollarSign className="w-3.5 h-3.5" />
               </div>
             </div>
-          ))}
+            <div className="mt-1 flex items-baseline justify-between">
+              <p className="text-xl font-bold text-slate-100 tracking-tight">
+                {formatMoney(salesKPIs.activePipelineValue)}
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {salesKPIs.activeDealsCount} active deals in funnel
+            </p>
+          </div>
+
+          {/* 2. Weighted Sales Forecast */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Weighted Forecast
+              </span>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <Target className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <p className="text-xl font-bold text-slate-100 tracking-tight">
+                {formatMoney(salesKPIs.weightedForecast)}
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Probability-adjusted
+            </p>
+          </div>
+
+          {/* 3. Won Revenue This Month */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Won This Month
+              </span>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                <TrendingUp className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <p className="text-xl font-bold text-slate-100 tracking-tight">
+                {formatMoney(salesKPIs.wonRevenueThisMonth)}
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {salesKPIs.wonDealsCount} deals closed won
+            </p>
+          </div>
+
+          {/* 4. Win Rate */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Win Rate
+              </span>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <p className="text-xl font-bold text-slate-100 tracking-tight">
+                {salesKPIs.winRate}%
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Won vs total closed
+            </p>
+          </div>
+
+          {/* 5. Overdue Follow-ups */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Overdue Follow-ups
+              </span>
+              <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+                salesKPIs.overdueFollowupsCount > 0
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <p className={`text-xl font-bold tracking-tight ${
+                salesKPIs.overdueFollowupsCount > 0 ? 'text-rose-400' : 'text-slate-100'
+              }`}>
+                {salesKPIs.overdueFollowupsCount}
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {salesKPIs.overdueFollowupsCount > 0 ? 'Requires attention' : 'All follow-ups current'}
+            </p>
+          </div>
         </div>
       )}
 
@@ -419,8 +564,70 @@ export const LeadsPage: React.FC = () => {
         <Filters
           search={filters.search}
           onSearchChange={(search) => setFilters({ search })}
-          placeholder="Search leads by title, name, or company..."
+          placeholder="Search leads by name, company, email, phone, or title..."
           onReset={resetFilters}
+          activeChips={activeChips}
+          extraFilters={
+            <>
+              {/* Source filter */}
+              <div className="w-full sm:w-36">
+                <input
+                  type="text"
+                  value={filters.source}
+                  onChange={(e) => setFilters({ source: e.target.value })}
+                  placeholder="Filter source..."
+                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
+                />
+              </div>
+
+              {/* Dynamic custom-field filters (tenant-defined, filterable) */}
+              {leadCustomFields.filter((f) => f.is_active && f.filterable).map((f) => {
+                const val = filters.custom_fields[f.key] || '';
+                const update = (v: string) => {
+                  const next = { ...filters.custom_fields };
+                  if (v === '') delete next[f.key];
+                  else next[f.key] = v;
+                  setFilters({ custom_fields: next });
+                };
+                return (
+                  <div key={f.id} className="w-full sm:w-36">
+                    {f.field_type === 'select' ? (
+                      <select
+                        value={val}
+                        onChange={(e) => update(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
+                      >
+                        <option value="">{f.label}: All</option>
+                        {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'}
+                        value={val}
+                        onChange={(e) => update(e.target.value)}
+                        placeholder={f.label}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Include archived toggle */}
+              <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
+                <input
+                  type="checkbox"
+                  checked={filters.include_archived}
+                  onChange={(e) => setFilters({ include_archived: e.target.checked })}
+                  className="accent-brand-500 rounded"
+                />
+                Show archived
+              </label>
+
+              {/* Saved filters */}
+              <SavedFilters currentFilters={filters} onApply={(def) => setFilters(def as any)} />
+            </>
+          }
         >
           {/* Status filter dropdown */}
           <div className="w-full sm:w-36">
@@ -468,64 +675,6 @@ export const LeadsPage: React.FC = () => {
               <option value="Urgent">Urgent</option>
             </select>
           </div>
-
-          {/* Source filter */}
-          <div className="w-full sm:w-32">
-            <input
-              type="text"
-              value={filters.source}
-              onChange={(e) => setFilters({ source: e.target.value })}
-              placeholder="Source"
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
-            />
-          </div>
-
-          {/* Dynamic custom-field filters (tenant-defined, filterable) */}
-          {leadCustomFields.filter((f) => f.is_active && f.filterable).map((f) => {
-            const val = filters.custom_fields[f.key] || '';
-            const update = (v: string) => {
-              const next = { ...filters.custom_fields };
-              if (v === '') delete next[f.key];
-              else next[f.key] = v;
-              setFilters({ custom_fields: next });
-            };
-            return (
-              <div key={f.id} className="w-full sm:w-36">
-                {f.field_type === 'select' ? (
-                  <select
-                    value={val}
-                    onChange={(e) => update(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
-                  >
-                    <option value="">{f.label}: All</option>
-                    {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
-                ) : (
-                  <input
-                    type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'}
-                    value={val}
-                    onChange={(e) => update(e.target.value)}
-                    placeholder={f.label}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
-                  />
-                )}
-              </div>
-            );
-          })}
-
-          {/* Include archived toggle */}
-          <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
-            <input
-              type="checkbox"
-              checked={filters.include_archived}
-              onChange={(e) => setFilters({ include_archived: e.target.checked })}
-              className="accent-brand-500 rounded"
-            />
-            Show archived
-          </label>
-
-          {/* Saved filters */}
-          <SavedFilters currentFilters={filters} onApply={(def) => setFilters(def as any)} />
         </Filters>
 
         {view === 'table' ? (
@@ -541,6 +690,7 @@ export const LeadsPage: React.FC = () => {
                 setChatChannel(ch || 'whatsapp');
                 setIsChatOpen(true);
               }}
+              onCallClick={handleManualCall}
             />
 
             <Pagination
@@ -750,6 +900,53 @@ export const LeadsPage: React.FC = () => {
               {agentState === 'ACTIVE_CALLING' && currentLead?.id === detailLead.id && (
                 <ActiveCallDisposition />
               )}
+
+              {/* Telecalling Quick Call Disposition Logger */}
+              <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PhoneCall className="w-4 h-4 text-brand-400" />
+                    <span className="text-xs font-bold text-slate-200">Log Call Disposition</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-medium">One-click telecalling outcome</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    onClick={() => handleLogDisposition('Connected - Interested')}
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Interested
+                  </button>
+                  <button
+                    onClick={() => handleLogDisposition('Callback Scheduled')}
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    Callback
+                  </button>
+                  <button
+                    onClick={() => handleLogDisposition('No Answer / Busy')}
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    No Answer
+                  </button>
+                  <button
+                    onClick={() => handleLogDisposition('Not Interested')}
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Not Interested
+                  </button>
+                </div>
+                {dispositionFeedback && (
+                  <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 pt-1 animate-in fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {dispositionFeedback}
+                  </div>
+                )}
+              </div>
 
               {/* Quick Details Card */}
               <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
