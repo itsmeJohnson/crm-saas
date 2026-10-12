@@ -4,13 +4,15 @@ import { useMetadataStore } from '../../store/metadataStore';
 import { useUserStore } from '../../store/userStore';
 import { LeadResponse } from '../../services/leadApi';
 import { emailApi } from '../../services/emailApi';
-import { GripVertical, Mail, Phone, Loader2, RefreshCw } from 'lucide-react';
+import { Mail, Phone, Loader2, RefreshCw, MessageCircle } from 'lucide-react';
 import { formatMoney } from '../../utils/currency';
 import { StageEmailDialog } from './StageEmailDialog';
 import { configForStage } from '../../utils/stageAutomation';
 
 interface LeadKanbanProps {
   onCardClick?: (lead: LeadResponse) => void;
+  onChatClick?: (lead: LeadResponse, channel?: 'whatsapp' | 'sms') => void;
+  onCallClick?: (leadId: string) => void;
 }
 
 // Coerce values that may arrive as strings (Decimal) so column totals never NaN.
@@ -25,7 +27,7 @@ const fmtValue = (v: number | string | null | undefined) => {
 
 interface PendingMove { lead: LeadResponse; toStage: { id: string; name: string }; fromStageName?: string; }
 
-export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
+export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick, onChatClick, onCallClick }) => {
   const { leads, updateLead, fetchLeads } = useLeadStore();
   const { pipelines, selectedPipelineId, selectPipeline, fetchBootstrap, loaded, isLoading } = useMetadataStore();
   const { users } = useUserStore();
@@ -138,20 +140,16 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Kanban Pipeline Control Bar */}
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-3.5 px-4 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-brand-500" />
-            <span>Staging Pipeline</span>
-          </div>
-
-          <div className="relative">
+    <div className="space-y-3">
+      {/* Kanban Pipeline Low-Profile Control Bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2.5 px-0.5 pb-0.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <span className="font-medium">Pipeline:</span>
             <select
               value={selected.id}
               onChange={(e) => selectPipeline(e.target.value)}
-              className="px-3.5 py-1.5 rounded-xl text-sm font-semibold bg-slate-950 border border-slate-700/80 text-slate-100 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 border border-slate-700/80 text-slate-100 focus:outline-none focus:border-brand-500 shadow-2xs cursor-pointer"
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -161,25 +159,25 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700/80 shadow-2xs">
-              {stages.length} Stages
-            </span>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-2xs">
-              {leads.length} Total Deals
-            </span>
-          </div>
+          <span className="text-xs text-slate-500 font-medium">·</span>
+          <span className="text-xs text-slate-400 font-medium">
+            {stages.length} stages
+          </span>
+          <span className="text-xs text-slate-500 font-medium">·</span>
+          <span className="text-xs text-slate-400 font-medium">
+            {leads.length} deals
+          </span>
           {moveError && <span className="text-xs text-rose-500 font-medium">{moveError}</span>}
         </div>
 
-        <div className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl shadow-2xs">
+        <div className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Drag cards between stages to advance deals & trigger auto-actions</span>
+          <span>Drag cards to advance stage</span>
         </div>
       </div>
 
       {/* Columns List */}
-      <div className="flex gap-4 overflow-x-auto pb-4 pt-1">
+      <div className="flex gap-3.5 overflow-x-auto pb-4 pt-1 items-start">
         {stages.map((stage) => {
           const items = grouped.get(stage.id) || [];
           const colValue = items.reduce((sum, l) => sum + num(l.value), 0);
@@ -190,46 +188,49 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
               onDragOver={(e) => { e.preventDefault(); setOverStageId(stage.id); }}
               onDragLeave={() => setOverStageId((cur) => (cur === stage.id ? null : cur))}
               onDrop={() => handleDrop(stage.id)}
-              className={`w-80 shrink-0 flex flex-col rounded-2xl border transition-all duration-200 ${
+              className={`w-72 shrink-0 flex flex-col rounded-xl border transition-all duration-150 ${
                 over
-                  ? 'border-brand-500 bg-brand-500/10 shadow-lg ring-2 ring-brand-500/20'
-                  : 'border-slate-700/80 bg-slate-950/60 shadow-xs'
+                  ? 'border-brand-500 bg-brand-500/10 shadow-md ring-2 ring-brand-500/20'
+                  : 'border-slate-800/80 bg-slate-950/40 shadow-2xs'
               }`}
             >
               {/* Column Header */}
-              <div className="p-3.5 border-b border-slate-800/80 flex items-center justify-between">
-                <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2.5 px-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/60 rounded-t-xl">
+                <div className="flex items-center gap-2 min-w-0">
                   <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 ring-4"
-                    style={{
-                      backgroundColor: stage.color || '#4F46E5',
-                      boxShadow: `0 0 10px ${(stage.color || '#4F46E5')}50`
-                    }}
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: stage.color || '#4F46E5' }}
                   />
-                  <span className="text-sm font-bold text-slate-100 truncate">
+                  <span className="text-xs font-bold text-slate-200 tracking-wide uppercase truncate">
                     {stage.name}
                   </span>
-                  <span className="text-xs font-bold text-slate-200 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 shadow-2xs shrink-0">
+                  <span className="text-[11px] font-semibold text-slate-400 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700/60 shrink-0">
                     {items.length}
                   </span>
                 </div>
                 {fmtValue(colValue) && (
-                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg shrink-0 shadow-2xs">
+                  <span className="text-xs font-semibold text-emerald-400 shrink-0 font-mono">
                     {fmtValue(colValue)}
                   </span>
                 )}
               </div>
 
               {/* Cards Container */}
-              <div className="p-3 space-y-3 flex-1 min-h-[160px] max-h-[calc(100vh-320px)] overflow-y-auto">
+              <div className="p-2.5 space-y-2.5 flex-1 min-h-[160px] max-h-[calc(100vh-270px)] overflow-y-auto">
                 {items.map((lead) => {
-                  const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.title;
-                  const initials = name
+                  const contactPerson = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
+                  const name = lead.title || contactPerson || 'Untitled Deal';
+                  const initials = (contactPerson || lead.title || 'LD')
                     .split(' ')
                     .filter(Boolean)
                     .slice(0, 2)
                     .map((w) => w[0]?.toUpperCase())
                     .join('') || 'LD';
+
+                  const assignedUser = users.find((u) => u.id === lead.assigned_user_id);
+                  const ownerName = assignedUser
+                    ? `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() || assignedUser.email
+                    : (lead.source || 'Unassigned');
 
                   return (
                     <div
@@ -238,79 +239,103 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
                       onDragStart={() => setDraggingId(lead.id)}
                       onDragEnd={() => { setDraggingId(null); setOverStageId(null); }}
                       onClick={() => onCardClick?.(lead)}
-                      className={`group relative bg-slate-900 border border-slate-700/80 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-brand-500/60 transition-all duration-200 cursor-grab active:cursor-grabbing select-none overflow-hidden ${
+                      className={`group relative bg-slate-900/90 hover:bg-slate-900 border border-slate-800/90 hover:border-slate-700 rounded-xl p-3 shadow-2xs hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing select-none overflow-hidden ${
                         draggingId === lead.id ? 'opacity-30 scale-95' : ''
                       }`}
                     >
-                      {/* Stage Color Left Accent Bar */}
+                      {/* Left accent bar matching stage color */}
                       <div
-                        className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r"
+                        className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
                         style={{ backgroundColor: stage.color || '#4F46E5' }}
                       />
 
-                      {/* Header row: Avatar + Name + Grip */}
-                      <div className="flex items-start gap-2.5 pl-1.5">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
-                          {initials}
-                        </div>
+                      {/* Header Row: Title & Quick Actions */}
+                      <div className="flex items-start justify-between gap-1.5 pl-1.5">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-slate-100 group-hover:text-brand-400 transition-colors truncate leading-tight">
+                          <p className="text-xs font-bold text-slate-100 group-hover:text-brand-400 transition-colors truncate">
                             {name}
                           </p>
-                          {lead.title && lead.title !== name && (
-                            <p className="text-xs text-slate-400 truncate mt-0.5">
-                              {lead.title}
+                          {(lead.company_name || (contactPerson && contactPerson !== name)) && (
+                            <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                              {lead.company_name || contactPerson}
                             </p>
                           )}
                         </div>
-                        <GripVertical className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors shrink-0 mt-0.5" />
+
+                        {/* Quick action icons */}
+                        <div className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+                          {lead.phone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onCallClick) onCallClick(lead.id);
+                                else window.location.href = `tel:${lead.phone}`;
+                              }}
+                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                              title={`Call ${lead.phone}`}
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChatClick?.(lead, 'whatsapp');
+                            }}
+                            className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                            title="Open WhatsApp / SMS & Documents"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </button>
+                          {lead.email && (
+                            <a
+                              href={`mailto:${lead.email}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-brand-400 transition-colors cursor-pointer"
+                              title={`Email ${lead.email}`}
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Middle row: Deal Value + Priority */}
-                      <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-800/80 pl-1.5 flex-wrap justify-between">
-                        <div>
+                      {/* Bottom Row: Deal Value, Priority, and Owner Avatar */}
+                      <div className="flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-slate-800/70 pl-1.5">
+                        <div className="flex items-center gap-2">
                           {fmtValue(lead.value) ? (
-                            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md shadow-2xs">
+                            <span className="text-xs font-semibold text-emerald-400 font-mono">
                               {fmtValue(lead.value)}
                             </span>
                           ) : (
-                            <span className="text-[11px] text-slate-400 font-medium">No value set</span>
+                            <span className="text-[10px] text-slate-500 font-medium">—</span>
                           )}
+
+                          {/* Linear-style priority indicator */}
+                          <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                lead.priority === 'Urgent'
+                                  ? 'bg-rose-500'
+                                  : lead.priority === 'High'
+                                  ? 'bg-amber-500'
+                                  : lead.priority === 'Low'
+                                  ? 'bg-slate-500'
+                                  : 'bg-blue-500'
+                              }`}
+                            />
+                            <span>{lead.priority || 'Med'}</span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-2xs ${
-                              lead.priority === 'Urgent'
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                : lead.priority === 'High'
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                : lead.priority === 'Low'
-                                ? 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                                : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            }`}
-                          >
-                            {lead.priority || 'Medium'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Footer row: channels & owner */}
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/60 pl-1.5 text-[11px] text-slate-400">
-                        {(() => {
-                          const assignedUser = users.find((u) => u.id === lead.assigned_user_id);
-                          const ownerName = assignedUser
-                            ? `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() || assignedUser.email
-                            : (lead.source || 'Direct');
-                          return (
-                            <span className="truncate max-w-[140px] font-medium text-slate-300">
-                              {ownerName}
-                            </span>
-                          );
-                        })()}
-                        <div className="flex items-center gap-2">
-                          {lead.email && <Mail className="w-3.5 h-3.5 text-slate-400 hover:text-brand-500 transition-colors" />}
-                          {lead.phone && <Phone className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-500 transition-colors" />}
+                        {/* Owner Initials Avatar */}
+                        <div
+                          className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700/80 text-[10px] font-bold text-slate-300 flex items-center justify-center shrink-0"
+                          title={`Assigned to: ${ownerName}`}
+                        >
+                          {initials}
                         </div>
                       </div>
                     </div>
@@ -318,8 +343,8 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({ onCardClick }) => {
                 })}
 
                 {items.length === 0 && (
-                  <div className="border-2 border-dashed border-slate-800 rounded-xl py-12 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs text-center px-4">
-                    <span>Drop leads here to advance</span>
+                  <div className="border border-dashed border-slate-800/80 rounded-xl py-10 flex flex-col items-center justify-center gap-1.5 text-slate-500 text-xs text-center px-3">
+                    <span>Drop deals here</span>
                   </div>
                 )}
               </div>

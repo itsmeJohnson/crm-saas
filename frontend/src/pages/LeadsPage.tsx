@@ -13,7 +13,7 @@ import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse, LeadReport } from '../services/leadApi';
 import { normalizeFieldOptions } from '../services/metadataApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star, MessageCircle, FileSpreadsheet } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star, MessageCircle, FileSpreadsheet, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { OmniChannelChatDrawer } from '../components/crm/OmniChannelChatDrawer';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
@@ -139,6 +139,8 @@ export const LeadsPage: React.FC = () => {
 
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
   const [report, setReport] = useState<LeadReport | null>(null);
   const { customFields, fetchBootstrap } = useMetadataStore();
   const leadCustomFields = customFields.filter((f) => f.entity_type === 'lead');
@@ -198,31 +200,27 @@ export const LeadsPage: React.FC = () => {
     : '—';
 
   return (
-    <div className="space-y-6">
-      {/* Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-100">
+    <div className="space-y-4">
+      {/* Unified Executive Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-slate-800/80 pb-4">
+        {/* Left: Title + Deal Count + View Switcher + Metric Toggle */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-100">
               Leads
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-400 border border-brand-500/30">
-              Live Pipeline
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/80 font-mono">
+              {report?.total_leads ?? leads.length}
             </span>
           </div>
-          <p className="text-sm text-slate-400 mt-1">
-            Monitor sales opportunities, deal values, and log interactions to drive conversions.
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
           {/* View toggle: Table / Kanban */}
-          <div className="flex items-center p-1 bg-slate-950 border border-slate-700/80 rounded-xl shadow-2xs shrink-0">
+          <div className="flex items-center p-0.5 bg-slate-950 border border-slate-800 rounded-lg shadow-2xs">
             <button
               onClick={() => setView('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                 view === 'table'
-                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-xs'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-2xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Table view"
@@ -231,9 +229,9 @@ export const LeadsPage: React.FC = () => {
             </button>
             <button
               onClick={() => setView('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                 view === 'kanban'
-                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-xs'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-2xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Kanban board"
@@ -242,125 +240,172 @@ export const LeadsPage: React.FC = () => {
             </button>
           </div>
 
-          {isPrivileged && (
+          {/* Compact Metrics Toggle Pill */}
+          {report && (
             <button
-              onClick={() => setIsFieldsOpen(true)}
-              className="flex items-center justify-center gap-2 px-3.5 py-2 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 rounded-xl text-sm font-semibold text-slate-200 hover:text-slate-100 shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
-              title="Manage custom fields"
+              onClick={() => setShowMetrics(!showMetrics)}
+              className="flex items-center gap-2 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all cursor-pointer shadow-2xs"
+              title="Toggle detailed KPI cards"
             >
-              <SlidersHorizontal className="w-4 h-4 text-slate-400" />
-              Custom Fields
+              <span className="text-emerald-400 font-semibold">{formatMoney(report.total_value)}</span>
+              <span className="text-slate-500">·</span>
+              <span>{report.conversion_rate}% Win</span>
+              {showMetrics ? (
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              )}
             </button>
           )}
+        </div>
 
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Auto assignment quick settings */}
           {isPrivileged && <AssignmentSettings />}
 
-          {/* Export Leads (Upward Arrow icon) */}
-          <div className="flex items-center rounded-xl overflow-hidden border border-slate-700/80 bg-slate-900 shadow-2xs shrink-0">
-            <button
-              onClick={() => handleExport('csv')}
-              disabled={isExporting}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 hover:bg-slate-800 disabled:opacity-50 text-sm font-semibold text-slate-200 hover:text-emerald-400 transition-all cursor-pointer"
-              title="Export leads to CSV"
-            >
-              <Upload className="w-4 h-4 text-emerald-400" />
-              Export CSV
-            </button>
-            <button
-              onClick={() => handleExport('xlsx')}
-              disabled={isExporting}
-              className="flex items-center gap-1.5 px-3 py-2 border-l border-slate-700/80 hover:bg-slate-800 disabled:opacity-50 text-sm font-semibold text-slate-300 hover:text-emerald-400 transition-all cursor-pointer"
-              title="Export leads to Excel (.xlsx)"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-              XLSX
-            </button>
-          </div>
-
-          {/* Import Leads (Downward Arrow icon with CSV, XLSX & Sheets sources - NO TEXT CLIPPING/HIDING) */}
+          {/* Import Leads Button (Downward Arrow icon with CSV / XLSX badge - NO TEXT CLIPPING) */}
           {isPrivileged && (
             <button
               onClick={() => setIsImportOpen(true)}
-              className="group flex items-center justify-center gap-2 px-3.5 py-2 bg-slate-900 border border-slate-700/80 hover:border-brand-500/60 hover:bg-slate-800 rounded-xl text-sm font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
+              className="group flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-700/80 hover:border-brand-500/60 hover:bg-slate-800 rounded-lg text-xs font-semibold shadow-2xs transition-all cursor-pointer"
               title="Import leads from CSV, Excel (.xlsx), or Google Sheets"
             >
-              <Download className="w-4 h-4 text-brand-400 group-hover:translate-y-0.5 transition-transform shrink-0" />
+              <Download className="w-3.5 h-3.5 text-brand-400 group-hover:translate-y-0.5 transition-transform" />
               <span className="text-slate-200 group-hover:text-brand-400 transition-colors">
-                Import Leads
+                Import
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-brand-500/15 text-brand-400 border border-brand-500/30">
-                CSV / XLSX
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-brand-500/15 text-brand-400 border border-brand-500/30">
+                CSV/XLSX
               </span>
             </button>
           )}
 
+          {/* More Actions Dropdown (Export CSV, XLSX, Custom Fields) */}
+          <div className="relative">
+            <button
+              onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 rounded-lg text-xs font-semibold text-slate-200 shadow-2xs transition-all cursor-pointer"
+              title="Export and configuration options"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5 text-slate-400" />
+              <span>Actions</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {isActionsMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setIsActionsMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-1.5 w-52 bg-slate-900 border border-slate-700/90 rounded-xl shadow-xl z-40 py-1 divide-y divide-slate-800">
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        handleExport('csv');
+                        setIsActionsMenuOpen(false);
+                      }}
+                      disabled={isExporting}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-emerald-400 transition-colors cursor-pointer text-left"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Export to CSV</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExport('xlsx');
+                        setIsActionsMenuOpen(false);
+                      }}
+                      disabled={isExporting}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-emerald-400 transition-colors cursor-pointer text-left"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Export to Excel (.xlsx)</span>
+                    </button>
+                  </div>
+                  {isPrivileged && (
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setIsFieldsOpen(true);
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-brand-400 transition-colors cursor-pointer text-left"
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Custom Fields</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Primary CTA: Add Lead */}
           {isPrivileged && (
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-600 via-indigo-600 to-brand-500 hover:from-brand-500 hover:to-indigo-500 active:scale-[0.98] text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-brand-500/25 hover:shadow-lg hover:shadow-brand-500/35 cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 active:scale-[0.98] text-white rounded-lg text-xs font-semibold transition-all shadow-xs shadow-brand-500/20 cursor-pointer"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               Add Lead
             </button>
           )}
         </div>
       </div>
 
-      {/* KPI summary strip with rich elevation and accents */}
-      {report && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      {/* Collapsible Detailed KPI Summary Strip */}
+      {report && showMetrics && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200">
           {[
             {
               label: 'Total Leads',
               value: report.total_leads.toLocaleString(),
               icon: Users2,
-              accent: 'from-blue-500/20 via-blue-500/5 to-transparent',
-              iconBg: 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20',
-              badge: 'Pipeline Deals'
+              iconBg: 'bg-blue-500/10 text-blue-400',
+              badge: 'Pipeline'
             },
             {
               label: 'Pipeline Value',
               value: formatMoney(report.total_value),
               icon: DollarSign,
-              accent: 'from-emerald-500/20 via-emerald-500/5 to-transparent',
-              iconBg: 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20',
-              badge: 'Active Value'
+              iconBg: 'bg-emerald-500/10 text-emerald-400',
+              badge: 'Active Deals'
             },
             {
               label: 'Conversion Rate',
               value: `${report.conversion_rate}%`,
               icon: TrendingUp,
-              accent: 'from-indigo-500/20 via-indigo-500/5 to-transparent',
-              iconBg: 'bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20',
+              iconBg: 'bg-indigo-500/10 text-indigo-400',
               badge: 'Win Velocity'
             },
             {
               label: 'Avg. Score',
               value: Math.round(report.avg_score || 0).toString(),
               icon: Star,
-              accent: 'from-amber-500/20 via-amber-500/5 to-transparent',
-              iconBg: 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20',
-              badge: 'AI Propensity'
+              iconBg: 'bg-amber-500/10 text-amber-400',
+              badge: 'Lead Score'
             },
           ].map((s) => (
             <div
               key={s.label}
-              className="relative overflow-hidden bg-slate-900 border border-slate-700/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-slate-600 transition-all duration-200 group"
+              className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all"
             >
-              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${s.accent} rounded-bl-full pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity`} />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-[11px] font-semibold text-slate-400">
                   {s.label}
                 </span>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.iconBg} shadow-2xs`}>
-                  <s.icon className="w-4 h-4" />
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${s.iconBg}`}>
+                  <s.icon className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="mt-2.5 flex items-baseline justify-between">
-                <p className="text-2xl lg:text-3xl font-extrabold text-slate-100 tracking-tight">
+              <div className="mt-1 flex items-baseline justify-between">
+                <p className="text-xl font-bold text-slate-100 tracking-tight">
                   {s.value}
                 </p>
-                <span className="text-[10px] font-medium text-slate-400">
+                <span className="text-[10px] text-slate-500">
                   {s.badge}
                 </span>
               </div>
@@ -369,8 +414,8 @@ export const LeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Filters, Table, Pagination */}
-      <div className="space-y-4">
+      {/* Filters, Table / Board, Pagination */}
+      <div className="space-y-3">
         <Filters
           search={filters.search}
           onSearchChange={(search) => setFilters({ search })}
@@ -378,11 +423,11 @@ export const LeadsPage: React.FC = () => {
           onReset={resetFilters}
         >
           {/* Status filter dropdown */}
-          <div className="w-full sm:w-44">
+          <div className="w-full sm:w-36">
             <select
               value={filters.status}
               onChange={(e) => setFilters({ status: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all cursor-pointer"
             >
               <option value="All">All Statuses</option>
               <option value="New">New</option>
@@ -394,11 +439,11 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Owner filter dropdown */}
-          <div className="w-full sm:w-44">
+          <div className="w-full sm:w-36">
             <select
               value={filters.assigned_user_id}
               onChange={(e) => setFilters({ assigned_user_id: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all cursor-pointer"
             >
               <option value="All">All Owners</option>
               {activeUsers.map(u => (
@@ -410,11 +455,11 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Priority filter dropdown */}
-          <div className="w-full sm:w-36">
+          <div className="w-full sm:w-32">
             <select
               value={filters.priority}
               onChange={(e) => setFilters({ priority: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all cursor-pointer"
             >
               <option value="All">All Priorities</option>
               <option value="Low">Low</option>
@@ -425,13 +470,13 @@ export const LeadsPage: React.FC = () => {
           </div>
 
           {/* Source filter */}
-          <div className="w-full sm:w-36">
+          <div className="w-full sm:w-32">
             <input
               type="text"
               value={filters.source}
               onChange={(e) => setFilters({ source: e.target.value })}
               placeholder="Source"
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
             />
           </div>
 
@@ -445,12 +490,12 @@ export const LeadsPage: React.FC = () => {
               setFilters({ custom_fields: next });
             };
             return (
-              <div key={f.id} className="w-full sm:w-44">
+              <div key={f.id} className="w-full sm:w-36">
                 {f.field_type === 'select' ? (
                   <select
                     value={val}
                     onChange={(e) => update(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
                   >
                     <option value="">{f.label}: All</option>
                     {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -461,7 +506,7 @@ export const LeadsPage: React.FC = () => {
                     value={val}
                     onChange={(e) => update(e.target.value)}
                     placeholder={f.label}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-2xs transition-all"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
                   />
                 )}
               </div>
@@ -469,7 +514,7 @@ export const LeadsPage: React.FC = () => {
           })}
 
           {/* Include archived toggle */}
-          <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
+          <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
             <input
               type="checkbox"
               checked={filters.include_archived}
@@ -506,7 +551,15 @@ export const LeadsPage: React.FC = () => {
             />
           </>
         ) : (
-          <LeadKanban onCardClick={handleRowClick} />
+          <LeadKanban
+            onCardClick={handleRowClick}
+            onChatClick={(lead, ch) => {
+              setChatLead(lead);
+              setChatChannel(ch || 'whatsapp');
+              setIsChatOpen(true);
+            }}
+            onCallClick={handleManualCall}
+          />
         )}
       </div>
 
