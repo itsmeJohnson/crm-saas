@@ -13,7 +13,8 @@ import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse, LeadReport } from '../services/leadApi';
 import { normalizeFieldOptions } from '../services/metadataApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star } from 'lucide-react';
+import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, Users2, TrendingUp, Star, MessageCircle } from 'lucide-react';
+import { OmniChannelChatDrawer } from '../components/crm/OmniChannelChatDrawer';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
 import { formatMoney } from '../utils/currency';
@@ -41,6 +42,10 @@ export const LeadsPage: React.FC = () => {
   const isPrivileged = user && (user.role === 'OrgAdmin' || user.role === 'Manager' || isTL);
   // Telecallers (Employees) can place a manual click-to-call to their own leads.
   const canManualCall = user?.role === 'Employee';
+
+  const [chatLead, setChatLead] = useState<LeadResponse | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatChannel, setChatChannel] = useState<'whatsapp' | 'sms'>('whatsapp');
 
   const handleManualCall = async (leadId: string) => {
     setCallError(null);
@@ -420,6 +425,11 @@ export const LeadsPage: React.FC = () => {
               selectedLeadIds={selectedLeadIds}
               onSelectLeads={setSelectedLeadIds}
               hideCheckboxes={!isPrivileged}
+              onChatClick={(lead, ch) => {
+                setChatLead(lead);
+                setChatChannel(ch || 'whatsapp');
+                setIsChatOpen(true);
+              }}
             />
 
             <Pagination
@@ -562,6 +572,19 @@ export const LeadsPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {detailLead.phone && (
+                  <button
+                    onClick={() => {
+                      setChatLead(detailLead);
+                      setChatChannel('whatsapp');
+                      setIsChatOpen(true);
+                    }}
+                    title="Open WhatsApp & SMS Chat window"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-300 rounded-xl transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" /> Chat
+                  </button>
+                )}
                 {canManualCall && agentState !== 'ACTIVE_CALLING' && detailLead.phone && (
                   <button
                     onClick={() => handleManualCall(detailLead.id)}
@@ -739,6 +762,14 @@ export const LeadsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* WhatsApp & SMS Live Chat Window (Documents, Images, PDF & CSV verification) */}
+      <OmniChannelChatDrawer
+        lead={chatLead}
+        isOpen={isChatOpen}
+        initialChannel={chatChannel}
+        onClose={() => setIsChatOpen(false)}
+      />
     </div>
   );
 };

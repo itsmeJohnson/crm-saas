@@ -43,8 +43,8 @@ const CommercialSummaryPanel: React.FC<{ regPlan?: any }> = (_props) => (
 const NavItem: React.FC<{ icon: React.ElementType; label: string; active: boolean; onClick: () => void }> = ({ icon: Icon, label, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer text-left relative ${
-      active ? 'bg-brand-500/10 text-brand-400 border-r-2 border-brand-500' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+    className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 text-xs font-semibold transition-all cursor-pointer text-left whitespace-nowrap rounded-lg md:rounded-none shrink-0 ${
+      active ? 'bg-brand-500/15 text-brand-400 md:border-r-2 md:border-brand-500' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
     }`}
   >
     <Icon className="w-4 h-4 shrink-0" />
@@ -160,7 +160,12 @@ export const TenantsPage: React.FC = () => {
         }
         default: break;
       }
-    } catch (err: any) { setGlobalError(err.response?.data?.detail || 'Failed to fetch data'); }
+    } catch (err: any) { 
+      const msg = err.response?.status === 403 
+        ? 'Access Restricted: Super Admin access required. Please sign in with Super Admin credentials to manage tenants and system instances.'
+        : err.response?.data?.detail || 'Failed to fetch data';
+      setGlobalError(msg); 
+    }
     finally { setIsLoading(false); }
   };
 
@@ -454,25 +459,33 @@ export const TenantsPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ display: 'flex', margin: '-24px', minHeight: 'calc(100vh - 64px)', overflow: 'hidden' }}>
-      <nav style={{ width: '188px', flexShrink: 0, borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <div className="p-4 border-b border-slate-800">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Super Admin</p>
-          <h2 className="text-sm font-bold text-slate-200 mt-0.5">Control Center</h2>
+    <div className="flex flex-col md:flex-row -m-6 min-h-[calc(100vh-64px)] overflow-hidden">
+      <nav className="w-full md:w-48 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border-color)] bg-[var(--bg-surface)] flex flex-col">
+        <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between md:block">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Super Admin</p>
+            <h2 className="text-sm font-bold text-slate-200 mt-0.5">Control Center</h2>
+          </div>
+          <Link
+            to="/"
+            className="md:hidden flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 rounded-lg"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> CRM
+          </Link>
         </div>
         <Link
           to="/"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border-b border-slate-800/70 transition-colors"
+          className="hidden md:flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border-b border-slate-800/70 transition-colors"
         >
           <ArrowLeft className="w-4 h-4 shrink-0" />
           Back to CRM
         </Link>
-        <div className="py-2 flex-1">
+        <div className="py-2 flex-1 flex md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar gap-1 px-2 md:px-0">
           {navItems.map(item => <NavItem key={item.key} icon={item.icon} label={item.label} active={activeSection === item.key} onClick={() => { setActiveSection(item.key); setGlobalError(null); }} />)}
         </div>
       </nav>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }} className="space-y-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {globalError && (
           <div className="p-4 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-start gap-2.5 text-sm text-red-400">
             <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" /><span>{globalError}</span>

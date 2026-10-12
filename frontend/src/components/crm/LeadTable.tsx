@@ -14,6 +14,7 @@ interface LeadTableProps {
   selectedLeadIds: string[];
   onSelectLeads: (ids: string[]) => void;
   hideCheckboxes?: boolean;
+  onChatClick?: (lead: LeadResponse, channel?: 'whatsapp' | 'sms') => void;
 }
 
 /** Compact relative time, e.g. "Today", "3d ago", "2mo ago". */
@@ -57,6 +58,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   selectedLeadIds,
   onSelectLeads,
   hideCheckboxes = false,
+  onChatClick,
 }) => {
   const { leads, isLoading, error, deleteLead } = useLeadStore();
   const { users, fetchUsers } = useUserStore();
@@ -256,17 +258,28 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   {!isEmployee && (
                     <td className="px-5 py-3.5 text-right align-middle">
                       <div className="flex items-center justify-end gap-2">
-                        {whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim()) && (
-                          <a
-                            href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="Chat on WhatsApp"
-                            className="p-2 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                          </a>
+                        {lead.phone && (
+                          onChatClick ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onChatClick(lead, 'whatsapp'); }}
+                              title="Open WhatsApp & SMS Chat Window"
+                              className="p-2 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <a
+                              href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Chat on WhatsApp"
+                              className="p-2 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </a>
+                          )
                         )}
                         <button
                           onClick={(e) => handleEdit(e, lead)}
@@ -335,17 +348,28 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   <div className="flex items-center justify-between mt-2.5">
                     {ownerBadge(lead)}
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim()) && (
-                        <a
-                          href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          title="Chat on WhatsApp"
-                          className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </a>
+                      {lead.phone && (
+                        onChatClick ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onChatClick(lead, 'whatsapp'); }}
+                            title="Open WhatsApp & SMS Chat"
+                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <a
+                            href={whatsappHref(lead.phone, `Hi ${lead.first_name || ''}`.trim())!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Chat on WhatsApp"
+                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        )
                       )}
                       {!isEmployee && (
                         <>
