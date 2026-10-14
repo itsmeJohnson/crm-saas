@@ -39,6 +39,12 @@ COPY --chown=appuser:appgroup . .
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
 
+# Pre-create writable runtime dirs owned by the non-root user. A named volume
+# mounted at /app/uploads inherits this ownership on first init, so the app
+# (running as appuser) can create uploads/branding etc. Without this the volume
+# mounts in root-owned and the app crashes at startup with PermissionError.
+RUN mkdir -p /app/uploads/branding && chown -R appuser:appgroup /app/uploads
+
 USER appuser
 
 EXPOSE 8000

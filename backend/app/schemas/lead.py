@@ -189,3 +189,48 @@ class FollowUpCreate(BaseModel):
     reminder_minutes_before: int | None = Field(None, ge=0, le=10080)
     create_calendar_event: bool = False
     set_status: str | None = Field(None, max_length=50)
+
+
+# --- Enterprise High-Performance Aggregations (Million-Lead Scale) ---
+
+class SalesKPISummaryResponse(BaseModel):
+    """Database-side aggregate of 5 core Sales KPIs computed in a single SQL query."""
+    active_pipeline_value: Decimal = Decimal("0")
+    active_deals_count: int = 0
+    weighted_forecast: Decimal = Decimal("0")
+    won_revenue_this_month: Decimal = Decimal("0")
+    won_deals_count: int = 0
+    lost_deals_count: int = 0
+    win_rate: float = 0.0
+    overdue_followups_count: int = 0
+    total_leads_count: int = 0
+
+
+class KanbanStageSummary(BaseModel):
+    """Accurate server-calculated totals for a single pipeline stage + initial cards."""
+    stage_id: uuid.UUID
+    stage_name: str
+    order_position: int = 0
+    total_count: int = 0
+    total_value: Decimal = Decimal("0")
+    cards: list[LeadResponse] = []
+    has_more: bool = False
+
+
+class KanbanBoardResponse(BaseModel):
+    """Enterprise Kanban board response with stage aggregates and initial cards."""
+    pipeline_id: uuid.UUID | None = None
+    stages: list[KanbanStageSummary] = []
+    total_pipeline_value: Decimal = Decimal("0")
+    total_deals_count: int = 0
+
+
+class KanbanStageCardsResponse(BaseModel):
+    """Paginated cards for a single Kanban stage (incremental loading)."""
+    stage_id: uuid.UUID
+    total_count: int = 0
+    cards: list[LeadResponse] = []
+    has_more: bool = False
+    skip: int = 0
+    limit: int = 10
+

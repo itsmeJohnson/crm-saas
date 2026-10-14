@@ -29,6 +29,32 @@ export const Filters: React.FC<FiltersProps> = ({
   extraFilters,
 }) => {
   const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [localSearch, setLocalSearch] = React.useState(search);
+
+  // Sync external changes (reset or chip removal)
+  React.useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  // Debounce keystrokes by 300ms
+  React.useEffect(() => {
+    if (localSearch === search) return;
+    const timer = setTimeout(() => {
+      onSearchChange(localSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, search, onSearchChange]);
+
+  const handleClear = () => {
+    setLocalSearch('');
+    onSearchChange('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onSearchChange(localSearch);
+    }
+  };
 
   return (
     <div className="space-y-2 mb-3">
@@ -40,14 +66,15 @@ export const Filters: React.FC<FiltersProps> = ({
           <input
             type="text"
             placeholder={placeholder}
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="w-full pl-9 pr-8 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 shadow-2xs transition-all"
           />
-          {search && (
+          {localSearch && (
             <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5"
+              onClick={handleClear}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5 cursor-pointer"
               title="Clear search"
             >
               <X className="w-3 h-3" />

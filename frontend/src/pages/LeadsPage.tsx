@@ -20,7 +20,6 @@ import { useMetadataStore } from '../store/metadataStore';
 import { formatMoney } from '../utils/currency';
 import { LeadKanban } from '../components/crm/LeadKanban';
 import { FilterChip } from '../components/crm/Filters';
-import { calculateSalesKPIs } from '../utils/salesMetrics';
 import { noteApi } from '../services/noteApi';
 import { LeadCustomFieldsManager } from '../components/crm/LeadCustomFieldsManager';
 import { ImportModal } from '../components/leads/ImportModal';
@@ -64,6 +63,7 @@ export const LeadsPage: React.FC = () => {
 
   const {
     leads,
+    totalCount,
     fetchLeads,
     filters,
     setFilters,
@@ -74,6 +74,9 @@ export const LeadsPage: React.FC = () => {
     bulkUpdate,
     archiveLead,
     restoreLead,
+    kpiSummary,
+    fetchKPISummary,
+    fetchKanbanBoard,
   } = useLeadStore();
 
   const handleConvert = async (lead: LeadResponse) => {
@@ -149,7 +152,20 @@ export const LeadsPage: React.FC = () => {
   const { customFields, fetchBootstrap } = useMetadataStore();
   const leadCustomFields = customFields.filter((f) => f.entity_type === 'lead');
 
-  const salesKPIs = React.useMemo(() => calculateSalesKPIs(leads), [leads]);
+  const salesKPIs = React.useMemo(() => {
+    if (kpiSummary) return kpiSummary;
+    return {
+      activePipelineValue: 0,
+      activeDealsCount: 0,
+      weightedForecast: 0,
+      wonRevenueThisMonth: 0,
+      wonDealsCount: 0,
+      lostDealsCount: 0,
+      winRate: 0,
+      overdueFollowupsCount: 0,
+      totalLeadsCount: 0,
+    };
+  }, [kpiSummary]);
 
   const activeChips: FilterChip[] = React.useMemo(() => {
     const chips: FilterChip[] = [];
@@ -249,6 +265,8 @@ export const LeadsPage: React.FC = () => {
 
   useEffect(() => {
     fetchLeads();
+    fetchKPISummary();
+    fetchKanbanBoard();
     if (users.length === 0) fetchUsers();
     fetchDashboardMetrics();
     fetchBootstrap();
@@ -697,7 +715,9 @@ export const LeadsPage: React.FC = () => {
               skip={pagination.skip}
               limit={pagination.limit}
               itemsCount={leads.length}
+              totalCount={totalCount}
               onPageChange={(skip) => setPagination({ skip })}
+              onLimitChange={(limit) => setPagination({ limit, skip: 0 })}
             />
           </>
         ) : (

@@ -20,6 +20,10 @@ interface MetadataState {
   fetchBootstrap: (force?: boolean) => Promise<void>;
   /** Force a re-fetch (call after any custom-field or pipeline mutation). */
   refresh: () => Promise<void>;
+  /** Wipe all cached org metadata so the next load re-fetches from scratch.
+   * Must run on logout / tenant switch, otherwise the previous tenant's
+   * crm_config (and its vertical skin) leaks into the next session. */
+  reset: () => void;
   selectPipeline: (id: string | null) => void;
 
   // Selectors
@@ -82,6 +86,19 @@ export const useMetadataStore = create<MetadataState>((set, get) => ({
   refresh: async () => {
     await get().fetchBootstrap(true);
   },
+
+  reset: () => set({
+    metadataVersion: null,
+    customFields: [],
+    customFieldsByEntity: {},
+    customObjects: [],
+    pipelines: [],
+    crmConfig: null,
+    selectedPipelineId: null,
+    isLoading: false,
+    loaded: false,
+    error: null,
+  }),
 
   selectPipeline: (id) => set({ selectedPipelineId: id }),
 

@@ -33,3 +33,17 @@ backend/uploads/
 
 # Backups
 backend/backups/
+
+# Local databases & test DBs
+backend/*.db*
+*.db
+*.db-journal
+*.db.bak*
+
+# Mobile binaries
+*.apk
+*.aab
+*.idsig
+
+# Tooling
+.claude/

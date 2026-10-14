@@ -12,7 +12,7 @@ from app.schemas.lead import (
     LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
     LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
-    FollowUpCreate,
+    FollowUpCreate, SalesKPISummaryResponse, KanbanBoardResponse, KanbanStageCardsResponse,
 )
 from app.schemas.saved_filter import SavedFilterCreate, SavedFilterUpdate, SavedFilterResponse
 from app.schemas.reports import LeadReportResponse
@@ -35,7 +35,39 @@ _gate_bulk_import = Depends(require_feature("BULK_IMPORT"))
 
 router = APIRouter()
 
-# --- CRM Leads Core CRUD ---
+# --- CRM Leads Core CRUD & High-Performance Endpoints ---
+
+@router.get("/kpi-summary", response_model=SalesKPISummaryResponse)
+async def get_sales_kpi_summary(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Accurate aggregate of 5 core Sales KPIs computed server-side in a single query."""
+    lead_service = LeadService(db, actor.organization_id)
+    return await lead_service.get_sales_kpi_summary(actor)
+
+@router.get("/kanban-board", response_model=KanbanBoardResponse)
+async def get_kanban_board(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    pipeline_id: uuid.UUID | None = Query(None),
+    limit: int = Query(10, ge=1, le=50, description="Initial number of cards per stage"),
+):
+    """Fetch Kanban board stages with accurate server totals and initial batch of cards."""
+    lead_service = LeadService(db, actor.organization_id)
+    return await lead_service.get_kanban_board(actor, pipeline_id=pipeline_id, initial_card_limit=limit)
+
+@router.get("/kanban-stage/{stage_id}", response_model=KanbanStageCardsResponse)
+async def get_kanban_stage_cards(
+    stage_id: uuid.UUID,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """Fetch incremental paginated cards for a single Kanban stage."""
+    lead_service = LeadService(db, actor.organization_id)
+    return await lead_service.get_kanban_stage_cards(actor, stage_id=stage_id, skip=skip, limit=limit)
 
 @router.post("/", response_model=LeadResponse, status_code=status.HTTP_201_CREATED)
 async def create_lead(
@@ -55,6 +87,7 @@ async def create_lead(
 
 @router.get("/", response_model=List[LeadResponse])
 async def list_leads(
+    response: Response,
     actor: Annotated[User, Depends(require_active_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
@@ -87,13 +120,15 @@ async def list_leads(
             raise HTTPException(status_code=400, detail="custom_fields must be a valid JSON object")
 
     lead_service = LeadService(db, actor.organization_id)
-    records, _ = await lead_service.paginate_leads(
+    records, total = await lead_service.paginate_leads(
         actor, skip, limit, search, status, assigned_user_id, name, city,
         source=source, stage_id=stage_id, priority=priority, min_value=min_value,
         max_value=max_value, created_from=created_from, created_to=created_to,
         include_archived=include_archived, updated_after=updated_after,
         custom_filters=custom_filters,
     )
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
     return list(records)
 
 @router.get("/export")

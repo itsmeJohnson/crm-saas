@@ -157,9 +157,102 @@ export interface LeadListFilters {
   custom_fields?: string;
 }
 
+export interface SalesKPISummary {
+  activePipelineValue: number;
+  activeDealsCount: number;
+  weightedForecast: number;
+  wonRevenueThisMonth: number;
+  wonDealsCount: number;
+  lostDealsCount: number;
+  winRate: number;
+  overdueFollowupsCount: number;
+  totalLeadsCount: number;
+}
+
+export interface KanbanStageSummary {
+  stage_id: string;
+  stage_name: string;
+  order_position: number;
+  total_count: number;
+  total_value: number;
+  cards: LeadResponse[];
+  has_more: boolean;
+}
+
+export interface KanbanBoardResponse {
+  pipeline_id: string | null;
+  stages: KanbanStageSummary[];
+  total_pipeline_value: number;
+  total_deals_count: number;
+}
+
+export interface KanbanStageCardsResponse {
+  stage_id: string;
+  total_count: number;
+  cards: LeadResponse[];
+  has_more: boolean;
+  skip: number;
+  limit: number;
+}
+
+export interface PaginatedLeadsResponse {
+  leads: LeadResponse[];
+  totalCount: number;
+}
+
 export const leadApi = {
   getLeads: async (params: LeadListFilters) => {
     const response = await api.get<LeadResponse[]>('/leads/', { params });
+    return response.data;
+  },
+
+  getLeadsPaginated: async (params: LeadListFilters, signal?: AbortSignal): Promise<PaginatedLeadsResponse> => {
+    const response = await api.get<LeadResponse[]>('/leads/', { params, signal });
+    const totalHeader = response.headers['x-total-count'] || response.headers['X-Total-Count'];
+    const totalCount = totalHeader ? parseInt(totalHeader, 10) : response.data.length;
+    return {
+      leads: response.data,
+      totalCount: Number.isFinite(totalCount) ? totalCount : response.data.length,
+    };
+  },
+
+  getSalesKPISummary: async (): Promise<SalesKPISummary> => {
+    const response = await api.get<{
+      active_pipeline_value: number | string;
+      active_deals_count: number;
+      weighted_forecast: number | string;
+      won_revenue_this_month: number | string;
+      won_deals_count: number;
+      lost_deals_count: number;
+      win_rate: number;
+      overdue_followups_count: number;
+      total_leads_count: number;
+    }>('/leads/kpi-summary');
+    const d = response.data;
+    return {
+      activePipelineValue: typeof d.active_pipeline_value === 'string' ? parseFloat(d.active_pipeline_value) : d.active_pipeline_value,
+      activeDealsCount: d.active_deals_count,
+      weightedForecast: typeof d.weighted_forecast === 'string' ? parseFloat(d.weighted_forecast) : d.weighted_forecast,
+      wonRevenueThisMonth: typeof d.won_revenue_this_month === 'string' ? parseFloat(d.won_revenue_this_month) : d.won_revenue_this_month,
+      wonDealsCount: d.won_deals_count,
+      lostDealsCount: d.lost_deals_count,
+      winRate: d.win_rate,
+      overdueFollowupsCount: d.overdue_followups_count,
+      totalLeadsCount: d.total_leads_count,
+    };
+  },
+
+  getKanbanBoard: async (pipelineId?: string, limit = 10): Promise<KanbanBoardResponse> => {
+    const response = await api.get<KanbanBoardResponse>('/leads/kanban-board', {
+      params: { pipeline_id: pipelineId || undefined, limit },
+    });
+    return response.data;
+  },
+
+  getKanbanStageCards: async (stageId: string, skip = 0, limit = 10): Promise<KanbanStageCardsResponse> => {
+    const response = await api.get<KanbanStageCardsResponse>(`/leads/kanban-stage/${stageId}`, {
+      params: { skip, limit },
+    });
     return response.data;
   },
 
@@ -225,6 +318,11 @@ export const leadApi = {
 
   findDuplicates: async (params: { email?: string; phone?: string; exclude_lead_id?: string }) => {
     const response = await api.get<LeadResponse[]>('/leads/duplicates', { params });
+    return response.data;
+  },
+
+  mergeLeads: async (payload: { primary_id: string; secondary_id: string }) => {
+    const response = await api.post<LeadResponse>('/leads/merge', payload);
     return response.data;
   },
 

@@ -243,6 +243,49 @@ class LeadService:
             updated_after=updated_after, custom_filters=custom_filters,
         )
 
+    @classmethod
+    async def invalidate_perf_cache(cls, organization_id: uuid.UUID):
+        """Invalidate KPI and Kanban cached data for this organization."""
+        try:
+            from app.core.redis import redis_client
+            await redis_client.delete_pattern(f"kpi:{organization_id}:*")
+            await redis_client.delete_pattern(f"kanban:{organization_id}:*")
+        except Exception:
+            pass
+
+    async def get_sales_kpi_summary(self, actor: User) -> dict:
+        """Fetch accurate aggregate Sales KPIs computed server-side in a single query."""
+        if not actor.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
+        allowed_user_ids = await self._resolve_scope(actor)
+        return await self.lead_repo.get_sales_kpi_summary(allowed_user_ids)
+
+    async def get_kanban_board(
+        self,
+        actor: User,
+        pipeline_id: uuid.UUID | None = None,
+        initial_card_limit: int = 10
+    ) -> dict:
+        """Fetch Kanban board stages with database-calculated totals and initial cards."""
+        if not actor.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
+        allowed_user_ids = await self._resolve_scope(actor)
+        return await self.lead_repo.get_kanban_board(pipeline_id, allowed_user_ids, initial_card_limit)
+
+    async def get_kanban_stage_cards(
+        self,
+        actor: User,
+        stage_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 10
+    ) -> dict:
+        """Fetch next slice of cards for a stage (incremental Kanban loading)."""
+        if not actor.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
+        allowed_user_ids = await self._resolve_scope(actor)
+        return await self.lead_repo.get_kanban_stage_cards(stage_id, allowed_user_ids, skip, limit)
+
+
     async def export_leads(self, actor: User, filters: dict) -> Sequence[Lead]:
         """Return leads (scoped) matching filters for CSV/XLSX export."""
         if not actor.is_active:

@@ -38,7 +38,16 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
   onCallClick,
   onAddDeal,
 }) => {
-  const { leads, updateLead, fetchLeads } = useLeadStore();
+  const {
+    leads,
+    kanbanBoard,
+    loadingStageId,
+    loadMoreStageCards,
+    moveKanbanCard,
+    fetchKanbanBoard,
+    updateLead,
+    fetchLeads,
+  } = useLeadStore();
   const { pipelines, selectedPipelineId, selectPipeline, fetchBootstrap, loaded, isLoading } = useMetadataStore();
   const { users } = useUserStore();
 
@@ -57,7 +66,8 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
 
   useEffect(() => {
     fetchBootstrap(true);
-  }, []);
+    fetchKanbanBoard(selectedPipelineId || undefined);
+  }, [selectedPipelineId]);
 
   const selected = useMemo(
     () => pipelines.find((p) => p.id === selectedPipelineId) || pipelines[0] || null,
@@ -69,35 +79,25 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
     return [...selected.stages].sort((a, b) => a.order_position - b.order_position);
   }, [selected]);
 
-  const stageIds = useMemo(() => new Set(stages.map((s) => s.id)), [stages]);
   const stageName = (id?: string | null) => stages.find((s) => s.id === id)?.name;
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, LeadResponse[]>();
-    stages.forEach((s) => map.set(s.id, []));
-    for (const lead of leads) {
-      if (lead.is_archived) continue;
-      if (lead.stage_id && stageIds.has(lead.stage_id)) {
-        map.get(lead.stage_id)!.push(lead);
-      } else if (stages.length > 0) {
-        const stageNameLower = (lead.stage?.name || lead.status || '').toLowerCase().trim();
-        const matched = stages.find((s) => s.name.toLowerCase().trim() === stageNameLower);
-        if (matched) {
-          map.get(matched.id)!.push(lead);
-        } else {
-          map.get(stages[0].id)!.push(lead);
-        }
+  // Find a lead from kanbanBoard cards or fallback leads
+  const findLeadCard = (id: string): LeadResponse | undefined => {
+    if (kanbanBoard) {
+      for (const st of kanbanBoard.stages) {
+        const found = st.cards.find((c) => c.id === id);
+        if (found) return found;
       }
     }
-    return map;
-  }, [leads, stages, stageIds]);
+    return leads.find((l) => l.id === id);
+  };
 
   const handleDrop = async (stageId: string) => {
     const id = draggingId;
     setDraggingId(null);
     setOverStageId(null);
     if (!id) return;
-    const lead = leads.find((l) => l.id === id);
+    const lead = findLeadCard(id);
     const stage = stages.find((s) => s.id === stageId);
     if (!lead || !stage || lead.stage_id === stageId) return;
 
@@ -123,15 +123,13 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
       return;
     }
 
-    // 4. Standard move with optimistic state & error rollback
+    // 4. High-performance optimistic stage transition
     try {
-      await updateLead(lead.id, { stage_id: stage.id });
+      await moveKanbanCard(lead.id, stage.id);
       setToast(`Moved "${lead.title}" to ${stage.name}.`);
       setTimeout(() => setToast(null), 3000);
-      await fetchLeads();
     } catch (err: any) {
       setMoveError(err.message || 'Failed to update stage');
-      await fetchLeads(); // rollback
     }
   };
 
@@ -268,7 +266,7 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
           </span>
           <span className="text-xs text-slate-500">·</span>
           <span className="text-xs text-slate-400 font-medium">
-            {leads.filter((l) => !l.is_archived).length} total deals
+            {kanbanBoard ? `${kanbanBoard.total_deals_count} total deals` : `${leads.filter((l) => !l.is_archived).length} total deals`}
           </span>
 
           {moveError && <span className="text-xs text-rose-500 font-semibold">{moveError}</span>}
@@ -283,8 +281,11 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
       {/* Kanban Columns List */}
       <div className="flex gap-3 overflow-x-auto pb-4 pt-0.5 items-start">
         {stages.map((stage) => {
-          const items = grouped.get(stage.id) || [];
-          const colValue = items.reduce((sum, l) => sum + num(l.value), 0);
+          const serverStage = kanbanBoard?.stages?.find((s) => s.stage_id === stage.id);
+          const items = serverStage ? serverStage.cards : [];
+          const colValue = serverStage ? serverStage.total_value : 0;
+          const totalCount = serverStage ? serverStage.total_count : items.length;
+          const hasMore = serverStage ? serverStage.has_more : false;
           const stageColor = getStageColor(stage.name, stage.color);
           const over = overStageId === stage.id;
 
@@ -311,7 +312,7 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
                     {stage.name}
                   </span>
                   <span className="text-[11px] font-semibold text-slate-400 bg-slate-800/90 px-1.5 py-0.2 rounded border border-slate-700/70 shrink-0">
-                    {items.length}
+                    {totalCount}
                   </span>
                 </div>
 
@@ -484,6 +485,27 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
                     </div>
                   );
                 })}
+
+                {/* Incremental loading for million-lead scale */}
+                {hasMore && (
+                  <button
+                    type="button"
+                    onClick={() => loadMoreStageCards(stage.id)}
+                    disabled={loadingStageId === stage.id}
+                    className="w-full py-2 px-3 mt-1 text-xs font-semibold text-brand-300 hover:text-brand-200 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {loadingStageId === stage.id ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-400" />
+                        <span>Loading cards…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Load more (+10 deals)</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
                 {/* Helpful empty state */}
                 {items.length === 0 && (

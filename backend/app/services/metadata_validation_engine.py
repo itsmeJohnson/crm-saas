@@ -45,22 +45,31 @@ class MetadataValidationEngine:
         exclude_id: uuid.UUID | None = None,
         json_field: str = "custom_fields",
         extra_unique_filters: list | None = None,
+        ignore_unknown: bool = False,
     ) -> Dict[str, Any]:
         """
         Validates custom field values against custom field definitions.
         Ensures type constraints, validation rules (required, min/max, regex, uniqueness),
         and applies default values.
         Returns a sanitized dictionary containing only valid custom field values.
+
+        ``ignore_unknown``: when True, keys with no active definition are silently
+        dropped instead of raising. Used by update paths so a lead carrying legacy
+        or system-written keys (e.g. UTM captured from a web form) stays editable —
+        an unrecognized key must never brick a stage change or edit.
         """
         # Build map of active definitions
         def_map = {d.key: d for d in definitions if d.is_active}
 
-        # 1. Reject unknown keys
-        for key in payload.keys():
-            if key not in def_map:
-                raise MetadataValidationError(
-                    f"Unknown custom field key: '{key}'", field=key, code="unknown_field"
-                )
+        # 1. Unknown keys: reject (strict create path) or drop (tolerant update path)
+        if not ignore_unknown:
+            for key in payload.keys():
+                if key not in def_map:
+                    raise MetadataValidationError(
+                        f"Unknown custom field key: '{key}'", field=key, code="unknown_field"
+                    )
+        else:
+            payload = {k: v for k, v in payload.items() if k in def_map}
 
         sanitized: Dict[str, Any] = {}
 

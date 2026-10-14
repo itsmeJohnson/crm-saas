@@ -16,6 +16,8 @@ const IntegrationMarketplacePage = lazy(() => import('../pages/settings/Integrat
 const LeadsPage = lazy(() => import('../pages/LeadsPage').then(m => ({ default: m.LeadsPage })));
 const LeadReportsPage = lazy(() => import('../pages/LeadReportsPage').then(m => ({ default: m.LeadReportsPage })));
 const LeadAutomationPage = lazy(() => import('../pages/LeadAutomationPage').then(m => ({ default: m.LeadAutomationPage })));
+const EmailSequencesPage = lazy(() => import('../pages/EmailSequencesPage').then(m => ({ default: m.EmailSequencesPage })));
+const BookingLinksPage = lazy(() => import('../pages/BookingLinksPage').then(m => ({ default: m.BookingLinksPage })));
 const CompaniesPage = lazy(() => import('../pages/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
 const ContactsPage = lazy(() => import('../pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
 const ContactReportsPage = lazy(() => import('../pages/ContactReportsPage').then(m => ({ default: m.ContactReportsPage })));
@@ -175,7 +177,9 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/leads/reports', component: LeadReportsPage, featureCode: 'LEAD_MANAGEMENT' },
       { path: '/leads/automation', component: LeadAutomationPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
       { path: '/lead-capture', component: LeadCapturePage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Lead Capture', icon: Webhook, group: 'Growth & Analytics' } },
-      { path: '/websites', component: LandingPagesPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Websites', icon: Building, group: 'Growth & Analytics' } }
+      { path: '/websites', component: LandingPagesPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Websites', icon: Building, group: 'Growth & Analytics' } },
+      { path: '/email-sequences', component: EmailSequencesPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Email Sequences', icon: MessagesSquare, group: 'Growth & Analytics' } },
+      { path: '/booking-links', component: BookingLinksPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Booking Links', icon: CalendarDays, group: 'Growth & Analytics' } }
     ]
   },
   {

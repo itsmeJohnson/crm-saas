@@ -10,6 +10,10 @@ import { Register } from './modules/auth/Register';
 import { LegalPage } from './pages/legal/LegalPage';
 import { PricingPage } from './pages/PricingPage';
 import { LandingPageView } from './pages/LandingPageView';
+import { BookingView } from './pages/BookingView';
+import { RestaurantOptInView } from './pages/RestaurantOptInView';
+import { RestaurantStaffScanner } from './pages/RestaurantStaffScanner';
+import { RestaurantDashboard } from './pages/RestaurantDashboard';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
 import { MODULES_REGISTRY } from './routes/moduleRegistry';
 import { ModuleGuardRoute } from './components/common/ModuleGuardRoute';
@@ -45,6 +49,22 @@ export const App: React.FC = () => {
 
             {/* Public landing pages (Website Engine, no auth) */}
             <Route path="/lp/:slug" element={<LandingPageView />} />
+
+            {/* Public self-service appointment booking (no auth) */}
+            <Route path="/book/:slug" element={<BookingView />} />
+
+            {/* Public restaurant QR-voucher guest opt-in (no auth) */}
+            <Route path="/r/:venueSlug/t/:tableToken" element={<RestaurantOptInView />} />
+
+            {/* Staff voucher scanner — authenticated, full-screen (no app shell) */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/staff/redeem" element={<RestaurantStaffScanner />} />
+            </Route>
+
+            {/* Restaurant owner console — managers only, full-screen */}
+            <Route element={<ProtectedRoute allowedRoles={['SuperAdmin', 'OrgAdmin', 'Manager']} />}>
+              <Route path="/restaurant/manage" element={<RestaurantDashboard />} />
+            </Route>
 
             {/* Public legal pages (no auth) */}
             <Route path="/legal/:doc" element={<LegalPage />} />

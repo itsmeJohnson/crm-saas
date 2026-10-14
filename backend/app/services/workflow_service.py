@@ -685,11 +685,14 @@ class WorkflowService:
                 return None
         if atype == "send_email" and action.get("message") and lead.email:
             # Automated email to the lead. Best-effort; swallow transport errors.
+            # Subject/body support {{first_name}}/{{company}}/… placeholders so
+            # stage-transition emails read personally, not like a form letter.
             from app.services.email_service_module import EmailModuleService
+            from app.services.email_sequence_service import render_template
             try:
                 await EmailModuleService(self.db).send(actor, {
-                    "subject": str(action.get("subject") or f'Regarding {lead.title}'),
-                    "body": str(action["message"]),
+                    "subject": render_template(str(action.get("subject") or f'Regarding {lead.title}'), lead),
+                    "body": render_template(str(action["message"]), lead),
                     "to": lead.email,
                     "lead_id": lead.id,
                 })

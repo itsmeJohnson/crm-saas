@@ -104,7 +104,15 @@ api.interceptors.response.use(
     ) {
       useAuthStore.getState().logout();
     }
-    
+
+    // 423 Locked: single-tenant license is in read-only mode. Surface the friendly
+    // banner instead of a raw error. Import lazily to avoid a store<->api cycle.
+    if (error.response?.status === 423 && error.response?.data?.error === "read_only") {
+      import('../store/licenseStore').then(({ useLicenseStore }) => {
+        useLicenseStore.getState().setReadOnly(true, error.response?.data?.message);
+      });
+    }
+
     return Promise.reject(error);
   }
 );

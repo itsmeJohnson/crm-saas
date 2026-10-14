@@ -21,6 +21,9 @@ from app.api.v1.communications import router as communications_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.lead_capture import router as lead_capture_router
 from app.api.v1.landing_pages import router as landing_pages_router, public_router as landing_public_router
+from app.api.v1.booking import router as booking_router, public_router as booking_public_router
+from app.api.v1.restaurant import router as restaurant_router, public_router as restaurant_public_router
+from app.api.v1.email_sequences import router as email_sequences_router
 from app.api.v1.public_invoices import router as public_invoices_router
 from app.api.v1.treatment_catalog import router as treatment_catalog_router
 from app.api.v1.product_catalog import router as product_catalog_router
@@ -346,6 +349,14 @@ async def lifespan(app: FastAPI):
     reminder_task = asyncio.create_task(reminder_dispatch_loop())
     whatsapp_sla_task = asyncio.create_task(whatsapp_sla_loop())
     whatsapp_sync_task = asyncio.create_task(whatsapp_sync_loop())
+
+    # OPTIONAL license heartbeat (single-tenant client instances only).
+    # Inert unless ENABLE_LICENSE_HEARTBEAT=true — the base CRM never starts it.
+    license_task = None
+    if os.getenv("ENABLE_LICENSE_HEARTBEAT", "false").strip().lower() == "true":
+        from app.services.license_check import run_loop as _license_run_loop
+        license_task = asyncio.create_task(_license_run_loop())
+
     yield
     # Graceful shutdown of the background loops. Each is cancelled, then awaited
     # with a BOUNDED timeout: if a loop is wedged in a non-cancellable await (a
@@ -353,7 +364,9 @@ async def lifespan(app: FastAPI):
     # "Waiting for application shutdown" — the dev --reload hang that silently
     # takes the whole app (and its reminder/scheduler jobs) down. Cap the wait so
     # the process always restarts cleanly instead of freezing.
-    bg_tasks = (cron_task, queue_task, scheduler_task, reminder_task, whatsapp_sla_task, whatsapp_sync_task)
+    bg_tasks = [cron_task, queue_task, scheduler_task, reminder_task, whatsapp_sla_task, whatsapp_sync_task]
+    if license_task is not None:
+        bg_tasks.append(license_task)
     for t in bg_tasks:
         t.cancel()
     try:
@@ -428,6 +441,16 @@ def _feat(code: str):
     """Plan-tier gate: 403 unless the tenant's plan includes `code` (SuperAdmin bypasses)."""
     return [_Depends(_require_feature(code))]
 
+# ── OPTIONAL: license heartbeat status route + read-only enforcer ─────────────
+# Mounted ONLY for single-tenant client instances (ENABLE_LICENSE_HEARTBEAT=true).
+# For the base/default CRM this block is skipped entirely: no route, no middleware,
+# zero behavioural change.
+if os.getenv("ENABLE_LICENSE_HEARTBEAT", "false").strip().lower() == "true":
+    from app.api.v1.license import router as license_router
+    from app.services.license_check import ReadOnlyEnforcerMiddleware
+    app.include_router(license_router, prefix=f"{settings.API_V1_STR}/license", tags=["license"])
+    app.add_middleware(ReadOnlyEnforcerMiddleware)
+
 app.include_router(auth_router,            prefix=f"{settings.API_V1_STR}/auth",            tags=["auth"])
 app.include_router(org_router,             prefix=f"{settings.API_V1_STR}/organizations",   tags=["organizations"])
 app.include_router(users_router,           prefix=f"{settings.API_V1_STR}/users",           tags=["users"])
@@ -441,6 +464,11 @@ app.include_router(leads_router,           prefix=f"{settings.API_V1_STR}/leads"
 app.include_router(lead_capture_router,    prefix=f"{settings.API_V1_STR}/lead-capture",    tags=["lead-capture"])
 app.include_router(landing_pages_router,    prefix=f"{settings.API_V1_STR}/landing-pages",    tags=["landing-pages"])
 app.include_router(landing_public_router,   prefix=f"{settings.API_V1_STR}/public/landing",   tags=["public-landing"])
+app.include_router(booking_router,          prefix=f"{settings.API_V1_STR}/booking",          tags=["booking"])
+app.include_router(booking_public_router,   prefix=f"{settings.API_V1_STR}/public/booking",   tags=["public-booking"])
+app.include_router(restaurant_router,        prefix=f"{settings.API_V1_STR}/restaurant",       tags=["restaurant"])
+app.include_router(restaurant_public_router, prefix=f"{settings.API_V1_STR}/public/restaurant", tags=["public-restaurant"])
+app.include_router(email_sequences_router,  prefix=f"{settings.API_V1_STR}/email-sequences",  tags=["email-sequences"])
 app.include_router(public_invoices_router, prefix=f"{settings.API_V1_STR}/public",           tags=["public"])
 app.include_router(treatment_catalog_router, prefix=f"{settings.API_V1_STR}/treatment-catalog", tags=["treatment-catalog"])
 app.include_router(product_catalog_router, prefix=f"{settings.API_V1_STR}/product-catalog", tags=["product-catalog"])

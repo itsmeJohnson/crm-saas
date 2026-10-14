@@ -1,0 +1,29 @@
+# Never bake secrets, local databases, or dev cruft into the image.
+# The dev .env (RUN_CREATE_ALL=true, SMTP creds, sandbox keys) must NOT ship —
+# production config comes exclusively from real environment variables.
+.env
+.env.*
+*.env
+
+# Local / test databases and their backups
+*.db
+*.db.bak-*
+*.sqlite
+*.sqlite3
+
+# Python caches / test artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local runtime data (provided by mounted volumes in production)
+uploads/
+backups/
+
+# VCS / editor
+.git/
+.gitignore
+.DS_Store

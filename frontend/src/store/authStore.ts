@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useMetadataStore } from './metadataStore';
 
 export interface User {
   id: string;
@@ -59,6 +60,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('organization', JSON.stringify(organization));
     localStorage.setItem('features', JSON.stringify(features));
     set({ user, organization, features, accessToken, refreshToken });
+    // New session (possibly a different tenant/vertical): drop any cached
+    // metadata so the org's crm_config — and its vertical skin — re-resolves.
+    useMetadataStore.getState().reset();
   },
 
   setTokens: (accessToken, refreshToken) => {
@@ -74,5 +78,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('organization');
     localStorage.removeItem('features');
     set({ accessToken: null, refreshToken: null, user: null, organization: null, features: [] });
+    // Clear cached org metadata so the next tenant doesn't inherit this one's skin.
+    useMetadataStore.getState().reset();
   },
 }));

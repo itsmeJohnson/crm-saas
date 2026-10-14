@@ -7,7 +7,9 @@ import { useLeadStore } from '../../store/leadStore';
 import { useUserStore } from '../../store/userStore';
 import { useMetadataStore } from '../../store/metadataStore';
 import { DynamicCustomFields } from './DynamicCustomFields';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, MessageCircle, Copy } from 'lucide-react';
+import { whatsappHref } from '../../utils/whatsapp';
+import { leadApi } from '../../services/leadApi';
 import { currencySymbol } from '../../utils/currency';
 
 const leadSchema = z.object({
@@ -46,6 +48,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   const [pipelineId, setPipelineId] = useState<string>('');
   const [customValues, setCustomValues] = useState<Record<string, any>>({});
   const [customErrors, setCustomErrors] = useState<Record<string, string>>({});
+  const [dupes, setDupes] = useState<LeadResponse[]>([]);
 
   const {
     register,
@@ -73,6 +76,30 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   });
 
   const stageId = watch('stage_id');
+  const emailVal = watch('email');
+  const phoneVal = watch('phone');
+
+  // Warn-at-entry duplicate check: as the user types a real email/phone, look
+  // for existing leads that share it so they don't create a duplicate record.
+  useEffect(() => {
+    if (!isOpen) return;
+    const email = (emailVal || '').trim();
+    const phone = (phoneVal || '').trim();
+    const hasEmail = email.includes('@');
+    const hasPhone = phone.replace(/[^0-9]/g, '').length >= 8 && !phone.includes('*');
+    if (!hasEmail && !hasPhone) { setDupes([]); return; }
+    const handle = setTimeout(async () => {
+      try {
+        const matches = await leadApi.findDuplicates({
+          email: hasEmail ? email : undefined,
+          phone: hasPhone ? phone : undefined,
+          exclude_lead_id: lead?.id,
+        });
+        setDupes(matches);
+      } catch { /* non-blocking */ }
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [emailVal, phoneVal, isOpen, lead?.id]);
 
   const stagesForPipeline = useMemo(() => {
     const p = pipelines.find((pl) => pl.id === pipelineId);
@@ -222,6 +249,27 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             {errors.title && <p className="mt-1.5 text-xs text-red-400">{errors.title.message}</p>}
           </div>
 
+          {dupes.length > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-amber-300 text-sm font-semibold">
+                <Copy className="w-4 h-4" />
+                {dupes.length === 1 ? 'A lead with this contact already exists' : `${dupes.length} leads with this contact already exist`}
+              </div>
+              <ul className="mt-2 space-y-1">
+                {dupes.slice(0, 4).map((d) => (
+                  <li key={d.id} className="text-xs text-amber-100/90 flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {(d.first_name ? d.first_name + ' ' : '') + d.last_name}
+                      {d.email ? ` · ${d.email}` : ''}{d.phone ? ` · ${d.phone}` : ''}
+                    </span>
+                    <span className="shrink-0 text-amber-300/70">{d.status}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-amber-200/70">You can still save, but consider updating the existing lead instead.</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Contact First Name</label>
@@ -258,10 +306,19 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Phone</label>
-                {lead?.phone?.includes('*') && (
+                {lead?.phone?.includes('*') ? (
                   <span className="text-[10px] text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 select-none">
                     Protected Number
                   </span>
+                ) : whatsappHref(lead?.phone, `Hi ${lead?.first_name || ''}`.trim()) && (
+                  <a
+                    href={whatsappHref(lead?.phone, `Hi ${lead?.first_name || ''}`.trim())!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                  >
+                    <MessageCircle className="w-3 h-3" /> WhatsApp
+                  </a>
                 )}
               </div>
               <input

@@ -89,6 +89,13 @@ services:
       - SPACES_BUCKET=${SPACES_BUCKET:-}
       - SPACES_ENDPOINT=${SPACES_ENDPOINT:-}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-https://localhost}
+      # Public site origin — used to build restaurant QR scan URLs (/r/{slug}/t/{token})
+      # and password-reset links. MUST be the customer-facing HTTPS domain.
+      - FRONTEND_URL=${FRONTEND_URL:?FRONTEND_URL must be set in .env}
+      # AES-256 key (base64, 32 bytes) that encrypts WhatsApp/telephony credentials
+      # at rest. Required for real WhatsApp voucher/campaign sends. Generate with:
+      #   python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
+      - TELEPHONY_ENCRYPTION_KEY=${TELEPHONY_ENCRYPTION_KEY:?TELEPHONY_ENCRYPTION_KEY must be set in .env}
       - LOG_JSON=true
     depends_on:
       db:
