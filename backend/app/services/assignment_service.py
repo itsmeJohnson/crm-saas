@@ -80,19 +80,19 @@ class AssignmentService:
         present_user_ids = set((await self.db.execute(present_query)).scalars().all())
         present_employees = [u for u in active_employees if u.id in present_user_ids]
 
-        if not present_employees:
-            # Nobody has marked attendance today; consider absent and return None
-            return None
+        # Use present employees if attendance has been clocked in today; otherwise fall back to all active
+        # employees so leads are not left unassigned (e.g. leads arriving outside shift hours or in automated workflows).
+        eligible_employees = present_employees if present_employees else active_employees
 
         # Branch-wise routing: when the lead belongs to a branch and that branch
         # has active reps, rotate only within the branch using an independent
         # per-branch cursor. Otherwise fall back to the org-wide pool and cursor.
         branch_key = str(lead.branch_id) if lead.branch_id else None
-        pool = present_employees
+        pool = eligible_employees
         cursor_user_id = config.last_assigned_user_id
         branch_scoped = False
         if branch_key:
-            branch_pool = [u for u in present_employees if getattr(u, "branch_id", None) == lead.branch_id]
+            branch_pool = [u for u in eligible_employees if getattr(u, "branch_id", None) == lead.branch_id]
             if branch_pool:
                 pool = branch_pool
                 cursor_user_id = (config.branch_cursors or {}).get(branch_key)
