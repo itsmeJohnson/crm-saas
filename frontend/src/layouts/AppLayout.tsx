@@ -39,7 +39,7 @@ export const AppLayout: React.FC = () => {
 
   const NAV_GROUPS = [
     'Clinical Operations', 'Patient Engagement', 'Clinic Management',
-    'Growth & Analytics', 'Administration', 'Platform'
+    'Growth & Analytics', 'Administration'
   ];
 
   const allNavItems = MODULES_REGISTRY.flatMap((mod) =>
@@ -62,6 +62,8 @@ export const AppLayout: React.FC = () => {
 
   const navItems = allNavItems.filter((item) => {
     if (!user) return false;
+    // Client dedicated deployment: hide platform administration section
+    if (item.group === 'Platform' || item.module === 'platform_core') return false;
     if (item.roles) {
       const hasRole = item.roles.includes(user.role);
       const isTeamLeaderUsers = item.name === 'Staff & Team' && user.role === 'Employee' && user.is_team_leader;

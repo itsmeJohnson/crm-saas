@@ -476,8 +476,8 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     section: 'workspace',
     trial: true,
     routes: [
-      { path: '/tenants', component: TenantsPage, roles: ['SuperAdmin'], sidebar: { name: 'Tenants' } },
-      { path: '/trial-requests', component: TrialRequestsPage, roles: ['SuperAdmin'], sidebar: { name: 'Trial Requests' } }
+      { path: '/tenants', component: TenantsPage, roles: ['SuperAdmin'] },
+      { path: '/trial-requests', component: TrialRequestsPage, roles: ['SuperAdmin'] }
     ]
   },
 
