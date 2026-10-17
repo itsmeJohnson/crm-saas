@@ -425,7 +425,7 @@ export const LeadsPage: React.FC = () => {
                     className="fixed inset-0 z-30"
                     onClick={() => setIsActionsMenuOpen(false)}
                   />
-                  <div className="absolute right-0 mt-1.5 w-56 bg-[#111a2e] border border-[#1e293b] rounded-xl shadow-xl z-40 py-1 divide-y divide-[#1e293b]">
+                  <div className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-40 py-1 divide-y divide-slate-100 dark:divide-slate-800">
                     <div className="py-1">
                       <button
                         onClick={() => {
@@ -433,9 +433,9 @@ export const LeadsPage: React.FC = () => {
                           handleRoundRobinAllocate();
                         }}
                         disabled={isAllocating}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-indigo-300 hover:bg-[#18233d] transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left"
                       >
-                        <Users className="w-3.5 h-3.5 text-indigo-400" />
+                        <Users className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                         <span>{isAllocating ? 'Allocating Leads...' : 'Round-Robin Lead Split'}</span>
                       </button>
                     </div>
@@ -446,9 +446,9 @@ export const LeadsPage: React.FC = () => {
                           setIsActionsMenuOpen(false);
                         }}
                         disabled={isExporting}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-[#18233d] hover:text-emerald-400 transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer text-left"
                       >
-                        <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                        <Upload className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                         <span>Export to CSV</span>
                       </button>
                       <button
@@ -457,9 +457,9 @@ export const LeadsPage: React.FC = () => {
                           setIsActionsMenuOpen(false);
                         }}
                         disabled={isExporting}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-[#18233d] hover:text-emerald-400 transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer text-left"
                       >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                         <span>Export to Excel (.xlsx)</span>
                       </button>
                     </div>
@@ -469,7 +469,7 @@ export const LeadsPage: React.FC = () => {
                           setIsFieldsOpen(true);
                           setIsActionsMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-[#18233d] hover:text-brand-400 transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-brand-600 dark:hover:text-brand-400 transition-colors cursor-pointer text-left"
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
                         <span>Custom Fields</span>

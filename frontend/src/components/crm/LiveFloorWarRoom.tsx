@@ -118,36 +118,38 @@ export const LiveFloorWarRoom: React.FC = () => {
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} className="hidden" />
 
       {/* Header & Mode Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1e293b] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-600 dark:text-indigo-400">
               <Radio className="w-5 h-5 animate-pulse" />
             </span>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                Floor War Room & Audio Vault
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                Live Call Floor & Recordings
               </h1>
-              <p className="text-xs text-slate-400">
-                Live floor agent telemetry sync (<span className="text-emerald-400 font-semibold">&lt;1.5s latency</span>) & Role-gated call vaults
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Real-time telecaller status monitor and call recording library
               </p>
             </div>
           </div>
         </div>
 
         {/* Tab Toggle */}
-        <div className="flex items-center p-1 bg-[#080b14] border border-[#1e293b] rounded-xl self-start sm:self-auto">
+        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl self-start sm:self-auto shadow-2xs">
           <button
             onClick={() => setActiveTab('floor')}
             className={`min-h-[38px] px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'floor'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Live Floor Matrix</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">{agents.length}</span>
+            <span>Active Telecallers</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === 'floor' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+            }`}>{agents.length}</span>
           </button>
 
           <button
@@ -155,12 +157,12 @@ export const LiveFloorWarRoom: React.FC = () => {
             className={`min-h-[38px] px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'vault'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
             }`}
           >
             <Volume2 className="w-3.5 h-3.5" />
-            <span>Audio Vault</span>
-            {!isPrivileged && <Lock className="w-3 h-3 text-amber-400 ml-1" />}
+            <span>Call Recordings</span>
+            {!isPrivileged && <Lock className="w-3 h-3 text-amber-500 ml-1" />}
           </button>
         </div>
       </div>
@@ -169,62 +171,62 @@ export const LiveFloorWarRoom: React.FC = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="crm-metric-card flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active Calling</p>
-            <p className="text-2xl font-black text-indigo-400 mt-1">{activeCallingCount}</p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Calling</p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{activeCallingCount}</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
             <PhoneCall className="w-5 h-5 animate-pulse" />
           </div>
         </div>
 
         <div className="crm-metric-card flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ringing</p>
-            <p className="text-2xl font-black text-amber-400 mt-1">{ringingCount}</p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ringing</p>
+            <p className="text-2xl font-black text-amber-500 dark:text-amber-400 mt-1">{ringingCount}</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 dark:text-amber-400">
             <PhoneForwarded className="w-5 h-5" />
           </div>
         </div>
 
         <div className="crm-metric-card flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Idle / Ready</p>
-            <p className="text-2xl font-black text-emerald-400 mt-1">{idleCount}</p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Idle / Ready</p>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{idleCount}</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
 
         <div className="crm-metric-card flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">On Break</p>
-            <p className="text-2xl font-black text-rose-400 mt-1">{breakCount}</p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">On Break</p>
+            <p className="text-2xl font-black text-rose-500 dark:text-rose-400 mt-1">{breakCount}</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+          <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 dark:text-rose-400">
             <Coffee className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* TAB 1: Live Floor Matrix */}
+      {/* TAB 1: Active Telecallers Floor */}
       {activeTab === 'floor' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span className="font-semibold uppercase tracking-wider">Calling Floor Real-Time Monitor</span>
-            <span className="flex items-center gap-1.5 text-emerald-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Live WebSocket Active
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
+            <span className="font-semibold uppercase tracking-wider">Active Telecallers On Floor</span>
+            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              Live Status Sync
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {agents.length === 0 ? (
-              <div className="col-span-full p-8 text-center bg-[#111a2e] border border-[#1e293b] rounded-2xl">
-                <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-300">No agents registered on floor yet</p>
-                <p className="text-xs text-slate-500 mt-1">Logged-in telecallers will appear here instantly.</p>
+              <div className="col-span-full p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                <Users className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No telecallers active on the floor</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Logged-in agents taking calls or available will appear here in real time.</p>
               </div>
             ) : (
               agents.map((agent) => {
@@ -235,53 +237,53 @@ export const LiveFloorWarRoom: React.FC = () => {
                 return (
                   <div
                     key={agent.user_id}
-                    className="p-4 rounded-xl bg-[#111a2e] border border-[#1e293b] hover:border-slate-700 transition space-y-3"
+                    className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-slate-700 shadow-sm transition space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-white truncate">{agent.name}</h4>
-                        <p className="text-[11px] text-slate-400 truncate">{agent.email}</p>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">{agent.name}</h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{agent.email}</p>
                       </div>
 
                       {/* State Pill */}
                       <span
                         className={`crm-status-pill text-[10px] font-bold ${
                           isCalling
-                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 animate-pulse'
+                            ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 animate-pulse'
                             : isRinging
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse'
                             : isBreak
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
                         }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${
-                          isCalling ? 'bg-indigo-400' : isRinging ? 'bg-amber-400' : isBreak ? 'bg-rose-400' : 'bg-emerald-400'
+                          isCalling ? 'bg-indigo-500' : isRinging ? 'bg-amber-500' : isBreak ? 'bg-rose-500' : 'bg-emerald-500'
                         }`} />
                         {agent.state.replace('_', ' ')}
                       </span>
                     </div>
 
                     {/* Calling Detail */}
-                    <div className="p-2.5 rounded-lg bg-[#080b14] border border-[#1e293b] space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between text-slate-400">
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                         <span>Current Lead</span>
-                        <span className="font-semibold text-slate-200 truncate max-w-[140px]">
+                        <span className="font-semibold text-slate-900 dark:text-slate-200 truncate max-w-[140px]">
                           {agent.current_lead_name || '—'}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-slate-400">
-                        <span>State Elapsed</span>
-                        <span className="font-mono font-bold text-indigo-400">
+                      <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span>Status Duration</span>
+                        <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
                           {formatSecs(agent.state_duration_seconds || 0)}
                         </span>
                       </div>
                     </div>
 
                     {/* Stats footer */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-[#1e293b]">
-                      <span>Dials Today: <strong className="text-white">{agent.calls_today}</strong></span>
-                      <span>Talk Time: <strong className="text-emerald-400">{formatSecs(agent.total_talk_time_seconds)}</strong></span>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span>Calls Today: <strong className="text-slate-900 dark:text-white">{agent.calls_today}</strong></span>
+                      <span>Talk Time: <strong className="text-emerald-600 dark:text-emerald-400">{formatSecs(agent.total_talk_time_seconds)}</strong></span>
                     </div>
                   </div>
                 );
@@ -291,30 +293,30 @@ export const LiveFloorWarRoom: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: Audio Vault */}
+      {/* TAB 2: Call Recordings */}
       {activeTab === 'vault' && (
         <div className="space-y-4">
           {!isPrivileged ? (
-            <div className="p-8 text-center bg-[#111a2e] border border-amber-500/30 rounded-2xl space-y-2">
-              <Lock className="w-8 h-8 text-amber-400 mx-auto" />
-              <h3 className="text-sm font-bold text-white">Audio Vault Restricted</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Call recording playbacks and time-limited presigned streaming endpoints are restricted exclusively to Workspace Admins and Managers for compliance and anti-poaching security.
+            <div className="p-8 text-center bg-amber-500/5 dark:bg-slate-900 border border-amber-500/30 rounded-2xl space-y-2">
+              <Lock className="w-8 h-8 text-amber-500 dark:text-amber-400 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Call Recordings Restricted</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                Call recording playback is restricted to Team Leads and Managers for quality and compliance.
               </p>
             </div>
           ) : (
-            <div className="bg-[#111a2e] border border-[#1e293b] rounded-2xl overflow-hidden shadow-xl">
-              <div className="px-5 py-4 border-b border-[#1e293b] flex items-center justify-between">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-transparent">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-indigo-400" />
-                    Role-Gated Compliance Vault
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    Call Recordings Library
                   </h3>
-                  <p className="text-xs text-slate-400">Presigned time-limited audio streaming</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Review and listen to completed call recordings</p>
                 </div>
                 <button
                   onClick={fetchVaultRecordings}
-                  className="min-h-[36px] px-3 py-1.5 rounded-lg bg-[#080b14] border border-[#1e293b] text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
+                  className="min-h-[36px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Refresh
@@ -327,36 +329,36 @@ export const LiveFloorWarRoom: React.FC = () => {
                     <tr>
                       <th>Agent</th>
                       <th>Lead Contact</th>
-                      <th>Outcome</th>
+                      <th>Disposition</th>
                       <th>Duration</th>
-                      <th>Timestamp</th>
+                      <th>Date & Time</th>
                       <th className="text-right">Playback</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recordings.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-slate-500 text-xs">
-                          No audio recordings captured yet.
+                        <td colSpan={6} className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs">
+                          No call recordings captured yet.
                         </td>
                       </tr>
                     ) : (
                       recordings.map((rec) => (
                         <tr key={rec.id} className="crm-table-row">
-                          <td className="font-semibold text-white">{rec.caller_name}</td>
+                          <td className="font-semibold text-slate-900 dark:text-white">{rec.caller_name}</td>
                           <td>
                             <div>
-                              <p className="font-semibold text-slate-200">{rec.lead_name}</p>
-                              <p className="font-mono text-[11px] text-indigo-300">{rec.phone_masked}</p>
+                              <p className="font-semibold text-slate-900 dark:text-slate-200">{rec.lead_name}</p>
+                              <p className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400">{rec.phone_masked}</p>
                             </div>
                           </td>
                           <td>
-                            <span className="crm-status-pill bg-slate-800 text-slate-300 border border-slate-700">
+                            <span className="crm-status-pill bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
                               {rec.outcome}
                             </span>
                           </td>
-                          <td className="font-mono text-xs">{formatSecs(rec.duration_seconds)}</td>
-                          <td className="text-slate-400 text-xs">
+                          <td className="font-mono text-xs text-slate-700 dark:text-slate-300">{formatSecs(rec.duration_seconds)}</td>
+                          <td className="text-slate-500 dark:text-slate-400 text-xs">
                             {new Date(rec.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                           </td>
                           <td className="text-right">
@@ -365,7 +367,7 @@ export const LiveFloorWarRoom: React.FC = () => {
                               className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ml-auto cursor-pointer ${
                                 playingId === rec.id
                                   ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                                  : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white'
+                                  : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200 dark:bg-indigo-600/20 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-600 dark:hover:text-white'
                               }`}
                             >
                               {playingId === rec.id ? (
@@ -376,7 +378,7 @@ export const LiveFloorWarRoom: React.FC = () => {
                               ) : (
                                 <>
                                   <Play className="w-3.5 h-3.5" />
-                                  <span>Stream</span>
+                                  <span>Play</span>
                                 </>
                               )}
                             </button>
