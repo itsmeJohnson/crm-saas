@@ -222,22 +222,22 @@ export const CallingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-slate-200 dark:border-slate-800/60 pb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+      <div className="border-b border-[var(--border-color)] pb-6">
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-3">
           <PhoneCall className="w-7 h-7 text-indigo-600 dark:text-brand-400" />
           Calling
         </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Call history, recordings, tags, and the live dialing queue.</p>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">Call history, recordings, tags, and the live dialing queue.</p>
       </div>
 
       {canMonitor && (
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-3">
           <button
             onClick={() => setViewMode('war_room')}
             className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               viewMode === 'war_room'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 shadow-2xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] shadow-2xs'
             }`}
           >
             <Radio className="w-4 h-4 text-emerald-500 dark:text-emerald-400 animate-pulse" />
@@ -248,7 +248,7 @@ export const CallingPage: React.FC = () => {
             className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               viewMode === 'history'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 shadow-2xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] shadow-2xs'
             }`}
           >
             <PhoneCall className="w-4 h-4" />
@@ -264,38 +264,38 @@ export const CallingPage: React.FC = () => {
           {canMonitor && <QueueMonitor />}
 
       {/* Filters */}
-      <div className="glass-panel border border-slate-200 dark:border-slate-800/85 rounded-2xl p-4 flex flex-wrap items-center gap-3 shadow-2xs">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 flex flex-wrap items-center gap-3 shadow-2xs">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             placeholder="Search calls…"
-            className="w-full bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/70 text-slate-900 dark:text-slate-200 py-2 pl-9 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full bg-[var(--bg-inset)] border border-[var(--border-color)] text-[var(--text-primary)] py-2 pl-9 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 placeholder:text-[var(--text-muted)]"
           />
         </div>
         <select value={direction} onChange={(e) => { setDirection(e.target.value); setPage(0); }}
-                className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/70 text-slate-800 dark:text-slate-300 py-2 px-3 rounded-lg text-sm focus:outline-none">
+                className="bg-[var(--bg-inset)] border border-[var(--border-color)] text-[var(--text-primary)] py-2 px-3 rounded-lg text-sm focus:outline-none">
           <option value="">All directions</option>
           <option value="INBOUND">Inbound</option>
           <option value="OUTBOUND">Outbound</option>
         </select>
         <select value={disposition} onChange={(e) => { setDisposition(e.target.value); setPage(0); }}
-                className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/70 text-slate-800 dark:text-slate-300 py-2 px-3 rounded-lg text-sm focus:outline-none">
+                className="bg-[var(--bg-inset)] border border-[var(--border-color)] text-[var(--text-primary)] py-2 px-3 rounded-lg text-sm focus:outline-none">
           <option value="">All dispositions</option>
           {DISPOSITIONS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <select value={tag} onChange={(e) => { setTag(e.target.value); setPage(0); }}
-                className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/70 text-slate-800 dark:text-slate-300 py-2 px-3 rounded-lg text-sm focus:outline-none">
+                className="bg-[var(--bg-inset)] border border-[var(--border-color)] text-[var(--text-primary)] py-2 px-3 rounded-lg text-sm focus:outline-none">
           <option value="">All tags</option>
           {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer select-none">
           <input type="checkbox" checked={missedOnly} onChange={(e) => { setMissedOnly(e.target.checked); setPage(0); }}
                  className="w-3.5 h-3.5 rounded" />
           Missed only
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer select-none">
           <input type="checkbox" checked={recordedOnly} onChange={(e) => { setRecordedOnly(e.target.checked); setPage(0); }}
                  className="w-3.5 h-3.5 rounded" />
           With recording
@@ -305,31 +305,31 @@ export const CallingPage: React.FC = () => {
       {error && <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-sm">{error}</div>}
 
       {/* History table */}
-      <div className="glass-panel border border-slate-200 dark:border-slate-800/85 rounded-2xl overflow-hidden shadow-2xs">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xs">
         {isLoading ? (
-          <div className="py-24 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin inline" /></div>
+          <div className="py-24 text-center text-[var(--text-muted)]"><Loader2 className="w-6 h-6 animate-spin inline" /></div>
         ) : items.length === 0 ? (
           <div className="py-24 text-center">
-            <PhoneCall className="w-10 h-10 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-500 dark:text-slate-400 text-sm">No calls match the current filters.</p>
+            <PhoneCall className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-3" />
+            <p className="text-[var(--text-secondary)] text-sm">No calls match the current filters.</p>
           </div>
         ) : (
           <>
             {/* Mobile Cards (screens < md) */}
-            <div className="md:hidden divide-y divide-slate-200 dark:divide-slate-800/60">
+            <div className="md:hidden divide-y divide-[var(--border-color)]">
               {items.map((item) => (
-                <div key={item.id} className="p-4 space-y-2.5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition">
+                <div key={item.id} className="p-4 space-y-2.5 hover:bg-[var(--bg-card-hover)] transition">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <DirectionIcon item={item} />
-                      <span className="text-sm font-semibold text-slate-900 dark:text-slate-200 truncate">{item.subject}</span>
+                      <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{item.subject}</span>
                     </div>
-                    <span className="text-xs font-mono text-slate-500 dark:text-slate-400 shrink-0">{formatDuration(item.duration)}</span>
+                    <span className="text-xs font-mono text-[var(--text-secondary)] shrink-0">{formatDuration(item.duration)}</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span className="truncate">Lead: <strong className="text-slate-900 dark:text-slate-200 font-medium">{item.lead_title || '—'}</strong></span>
-                    <span className="shrink-0">Agent: <strong className="text-slate-700 dark:text-slate-300 font-medium">{item.agent_name || '—'}</strong></span>
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                    <span className="truncate">Lead: <strong className="text-[var(--text-primary)] font-medium">{item.lead_title || '—'}</strong></span>
+                    <span className="shrink-0">Agent: <strong className="text-[var(--text-secondary)] font-medium">{item.agent_name || '—'}</strong></span>
                   </div>
 
                   <div className="flex items-center justify-between gap-2 pt-1">
@@ -337,15 +337,15 @@ export const CallingPage: React.FC = () => {
                       {item.status === 'Missed' ? (
                         <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-red-500/10 text-red-500 border border-red-500/20">Missed</span>
                       ) : item.disposition ? (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">{item.disposition}</span>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-[var(--bg-inset)] text-[var(--text-secondary)] border border-[var(--border-color)]">{item.disposition}</span>
                       ) : (
-                        <span className="text-slate-500 text-xs">{item.status}</span>
+                        <span className="text-[var(--text-muted)] text-xs">{item.status}</span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-500">{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/40">
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border-subtle)]">
                     <div className="flex-1 min-w-0">
                       <TagEditor item={item} onSaved={onTagsSaved} />
                     </div>
@@ -361,7 +361,7 @@ export const CallingPage: React.FC = () => {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800/80 text-left text-[11px] uppercase tracking-wider text-slate-500 bg-slate-50/60 dark:bg-transparent">
+                  <tr className="border-b border-[var(--border-color)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)] bg-[var(--bg-inset)]">
                     <th className="px-4 py-3 font-semibold">Call</th>
                     <th className="px-4 py-3 font-semibold">Lead</th>
                     <th className="px-4 py-3 font-semibold">Agent</th>
@@ -374,28 +374,28 @@ export const CallingPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800/40 hover:bg-slate-50/80 dark:hover:bg-slate-900/40">
+                    <tr key={item.id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-card-hover)]">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <DirectionIcon item={item} />
-                          <span className="text-slate-800 dark:text-slate-300 truncate max-w-[200px]" title={item.subject}>{item.subject}</span>
+                          <span className="text-[var(--text-primary)] truncate max-w-[200px]" title={item.subject}>{item.subject}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-800 dark:text-slate-300">{item.lead_title || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{item.agent_name || '—'}</td>
+                      <td className="px-4 py-3 text-[var(--text-primary)]">{item.lead_title || '—'}</td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">{item.agent_name || '—'}</td>
                       <td className="px-4 py-3">
                         {item.status === 'Missed' ? (
                           <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-red-500/10 text-red-500 border border-red-500/20">Missed</span>
                         ) : item.disposition ? (
-                          <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700/60">{item.disposition}</span>
+                          <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-[var(--bg-inset)] text-[var(--text-secondary)] border border-[var(--border-color)]">{item.disposition}</span>
                         ) : (
-                          <span className="text-slate-500 text-xs">{item.status}</span>
+                          <span className="text-[var(--text-muted)] text-xs">{item.status}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono text-xs">{formatDuration(item.duration)}</td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)] font-mono text-xs">{formatDuration(item.duration)}</td>
                       <td className="px-4 py-3"><TagEditor item={item} onSaved={onTagsSaved} /></td>
                       <td className="px-4 py-3"><RecordingCell url={item.recording_url} canMonitor={canMonitor} /></td>
-                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(item.timestamp).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-[var(--text-muted)] text-xs whitespace-nowrap">{new Date(item.timestamp).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -406,15 +406,15 @@ export const CallingPage: React.FC = () => {
 
         {/* Pagination */}
         {!isLoading && total > PAGE_SIZE && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-800/60">
-            <span className="text-xs text-slate-500">{total} calls · page {page + 1} of {totalPages}</span>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)]">
+            <span className="text-xs text-[var(--text-muted)]">{total} calls · page {page + 1} of {totalPages}</span>
             <div className="flex items-center gap-1">
               <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 disabled:opacity-30 cursor-pointer">
+                      className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] disabled:opacity-30 cursor-pointer">
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 disabled:opacity-30 cursor-pointer">
+                      className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] disabled:opacity-30 cursor-pointer">
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
