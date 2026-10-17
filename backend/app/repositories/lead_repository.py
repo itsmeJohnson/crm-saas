@@ -148,7 +148,8 @@ class LeadRepository(TenantRepository[Lead]):
                     func.coalesce(self.model.first_name, '') + ' ' +
                     func.coalesce(self.model.last_name, '') + ' ' +
                     func.coalesce(self.model.email, '') + ' ' +
-                    func.coalesce(self.model.phone, '')
+                    func.coalesce(self.model.phone, '') + ' ' +
+                    func.coalesce(self.model.city, '')
                 )
                 query = query.filter(search_expr.ilike(search_filter))
         return query
