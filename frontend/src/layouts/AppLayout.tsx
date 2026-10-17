@@ -16,6 +16,7 @@ import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 import { CallbackTakeoverModal } from '../components/crm/CallbackTakeoverModal';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { TELECALLING_NAV_GROUPS, TELECALLING_ITEM_GROUP_MAP, isTelecallingMode } from '../config/navigation';
+import { api } from '../services/api';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -37,6 +38,19 @@ export const AppLayout: React.FC = () => {
       fetchBootstrap().catch(() => {});
     }
   }, [user, metadataLoaded, fetchBootstrap]);
+
+  // Sync latest user role & profile from database reactively
+  useEffect(() => {
+    if (user) {
+      api.get('/auth/me').then((res) => {
+        const fresh = res.data;
+        if (fresh && fresh.role && fresh.role !== user.role) {
+          useAuthStore.setState({ user: { ...user, ...fresh } });
+          localStorage.setItem('user', JSON.stringify({ ...user, ...fresh }));
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   const TRIAL_MODE = true;
   const inTelecalling = isTelecallingMode();
