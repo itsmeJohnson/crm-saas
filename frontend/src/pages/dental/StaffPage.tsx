@@ -177,9 +177,9 @@ export const StaffPage: React.FC = () => {
             <button
               id="add-member-button"
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 text-slate-100 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm cursor-pointer"
             >
-              <UserPlus className="w-4 h-4 text-brand-500 dark:text-brand-400" />
+              <UserPlus className="w-4 h-4 text-brand-600 dark:text-brand-400" />
               Add Member
             </button>
           )}
