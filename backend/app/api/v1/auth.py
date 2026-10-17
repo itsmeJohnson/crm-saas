@@ -282,7 +282,7 @@ async def me(
             TenantSubscription.is_deleted == False
         )
         sub_res = await db.execute(sub_stmt)
-        sub = sub_res.scalar_one_or_none()
+        sub = sub_res.scalars().first()
         if sub and sub.status in ["active", "trial"]:
             pf_stmt = (
                 select(Feature.code)

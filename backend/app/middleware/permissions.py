@@ -1,7 +1,7 @@
 from typing import List, Annotated
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
