@@ -252,8 +252,35 @@ class AttendanceService:
         await self.db.flush()
         return rec
 
+    async def resume_shift(self, actor: User, *, target_user_id=None) -> dict:
+        user_id = target_user_id or actor.id
+        if user_id != actor.id and not self._is_manager(actor):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot resume shift for another user.")
+        tz = await self._org_tz(actor.organization_id)
+        now = _now().astimezone(timezone.utc)
+        work_date = now.astimezone(tz).date()
+        rec = await self._record_for(actor.organization_id, user_id, work_date)
+        if not rec or not rec.clock_in_at:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active attendance record found for today.")
+        if not rec.clock_out_at:
+            return await self._serialize_record(rec)
+
+        # Clear checkout to resume working session
+        rec.clock_out_at = None
+        rec.is_early_logout = False
+        rec.early_minutes = 0
+        if rec.status in ("absent", "half_day"):
+            rec.status = "present"
+        self.db.add(rec)
+        await self.db.flush()
+        await self.db.refresh(rec)
+        await self.audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
+                                   action="ATTENDANCE_RESUME_SHIFT", resource_type="attendance", resource_id=str(rec.id),
+                                   action_metadata={"user_id": str(user_id)})
+        return await self._serialize_record(rec)
+
     async def clock_in(self, actor: User, *, target_user_id=None, latitude=None, longitude=None,
-                       source="web", device_id=None, at: datetime | None = None) -> dict:
+                       source="web", device_id=None, at: datetime | None = None, resume: bool = False) -> dict:
         user_id = target_user_id or actor.id
         if user_id != actor.id and not self._is_manager(actor):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot clock in for another user.")
@@ -264,7 +291,12 @@ class AttendanceService:
         if rec.clock_in_at and not rec.clock_out_at:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already clocked in.")
         if rec.clock_in_at and rec.clock_out_at:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Attendance already completed for today.")
+            if resume:
+                return await self.resume_shift(actor, target_user_id=user_id)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Attendance already completed for today. Click 'Resume Shift' to continue working."
+            )
         shift = await self._active_shift(actor.organization_id, user_id, work_date)
         rec.clock_in_at = now
         rec.source = source

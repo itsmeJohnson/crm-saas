@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 import { dashboardApi, EmployeeSummary } from '../../services/dashboardApi';
 import { attendanceApi, MyToday } from '../../services/attendanceApi';
 import { DialerConsole } from '../../components/dialer/DialerConsole';
-import { Sparkles, RefreshCw, PhoneCall, LogIn, Clock } from 'lucide-react';
+import { Sparkles, RefreshCw, PhoneCall, LogIn, Clock, RotateCcw } from 'lucide-react';
 import { MyTasksWidget } from '../../components/dashboard/MyTasksWidget';
 import { WorkQueueWidget } from '../../components/dashboard/WorkQueueWidget';
 import { MyLeadsWidget } from '../../components/dashboard/MyLeadsWidget';
@@ -70,12 +70,23 @@ export const EmployeeDashboard: React.FC = () => {
     (todayAttendance?.record?.clock_in_at && !todayAttendance?.record?.clock_out_at) ||
     summary?.is_online
   );
+  const isPunchedOutToday = Boolean(
+    todayAttendance?.record?.clock_in_at && todayAttendance?.record?.clock_out_at
+  );
 
   const handleQuickClockIn = async () => {
     setClockingIn(true);
     try {
-      const res = await attendanceApi.clockIn();
-      // Instantly reactively update local state
+      let res: any;
+      if (isPunchedOutToday) {
+        try {
+          res = await attendanceApi.resumeShift();
+        } catch {
+          res = await attendanceApi.clockIn({ resume: true });
+        }
+      } else {
+        res = await attendanceApi.clockIn();
+      }
       setTodayAttendance((prev) => ({
         work_date: res.work_date || new Date().toISOString().split('T')[0],
         record: res,
@@ -89,7 +100,25 @@ export const EmployeeDashboard: React.FC = () => {
       ]);
     } catch (e: any) {
       console.error(e);
-      alert(e?.response?.data?.detail || e?.message || 'Check-in failed');
+      // Self-heal: If error message mentions already completed, resume shift
+      if (e?.response?.data?.detail?.includes('already completed') || e?.response?.status === 409) {
+        try {
+          const res = await attendanceApi.resumeShift();
+          setTodayAttendance((prev) => ({
+            work_date: res.work_date || new Date().toISOString().split('T')[0],
+            record: res,
+            shift: prev?.shift || null,
+            on_break: false,
+          }));
+          window.dispatchEvent(new CustomEvent('attendance-updated'));
+          await Promise.allSettled([
+            checkAttendance(),
+            dashboardApi.getEmployeeSummary().then(setSummary)
+          ]);
+          return;
+        } catch {}
+      }
+      alert(e?.response?.data?.detail || e?.message || 'Attendance action failed');
     } finally {
       setClockingIn(false);
     }
@@ -131,7 +160,9 @@ export const EmployeeDashboard: React.FC = () => {
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shadow-lg ${
               isClockedIn 
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                : isPunchedOutToday
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                  : 'bg-slate-700/30 border-slate-600/40 text-slate-400'
             }`}>
               <PhoneCall className="w-5 h-5" />
             </div>
@@ -141,15 +172,23 @@ export const EmployeeDashboard: React.FC = () => {
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                   isClockedIn 
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                    : isPunchedOutToday
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                      : 'bg-slate-700/30 border-slate-600/40 text-slate-400'
                 }`}>
-                  {isClockedIn ? 'Active • Attendance Verified' : 'Clock-In Required to Call'}
+                  {isClockedIn 
+                    ? 'Active • Attendance Verified' 
+                    : isPunchedOutToday
+                      ? 'Shift Ended • Calling Paused'
+                      : 'Punch-In Required to Call'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {isClockedIn
                   ? 'Your calling queue is active. Auto-dial ready, consecutive call progression, and break management.'
-                  : 'Mark attendance to unlock your assigned leads queue and progressive telecalling.'}
+                  : isPunchedOutToday
+                    ? 'Shift was punched out today. Accidentally clicked punch out? Resume your shift to continue calling.'
+                    : 'Punch in attendance to unlock your assigned leads queue and progressive telecalling.'}
               </p>
             </div>
           </div>
@@ -160,8 +199,10 @@ export const EmployeeDashboard: React.FC = () => {
               disabled={clockingIn}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
             >
-              <LogIn className="w-4 h-4" />
-              {clockingIn ? 'Marking Attendance...' : 'Mark Attendance & Start Calling'}
+              {isPunchedOutToday ? <RotateCcw className={`w-4 h-4 ${clockingIn ? 'animate-spin' : ''}`} /> : <LogIn className="w-4 h-4" />}
+              {clockingIn 
+                ? (isPunchedOutToday ? 'Resuming Shift...' : 'Punching In...') 
+                : (isPunchedOutToday ? 'Resume Shift & Start Calling' : 'Punch In & Start Calling')}
             </button>
           )}
         </div>
@@ -174,10 +215,24 @@ export const EmployeeDashboard: React.FC = () => {
         ) : (
           <div className="py-8 px-6 bg-slate-950/40 border border-dashed border-slate-800 rounded-xl text-center space-y-3">
             <Clock className="w-8 h-8 text-amber-400/80 mx-auto animate-pulse" />
-            <h3 className="text-sm font-semibold text-slate-200">Calling Cockpit is Paused</h3>
+            <h3 className="text-sm font-semibold text-slate-200">
+              {isPunchedOutToday ? 'Shift Punched Out (Cockpit Paused)' : 'Calling Cockpit is Paused'}
+            </h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Company policy requires an active clock-in punch before starting customer outreach. Clock in above to start your dialing session.
+              {isPunchedOutToday
+                ? 'Your shift is currently marked as punched out. If you ended it by mistake or want to continue outreach, resume your shift below.'
+                : 'Company policy requires an active attendance punch before starting customer outreach. Punch in above to start your dialing session.'}
             </p>
+            {isPunchedOutToday && (
+              <button
+                onClick={handleQuickClockIn}
+                disabled={clockingIn}
+                className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${clockingIn ? 'animate-spin' : ''}`} />
+                Resume Shift Now
+              </button>
+            )}
           </div>
         )}
       </div>

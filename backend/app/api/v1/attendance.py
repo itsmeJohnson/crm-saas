@@ -26,7 +26,12 @@ async def my_today(actor: Annotated[User, Depends(require_active_user)], db: Ann
 
 @router.post("/clock-in", response_model=AttendanceRecordResponse)
 async def clock_in(req: ClockRequest, actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
-    return await AttendanceService(db).clock_in(actor, latitude=req.latitude, longitude=req.longitude)
+    return await AttendanceService(db).clock_in(actor, latitude=req.latitude, longitude=req.longitude, resume=bool(req.resume))
+
+
+@router.post("/resume-shift", response_model=AttendanceRecordResponse)
+async def resume_shift(actor: Annotated[User, Depends(require_active_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+    return await AttendanceService(db).resume_shift(actor)
 
 
 @router.post("/clock-out", response_model=AttendanceRecordResponse)

@@ -104,8 +104,10 @@ export interface ShiftAssignmentRow {
 
 export const attendanceApi = {
   myToday: async () => (await api.get<MyToday>('/attendance/me/today')).data,
-  clockIn: async (geo?: { latitude?: number; longitude?: number }) =>
+  clockIn: async (geo?: { latitude?: number; longitude?: number; resume?: boolean }) =>
     (await api.post<AttendanceRecord>('/attendance/clock-in', geo || {})).data,
+  resumeShift: async () =>
+    (await api.post<AttendanceRecord>('/attendance/resume-shift', {})).data,
   clockOut: async (geo?: { latitude?: number; longitude?: number }) =>
     (await api.post<AttendanceRecord>('/attendance/clock-out', geo || {})).data,
   breakStart: async (reason?: string) => (await api.post<AttendanceRecord>('/attendance/break/start', { reason })).data,

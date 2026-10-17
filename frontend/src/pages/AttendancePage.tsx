@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Clock, LogIn, LogOut, Coffee, Loader2, Plus, X, Check, Trash2, Pencil, CalendarClock,
-  UserCheck, ClipboardList, BarChart3, MapPin, AlarmClock, Play,
+  UserCheck, ClipboardList, BarChart3, MapPin, AlarmClock, Play, RotateCcw,
 } from 'lucide-react';
 import {
   attendanceApi, Shift, AttendanceRecord, MyToday, Correction, AttendanceDashboard, MonthlyReport,
@@ -58,7 +58,7 @@ const ClockPanel: React.FC<{ onChange: () => void }> = ({ onChange }) => {
         <div>
           <p className="text-[11px] text-slate-500 uppercase tracking-wider">Today · {data?.work_date}</p>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-2xl font-bold text-slate-100">{clockedIn ? 'Clocked in' : done ? 'Shift complete' : 'Not clocked in'}</p>
+            <p className="text-2xl font-bold text-slate-100">{clockedIn ? 'Punched In' : done ? 'Punched Out (Shift Ended)' : 'Not Punched In'}</p>
             {rec && <StatusChip status={rec.status} />}
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -66,9 +66,9 @@ const ClockPanel: React.FC<{ onChange: () => void }> = ({ onChange }) => {
           </p>
           {rec && (
             <p className="text-xs text-slate-400 mt-2 flex items-center gap-3 flex-wrap">
-              <span className="inline-flex items-center gap-1"><LogIn className="w-3.5 h-3.5" /> {fmtTime(rec.clock_in_at)}</span>
-              <span className="inline-flex items-center gap-1"><LogOut className="w-3.5 h-3.5" /> {fmtTime(rec.clock_out_at)}</span>
-              <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {fmtMins(rec.worked_minutes)} worked</span>
+              <span className="inline-flex items-center gap-1"><LogIn className="w-3.5 h-3.5 text-emerald-400" /> Punch-In: {fmtTime(rec.clock_in_at)}</span>
+              <span className="inline-flex items-center gap-1"><LogOut className="w-3.5 h-3.5 text-rose-400" /> Punch-Out: {fmtTime(rec.clock_out_at)}</span>
+              <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-brand-400" /> {fmtMins(rec.worked_minutes)} worked</span>
               <span className="inline-flex items-center gap-1"><Coffee className="w-3.5 h-3.5" /> {fmtMins(rec.break_minutes)} break</span>
               {rec.is_late && <span className="text-amber-400">Late {rec.late_minutes}m</span>}
               {rec.is_early_logout && <span className="text-orange-400">Early {rec.early_minutes}m</span>}
@@ -79,7 +79,7 @@ const ClockPanel: React.FC<{ onChange: () => void }> = ({ onChange }) => {
           {!clockedIn && !done && (
             <button disabled={busy} onClick={() => act(async () => attendanceApi.clockIn(await getGeo()))}
                     className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-medium py-2 px-4 rounded-lg disabled:opacity-40 cursor-pointer">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />} Clock in
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />} Punch In
             </button>
           )}
           {clockedIn && (
@@ -87,15 +87,28 @@ const ClockPanel: React.FC<{ onChange: () => void }> = ({ onChange }) => {
               {data?.on_break ? (
                 <button disabled={busy} onClick={() => act(() => attendanceApi.breakEnd())} className="inline-flex items-center gap-1.5 border border-amber-500/40 text-amber-300 text-sm py-2 px-3 rounded-lg cursor-pointer"><Play className="w-4 h-4" /> End break</button>
               ) : (
-                <button disabled={busy} onClick={() => act(() => attendanceApi.breakStart())} className="inline-flex items-center gap-1.5 border border-slate-700 text-slate-300 text-sm py-2 px-3 rounded-lg cursor-pointer"><Coffee className="w-4 h-4" /> Break</button>
+                <button disabled={busy} onClick={() => act(() => attendanceApi.breakStart())} className="inline-flex items-center gap-1.5 border border-slate-700 text-slate-300 text-sm py-2 px-3 rounded-lg cursor-pointer"><Coffee className="w-4 h-4" /> Take Break</button>
               )}
-              <button disabled={busy} onClick={() => act(async () => attendanceApi.clockOut(await getGeo()))}
-                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg disabled:opacity-40 cursor-pointer">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />} Clock out
+              <button disabled={busy} onClick={() => {
+                if (window.confirm("Are you sure you want to Punch Out and end your shift for today?")) {
+                  act(async () => attendanceApi.clockOut(await getGeo()));
+                }
+              }}
+                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg disabled:opacity-40 cursor-pointer">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />} Punch Out
               </button>
             </>
           )}
-          {done && <span className="text-xs text-slate-500 inline-flex items-center gap-1"><Check className="w-4 h-4 text-emerald-400" /> Done for today</span>}
+          {done && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 inline-flex items-center gap-1"><Check className="w-4 h-4 text-emerald-400" /> Done for today</span>
+              <button disabled={busy} onClick={() => act(() => attendanceApi.resumeShift())}
+                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 text-white text-xs font-semibold py-1.5 px-3 rounded-lg disabled:opacity-40 cursor-pointer shadow-md"
+                      title="Reopen shift if punched out by mistake">
+                <RotateCcw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> Resume Shift
+              </button>
+            </div>
+          )}
         </div>
       </div>
       {data?.on_break && <p className="text-xs text-amber-400/80 mt-3 flex items-center gap-1.5"><Coffee className="w-3.5 h-3.5" /> On break…</p>}

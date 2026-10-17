@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { attendanceApi, MyToday, AttendanceDashboard } from '../../services/attendanceApi';
-import { Clock, LogIn, LogOut, Coffee, Loader2, UserCheck } from 'lucide-react';
+import { Clock, LogIn, LogOut, Coffee, Loader2, UserCheck, RotateCcw } from 'lucide-react';
 
 const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
@@ -51,17 +51,26 @@ export const AttendanceWidget: React.FC = () => {
         <>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-bold text-slate-100">{clockedIn ? 'Clocked in' : done ? 'Shift complete' : 'Not clocked in'}</p>
+              <p className="text-sm font-bold text-slate-100">{clockedIn ? 'Punched In' : done ? 'Punched Out (Shift Ended)' : 'Not Punched In'}</p>
               <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1"><LogIn className="w-3 h-3" /> {fmtTime(rec?.clock_in_at || null)}</span>
-                <span className="inline-flex items-center gap-1"><LogOut className="w-3 h-3" /> {fmtTime(rec?.clock_out_at || null)}</span>
+                <span className="inline-flex items-center gap-1"><LogIn className="w-3 h-3 text-emerald-400" /> {fmtTime(rec?.clock_in_at || null)}</span>
+                <span className="inline-flex items-center gap-1"><LogOut className="w-3 h-3 text-rose-400" /> {fmtTime(rec?.clock_out_at || null)}</span>
               </p>
             </div>
             {!clockedIn && !done && (
-              <button disabled={busy} onClick={() => act(() => attendanceApi.clockIn())} className="inline-flex items-center gap-1.5 bg-emerald-500/90 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer disabled:opacity-40"><LogIn className="w-3.5 h-3.5" /> Clock in</button>
+              <button disabled={busy} onClick={() => act(() => attendanceApi.clockIn())} className="inline-flex items-center gap-1.5 bg-emerald-500/90 hover:bg-emerald-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer disabled:opacity-40">
+                <LogIn className="w-3.5 h-3.5" /> Punch In
+              </button>
             )}
             {clockedIn && (
-              <button disabled={busy} onClick={() => act(() => attendanceApi.clockOut())} className="inline-flex items-center gap-1.5 bg-red-500/90 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer disabled:opacity-40"><LogOut className="w-3.5 h-3.5" /> Clock out</button>
+              <button disabled={busy} onClick={() => act(() => attendanceApi.clockOut())} className="inline-flex items-center gap-1.5 bg-rose-500/90 hover:bg-rose-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer disabled:opacity-40">
+                <LogOut className="w-3.5 h-3.5" /> Punch Out
+              </button>
+            )}
+            {done && (
+              <button disabled={busy} onClick={() => act(() => attendanceApi.resumeShift())} className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer disabled:opacity-40 shadow-sm" title="Reopen today's shift if punched out by mistake">
+                <RotateCcw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> Resume Shift
+              </button>
             )}
           </div>
           {today?.on_break && <p className="text-[11px] text-amber-400/80 mt-2 flex items-center gap-1"><Coffee className="w-3 h-3" /> On break</p>}

@@ -65,6 +65,7 @@ class ShiftAssignmentRow(BaseModel):
 class ClockRequest(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
+    resume: bool | None = False
 
 
 class BreakStartRequest(BaseModel):
