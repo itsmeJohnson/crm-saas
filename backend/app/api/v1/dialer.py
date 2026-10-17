@@ -230,7 +230,9 @@ async def get_next_lead(
     await WorkflowService(db).run("call_logged", lead, actor)
 
     # 5. Transition agent's Redis state to ACTIVE_CALLING
-    await state_service.set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")
+    await state_service.set_agent_state(
+        actor.organization_id, actor.id, "ACTIVE_CALLING", metadata={"lead_id": str(lead.id)}
+    )
 
     await db.commit()
     
@@ -368,7 +370,9 @@ async def call_lead(
     # 5. Fire call_logged workflow rules, then flip the agent to ACTIVE_CALLING.
     from app.services.workflow_service import WorkflowService
     await WorkflowService(db).run("call_logged", lead, actor)
-    await AgentStateService().set_agent_state(actor.organization_id, actor.id, "ACTIVE_CALLING")
+    await AgentStateService().set_agent_state(
+        actor.organization_id, actor.id, "ACTIVE_CALLING", metadata={"lead_id": str(lead.id)}
+    )
 
     await db.commit()
 

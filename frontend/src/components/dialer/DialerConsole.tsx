@@ -203,13 +203,19 @@ export const DialerConsole: React.FC = () => {
         // reset follow-up fields
         setFollowUpDate(''); setFollowUpTime(''); setReminderEnabled(true);
         setReminderBefore(30); setFollowUpPriority('Medium');
-      } else {
-        await submitDisposition({
-          status: selectedStatus,
-          remarks: remarks,
-          custom_pipeline_stage_id: isStageAllowed ? (targetStageId || undefined) : undefined
-        });
       }
+
+      // Always submit call disposition outcome to backend
+      await submitDisposition({
+        status: selectedStatus,
+        remarks: remarks,
+        custom_pipeline_stage_id: isStageAllowed ? (targetStageId || undefined) : undefined
+      });
+
+      // Clear disposition form fields for the next call
+      setSelectedStatus(null);
+      setRemarks('');
+      setTargetStageId('');
 
       // Refresh dashboard data instantly on submission
       try {
@@ -225,7 +231,9 @@ export const DialerConsole: React.FC = () => {
         // Power dialer: visible countdown to the next call instead of an instant redial
         setNextCallCountdown(powerDelay);
       }
-    } catch (err) {}
+    } catch (err: any) {
+      console.error('Failed to submit disposition:', err);
+    }
   };
 
   const breakOptions = ['Lunch', 'Tea', 'Meeting', 'General'];
@@ -478,11 +486,15 @@ export const DialerConsole: React.FC = () => {
                   <div>
                     <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Active Lead Context</span>
                     <h3 className="text-2xl font-bold text-slate-100 mt-1">
-                      {currentLead?.first_name} {currentLead?.last_name}
+                      {currentLead?.first_name || currentLead?.last_name
+                        ? `${currentLead?.first_name || ''} ${currentLead?.last_name || ''}`.trim()
+                        : 'Active Call Connected'}
                     </h3>
                     <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5">
                       <Building className="w-4 h-4 text-slate-500" />
-                      {currentLead?.title} {currentLead?.company_name && `at ${currentLead?.company_name}`}
+                      {currentLead?.title || currentLead?.company_name
+                        ? `${currentLead?.title || ''} ${currentLead?.company_name ? `at ${currentLead?.company_name}` : ''}`.trim()
+                        : 'In-progress call session'}
                     </p>
                   </div>
                   
@@ -627,10 +639,10 @@ export const DialerConsole: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isSubmitDisabled}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/10 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed transform active:scale-[0.98]"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/10 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed transform active:scale-[0.98] cursor-pointer"
                   >
                     <CheckCircle className="w-5 h-5" />
-                    Submit Disposition Outcome
+                    {isLoading ? 'Saving Disposition...' : 'Save Call Disposition'}
                   </button>
                 </div>
               </form>

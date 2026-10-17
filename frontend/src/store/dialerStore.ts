@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { dialerApi, CallCreds } from '../services/dialerApi';
-import { LeadResponse } from '../services/leadApi';
+import { LeadResponse, leadApi } from '../services/leadApi';
 
 export type AgentState = 'IDLE' | 'ACTIVE_CALLING' | 'BREAK';
 
@@ -79,6 +79,14 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             } catch (e) {}
           }
         }
+        if (!lead && data.metadata?.lead_id) {
+          try {
+            lead = await leadApi.getLead(data.metadata.lead_id);
+            if (lead && typeof localStorage !== 'undefined') {
+              localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+            }
+          } catch (e) {}
+        }
         if (!direction && typeof localStorage !== 'undefined') {
           direction = localStorage.getItem('crm_dialer_call_direction') as 'INBOUND' | 'OUTBOUND' | null;
         }
@@ -139,13 +147,25 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   },
 
   submitDisposition: async (dispositionData) => {
-    const lead = get().currentLead;
-    if (!lead) {
-      throw new Error('No active lead to disposition');
+    let lead = get().currentLead;
+    if (!lead && typeof localStorage !== 'undefined') {
+      const cachedLead = localStorage.getItem('crm_dialer_current_lead');
+      if (cachedLead) {
+        try {
+          lead = JSON.parse(cachedLead);
+        } catch {}
+      }
     }
+
     set({ isLoading: true, error: null });
     try {
-      await dialerApi.submitDisposition(lead.id, dispositionData);
+      if (lead && lead.id) {
+        await dialerApi.submitDisposition(lead.id, dispositionData);
+      } else {
+        // Orphaned active call session: reset agent back to IDLE so telecaller is never trapped
+        await dialerApi.updateState({ state: 'IDLE' });
+      }
+
       stopTimer();
       set({
         currentLead: null,
@@ -160,7 +180,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         localStorage.removeItem('crm_dialer_call_direction');
       }
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || err.message || 'Failed to submit disposition';
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to save call disposition';
       set({ error: errMsg, isLoading: false });
       throw err;
     }
