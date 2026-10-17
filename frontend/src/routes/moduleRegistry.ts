@@ -396,7 +396,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       ]},
       { path: '/departments', component: DepartmentsPage, roles: ['OrgAdmin', 'Manager'] },
       { path: '/teams', component: TeamsPage },
-      { path: '/users', component: UsersPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'ROLE_BASED_ACCESS' },
+      { path: '/users', component: UsersPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'ROLE_BASED_ACCESS' },
       { path: '/attendance', component: AttendancePage },
       { path: '/leaves', component: LeavePage },
       { path: '/shifts', component: ShiftManagementPage },

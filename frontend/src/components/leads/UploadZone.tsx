@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { FileSpreadsheet, Link2, Download } from 'lucide-react';
 import { leadImportApi, BusinessTemplateType } from '../../services/leadImportApi';
+import { useAuthStore } from '../../store/authStore';
 
 interface UploadZoneProps {
   sourceType: 'file' | 'google_sheets';
@@ -30,12 +31,33 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<BusinessTemplateType[]>([]);
+  const { organization } = useAuthStore();
+  const isSamarthaAgency = organization?.name?.toLowerCase().includes('samartha') || organization?.slug?.includes('samartha');
 
   useEffect(() => {
     leadImportApi.getBusinessTemplateTypes()
-      .then(setBusinessTypes)
-      .catch(() => setBusinessTypes([]));
-  }, []);
+      .then((types) => {
+        if (isSamarthaAgency) {
+          const samarthaOnly = types.filter(t => t.key === 'samartha_sankalpa');
+          if (samarthaOnly.length > 0) {
+            setBusinessTypes(samarthaOnly);
+          } else {
+            setBusinessTypes([{ key: 'samartha_sankalpa', label: 'Samartha Sankalpa Telecalling Agency' }]);
+          }
+          setTemplateVertical('samartha_sankalpa');
+          return;
+        }
+        setBusinessTypes(types);
+      })
+      .catch(() => {
+        if (isSamarthaAgency) {
+          setBusinessTypes([{ key: 'samartha_sankalpa', label: 'Samartha Sankalpa Telecalling Agency' }]);
+          setTemplateVertical('samartha_sankalpa');
+        } else {
+          setBusinessTypes([]);
+        }
+      });
+  }, [isSamarthaAgency]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -173,11 +195,11 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
           </div>
         </div>
         <select
-          value={templateVertical}
+          value={templateVertical || (isSamarthaAgency ? 'samartha_sankalpa' : '')}
           onChange={(e) => setTemplateVertical(e.target.value)}
           className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
         >
-          <option value="">Generic Template (no business type)</option>
+          {!isSamarthaAgency && <option value="">Generic Template (no business type)</option>}
           {businessTypes.map((bt) => (
             <option key={bt.key} value={bt.key}>{bt.label}</option>
           ))}

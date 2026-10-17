@@ -20,7 +20,7 @@ export const Home: React.FC = () => {
           ))}
         </div>
       }>
-        {role === 'Employee' ? (
+        {role === 'Employee' || role === 'TeamLeader' ? (
           <EmployeeDashboard />
         ) : (
           <DentalDashboard />

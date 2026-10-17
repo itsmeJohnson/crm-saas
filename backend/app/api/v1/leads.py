@@ -505,19 +505,30 @@ async def delete_lead_attachment(
 
 @router.get("/import/template/business-types")
 async def list_import_template_business_types(
-    actor: Annotated[User, Depends(require_tl_or_above)]
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """List business verticals with a tailored import template available."""
+    org_stmt = select(Organization).filter(Organization.id == actor.organization_id)
+    org = (await db.execute(org_stmt)).scalars().first()
+    if org and ("samartha" in (org.name or "").lower() or "samartha" in (org.slug or "").lower()):
+        return [{"key": "samartha_sankalpa", "label": "Samartha Sankalpa Telecalling Agency"}]
     return LeadImportService.list_business_templates()
 
 @router.get("/import/template")
 async def get_import_template(
     actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
     vertical: str | None = Query(None, description="Business type key for a tailored template, e.g. 'real_estate'")
 ):
     """Download CSV or Excel template for bulk lead imports, optionally
     tailored to a business vertical with relevant headers and sample rows."""
+    if not vertical:
+        org_stmt = select(Organization).filter(Organization.id == actor.organization_id)
+        org = (await db.execute(org_stmt)).scalars().first()
+        if org and ("samartha" in (org.name or "").lower() or "samartha" in (org.slug or "").lower()):
+            vertical = "samartha_sankalpa"
     filename_suffix = f"_{vertical}" if vertical else ""
     if format == "xlsx":
         xlsx_bytes = LeadImportService.generate_xlsx_template(vertical)

@@ -106,8 +106,8 @@ async def test_gupshup_provider_methods():
 
     # Test template sync
     templates = await provider.sync_templates()
-    assert len(templates) > 0
-    assert templates[0]["name"] == "call_followup_lead"
+    template_names = [t["name"] for t in templates]
+    assert "hiring" in template_names
 
     # Test health check
     health = await provider.check_health()

@@ -83,6 +83,16 @@ def suggest_mappings(headers: List[str]) -> Dict[str, Dict[str, Any]]:
 # the user maps them manually in the wizard's column-mapping step, same as
 # any unrecognized header.
 BUSINESS_TEMPLATES: Dict[str, Dict[str, Any]] = {
+    "samartha_sankalpa": {
+        "label": "Samartha Sankalpa Telecalling Agency",
+        "headers": ["First Name", "Last Name", "Email", "Phone", "Company", "Title", "Deal Value", "City", "Source"],
+        "rows": [
+            ["Rajesh", "Kumar", "rajesh.kumar@example.com", "9845123456", "Samartha Sankalpa Telecalling", "Telecaller Candidate", "25000", "Bangalore", "Recruitment Drive"],
+            ["Pooja", "Sharma", "pooja.sharma@example.com", "9876543210", "Samartha Sankalpa Agency", "Inbound Campaign Lead", "35000", "Bangalore", "Website Inquiry"],
+            ["Anand", "Verma", "anand.verma@example.com", "9812345678", "Samartha Sankalpa Agency", "Outbound Telesales Lead", "40000", "Bangalore", "Portal"],
+            ["Deepa", "Nair", "deepa.nair@example.com", "9823456789", "Samartha Sankalpa Agency", "Customer Verification", "30000", "Bangalore", "Referral"],
+        ],
+    },
     "real_estate": {
         "label": "Real Estate",
         "headers": ["First Name", "Last Name", "Email", "Phone", "Builder / Developer", "Property Type", "Budget", "City", "Source"],
@@ -187,6 +197,8 @@ class LeadImportService:
     def generate_csv_template(vertical: str | None = None) -> str:
         """Generate string of CSV template headers, optionally tailored to a
         business vertical with sample rows so it reads as pre-customized."""
+        if not vertical:
+            vertical = "samartha_sankalpa"
         preset = BUSINESS_TEMPLATES.get(vertical)
         if preset:
             headers, rows = preset["headers"], preset["rows"]
@@ -203,6 +215,8 @@ class LeadImportService:
     def generate_xlsx_template(vertical: str | None = None) -> bytes:
         """Generate bytes of XLSX template workbook, optionally tailored to a
         business vertical with sample rows so it reads as pre-customized."""
+        if not vertical:
+            vertical = "samartha_sankalpa"
         preset = BUSINESS_TEMPLATES.get(vertical)
         if preset:
             headers, rows = preset["headers"], preset["rows"]
@@ -652,8 +666,58 @@ class LeadImportService:
             await self.db.flush()
             
             if assignment_mode == "AUTO":
-                for lead_obj in imported_leads:
-                    await self.assignment_service.assign_lead(lead_obj)
+                from app.models.attendance import AttendanceRecord
+                today = datetime.now(timezone.utc).date()
+                active_user_query = select(User).filter(
+                    User.organization_id == actor.organization_id,
+                    User.role.in_(["Employee", "TeamLeader"]),
+                    User.is_active == True,
+                    User.is_deleted == False
+                ).order_by(User.id)
+                active_res = await self.db.execute(active_user_query)
+                active_pool = list(active_res.scalars().all())
+
+                present_query = select(AttendanceRecord.user_id).filter(
+                    AttendanceRecord.organization_id == actor.organization_id,
+                    AttendanceRecord.work_date == today,
+                    AttendanceRecord.clock_in_at.is_not(None),
+                    AttendanceRecord.clock_out_at.is_(None),
+                    AttendanceRecord.status.in_(["present", "late", "half_day"])
+                )
+                present_user_ids = set((await self.db.execute(present_query)).scalars().all())
+                present_pool = [u for u in active_pool if u.id in present_user_ids]
+
+                eligible_assignees = [u for u in present_pool if u.role == "Employee"] or present_pool
+                if not eligible_assignees:
+                    eligible_assignees = [u for u in active_pool if u.role == "Employee"] or active_pool
+
+                if eligible_assignees:
+                    num_leads = len(imported_leads)
+                    num_assignees = len(eligible_assignees)
+                    k = num_leads // num_assignees
+                    r = num_leads % num_assignees
+                    idx = 0
+                    for i, assignee in enumerate(eligible_assignees):
+                        chunk_size = k + (1 if i < r else 0)
+                        for _ in range(chunk_size):
+                            if idx < num_leads:
+                                lead = imported_leads[idx]
+                                lead.assigned_user_id = assignee.id
+                                self.db.add(lead)
+                                await self.audit_service.log_event(
+                                    organization_id=actor.organization_id,
+                                    actor_user_id=actor.id,
+                                    action="LEAD_ASSIGNED",
+                                    resource_type="lead",
+                                    resource_id=str(lead.id),
+                                    action_metadata={
+                                        "assigned_user_id": str(assignee.id),
+                                        "assigned_email": assignee.email,
+                                        "reason": "import_auto_assign_equal_split",
+                                        "strategy": "ROUND_ROBIN_SPLIT"
+                                    }
+                                )
+                                idx += 1
             elif assignment_mode == "SPECIFIC_USER" and target_user:
                 for lead_obj in imported_leads:
                     await self.assignment_service.assign_lead_to_user(lead_obj, target_user)
@@ -671,21 +735,23 @@ class LeadImportService:
                 )
                 present_user_ids = set((await self.db.execute(present_query)).scalars().all())
                 present_target_users = [u for u in target_users if u.id in present_user_ids]
+                # Fallback to selected target users if none have marked attendance yet
+                active_assignees = present_target_users if present_target_users else target_users
 
-                # Distribute equally among present agents. If none are present, leads stay unassigned.
-                if present_target_users:
+                if active_assignees:
                     num_leads = len(imported_leads)
-                    num_assignees = len(present_target_users)
+                    num_assignees = len(active_assignees)
                     k = num_leads // num_assignees
                     r = num_leads % num_assignees
                     
                     idx = 0
-                    for i, assignee in enumerate(present_target_users):
+                    for i, assignee in enumerate(active_assignees):
                         chunk_size = k + (1 if i < r else 0)
                         for _ in range(chunk_size):
-                            lead = imported_leads[idx]
-                            lead.assigned_user_id = assignee.id
-                            self.db.add(lead)
+                            if idx < num_leads:
+                                lead = imported_leads[idx]
+                                lead.assigned_user_id = assignee.id
+                                self.db.add(lead)
                             # Log audit event for assignment
                             await self.audit_service.log_event(
                                 organization_id=actor.organization_id,
