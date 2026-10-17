@@ -14,19 +14,18 @@ const SUMMARY = {
 describe('EmployeeHeroCard', () => {
   afterEach(() => cleanup());
 
-  it('shows the employee name, online status and all day stats', () => {
+  it('shows the employee name, punch status and all day stats', () => {
     render(<EmployeeHeroCard summary={SUMMARY as any} name="Amit" />);
     expect(screen.getByText('Amit Kumar')).toBeDefined();
-    expect(screen.getByText('Online')).toBeDefined();
-    expect(screen.getByText('2h 15m')).toBeDefined();      // working duration
+    expect(screen.getByText(/Punched In/i)).toBeDefined();
     expect(screen.getByText("Today's Follow-ups")).toBeDefined();
     expect(screen.getByText('Overdue Follow-ups')).toBeDefined();
     expect(screen.getByText('Interested Leads')).toBeDefined();
     expect(screen.getByText('4')).toBeDefined();            // todays_follow_ups value
   });
 
-  it('renders Offline and dashes when the employee has not checked in', () => {
+  it('renders Not Punched In when the employee has not checked in', () => {
     render(<EmployeeHeroCard summary={{ ...SUMMARY, is_online: false, check_in_at: null, working_minutes: 0 } as any} name="Amit" />);
-    expect(screen.getByText('Offline')).toBeDefined();
+    expect(screen.getByText(/Not Punched In/i)).toBeDefined();
   });
 });

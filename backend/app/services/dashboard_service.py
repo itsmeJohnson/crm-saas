@@ -302,6 +302,10 @@ class DashboardService:
             AttendanceRecord.user_id == actor.id,
             AttendanceRecord.work_date >= today - timedelta(days=1)
         ).order_by(AttendanceRecord.created_at.desc()))).scalars().first()
+        # If the latest record was from yesterday and has already clocked out, today is a fresh unpunched day
+        if att and att.work_date < today and att.clock_out_at is not None:
+            att = None
+
         check_in_at = att.clock_in_at if att else None
         check_out_at = att.clock_out_at if att else None
         is_online = bool(check_in_at and not check_out_at)

@@ -30,8 +30,8 @@ export const EmployeeHeroCard: React.FC<{
   const [confirmPunchOut, setConfirmPunchOut] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
-  const checkInAt = attendanceRecord?.clock_in_at || summary?.check_in_at;
-  const checkOutAt = attendanceRecord?.clock_out_at || summary?.check_out_at;
+  const checkInAt = attendanceRecord ? attendanceRecord.clock_in_at : (summary?.is_online ? summary?.check_in_at : null);
+  const checkOutAt = attendanceRecord ? attendanceRecord.clock_out_at : null;
 
   const isPunchedIn = Boolean(checkInAt && !checkOutAt);
   const isPunchedOutToday = Boolean(checkInAt && checkOutAt);
