@@ -9,8 +9,9 @@ from app.models.user import User
 from app.models.pipeline import Pipeline, PipelineStage
 from app.models.assignment_config import AssignmentConfig
 from app.core.security import get_password_hash
+from app.core.config import settings
 
-DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/crm"
+DATABASE_URL = str(settings.SQLALCHEMY_DATABASE_URI)
 
 async def seed():
     engine = create_async_engine(DATABASE_URL)
