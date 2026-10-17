@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 
 const DentalDashboard = lazy(() => import('../../pages/dental/DentalDashboard').then(m => ({ default: m.DentalDashboard })));
 const EmployeeDashboard = lazy(() => import('./EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })));
+const SuperAdminTelemetryDashboard = lazy(() => import('./SuperAdminTelemetryDashboard').then(m => ({ default: m.SuperAdminTelemetryDashboard })));
 
 export const Home: React.FC = () => {
   const { user } = useAuthStore();
@@ -22,6 +23,8 @@ export const Home: React.FC = () => {
       }>
         {role === 'Employee' || role === 'TeamLeader' ? (
           <EmployeeDashboard />
+        ) : role === 'SuperAdmin' ? (
+          <SuperAdminTelemetryDashboard />
         ) : (
           <DentalDashboard />
         )}

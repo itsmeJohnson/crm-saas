@@ -2,7 +2,7 @@ import React, { lazy } from 'react';
 import {
   LayoutDashboard, FolderKanban, Users, CalendarDays, Activity, Receipt, Clock,
   MessagesSquare, ListChecks, MessageCircle, PhoneCall, Stethoscope, UsersRound,
-  GitBranch, BarChart3, Megaphone, Webhook, Settings, Building, Gauge
+  GitBranch, BarChart3, Megaphone, Webhook, Settings, Building, Gauge, ShieldCheck
 } from 'lucide-react';
 
 // Lazy-loaded workspace components
@@ -175,11 +175,11 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     routes: [
       { path: '/leads', component: LeadsPage, featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Leads & Enquiries' } },
       { path: '/leads/reports', component: LeadReportsPage, featureCode: 'LEAD_MANAGEMENT' },
-      { path: '/leads/automation', component: LeadAutomationPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' },
-      { path: '/lead-capture', component: LeadCapturePage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Lead Capture', icon: Webhook, group: 'Growth & Analytics' } },
-      { path: '/websites', component: LandingPagesPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Websites', icon: Building, group: 'Growth & Analytics' } },
-      { path: '/email-sequences', component: EmailSequencesPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Email Sequences', icon: MessagesSquare, group: 'Growth & Analytics' } },
-      { path: '/booking-links', component: BookingLinksPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Booking Links', icon: CalendarDays, group: 'Growth & Analytics' } }
+      { path: '/leads/automation', component: LeadAutomationPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'LEAD_MANAGEMENT' },
+      { path: '/lead-capture', component: LeadCapturePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Lead Capture', icon: Webhook, group: 'Growth & Analytics' } },
+      { path: '/websites', component: LandingPagesPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'LEAD_CAPTURE', sidebar: { name: 'Websites', icon: Building, group: 'Growth & Analytics' } },
+      { path: '/email-sequences', component: EmailSequencesPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Email Sequences', icon: MessagesSquare, group: 'Growth & Analytics' } },
+      { path: '/booking-links', component: BookingLinksPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Booking Links', icon: CalendarDays, group: 'Growth & Analytics' } }
     ]
   },
   {
@@ -234,7 +234,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     group: 'Clinic Management',
     section: 'workspace',
     trial: true,
-    routes: [{ path: '/pipelines', component: PipelineSettings, roles: ['OrgAdmin'], featureCode: 'SALES_PIPELINE', sidebar: { name: 'Pipelines' } }]
+    routes: [{ path: '/pipelines', component: PipelineSettings, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'SALES_PIPELINE', sidebar: { name: 'Pipelines' } }]
   },
   {
     key: 'activities',
@@ -279,7 +279,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/calling/reports', component: CallingReportsPage, featureCode: 'CLICK_TO_CALL' },
       { path: '/sms', component: SmsPage, featureCode: 'SMS_MESSAGING' },
       { path: '/sms/reports', component: SmsReportsPage, featureCode: 'SMS_MESSAGING' },
-      { path: '/voice', component: VoicePage, featureCode: 'VOICE_BROADCAST', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Voice Broadcast', icon: Megaphone } },
+      { path: '/voice', component: VoicePage, featureCode: 'VOICE_BROADCAST', roles: ['OrgAdmin'], sidebar: { name: 'Voice Broadcast', icon: Megaphone } },
       { path: '/whatsapp', component: WhatsAppPage, featureCode: 'WHATSAPP_MESSAGING', sidebar: { name: 'WhatsApp Center', icon: MessageCircle } },
       { path: '/whatsapp/reports', component: WhatsAppReportsPage, featureCode: 'WHATSAPP_MESSAGING' },
       { path: '/whatsapp/settings', component: WhatsAppSettingsPage, featureCode: 'WHATSAPP_MESSAGING', roles: ['OrgAdmin'] },
@@ -308,7 +308,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     group: 'Growth & Analytics',
     section: 'workspace',
     trial: true,
-    routes: [{ path: '/marketing', component: MarketingPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Marketing ROI' } }]
+    routes: [{ path: '/marketing', component: MarketingPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Marketing ROI' } }]
   },
 
   // ── Dental-Specific Industry Modules ──
@@ -389,7 +389,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     trial: true,
     routes: [
       { path: '/staff', component: StaffPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Staff & Team', group: 'Clinic Management', icon: UsersRound } },
-      { path: '/settings', component: SettingsLayout, roles: ['SuperAdmin', 'OrgAdmin'], isNestedRouteContainer: true, sidebar: { name: 'Clinic Settings', group: 'Administration', icon: Settings }, nestedRoutes: [
+      { path: '/settings', component: SettingsLayout, roles: ['SuperAdmin', 'OrgAdmin'], isNestedRouteContainer: true, sidebar: { name: 'Global Settings', group: 'Global Settings', icon: Settings }, nestedRoutes: [
         { path: '', component: SettingsHome, index: true },
         { path: 'integrations', component: IntegrationMarketplacePage },
         { path: 'calling', component: SettingsCallingPage }
@@ -397,19 +397,19 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/departments', component: DepartmentsPage, roles: ['OrgAdmin', 'Manager'] },
       { path: '/teams', component: TeamsPage },
       { path: '/users', component: UsersPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'ROLE_BASED_ACCESS' },
-      { path: '/attendance', component: AttendancePage },
-      { path: '/leaves', component: LeavePage },
-      { path: '/shifts', component: ShiftManagementPage },
-      { path: '/performance', component: PerformancePage },
-      { path: '/targets', component: TargetsPage },
-      { path: '/approvals', component: ApprovalsPage },
+      { path: '/attendance', component: AttendancePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Attendance', icon: Clock, group: 'Administration' } },
+      { path: '/leaves', component: LeavePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Leaves', icon: CalendarDays, group: 'Administration' } },
+      { path: '/shifts', component: ShiftManagementPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Shifts', icon: Clock, group: 'Administration' } },
+      { path: '/performance', component: PerformancePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Performance', icon: Activity, group: 'Administration' } },
+      { path: '/targets', component: TargetsPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Targets', icon: Gauge, group: 'Administration' } },
+      { path: '/approvals', component: ApprovalsPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Approvals', icon: ListChecks, group: 'Administration' } },
       { path: '/roles', component: RolesPermissionsPage, roles: ['OrgAdmin'] },
-      { path: '/custom-objects', component: CustomObjectsPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Custom Objects', group: 'Administration', icon: Gauge } },
-      { path: '/forms', component: FormBuilderPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Dynamic Forms', group: 'Administration', icon: Gauge } },
+      { path: '/custom-objects', component: CustomObjectsPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Custom Objects', group: 'Administration', icon: Gauge } },
+      { path: '/forms', component: FormBuilderPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Dynamic Forms', group: 'Administration', icon: Gauge } },
       { path: '/organization', component: Profile, roles: ['OrgAdmin'], sidebar: { name: 'Organization', icon: Building, group: 'Administration' } },
       { path: '/branches', component: BranchTerritoryPage, roles: ['OrgAdmin', 'Manager'] },
       // Billing Operations
-      { path: '/billing', component: BillingPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Billing & Invoices', group: 'Clinical Operations', icon: Receipt } },
+      { path: '/billing', component: BillingPage, roles: ['OrgAdmin'], sidebar: { name: 'Billing & Invoices', group: 'Clinical Operations', icon: Receipt } },
       { path: '/billing/settings', component: InvoiceSettingsPage, roles: ['OrgAdmin', 'Manager'] }
     ]
   },
@@ -422,14 +422,14 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     trial: true,
     routes: [
       // ── Convert tier: manager analytics, KPIs, goals ──
-      { path: '/org-analytics', component: OrganizationAnalyticsPage, featureCode: 'MANAGER_DASHBOARD', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Team Analytics', icon: BarChart3, group: 'Growth & Analytics' } },
-      { path: '/executive-dashboard', component: ExecutiveDashboardPage, featureCode: 'MANAGER_DASHBOARD', roles: ['OrgAdmin', 'Manager'] },
-      { path: '/kpi', component: KpiPage, featureCode: 'KPI_DASHBOARD', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'KPIs', icon: Gauge, group: 'Growth & Analytics' } },
-      { path: '/okr', component: OkrPage, featureCode: 'TARGET_MANAGEMENT', roles: ['OrgAdmin', 'Manager'] },
+      { path: '/org-analytics', component: OrganizationAnalyticsPage, featureCode: 'MANAGER_DASHBOARD', roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Team Analytics', icon: BarChart3, group: 'Growth & Analytics' } },
+      { path: '/executive-dashboard', component: ExecutiveDashboardPage, featureCode: 'MANAGER_DASHBOARD', roles: ['OrgAdmin', 'Manager', 'TeamLeader'] },
+      { path: '/kpi', component: KpiPage, featureCode: 'KPI_DASHBOARD', roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'KPIs', icon: Gauge, group: 'Growth & Analytics' } },
+      { path: '/okr', component: OkrPage, featureCode: 'TARGET_MANAGEMENT', roles: ['OrgAdmin', 'Manager', 'TeamLeader'] },
       // ── Scale tier: advanced analytics + custom reports ──
-      { path: '/report-builder', component: ReportBuilderPage, featureCode: 'CUSTOM_REPORTS', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Report Builder', icon: BarChart3, group: 'Growth & Analytics' } },
-      { path: '/scheduled-reports', component: ScheduledReportsPage, featureCode: 'CUSTOM_REPORTS', roles: ['OrgAdmin', 'Manager'] },
-      { path: '/sales-analytics', component: SalesAnalyticsPage, featureCode: 'ADVANCED_ANALYTICS', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Sales Analytics', icon: BarChart3, group: 'Growth & Analytics' } },
+      { path: '/report-builder', component: ReportBuilderPage, featureCode: 'CUSTOM_REPORTS', roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Report Builder', icon: BarChart3, group: 'Growth & Analytics' } },
+      { path: '/scheduled-reports', component: ScheduledReportsPage, featureCode: 'CUSTOM_REPORTS', roles: ['OrgAdmin', 'Manager', 'TeamLeader'] },
+      { path: '/sales-analytics', component: SalesAnalyticsPage, featureCode: 'ADVANCED_ANALYTICS', roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Sales Analytics', icon: BarChart3, group: 'Growth & Analytics' } },
       { path: '/employee-analytics', component: EmployeeAnalyticsPage, featureCode: 'TEAM_MONITORING', roles: ['OrgAdmin', 'Manager'] },
       { path: '/financial-analytics', component: FinancialAnalyticsPage, featureCode: 'ADVANCED_ANALYTICS', roles: ['OrgAdmin', 'Manager'] },
       { path: '/forecasting', component: ForecastingPage, featureCode: 'ADVANCED_ANALYTICS', roles: ['OrgAdmin', 'Manager'] },
@@ -440,8 +440,8 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/predictive', component: PredictivePage, featureCode: 'ADVANCED_ANALYTICS', roles: ['OrgAdmin', 'Manager'] },
       { path: '/compliance', component: CompliancePage, featureCode: 'ADVANCED_ANALYTICS', roles: ['OrgAdmin', 'Manager'] },
       // ── Scale tier: AI suite (call summaries, copilot, intelligence) ──
-      { path: '/copilot', component: CopilotPage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'AI Copilot', icon: Activity, group: 'Growth & Analytics' } },
-      { path: '/comm-intelligence', component: CommIntelligencePage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Call Summaries', icon: Activity, group: 'Growth & Analytics' } },
+      { path: '/copilot', component: CopilotPage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'AI Copilot', icon: Activity, group: 'Growth & Analytics' } },
+      { path: '/comm-intelligence', component: CommIntelligencePage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Call Summaries', icon: Activity, group: 'Growth & Analytics' } },
       { path: '/ai', component: AiPlatformPage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager'] },
       { path: '/lead-intelligence', component: LeadIntelligencePage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager'] },
       { path: '/sales-intelligence', component: SalesIntelligencePage, featureCode: 'AI_CALL_SUMMARY', roles: ['OrgAdmin', 'Manager'] },
@@ -472,12 +472,12 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     key: 'platform_core',
     label: 'Platform Administration',
     icon: Building,
-    group: 'Platform',
+    group: 'Platform Administration',
     section: 'workspace',
     trial: true,
     routes: [
-      { path: '/tenants', component: TenantsPage, roles: ['SuperAdmin'] },
-      { path: '/trial-requests', component: TrialRequestsPage, roles: ['SuperAdmin'] }
+      { path: '/tenants', component: TenantsPage, roles: ['SuperAdmin'], sidebar: { name: 'Tenants Directory', icon: Building, group: 'Platform Administration' } },
+      { path: '/trial-requests', component: TrialRequestsPage, roles: ['SuperAdmin'], sidebar: { name: 'Trial Requests', icon: ShieldCheck, group: 'Platform Administration' } }
     ]
   },
 

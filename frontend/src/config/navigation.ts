@@ -4,6 +4,8 @@
  */
 
 export const TELECALLING_NAV_GROUPS = [
+  "Platform Administration",
+  "Global Settings",
   "Lead Management",
   "Dialer Console",
   "Campaign Analytics",
@@ -12,15 +14,23 @@ export const TELECALLING_NAV_GROUPS = [
 ];
 
 export const TELECALLING_ITEM_GROUP_MAP: Record<string, string> = {
+  // Platform Administration (SuperAdmin Root)
+  "Tenants Directory": "Platform Administration",
+  "Trial Requests": "Platform Administration",
+
+  // Global Settings (SuperAdmin Root)
+  "Global Settings": "Global Settings",
+
   // Lead Management
   "Leads & Enquiries": "Lead Management",
   "Contacts Directory": "Lead Management",
   "Lead Capture": "Lead Management",
   "Websites": "Lead Management",
-  "Billing & Invoices": "Administration",
+  "Email Sequences": "Lead Management",
+  "Booking Links": "Lead Management",
+  "Pipelines": "Lead Management",
   "Companies": "Lead Management",
   "Customers": "Lead Management",
-  "Pipelines": "Lead Management",
 
   // Dialer Console
   "Phone Calling": "Dialer Console",
@@ -40,18 +50,23 @@ export const TELECALLING_ITEM_GROUP_MAP: Record<string, string> = {
 
   // Follow-ups & Reminders
   "Tasks & Reminders": "Follow-ups & Reminders",
-  "Booking Links": "Follow-ups & Reminders",
-  "Email Sequences": "Follow-ups & Reminders",
   "Follow-ups": "Follow-ups & Reminders",
 
   // Administration
   "Staff & Team": "Administration",
+  "Custom Objects": "Administration",
+  "Dynamic Forms": "Administration",
+  "Attendance": "Administration",
+  "Leaves": "Administration",
+  "Shifts": "Administration",
+  "Performance": "Administration",
+  "Targets": "Administration",
+  "Approvals": "Administration",
   "Call Center Settings": "Administration",
   "Clinic Settings": "Administration",
   "Settings": "Administration",
-  "Custom Objects": "Administration",
-  "Dynamic Forms": "Administration",
   "Organization": "Administration",
+  "Billing & Invoices": "Administration",
   "API & Developer": "Administration",
   "Integrations": "Administration",
 };

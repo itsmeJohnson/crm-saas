@@ -39,6 +39,8 @@ export const AppLayout: React.FC = () => {
   const TRIAL_MODE = true;
   const inTelecalling = isTelecallingMode();
   const isBaselineTelecaller = user?.role === 'Employee' && !user?.is_team_leader;
+  const isSuperAdmin = user?.role === 'SuperAdmin';
+  const isManagerOrTL = user?.role === 'Manager' || user?.role === 'TeamLeader' || (user?.role === 'Employee' && user?.is_team_leader);
 
   const TELECALLER_ALLOWED_ITEMS = new Set([
     'Leads & Enquiries',
@@ -48,7 +50,37 @@ export const AppLayout: React.FC = () => {
     'Tasks & Reminders',
   ]);
 
-  const NAV_GROUPS = (inTelecalling || isBaselineTelecaller)
+  const SUPERADMIN_HIDDEN_ITEMS = new Set([
+    // Dialer Console items: SuperAdmins do not dial leads or text customers
+    'Phone Calling',
+    'WhatsApp Center',
+    'Communications',
+    'Voice Broadcast',
+    // Local agency layout tabs under Campaign Analytics
+    'Marketing ROI',
+    'Sales Analytics',
+    // Local operations clutter
+    'Leads & Enquiries',
+    'Contacts Directory',
+    'Lead Capture',
+    'Websites',
+    'Email Sequences',
+    'Booking Links',
+    'Pipelines',
+    'Tasks & Reminders',
+    'Staff & Team',
+    'Custom Objects',
+    'Dynamic Forms',
+    'Attendance',
+    'Leaves',
+    'Shifts',
+    'Performance',
+    'Targets',
+    'Approvals',
+    'Billing & Invoices',
+  ]);
+
+  const NAV_GROUPS = (inTelecalling || isBaselineTelecaller || isSuperAdmin || isManagerOrTL)
     ? TELECALLING_NAV_GROUPS
     : [
         'Clinical Operations', 'Patient Engagement', 'Clinic Management',
@@ -59,8 +91,11 @@ export const AppLayout: React.FC = () => {
     mod.routes
       .filter((r) => r.sidebar)
       .map((r) => {
-        const itemName = r.sidebar!.name;
-        const resolvedGroup = (inTelecalling || isBaselineTelecaller)
+        const rawItemName = r.sidebar!.name;
+        const itemName = (rawItemName === 'Global Settings' && user?.role !== 'SuperAdmin')
+          ? 'Settings'
+          : rawItemName;
+        const resolvedGroup = (inTelecalling || isBaselineTelecaller || isSuperAdmin || isManagerOrTL)
           ? (TELECALLING_ITEM_GROUP_MAP[itemName] || r.sidebar!.group || mod.group)
           : (r.sidebar!.group || mod.group);
         return {
@@ -81,12 +116,28 @@ export const AppLayout: React.FC = () => {
 
   const navItems = allNavItems.filter((item) => {
     if (!user) return false;
-    // Client dedicated deployment: hide platform administration section
-    if (item.group === 'Platform' || item.module === 'platform_core') return false;
 
-    // Strict RBAC filtering for baseline telecaller: only expose authorized modules
+    // Platform administration section is reserved for SuperAdmin only
+    if (
+      (item.group === 'Platform' || item.group === 'Platform Administration' || item.module === 'platform_core') &&
+      user.role !== 'SuperAdmin'
+    ) {
+      return false;
+    }
+
+    // SuperAdmin filtering: hide cold calling and operational clutter
+    if (isSuperAdmin) {
+      if (SUPERADMIN_HIDDEN_ITEMS.has(item.name)) return false;
+    }
+
+    // Baseline Telecaller restriction (Telecaller Employee role)
     if (isBaselineTelecaller) {
       if (!TELECALLER_ALLOWED_ITEMS.has(item.name)) return false;
+    }
+
+    // Manager / TeamLeader restriction: hide Global Settings (Settings layout is for SuperAdmin / OrgAdmin)
+    if (isManagerOrTL && item.name === 'Global Settings') {
+      return false;
     }
 
     if (item.roles) {
@@ -262,7 +313,7 @@ export const AppLayout: React.FC = () => {
     }
   };
 
-  const getGroupName = (g: string) => (inTelecalling || isBaselineTelecaller) ? g : ((groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g);
+  const getGroupName = (g: string) => (inTelecalling || isBaselineTelecaller || isSuperAdmin || isManagerOrTL) ? g : ((groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g);
   const getItemName = (n: string) => (itemTranslations[industry] ?? itemTranslations['generic'])[n] ?? n;
   const getSubSuiteLabel = () => {
     switch (industry) {
@@ -298,10 +349,14 @@ export const AppLayout: React.FC = () => {
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-slate-100 block truncate">
-              {organization?.name || 'SmileCare Dental'}
+              {user?.role === 'SuperAdmin'
+                ? 'CRM Enterprise · Secure Multi-Tenant Platform'
+                : (organization?.name || 'SmileCare Dental')}
             </span>
             <span className="text-[10px] text-slate-400 font-medium tracking-wide block">
-              {getSubSuiteLabel()}
+              {user?.role === 'SuperAdmin'
+                ? 'System Infrastructure & Multi-Tenant Control'
+                : getSubSuiteLabel()}
             </span>
           </div>
         </div>
@@ -404,49 +459,9 @@ export const AppLayout: React.FC = () => {
     </div>
   );
 
-  const PLATFORM_PREFIXES = ['/tenants'];
-  const isPlatformConsole = PLATFORM_PREFIXES.some(
-    (p) => location.pathname === p || location.pathname.startsWith(p + '/'),
-  );
-
-  if (isPlatformConsole) {
-    return (
-      <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
-        <ReadOnlyBanner />
-        <InboundCallPopup />
-        <header className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 bg-cyan-500 rounded flex items-center justify-center font-bold text-white text-xs flex-shrink-0">C</div>
-            <span className="font-bold text-sm text-slate-100 truncate">CRM Enterprise</span>
-            <span className="text-xs text-slate-400 truncate">• {organization?.name}</span>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-lg border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-xs text-slate-300 transition"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
-            </button>
-            <NotificationBell />
-            <button
-              onClick={handleLogout}
-              className="px-2.5 py-1 rounded-lg border border-[var(--border-color)] hover:border-rose-500/30 hover:bg-rose-500/10 text-xs text-rose-400 transition"
-            >
-              <LogOut className="w-3.5 h-3.5" /> Sign Out
-            </button>
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto bg-[var(--bg-app)]">
-          <div className="p-6 min-h-full">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen overflow-hidden flex-col md:flex-row bg-[var(--bg-app)] text-[var(--text-primary)]">
+      <ReadOnlyBanner />
       <InboundCallPopup />
       <WhatsAppLiveNotifier />
 

@@ -16,7 +16,7 @@ vi.mock('../../store/metadataStore', () => ({
   useMetadataStore: vi.fn(),
 }));
 
-describe('AppLayout Component - Sidebar Role Visibility', () => {
+describe('AppLayout Component - Strict RBAC Navigation Suite', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -26,19 +26,20 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     return render(<BrowserRouter>{ui}</BrowserRouter>);
   };
 
-  const setupMetadataMock = () => {
+  const setupMetadataMock = (overrides?: any) => {
     vi.mocked(useMetadataStore).mockImplementation((selector: any) => {
       const state = {
         loaded: true,
         crmConfig: {
-          industry: 'healthcare_dental',
-          template: 'healthcare_dental',
+          industry: 'telecalling',
+          template: 'telecalling',
           enabled_modules: [
             'dashboard', 'leads', 'patients', 'appointments', 'treatments',
             'treatment_plans', 'recall', 'dentists', 'clinical_reports',
             'billing', 'communications', 'reports', 'admin_core', 'pipelines',
-            'tasks'
-          ]
+            'tasks', 'analytics_suite', 'platform_core'
+          ],
+          ...overrides
         },
         fetchBootstrap: vi.fn(),
       };
@@ -46,17 +47,24 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     });
   };
 
-  it('renders all links for OrgAdmin role', () => {
+  const ALL_FEATURES = [
+    'LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS',
+    'CLICK_TO_CALL', 'WHATSAPP_MESSAGING', 'LEAD_CAPTURE',
+    'MANAGER_DASHBOARD', 'KPI_DASHBOARD', 'CUSTOM_REPORTS',
+    'ADVANCED_ANALYTICS', 'AI_CALL_SUMMARY'
+  ];
+
+  it('renders SuperAdmin control profile with platform roots and hides cold-calling clutter', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: any) => {
       const state = {
         user: {
-          first_name: 'Alice',
+          first_name: 'Super',
           last_name: 'Admin',
-          email: 'admin@democorp.com',
-          role: 'OrgAdmin',
+          email: 'samarthasankalpa@gmail.com',
+          role: 'SuperAdmin',
         },
-        organization: { name: 'Demo Corp' },
-        features: ['LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS'],
+        organization: { name: 'Root Infrastructure' },
+        features: ALL_FEATURES,
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -65,29 +73,45 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
-    expect(screen.getByText('Dashboard')).toBeDefined();
-    expect(screen.getByText('Leads & Enquiries')).toBeDefined();
-    expect(screen.getByText('Pipelines')).toBeDefined();
-    expect(screen.getByText('Staff & Team')).toBeDefined();
-    expect(screen.getByText('Organization')).toBeDefined();
+    // Header Title
+    expect(screen.getAllByText('CRM Enterprise · Secure Multi-Tenant Platform').length).toBeGreaterThanOrEqual(1);
 
-    // Billing & Account section is unified into the same sidebar for OrgAdmin.
-    expect(screen.getByText('Billing & Account')).toBeDefined();
-    expect(screen.getByText('Subscription')).toBeDefined();
-    expect(screen.getByText('Seat Licensing')).toBeDefined();
+    // EXPOSE / PIN to SuperAdmin Menu
+    expect(screen.getByText('Platform Administration')).toBeDefined();
+    expect(screen.getByText('Tenants Directory')).toBeDefined();
+    expect(screen.getByText('Trial Requests')).toBeDefined();
+
+    expect(screen.getAllByText('Global Settings').length).toBeGreaterThanOrEqual(1);
+
+    // Campaign Analytics (root metrics)
+    expect(screen.getByText('Dashboard')).toBeDefined();
+    expect(screen.getByText('Team Analytics')).toBeDefined();
+    expect(screen.getByText('KPIs')).toBeDefined();
+    expect(screen.getByText('Report Builder')).toBeDefined();
+    expect(screen.getByText('AI Copilot')).toBeDefined();
+    expect(screen.getByText('Call Summaries')).toBeDefined();
+
+    // HIDE from SuperAdmin Workspace Sidebars (operational clutter)
+    expect(screen.queryByText('Dialer Console')).toBeNull();
+    expect(screen.queryByText('Phone Calling')).toBeNull();
+    expect(screen.queryByText('WhatsApp Center')).toBeNull();
+    expect(screen.queryByText('Voice Broadcast')).toBeNull();
+    expect(screen.queryByText('Marketing ROI')).toBeNull();
+    expect(screen.queryByText('Sales Analytics')).toBeNull();
   });
 
-  it('renders standard links and Users, but hides Organization setting for Manager role', () => {
+  it('renders full operational floor suite for Manager/TeamLeader and blocks billing & platform', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: any) => {
       const state = {
         user: {
-          first_name: 'Bob',
-          last_name: 'Manager',
-          email: 'mgr@democorp.com',
-          role: 'Manager',
+          first_name: 'John',
+          last_name: 'A',
+          email: 'johnsondev02@gmail.com',
+          role: 'TeamLeader',
+          is_team_leader: true,
         },
-        organization: { name: 'Demo Corp' },
-        features: ['LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS'],
+        organization: { name: 'Samartha Sankalpa' },
+        features: ALL_FEATURES,
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -96,15 +120,57 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
-    expect(screen.getByText('Dashboard')).toBeDefined();
-    expect(screen.getByText('Leads & Enquiries')).toBeDefined();
-    expect(screen.getByText('Staff & Team')).toBeDefined();
-    expect(screen.queryByText('Pipelines')).toBeNull();
-    expect(screen.queryByText('Organization')).toBeNull();
-
-    // Billing & Account is OrgAdmin-only — a Manager sees none of it.
+    // 1. HIDE / LOCK from Manager Menu
+    expect(screen.queryByText('Platform Administration')).toBeNull();
+    expect(screen.queryByText('Tenants Directory')).toBeNull();
+    expect(screen.queryByText('Trial Requests')).toBeNull();
     expect(screen.queryByText('Billing & Account')).toBeNull();
     expect(screen.queryByText('Subscription')).toBeNull();
+    expect(screen.queryByText('Seat Licensing')).toBeNull();
+    expect(screen.queryByText('Global Settings')).toBeNull();
+
+    // 2. EXPOSE in Lead Management
+    expect(screen.getByText('Lead Management')).toBeDefined();
+    expect(screen.getByText('Leads & Enquiries')).toBeDefined();
+    expect(screen.getByText('Lead Capture')).toBeDefined();
+    expect(screen.getByText('Websites')).toBeDefined();
+    expect(screen.getByText('Email Sequences')).toBeDefined();
+    expect(screen.getByText('Booking Links')).toBeDefined();
+    expect(screen.getByText('Pipelines')).toBeDefined();
+
+    // 3. EXPOSE in Dialer Console
+    expect(screen.getByText('Dialer Console')).toBeDefined();
+    expect(screen.getByText('Phone Calling')).toBeDefined();
+    expect(screen.getByText('WhatsApp Center')).toBeDefined();
+    expect(screen.getByText('Communications')).toBeDefined();
+    expect(screen.queryByText('Voice Broadcast')).toBeNull();
+
+    // 4. EXPOSE in Campaign Analytics
+    expect(screen.getByText('Campaign Analytics')).toBeDefined();
+    expect(screen.getByText('Dashboard')).toBeDefined();
+    expect(screen.getByText('Marketing ROI')).toBeDefined();
+    expect(screen.getByText('Team Analytics')).toBeDefined();
+    expect(screen.getByText('Sales Analytics')).toBeDefined();
+    expect(screen.getByText('KPIs')).toBeDefined();
+    expect(screen.getByText('Report Builder')).toBeDefined();
+    expect(screen.getByText('AI Copilot')).toBeDefined();
+    expect(screen.getByText('Call Summaries')).toBeDefined();
+
+    // 5. EXPOSE in Administration
+    expect(screen.getByText('Administration')).toBeDefined();
+    expect(screen.getByText('Staff & Team')).toBeDefined();
+    expect(screen.getByText('Custom Objects')).toBeDefined();
+    expect(screen.getByText('Dynamic Forms')).toBeDefined();
+    expect(screen.getByText('Attendance')).toBeDefined();
+    expect(screen.getByText('Leaves')).toBeDefined();
+    expect(screen.getByText('Shifts')).toBeDefined();
+    expect(screen.getByText('Performance')).toBeDefined();
+    expect(screen.getByText('Targets')).toBeDefined();
+    expect(screen.getByText('Approvals')).toBeDefined();
+
+    // 6. Follow-ups & Reminders
+    expect(screen.getByText('Follow-ups & Reminders')).toBeDefined();
+    expect(screen.getByText('Tasks & Reminders')).toBeDefined();
   });
 
   it('enforces strict RBAC navigation groups for baseline Telecaller Employee role', () => {
@@ -118,7 +184,7 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
           is_team_leader: false,
         },
         organization: { name: 'Demo Corp' },
-        features: ['LEAD_MANAGEMENT', 'CLICK_TO_CALL', 'WHATSAPP_MESSAGING', 'ROLE_BASED_ACCESS'],
+        features: ALL_FEATURES,
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -127,19 +193,19 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
-    // 1. Navigation Groups visible for Telecaller
+    // Navigation Groups visible for Telecaller
     expect(screen.getByText('Lead Management')).toBeDefined();
     expect(screen.getByText('Dialer Console')).toBeDefined();
     expect(screen.getByText('Follow-ups & Reminders')).toBeDefined();
 
-    // 2. EXPOSE / SHOW in Telecaller Menu
+    // EXPOSE / SHOW in Telecaller Menu
     expect(screen.getByText('Leads & Enquiries')).toBeDefined();
     expect(screen.getByText('Phone Calling')).toBeDefined();
     expect(screen.getByText('WhatsApp Center')).toBeDefined();
     expect(screen.getByText('Communications')).toBeDefined();
     expect(screen.getByText('Tasks & Reminders')).toBeDefined();
 
-    // 3. REMOVE / HIDE from Telecaller Menu
+    // REMOVE / HIDE from Telecaller Menu
     expect(screen.queryByText('Billing & Invoices')).toBeNull();
     expect(screen.queryByText('Marketing ROI')).toBeNull();
     expect(screen.queryByText('Voice Broadcast')).toBeNull();
@@ -150,28 +216,6 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     expect(screen.queryByText('Billing & Account')).toBeNull();
     expect(screen.queryByText('Campaign Analytics')).toBeNull();
     expect(screen.queryByText('Administration')).toBeNull();
-  });
-
-  it('allows TeamLeader employee to view Staff & Team', () => {
-    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
-      const state = {
-        user: {
-          first_name: 'David',
-          last_name: 'Lead',
-          email: 'lead@johnsonsoftwares.com',
-          role: 'Employee',
-          is_team_leader: true,
-        },
-        organization: { name: 'Demo Corp' },
-        features: ['LEAD_MANAGEMENT', 'CLICK_TO_CALL', 'WHATSAPP_MESSAGING', 'ROLE_BASED_ACCESS'],
-        logout: vi.fn(),
-      };
-      return selector ? selector(state) : state;
-    });
-
-    setupMetadataMock();
-    renderWithRouter(<AppLayout />);
-
-    expect(screen.getByText('Staff & Team')).toBeDefined();
+    expect(screen.queryByText('Platform Administration')).toBeNull();
   });
 });
