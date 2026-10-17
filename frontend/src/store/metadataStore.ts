@@ -68,9 +68,9 @@ export const useMetadataStore = create<MetadataState>((set, get) => ({
         pipelines,
         selectedPipelineId: defaultPipelineId(pipelines, get().selectedPipelineId),
         crmConfig: data.crm_config ?? {
-          industry: 'healthcare_dental',
-          template: 'healthcare_dental',
-          enabled_modules: ['dashboard', 'leads', 'patients', 'appointments', 'treatments', 'treatment_plans', 'recall', 'dentists', 'clinical_reports', 'billing', 'communications', 'reports']
+          industry: 'telecalling',
+          template: 'telecalling',
+          enabled_modules: ['dashboard', 'leads', 'contacts', 'companies', 'customers', 'opportunities', 'pipelines', 'activities', 'tasks', 'follow_ups', 'communications', 'billing', 'reports', 'analytics_suite']
         },
         isLoading: false,
         loaded: true,

@@ -21,6 +21,7 @@ from app.services.whatsapp_service import WhatsAppService
 from app.schemas.whatsapp import (
     WaSettingsResponse,
     WaSettingsUpdate,
+    WaSettingsCreate,
     WaConversationItem,
     WaThreadResponse,
     WhatsAppMessageResponse,
@@ -79,6 +80,32 @@ async def consume_whatsapp_webhook(
 
     service = WhatsAppService(db)
     res = await service.handle_webhook(payload, x_hub_signature_256, raw_body)
+    await db.commit()
+    return Response(status_code=status.HTTP_200_OK, content=f"Event logged: {res.get('status')}")
+
+
+# ================= Gupshup Webhook Receiver (Public Endpoint) =================
+@router.get("/webhook/gupshup", response_class=Response)
+async def verify_gupshup_webhook():
+    """GET verification endpoint used during Gupshup callback URL testing."""
+    return Response(content="gupshup-webhook-active", media_type="text/plain")
+
+
+@router.post("/webhook/gupshup", response_class=Response)
+async def consume_gupshup_webhook(
+    request: Request,
+    token: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """POST callback receiver for Gupshup Enterprise WhatsApp inbound messages and status/DLR events."""
+    raw_body = await request.body()
+    try:
+        payload = await request.json()
+    except Exception:
+        return Response(status_code=status.HTTP_400_BAD_REQUEST, content="Invalid JSON payload.")
+
+    service = WhatsAppService(db)
+    res = await service.handle_gupshup_webhook(payload, token=token, raw_body=raw_body)
     await db.commit()
     return Response(status_code=status.HTTP_200_OK, content=f"Event logged: {res.get('status')}")
 
@@ -193,6 +220,20 @@ async def list_whatsapp_settings(
     return await service.list_settings(current_user)
 
 
+@router.post("/settings", response_model=WaSettingsResponse)
+async def create_whatsapp_settings(
+    data: WaSettingsCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role == "Employee":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Employee role not permitted.")
+    service = WhatsAppService(db)
+    res = await service.create_settings(current_user, data.model_dump(exclude_unset=True))
+    await db.commit()
+    return res
+
+
 @router.put("/settings", response_model=WaSettingsResponse)
 @router.put("/settings/{id}", response_model=WaSettingsResponse)
 async def update_whatsapp_settings(
@@ -238,6 +279,22 @@ async def sync_whatsapp_templates(
     res = await service.sync_templates(current_user, id)
     await db.commit()
     return res
+
+
+@router.get("/templates", response_model=List[WhatsAppTemplateResponse])
+async def list_whatsapp_templates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.whatsapp import WhatsAppTemplate
+    res = await db.execute(
+        select(WhatsAppTemplate).filter(
+            WhatsAppTemplate.organization_id == current_user.organization_id,
+            WhatsAppTemplate.is_deleted == False
+        ).order_by(WhatsAppTemplate.name)
+    )
+    return res.scalars().all()
+
 
 
 @router.post("/settings/{id}/rotate-token", response_model=WaSettingsResponse)

@@ -2,12 +2,14 @@ from app.services.telephony.base import TelephonyProvider
 from app.services.telephony.knowlarity import KnowlarityProvider
 from app.services.telephony.myoperator import MyOperatorProvider
 from app.services.telephony.exotel import ExotelProvider
+from app.services.telephony.callerdesk import CallerdeskProvider
 from app.services.telephony.custom_webhook import CustomWebhookProvider
 
 _PROVIDERS = {
     "myoperator": MyOperatorProvider,
     "knowlarity": KnowlarityProvider,
     "exotel": ExotelProvider,
+    "callerdesk": CallerdeskProvider,
     "custom_webhook": CustomWebhookProvider,
     "tata_smartflo": CustomWebhookProvider,
     "airtel_iq": CustomWebhookProvider,

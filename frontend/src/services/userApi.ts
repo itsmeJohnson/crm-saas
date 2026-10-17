@@ -14,6 +14,7 @@ export interface UserResponse {
   created_at: string;
   updated_at: string;
   is_team_leader?: boolean;
+  is_present_today?: boolean;
   seat_number?: string | null;
   inactive_reason?: string | null;
   phone?: string | null;

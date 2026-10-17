@@ -17,6 +17,9 @@ type Category = 'Calling' | 'SMS' | 'WhatsApp' | 'Email' | 'Payments' | 'CRM' | 
 const CATEGORIES: Category[] = ['Calling', 'SMS', 'WhatsApp', 'Email', 'Payments', 'CRM', 'AI', 'Marketing'];
 
 const CATALOG: Provider[] = [
+  { id: 'callerdesk', name: 'Callerdesk', logo: '📞', category: 'Calling', kind: 'route', route: '/settings/communication/calling',
+    description: 'Cloud telephony — Click2Call, inbound IVR webhooks & call recordings.',
+    features: ['Click-to-call', 'Live Popups', 'Inbound IVR', 'Call Recording'] },
   { id: 'myoperator', name: 'MyOperator', logo: '☎️', category: 'Calling', kind: 'myoperator',
     description: 'Cloud telephony — click-to-call, IVR, call recording & logs.',
     features: ['Click-to-call', 'OBD / IVR', 'Recording', 'Call logs'] },
@@ -36,8 +39,8 @@ const CATALOG: Provider[] = [
 
   { id: 'meta_whatsapp', name: 'WhatsApp Cloud', logo: '🟢', category: 'WhatsApp', kind: 'route', route: '/whatsapp',
     description: 'Meta WhatsApp Business Cloud API.', features: ['Templates', 'Media', '24h window'] },
-  { id: 'gupshup', name: 'Gupshup', logo: '💬', category: 'WhatsApp', kind: 'soon',
-    description: 'WhatsApp BSP.', features: ['Templates', 'Bot'] },
+  { id: 'gupshup', name: 'Gupshup', logo: '💬', category: 'WhatsApp', kind: 'route', route: '/whatsapp/settings?provider=gupshup',
+    description: 'Gupshup Enterprise WhatsApp Messaging API & Bot Studio.', features: ['Enterprise API', 'Templates', 'DLR Callbacks', '24h window'] },
 
   { id: 'smtp', name: 'Email (SMTP/IMAP)', logo: '📧', category: 'Email', kind: 'route', route: '/email',
     description: 'Send & sync email over SMTP/IMAP or OAuth.', features: ['SMTP', 'IMAP sync', 'Tracking'] },

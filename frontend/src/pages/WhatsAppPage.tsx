@@ -236,8 +236,28 @@ export const WhatsAppPage: React.FC = () => {
       
       // Auto pre-fill active settings filter if selected
       setTemplates([]);
-      communicationApi.listTemplates().then((t) => {
-        setTemplates(t.filter((x) => x.channel === 'WhatsApp'));
+      Promise.all([
+        communicationApi.listTemplates().catch(() => []),
+        whatsappApi.listTemplates().catch(() => []),
+      ]).then(([commList, waList]) => {
+        const commWhatsApp = (commList || []).filter((x) => x.channel === 'WhatsApp');
+        const waConverted = (waList || []).map((w) => ({
+          id: w.id,
+          organization_id: w.organization_id,
+          name: w.name,
+          channel: 'WhatsApp',
+          subject: null,
+          body: w.body_text,
+          created_at: '',
+          language: w.language,
+        }));
+        const combined = [...commWhatsApp];
+        waConverted.forEach((w) => {
+          if (!combined.some((c) => c.name.toLowerCase() === w.name.toLowerCase())) {
+            combined.push(w);
+          }
+        });
+        setTemplates(combined);
       }).catch(() => {});
     } catch (err: any) {
       setError(extractErrorMessage(err, 'Failed to load thread'));

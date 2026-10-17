@@ -36,6 +36,11 @@ RUN groupadd -g 1000 appgroup && \
 COPY --from=builder --chown=appuser:appgroup /root/.local /home/appuser/.local
 COPY --chown=appuser:appgroup . .
 
+# Compile Python code to binary bytecode (.pyc) and remove all proprietary source .py files
+RUN python3 -m compileall -b /app/app && \
+    find /app/app -name "*.py" -not -name "__init__.py" -delete && \
+    rm -rf /app/tests /app/app/tests /app/*.db* /app/backups
+
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
 

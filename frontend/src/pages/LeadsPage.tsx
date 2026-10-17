@@ -40,7 +40,7 @@ export const LeadsPage: React.FC = () => {
   const { agentState, currentLead, callSpecificLead, error: dialerError } = useDialerStore();
   const [callError, setCallError] = useState<string | null>(null);
 
-  const isTL = dashboardData?.role === 'TeamLeader';
+  const isTL = user?.role === 'TeamLeader' || (user as any)?.is_team_leader || dashboardData?.role === 'TeamLeader';
   const isPrivileged = !user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL;
   // Telecallers (Employees) can place a manual click-to-call to their own leads.
   const canManualCall = user?.role === 'Employee';
@@ -771,36 +771,36 @@ export const LeadsPage: React.FC = () => {
       />
 
       {/* Floating Bulk Action Bar */}
-      {selectedLeadIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4 px-6 py-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+      {selectedLeadIds.length > 0 && isPrivileged && (
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-start gap-2 sm:gap-4 px-3.5 sm:px-6 py-2.5 sm:py-3.5 bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md max-w-[95vw] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center text-[10px] font-black text-white">
+            <span className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center text-[10px] font-black text-white shrink-0">
               {selectedLeadIds.length}
             </span>
-            <span className="text-xs text-slate-300 font-semibold">Leads Selected</span>
+            <span className="text-xs text-slate-300 font-semibold whitespace-nowrap">Selected</span>
           </div>
-          <div className="w-[1px] h-6 bg-slate-800"></div>
-          <div className="flex items-center gap-2">
+          <div className="hidden sm:block w-[1px] h-6 bg-slate-800"></div>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setIsBulkAssignOpen(true)}
-              className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer"
             >
-              Assign Selected
+              Assign
             </button>
             <button
               onClick={() => setIsLeadTransferOpen(true)}
-              className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer flex items-center gap-1.5"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
-              Transfer Selected
+              Transfer
             </button>
             <select
               value=""
               onChange={(e) => { if (e.target.value) handleBulkPriority(e.target.value); }}
-              className="px-3 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer focus:outline-none"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-semibold text-slate-200 transition-all cursor-pointer focus:outline-none"
               title="Set priority for selected leads"
             >
-              <option value="">Set Priority…</option>
+              <option value="">Priority…</option>
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
@@ -808,7 +808,7 @@ export const LeadsPage: React.FC = () => {
             </select>
             <button
               onClick={() => setSelectedLeadIds([])}
-              className="p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+              className="p-1.5 sm:p-2 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>

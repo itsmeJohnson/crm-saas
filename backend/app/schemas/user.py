@@ -21,7 +21,7 @@ class UserUpdate(BaseModel):
     first_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, max_length=100)
     is_active: bool | None = None
-    role: str | None = Field(None, pattern="^(OrgAdmin|Manager|Employee)$")
+    role: str | None = Field(None, pattern="^(OrgAdmin|Manager|TeamLeader|Employee)$")
     reporting_to_id: uuid.UUID | None = None
     department_id: uuid.UUID | None = None
     branch_id: uuid.UUID | None = None
@@ -38,6 +38,7 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: datetime
     is_team_leader: bool = False
+    is_present_today: bool = False
     seat_number: str | None = None
     inactive_reason: str | None = None
     mfa_enabled: bool = False

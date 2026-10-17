@@ -10,7 +10,7 @@ import { useMetadataStore } from '../../store/metadataStore';
 
 
 export const BillingPage: React.FC = () => {
-  const isDental = (useMetadataStore((s) => s.crmConfig?.industry) || 'healthcare_dental') === 'healthcare_dental';
+  const isDental = useMetadataStore((s) => s.crmConfig?.industry) === 'healthcare_dental';
   const [invoices, setInvoices] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -25,7 +25,9 @@ export const BillingPage: React.FC = () => {
     try {
       const res = await api.get(`/customers/invoices/${inv.id}/whatsapp-share`);
       const { phone, pdf_url, invoice_number } = res.data || {};
-      const msg = `Hello, here is your invoice ${invoice_number || ''} from our clinic.\nView / download it here: ${pdf_url}`;
+      const msg = isDental 
+        ? `Hello, here is your invoice ${invoice_number || ''} from our clinic.\nView / download it here: ${pdf_url}`
+        : `Hello, here is your invoice ${invoice_number || ''}.\nView / download it here: ${pdf_url}`;
       const wa = phone
         ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
         : `https://wa.me/?text=${encodeURIComponent(msg)}`;

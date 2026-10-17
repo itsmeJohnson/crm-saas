@@ -77,7 +77,7 @@ export const AppLayout: React.FC = () => {
     // applies to everyone INCLUDING SuperAdmin (whose module gating is otherwise
     // bypassed below), so the owner's generic CRM has no medical leftovers.
     const DENTAL_ONLY = ['patients', 'appointments', 'treatments', 'treatment_plans', 'recall', 'dentists', 'clinical_reports'];
-    if (item.module && (crmConfig?.industry || 'healthcare_dental') !== 'healthcare_dental' && DENTAL_ONLY.includes(item.module)) {
+    if (item.module && (crmConfig?.industry || 'telecalling') !== 'healthcare_dental' && DENTAL_ONLY.includes(item.module)) {
       return false;
     }
     // Gating by resolved modules config
@@ -111,7 +111,7 @@ export const AppLayout: React.FC = () => {
     .toUpperCase() || 'D';
 
   // Dynamic Configuration Mapping based on template industry
-  const industry = crmConfig?.industry || 'healthcare_dental';
+  const industry = crmConfig?.industry || 'telecalling';
 
   const groupTranslations: Record<string, Record<string, string>> = {
     healthcare_dental: {

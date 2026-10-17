@@ -65,7 +65,7 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactId) { setError('Select a patient.'); return; }
+    if (!contactId) { setError('Select a client / contact.'); return; }
     const clean = items.filter((it) => it.description.trim() && Number(it.unit_price) >= 0);
     if (clean.length === 0) { setError('Add at least one line item.'); return; }
     setSubmitting(true); setError('');
@@ -94,16 +94,16 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
             <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-cyan-400">
               <FileText className="w-5 h-5" />
             </div>
-            <h3 className="text-sm font-bold text-slate-100">Create Invoice</h3>
+            <h3 className="text-sm font-bold text-slate-100">Create Client Invoice</h3>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
         </div>
 
         <form onSubmit={submit} className="p-5 space-y-4 overflow-y-auto">
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Patient</label>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Client / Contact</label>
             <select value={contactId} onChange={(e) => setContactId(e.target.value)} className="neo-input w-full px-3.5 py-2.5 text-xs">
-              <option value="">Select a patient…</option>
+              <option value="">Select a client / contact…</option>
               {patients.map((p) => (
                 <option key={p.id} value={p.id}>{p.first_name} {p.last_name}{p.phone ? ` · ${p.phone}` : ''}</option>
               ))}
@@ -112,14 +112,14 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Treatments / line items</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Services / Line Items</label>
               <button type="button" onClick={() => setItems((p) => [...p, { description: '', quantity: 1, unit_price: 0 }])}
                       className="neo-btn px-2 py-1 text-[11px] text-cyan-400 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add</button>
             </div>
             {catalog.length > 0 && (
               <select value="" onChange={(e) => { if (e.target.value) addFromCatalog(e.target.value); e.target.value=''; }}
                       className="neo-input w-full px-3 py-2 text-xs mb-2">
-                <option value="">+ Add from price list…</option>
+                <option value="">+ Add from service catalog…</option>
                 {catalog.map((t) => (
                   <option key={t.id} value={t.id}>{t.name} — {sym}{Number(t.price).toLocaleString('en-IN')}{t.category ? ` (${t.category})` : ''}</option>
                 ))}
@@ -129,7 +129,7 @@ export const CreateInvoiceModal: React.FC<Props> = ({ isOpen, onClose, onSuccess
               {items.map((it, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })}
-                         placeholder="e.g. Root Canal Therapy" className="neo-input flex-1 px-3 py-2 text-xs" />
+                         placeholder="e.g. Telecalling Campaign - Outbound / Lead Gen" className="neo-input flex-1 px-3 py-2 text-xs" />
                   <input type="number" min={0} value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })}
                          className="neo-input w-14 px-2 py-2 text-xs text-center" title="Qty" />
                   <input type="number" min={0} value={it.unit_price} onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })}

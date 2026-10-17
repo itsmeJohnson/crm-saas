@@ -130,12 +130,20 @@ def require_feature(feature_code: str):
     return dependency
 
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
-    """Check if the user is a Team Leader (Employee who reports to a Manager)."""
-    if user.role != "Employee" or not user.reporting_to_id:
+    """Check if the user is a Team Leader."""
+    if getattr(user, "role", None) == "TeamLeader":
+        return True
+    if user.role != "Employee":
         return False
-    parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
-    parent_role = parent_res.scalar()
-    return parent_role == "Manager"
+    if user.reporting_to_id:
+        parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+        parent_role = parent_res.scalar()
+        if parent_role in ("Manager", "OrgAdmin"):
+            return True
+    has_sub = (await db.execute(
+        select(func.count(User.id)).filter(User.reporting_to_id == user.id, User.is_deleted == False)
+    )).scalar() or 0
+    return has_sub > 0
 
 def require_permission(resource: str, action: str):
     """Custom-role matrix check for a specific resource/action. No-ops for

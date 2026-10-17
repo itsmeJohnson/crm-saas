@@ -58,6 +58,11 @@ class WaSettingsUpdate(BaseModel):
     regenerate_verify_token: bool = False
 
 
+class WaSettingsCreate(WaSettingsUpdate):
+    provider: str = Field("gupshup", max_length=30)
+
+
+
 class WaContactResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -139,7 +144,7 @@ class WaSendTemplateRequest(BaseModel):
     lead_id: Optional[uuid.UUID] = None
     contact_id: Optional[uuid.UUID] = None
     settings_id: Optional[uuid.UUID] = None
-    language: str = "en_US"
+    language: Optional[str] = "en"
     variables: Optional[List[str]] = None  # Dynamic body parameter values
 
 
@@ -230,7 +235,7 @@ class WhatsAppTemplateResponse(BaseModel):
     header_text: Optional[str] = None
     body_text: str
     footer_text: Optional[str] = None
-    buttons: Optional[Dict[str, Any]] = None
+    buttons: Optional[Any] = None
 
 
 # ---- Webhook payloads (token-secured; no auth) ----

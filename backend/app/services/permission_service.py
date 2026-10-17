@@ -111,14 +111,14 @@ class PermissionService:
     def verify_role_hierarchy(actor_role: str, target_role: str) -> bool:
         """
         Enforce hierarchical RBAC control.
-        - OrgAdmin can manage any role.
-        - Manager can only manage Employee.
-        - Employee cannot manage anyone.
+        - SuperAdmin/OrgAdmin can manage any role (Manager, TeamLeader, Employee).
+        - Manager can manage TeamLeader and Employee.
+        - Employee cannot manage anyone unless Team Leader.
         """
-        if actor_role == "OrgAdmin":
+        if actor_role in ("SuperAdmin", "OrgAdmin"):
             return True
         if actor_role == "Manager":
-            return target_role == "Employee"
+            return target_role in ("TeamLeader", "Employee")
         return False
 
     @staticmethod

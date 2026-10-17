@@ -3,15 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import {
   Calendar, Users, Clock, Activity, DollarSign, TrendingUp,
   Plus, ArrowRight, Stethoscope, RefreshCw,
-  ChevronRight, Zap, Phone, MessageSquare, CheckCircle2
+  ChevronRight, Zap, Phone, MessageSquare, CheckCircle2, Headphones
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
+import { useMetadataStore } from '../../store/metadataStore';
+import { useAuthStore } from '../../store/authStore';
 import { PatientProfileModal } from '../../components/dental/PatientProfileModal';
 import { BookAppointmentModal } from '../../components/dental/BookAppointmentModal';
 
 export const DentalDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { crmConfig } = useMetadataStore();
+  const { organization } = useAuthStore();
+  const isDental = crmConfig?.industry === 'healthcare_dental' || crmConfig?.template === 'healthcare_dental';
+  const orgName = organization?.name || 'Samartha Sankalpa Solutions';
+
   const [isLoading, setIsLoading] = useState(true);
   const [todayAppts, setTodayAppts] = useState<any[]>([]);
   const [treatments, setTreatments] = useState<any[]>([]);
@@ -96,7 +103,7 @@ export const DentalDashboard: React.FC = () => {
   const remainingToday = todayAppts.filter((a) => a.status !== 'Completed').length;
 
   // 8 Core Lifecycle Stages
-  const lifecycleStages = [
+  const lifecycleStages = isDental ? [
     { name: 'Marketing', count: `${leadSources.length} Sources`, path: '/marketing', desc: 'Google, Insta, WA' },
     { name: 'Leads', count: `${leadsCount} Inquiries`, path: '/leads', desc: 'New Consultations' },
     { name: 'Follow-up', count: `${followups.length} Tasks`, path: '/follow-ups', desc: 'Pre-op & Inquiries' },
@@ -105,6 +112,15 @@ export const DentalDashboard: React.FC = () => {
     { name: 'Treatments', count: `${treatments.length} Active`, path: '/treatments', desc: 'Multi-sitting Plans' },
     { name: 'Billing', count: `${formatMoney(totalBilled)} Total`, path: '/billing', desc: 'Invoiced & Collected' },
     { name: 'Recall / Repeat', count: `${overdueFollowups} Due`, path: '/follow-ups', desc: '6-Month Cleanings' },
+  ] : [
+    { name: 'Marketing', count: `${leadSources.length} Sources`, path: '/marketing', desc: 'Inbound Campaigns' },
+    { name: 'Leads', count: `${leadsCount} Inquiries`, path: '/leads', desc: 'Fresh & Assigned' },
+    { name: 'Follow-up', count: `${followups.length} Tasks`, path: '/follow-ups', desc: 'Scheduled Callbacks' },
+    { name: 'Calls / Appts', count: `${todayAppts.length} Today`, path: '/appointments', desc: 'Calling Queue' },
+    { name: 'Contacts', count: `${patientsCount} Leads`, path: '/contacts', desc: 'Verified Prospects' },
+    { name: 'Campaigns', count: `${treatments.length} Active`, path: '/treatments', desc: 'Active Pipelines' },
+    { name: 'Billing', count: `${formatMoney(totalBilled)} Total`, path: '/billing', desc: 'Invoiced & Collected' },
+    { name: 'Retention', count: `${overdueFollowups} Due`, path: '/follow-ups', desc: 'Follow-up Reminders' },
   ];
 
   return (
@@ -113,20 +129,20 @@ export const DentalDashboard: React.FC = () => {
       <div className="bento-card p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 flex-shrink-0">
-            <Stethoscope className="w-5 h-5" />
+            {isDental ? <Stethoscope className="w-5 h-5" /> : <Headphones className="w-5 h-5" />}
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-slate-100 tracking-tight">
-                SmileCare Dental Practice
+                {isDental ? 'SmileCare Dental Practice' : orgName}
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live OPD
+                {isDental ? 'Live OPD' : 'Live Operations'}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Practice Command Center • {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+              {isDental ? 'Practice Command Center' : 'Telecalling Operations Command Center'} • {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           </div>
         </div>
@@ -146,27 +162,29 @@ export const DentalDashboard: React.FC = () => {
             className="minimal-btn-primary px-3.5 py-2 text-xs"
           >
             <Plus className="w-3.5 h-3.5" />
-            Book Appointment
+            {isDental ? 'Book Appointment' : 'Schedule Call'}
           </button>
           <button
             onClick={() => navigate('/leads')}
             className="minimal-btn px-3.5 py-2 text-xs text-cyan-400 hover:text-cyan-300"
           >
             <Zap className="w-3.5 h-3.5 text-cyan-400" />
-            New Enquiry
+            {isDental ? 'New Enquiry' : 'New Lead'}
           </button>
         </div>
       </div>
 
       {/* ── Bento 6-Metric Grid ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        {/* Metric 1: Today's Appointments */}
+        {/* Metric 1: Today's Appointments / Calls */}
         <div
           onClick={() => navigate('/appointments')}
           className="bento-card p-4 hover:border-cyan-500/40 cursor-pointer transition"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Today's Appts</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+              {isDental ? "Today's Appts" : "Today's Calls"}
+            </span>
             <Calendar className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100">{todayAppts.length}</div>
@@ -175,18 +193,20 @@ export const DentalDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Metric 2: Total Patients */}
+        {/* Metric 2: Total Patients / Contacts */}
         <div
-          onClick={() => navigate('/patients')}
+          onClick={() => navigate(isDental ? '/patients' : '/contacts')}
           className="bento-card p-4 hover:border-emerald-500/40 cursor-pointer transition"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Patients</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+              {isDental ? 'Patients' : 'Contacts'}
+            </span>
             <Users className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100">{patientsCount}</div>
           <p className="text-[11px] text-emerald-400 mt-1 font-medium">
-            Registered
+            {isDental ? 'Registered' : 'Active Leads'}
           </p>
         </div>
 
@@ -205,22 +225,24 @@ export const DentalDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Metric 4: Active Treatments */}
+        {/* Metric 4: Active Treatments / Campaigns */}
         <div
           onClick={() => navigate('/treatments')}
           className="bento-card p-4 hover:border-purple-500/40 cursor-pointer transition"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Treatments</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+              {isDental ? 'Treatments' : 'Campaigns'}
+            </span>
             <Activity className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100">{treatments.length}</div>
           <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-            Active plans
+            {isDental ? 'Active plans' : 'Active pipelines'}
           </p>
         </div>
 
-        {/* Metric 5: Today's Revenue */}
+        {/* Metric 5: Today's Collections */}
         <div
           onClick={() => navigate('/billing')}
           className="bento-card p-4 hover:border-cyan-500/40 cursor-pointer transition"
@@ -255,10 +277,10 @@ export const DentalDashboard: React.FC = () => {
       <div className="bento-card p-5">
         <div className="flex items-center justify-between mb-3.5">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Practice Lifecycle Pipeline
+            {isDental ? 'Practice Lifecycle Pipeline' : 'Telecalling Lifecycle Pipeline'}
           </h2>
           <span className="text-[11px] text-slate-500">
-            Marketing to 6-Month Routine Recall
+            {isDental ? 'Marketing to 6-Month Routine Recall' : 'Lead Acquisition to Conversion & Retention'}
           </span>
         </div>
 
@@ -287,18 +309,18 @@ export const DentalDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Row 3: Operatory Schedule & Follow-up Queue ── */}
+      {/* ── Row 3: Call/Operatory Schedule & Follow-up Queue ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Operatory Schedule (7 cols) */}
+        {/* Schedule (7 cols) */}
         <div className="lg:col-span-7 bento-card p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-100">
-                  Today's Operatory Schedule ({todayAppts.length})
+                  {isDental ? "Today's Operatory Schedule" : "Today's Call Schedule"} ({todayAppts.length})
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Live chairside queue &amp; patient check-ins
+                  {isDental ? "Live chairside queue & patient check-ins" : "Live calling queue & scheduled demos"}
                 </p>
               </div>
               <button
@@ -313,8 +335,12 @@ export const DentalDashboard: React.FC = () => {
             {todayAppts.length === 0 ? (
               <div className="p-8 text-center my-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-color)] space-y-1.5">
                 <Calendar className="w-6 h-6 mx-auto text-slate-500" />
-                <p className="text-xs text-slate-300 font-medium">No appointments remaining for today.</p>
-                <p className="text-[11px] text-slate-500">Click Add Slot above to book a chair.</p>
+                <p className="text-xs text-slate-300 font-medium">
+                  {isDental ? 'No appointments remaining for today.' : 'No calls scheduled for today.'}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {isDental ? 'Click Add Slot above to book a chair.' : 'Click Add Slot above to schedule a call.'}
+                </p>
               </div>
             ) : (
               <div className="space-y-2 my-2">
@@ -337,10 +363,10 @@ export const DentalDashboard: React.FC = () => {
                           }}
                           className="text-xs font-semibold text-slate-100 hover:text-cyan-400 cursor-pointer truncate"
                         >
-                          {appt.contact?.name || appt.title || 'Patient Appointment'}
+                          {appt.contact?.name || appt.title || (isDental ? 'Patient Appointment' : 'Lead Consultation')}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
-                          {appt.description || 'Routine Checkup & Scaling'} • Dr. Arvind Mehta
+                          {appt.description || (isDental ? 'Routine Checkup & Scaling • Dr. Arvind Mehta' : 'Introductory Call & Product Demo')}
                         </p>
                       </div>
                     </div>
@@ -372,7 +398,9 @@ export const DentalDashboard: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
-            <span className="text-slate-500">Operatory Chairs: 3 Active</span>
+            <span className="text-slate-500">
+              {isDental ? 'Operatory Chairs: 3 Active' : 'Calling Channels: Active'}
+            </span>
             <button
               onClick={() => navigate('/appointments')}
               className="text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1"
@@ -388,10 +416,10 @@ export const DentalDashboard: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-100">
-                  Follow-up &amp; Recall Queue
+                  {isDental ? 'Follow-up & Recall Queue' : 'Follow-up & Callback Queue'}
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Post-op reviews &amp; 6-month checkups
+                  {isDental ? 'Post-op reviews & 6-month checkups' : 'Pending lead callbacks & task reviews'}
                 </p>
               </div>
               <button
@@ -404,7 +432,9 @@ export const DentalDashboard: React.FC = () => {
 
             <div className="space-y-2 my-2">
               {followups.length === 0 && (
-                <div className="p-6 text-center text-slate-500 text-xs">No follow-ups or recalls due.</div>
+                <div className="p-6 text-center text-slate-500 text-xs">
+                  {isDental ? 'No follow-ups or recalls due.' : 'No follow-ups or callbacks due.'}
+                </div>
               )}
               {followups.slice(0, 4).map((task) => (
                 <div
@@ -413,14 +443,14 @@ export const DentalDashboard: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-200 truncate">
-                      {task.title || 'Post-Extraction Review'}
+                      {task.title || (isDental ? 'Post-Extraction Review' : 'Follow-up Call')}
                     </span>
                     <span className="text-[10px] text-amber-400">
                       {task.due_date ? new Date(task.due_date).toLocaleDateString('en-IN') : 'Due Today'}
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-400 line-clamp-1">
-                    {task.description || 'Call patient to check sensitivity post-filling.'}
+                    {task.description || (isDental ? 'Call patient to check sensitivity post-filling.' : 'Follow-up on pricing proposal.')}
                   </p>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[9px] text-slate-500">{task.status || 'Pending'}</span>
@@ -450,17 +480,17 @@ export const DentalDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Row 4: Active Treatments (8 cols) & Patient Acquisition (4 cols) ── */}
+      {/* ── Row 4: Active Treatments/Campaigns (8 cols) & Acquisition (4 cols) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Active Treatments (8 cols) */}
+        {/* Active Treatments / Campaigns (8 cols) */}
         <div className="lg:col-span-8 bento-card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-100">
-                Active Clinical Treatment Plans ({treatments.length})
+                {isDental ? `Active Clinical Treatment Plans (${treatments.length})` : `Active Campaign Pipelines (${treatments.length})`}
               </h3>
               <p className="text-[11px] text-slate-400">
-                In-progress multi-sitting procedures
+                {isDental ? 'In-progress multi-sitting procedures' : 'In-progress customer & telecalling pipelines'}
               </p>
             </div>
             <button
@@ -473,9 +503,11 @@ export const DentalDashboard: React.FC = () => {
 
           <div className="space-y-2.5">
             {treatments.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 text-xs">No active treatment plans yet.</div>
+              <div className="p-6 text-center text-slate-500 text-xs">
+                {isDental ? 'No active treatment plans yet.' : 'No active campaign orders yet.'}
+              </div>
             ) : treatments.slice(0, 6).map((t) => {
-              const title = t.items?.[0]?.description || t.order_number || 'Treatment';
+              const title = t.items?.[0]?.description || t.order_number || (isDental ? 'Treatment' : 'Campaign');
               return (
                 <div key={t.id} className="p-3.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-color)] flex items-center justify-between">
                   <div>
@@ -489,13 +521,13 @@ export const DentalDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Patient Acquisition (4 cols) */}
+        {/* Lead / Patient Acquisition (4 cols) */}
         <div className="lg:col-span-4 bento-card p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-100">
-                  Patient Acquisition
+                  {isDental ? 'Patient Acquisition' : 'Lead Acquisition'}
                 </h3>
                 <p className="text-[11px] text-slate-400">
                   Marketing channel revenue

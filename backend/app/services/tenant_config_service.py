@@ -17,25 +17,25 @@ class TenantConfigurationResolver:
         if not org:
             # Fallback default configuration
             return {
-                "industry": IndustryType.HEALTHCARE_DENTAL.value,
-                "template": IndustryType.HEALTHCARE_DENTAL.value,
-                "enabled_modules": list(BUSINESS_TEMPLATES[IndustryType.HEALTHCARE_DENTAL]),
+                "industry": IndustryType.TELECALLING.value,
+                "template": IndustryType.TELECALLING.value,
+                "enabled_modules": list(BUSINESS_TEMPLATES[IndustryType.TELECALLING]),
             }
 
-        industry_val = org.industry or IndustryType.HEALTHCARE_DENTAL.value
-        template_val = org.business_template or IndustryType.HEALTHCARE_DENTAL.value
+        industry_val = org.industry or IndustryType.TELECALLING.value
+        template_val = org.business_template or IndustryType.TELECALLING.value
 
         try:
             industry_enum = IndustryType(industry_val)
         except ValueError:
-            industry_enum = IndustryType.HEALTHCARE_DENTAL
+            industry_enum = IndustryType.TELECALLING
 
         try:
             template_enum = IndustryType(template_val)
         except ValueError:
-            template_enum = IndustryType.HEALTHCARE_DENTAL
+            template_enum = IndustryType.TELECALLING
 
-        default_modules = BUSINESS_TEMPLATES.get(template_enum, BUSINESS_TEMPLATES[IndustryType.HEALTHCARE_DENTAL])
+        default_modules = BUSINESS_TEMPLATES.get(template_enum, BUSINESS_TEMPLATES[IndustryType.TELECALLING])
 
         if org.enabled_modules is not None:
             if isinstance(org.enabled_modules, list):

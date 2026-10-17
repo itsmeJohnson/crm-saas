@@ -3,10 +3,11 @@ import {
   X, Send, Paperclip, FileText, Image as ImageIcon,
   Check, CheckCheck, Clock, AlertTriangle, Phone,
   FileCheck, ShieldCheck, Download, ExternalLink,
-  MessageCircle, MessageSquare, Loader2
+  MessageCircle, MessageSquare, Loader2, LayoutTemplate,
+  Sparkles, CheckCircle2
 } from 'lucide-react';
 import { LeadResponse, leadApi } from '../../services/leadApi';
-import { whatsappApi, WaMessage, QuickReply } from '../../services/whatsappApi';
+import { whatsappApi, WaMessage, QuickReply, WaTemplate } from '../../services/whatsappApi';
 import { smsApi, SmsItem } from '../../services/smsApi';
 import { extractErrorMessage } from '../../utils/errors';
 
@@ -76,9 +77,67 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
   const [waConvId, setWaConvId] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
 
+  // WhatsApp Template state
+  const [waTemplates, setWaTemplates] = useState<WaTemplate[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<WaTemplate | null>(null);
+  const [templateVars, setTemplateVars] = useState<string[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     chatEndRef.current?.scrollIntoView({ behavior });
   };
+
+  const loadTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    try {
+      const list = await whatsappApi.listTemplates();
+      if (list && list.length > 0) {
+        setWaTemplates(list);
+        setSelectedTemplate(list[0]);
+      } else {
+        const fallback: WaTemplate[] = [
+          {
+            id: 'hiring-default',
+            organization_id: '',
+            meta_template_id: 'hiring',
+            name: 'hiring',
+            category: 'UTILITY',
+            language: 'en',
+            status: 'APPROVED',
+            header_format: null,
+            header_text: null,
+            body_text: 'Hi, thanks for your interest in telecaller hiring. We have received your application. Your interview is scheduled on Monday at Samartha Sankalpa OPC Pvt Ltd Location: Kengeri. Please reply with "CONFIRM" to confirm your slot.',
+            footer_text: null,
+            buttons: null,
+          }
+        ];
+        setWaTemplates(fallback);
+        setSelectedTemplate(fallback[0]);
+      }
+    } catch {
+      const fallback: WaTemplate[] = [
+        {
+          id: 'hiring-default',
+          organization_id: '',
+          meta_template_id: 'hiring',
+          name: 'hiring',
+          category: 'UTILITY',
+          language: 'en',
+          status: 'APPROVED',
+          header_format: null,
+          header_text: null,
+          body_text: 'Hi, thanks for your interest in telecaller hiring. We have received your application. Your interview is scheduled on Monday at Samartha Sankalpa OPC Pvt Ltd Location: Kengeri. Please reply with "CONFIRM" to confirm your slot.',
+          footer_text: null,
+          buttons: null,
+        }
+      ];
+      setWaTemplates(fallback);
+      setSelectedTemplate(fallback[0]);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, []);
 
   // Load conversation history for current lead & channel
   const loadConversation = useCallback(async () => {
@@ -135,8 +194,51 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     if (isOpen && lead) {
       loadConversation();
       whatsappApi.listQuickReplies().then(setQuickReplies).catch(() => {});
+      loadTemplates();
     }
-  }, [isOpen, lead, channel, loadConversation]);
+  }, [isOpen, lead, channel, loadConversation, loadTemplates]);
+
+  const handleSendTemplate = async (templateToUse?: WaTemplate) => {
+    const tmpl = templateToUse || selectedTemplate;
+    if (!tmpl || !lead || !lead.phone) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await whatsappApi.sendTemplate({
+        to_number: lead.phone,
+        template_name: tmpl.name,
+        template_id: tmpl.id?.includes('default') ? undefined : tmpl.id,
+        conversation_id: waConvId || undefined,
+        lead_id: lead.id,
+        language: tmpl.language || 'en',
+        variables: templateVars.length > 0 ? templateVars : undefined,
+      });
+
+      let displayBody = tmpl.body_text;
+      templateVars.forEach((val, idx) => {
+        displayBody = displayBody.replace(`{{${idx + 1}}}`, val);
+      });
+
+      const newMsg: ChatMessage = {
+        id: res.id || `local-${Date.now()}`,
+        channel: 'whatsapp',
+        direction: 'OUTBOUND',
+        body: res.body || displayBody,
+        status: res.wa_status || 'sent',
+        created_at: new Date().toISOString(),
+        media_type: 'template',
+      };
+      setMessages((prev) => [...prev, newMsg]);
+      setShowTemplateModal(false);
+      setTemplateVars([]);
+      setError(null);
+      setTimeout(() => scrollToBottom('smooth'), 50);
+    } catch (err: any) {
+      setError(extractErrorMessage(err, 'Failed to send template message'));
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (!isOpen || !lead) return null;
 
@@ -410,6 +512,13 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
                       </div>
                     )}
 
+                    {/* Template Badge if template */}
+                    {m.media_type === 'template' && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 w-fit">
+                        <FileCheck className="w-3 h-3" /> Approved WhatsApp Template
+                      </div>
+                    )}
+
                     {/* Message Body */}
                     {m.body && <p className="whitespace-pre-wrap break-words leading-relaxed text-xs sm:text-sm">{m.body}</p>}
 
@@ -437,6 +546,18 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         {/* Quick Onboarding Response Chips */}
         <div className="px-3 pt-2 bg-slate-900 border-t border-slate-800/60 overflow-x-auto no-scrollbar flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0 mr-1">Quick:</span>
+          {channel === 'whatsapp' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (waTemplates.length > 0 && !selectedTemplate) setSelectedTemplate(waTemplates[0]);
+                setShowTemplateModal(true);
+              }}
+              className="text-[11px] font-bold whitespace-nowrap px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 transition shrink-0 cursor-pointer flex items-center gap-1 shadow-sm"
+            >
+              <Sparkles className="w-3 h-3 text-emerald-400" /> ⚡ Send Template ({waTemplates.length})
+            </button>
+          )}
           {ONBOARDING_TEMPLATES.map((tmpl, idx) => (
             <button
               key={idx}
@@ -483,9 +604,41 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
 
         {/* Error message */}
         {error && (
-          <div className="mx-3 mt-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center justify-between shrink-0">
-            <span>{error}</span>
-            <button onClick={() => setError(null)}><X className="w-3.5 h-3.5" /></button>
+          <div className={`mx-3 mt-2 p-3 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0 animate-fade-in shadow-lg ${
+            error.toLowerCase().includes('24-hour') || error.toLowerCase().includes('template')
+              ? 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+              : 'bg-red-500/10 border-red-500/20 text-red-400'
+          }`}>
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                error.toLowerCase().includes('24-hour') || error.toLowerCase().includes('template') ? 'text-amber-400' : 'text-red-400'
+              }`} />
+              <div>
+                <p className="font-semibold">{error}</p>
+                {channel === 'whatsapp' && (error.toLowerCase().includes('24-hour') || error.toLowerCase().includes('template')) && (
+                  <p className="text-[11px] text-amber-300/80 mt-0.5">
+                    Free-form messaging is paused until user replies. Send an approved template message to re-open the 24-hour communication session.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              {channel === 'whatsapp' && (error.toLowerCase().includes('24-hour') || error.toLowerCase().includes('template')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (waTemplates.length > 0 && !selectedTemplate) setSelectedTemplate(waTemplates[0]);
+                    setShowTemplateModal(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                >
+                  <LayoutTemplate className="w-3.5 h-3.5" /> Send Template
+                </button>
+              )}
+              <button onClick={() => setError(null)} className="p-1 text-slate-400 hover:text-white">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -514,6 +667,23 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
             >
               <Paperclip className="w-4 h-4" />
             </button>
+
+            {/* Template Selector Button */}
+            {channel === 'whatsapp' && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (waTemplates.length > 0 && !selectedTemplate) setSelectedTemplate(waTemplates[0]);
+                  setShowTemplateModal(true);
+                }}
+                disabled={sending}
+                title="Send Approved WhatsApp Template (Bypasses 24h Window)"
+                className="p-2.5 rounded-xl border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition cursor-pointer shrink-0 flex items-center gap-1.5"
+              >
+                <LayoutTemplate className="w-4 h-4" />
+                <span className="text-xs font-semibold hidden sm:inline">Template</span>
+              </button>
+            )}
 
             {/* Input Textarea */}
             <textarea
@@ -553,6 +723,126 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
             </button>
           </div>
         </form>
+
+        {/* WhatsApp Template Selector Modal */}
+        {showTemplateModal && (
+          <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-sm p-4 flex flex-col justify-end sm:justify-center animate-fade-in">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-5 shadow-2xl max-h-[92%] flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <LayoutTemplate className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">Send WhatsApp Template</h3>
+                    <p className="text-[11px] text-slate-400">Approved Meta HSM broadcast template</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="my-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>Templates bypass the Meta 24-hour window restriction and re-open the conversation.</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
+                {/* Template Selector */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-300">Select Approved Template</label>
+                    {loadingTemplates && <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />}
+                  </div>
+                  <select
+                    value={selectedTemplate?.name || ''}
+                    onChange={(e) => {
+                      const found = waTemplates.find((t) => t.name === e.target.value);
+                      if (found) {
+                        setSelectedTemplate(found);
+                        setTemplateVars([]);
+                      }
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    {waTemplates.map((tmpl) => (
+                      <option key={tmpl.name} value={tmpl.name}>
+                        {tmpl.name} ({tmpl.category || 'UTILITY'} · {tmpl.language || 'en'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Template Message Preview */}
+                {selectedTemplate && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-semibold text-slate-400">Live WhatsApp Preview</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-emerald-500/20">
+                        {selectedTemplate.category || 'UTILITY'}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs leading-relaxed relative">
+                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold mb-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Meta Verified HSM Template
+                      </div>
+                      <p className="whitespace-pre-wrap text-slate-300">{selectedTemplate.body_text}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Variable fields if any */}
+                {selectedTemplate && (selectedTemplate.body_text.match(/\{\{(\d+)\}\}/g) || []).length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-xs font-semibold text-slate-300">Template Dynamic Parameters</label>
+                    {(selectedTemplate.body_text.match(/\{\{(\d+)\}\}/g) || []).map((_, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 w-16 shrink-0">Param {idx + 1}:</span>
+                        <input
+                          type="text"
+                          value={templateVars[idx] || ''}
+                          onChange={(e) => {
+                            const updated = [...templateVars];
+                            updated[idx] = e.target.value;
+                            setTemplateVars(updated);
+                          }}
+                          placeholder={`Value for {{${idx + 1}}}`}
+                          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(false)}
+                  disabled={sending}
+                  className="px-3.5 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendTemplate()}
+                  disabled={sending || !selectedTemplate}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50 shadow-lg shadow-emerald-900/30 cursor-pointer"
+                >
+                  {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Send Template to {lead.phone}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

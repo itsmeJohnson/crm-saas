@@ -53,12 +53,33 @@ class UserService:
         return sorted(list(all_seats - occupied))
 
     async def is_team_leader(self, user: User) -> bool:
-        """Check if the user is a Team Leader (Employee reporting to a Manager)."""
-        if user.role != "Employee" or not user.reporting_to_id:
+        """Check if the user is a Team Leader."""
+        if getattr(user, "role", None) == "TeamLeader":
+            return True
+        if user.role != "Employee":
             return False
-        parent_res = await self.db.execute(select(User.role).filter(User.id == user.reporting_to_id))
-        parent_role = parent_res.scalar()
-        return parent_role == "Manager"
+        if user.reporting_to_id:
+            parent_res = await self.db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+            parent_role = parent_res.scalar()
+            if parent_role in ("Manager", "OrgAdmin"):
+                return True
+        has_sub = (await self.db.execute(
+            select(func.count(User.id)).filter(User.reporting_to_id == user.id, User.is_deleted == False)
+        )).scalar() or 0
+        return has_sub > 0
+
+    async def _get_present_user_ids(self, organization_id: uuid.UUID) -> set[uuid.UUID]:
+        from datetime import datetime, timezone
+        from app.models.attendance import AttendanceRecord
+        today = datetime.now(timezone.utc).date()
+        present_query = select(AttendanceRecord.user_id).filter(
+            AttendanceRecord.organization_id == organization_id,
+            AttendanceRecord.work_date == today,
+            AttendanceRecord.clock_in_at.is_not(None),
+            AttendanceRecord.clock_out_at.is_(None),
+            AttendanceRecord.status.in_(["present", "late", "half_day"])
+        )
+        return set((await self.db.execute(present_query)).scalars().all())
 
     async def _validate_department(self, organization_id: uuid.UUID, data: dict) -> None:
         """If a department_id is supplied, ensure it belongs to this org (or is None)."""
@@ -147,21 +168,36 @@ class UserService:
         is_tl = await self.is_team_leader(actor)
         
         # If actor is a Team Leader, they can only create Employees reporting directly to them
-        if actor.role == "Employee":
-            if not is_tl:
+        if actor.role in ("Employee", "TeamLeader"):
+            if actor.role == "Employee" and not is_tl:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Telecallers cannot create users"
                 )
-            if role != "Employee":
+            if role not in ("Employee",):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Team Leaders can only create Employees"
+                    detail="Team Leaders can only create Sales Agents / Employees"
                 )
-            if reporting_to_id != actor.id:
+            if reporting_to_id and reporting_to_id != actor.id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Team Leaders can only create team members reporting to themselves"
+                )
+            if not reporting_to_id:
+                reporting_to_id = actor.id
+                user_data["reporting_to_id"] = actor.id
+        elif actor.role == "Manager":
+            if role not in ("TeamLeader", "Employee"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Managers can only create Team Leaders and Sales Agents / Employees"
+                )
+        elif actor.role in ("SuperAdmin", "OrgAdmin"):
+            if role not in ("OrgAdmin", "Manager", "TeamLeader", "Employee"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Invalid role level"
                 )
         
         PermissionService.check_user_management_permission(
@@ -541,8 +577,10 @@ class UserService:
         records, total = await self.user_repo.paginate_users(
             actor.organization_id, skip, limit, search_query, role, is_active, reporting_to_id
         )
+        present_uids = await self._get_present_user_ids(actor.organization_id)
         for u in records:
             u.is_team_leader = await self.is_team_leader(u)
+            u.is_present_today = (u.id in present_uids)
         return records, total
 
     async def get_downline_user_ids(self, actor: User) -> set[uuid.UUID]:
@@ -578,8 +616,10 @@ class UserService:
         rows = (await self.db.execute(select(User).filter(
             User.id.in_(ids), User.is_deleted == False, User.is_active == True
         ).order_by(User.first_name, User.last_name))).scalars().all()
+        present_uids = await self._get_present_user_ids(actor.organization_id)
         for u in rows:
             u.is_team_leader = await self.is_team_leader(u)
+            u.is_present_today = (u.id in present_uids)
         return list(rows)
 
     async def get_downline_user_ids_by_id(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> set[uuid.UUID]:
@@ -656,7 +696,7 @@ class UserService:
             )
 
         if role == "Manager":
-            if parent.role != "OrgAdmin":
+            if parent.role not in ("OrgAdmin", "SuperAdmin"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Managers must report to a Super Admin (OrgAdmin)"
@@ -679,10 +719,19 @@ class UserService:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Telecallers must report to a Team Leader who reports to a Manager"
                     )
+            elif parent.role in ("TeamLeader",):
+                pass
             else:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Employees must report to either a Manager (TL) or a Team Leader (Agent)"
+                )
+
+        elif role == "TeamLeader":
+            if parent.role not in ("Manager", "OrgAdmin", "SuperAdmin"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Team Leaders must report to a Manager or Administrator"
                 )
 
     async def replace_employee(

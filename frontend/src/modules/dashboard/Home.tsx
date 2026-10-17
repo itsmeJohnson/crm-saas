@@ -1,16 +1,11 @@
 import React, { Suspense, lazy } from 'react';
-import { useMetadataStore } from '../../store/metadataStore';
 import { useAuthStore } from '../../store/authStore';
 
 const DentalDashboard = lazy(() => import('../../pages/dental/DentalDashboard').then(m => ({ default: m.DentalDashboard })));
 const EmployeeDashboard = lazy(() => import('./EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })));
-const AnalyticsDashboard = lazy(() => import('../../components/dashboard/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
 export const Home: React.FC = () => {
-  const { crmConfig } = useMetadataStore();
   const { user } = useAuthStore();
-
-  const template = crmConfig?.template || 'healthcare_dental';
   const role = user?.role;
 
   return (
@@ -25,12 +20,10 @@ export const Home: React.FC = () => {
           ))}
         </div>
       }>
-        {template === 'healthcare_dental' ? (
-          <DentalDashboard />
-        ) : role === 'Employee' ? (
+        {role === 'Employee' ? (
           <EmployeeDashboard />
         ) : (
-          <AnalyticsDashboard />
+          <DentalDashboard />
         )}
       </Suspense>
     </div>

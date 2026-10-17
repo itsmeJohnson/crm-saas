@@ -658,34 +658,49 @@ class LeadImportService:
                 for lead_obj in imported_leads:
                     await self.assignment_service.assign_lead_to_user(lead_obj, target_user)
             elif assignment_mode == "MULTIPLE_USERS" and target_users:
-                # Chunk-split algorithm
-                num_leads = len(imported_leads)
-                num_assignees = len(target_users)
-                k = num_leads // num_assignees
-                r = num_leads % num_assignees
-                
-                idx = 0
-                for i, assignee in enumerate(target_users):
-                    chunk_size = k + (1 if i < r else 0)
-                    for _ in range(chunk_size):
-                        lead = imported_leads[idx]
-                        lead.assigned_user_id = assignee.id
-                        self.db.add(lead)
-                        # Log audit event for assignment
-                        await self.audit_service.log_event(
-                            organization_id=actor.organization_id,
-                            actor_user_id=actor.id,
-                            action="LEAD_ASSIGNED",
-                            resource_type="lead",
-                            resource_id=str(lead.id),
-                            action_metadata={
-                                "assigned_user_id": str(assignee.id),
-                                "assigned_email": assignee.email,
-                                "reason": "bulk_assignment_import",
-                                "strategy": "SPLIT"
-                            }
-                        )
-                        idx += 1
+                # Filter to only users who have marked attendance today and are currently present
+                from app.models.attendance import AttendanceRecord
+                today = datetime.now(timezone.utc).date()
+                present_query = select(AttendanceRecord.user_id).filter(
+                    AttendanceRecord.organization_id == actor.organization_id,
+                    AttendanceRecord.user_id.in_([u.id for u in target_users]),
+                    AttendanceRecord.work_date == today,
+                    AttendanceRecord.clock_in_at.is_not(None),
+                    AttendanceRecord.clock_out_at.is_(None),
+                    AttendanceRecord.status.in_(["present", "late", "half_day"])
+                )
+                present_user_ids = set((await self.db.execute(present_query)).scalars().all())
+                present_target_users = [u for u in target_users if u.id in present_user_ids]
+
+                # Distribute equally among present agents. If none are present, leads stay unassigned.
+                if present_target_users:
+                    num_leads = len(imported_leads)
+                    num_assignees = len(present_target_users)
+                    k = num_leads // num_assignees
+                    r = num_leads % num_assignees
+                    
+                    idx = 0
+                    for i, assignee in enumerate(present_target_users):
+                        chunk_size = k + (1 if i < r else 0)
+                        for _ in range(chunk_size):
+                            lead = imported_leads[idx]
+                            lead.assigned_user_id = assignee.id
+                            self.db.add(lead)
+                            # Log audit event for assignment
+                            await self.audit_service.log_event(
+                                organization_id=actor.organization_id,
+                                actor_user_id=actor.id,
+                                action="LEAD_ASSIGNED",
+                                resource_type="lead",
+                                resource_id=str(lead.id),
+                                action_metadata={
+                                    "assigned_user_id": str(assignee.id),
+                                    "assigned_email": assignee.email,
+                                    "reason": "bulk_assignment_import_present_only",
+                                    "strategy": "SPLIT"
+                                }
+                            )
+                            idx += 1
 
         # Commit transaction on successfully processed leads
         import_record.successful_rows = success_count

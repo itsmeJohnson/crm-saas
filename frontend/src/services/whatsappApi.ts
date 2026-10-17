@@ -175,6 +175,8 @@ export const whatsappApi = {
     (await api.get<WaSettings>('/whatsapp/settings', { params: { settings_id: settingsId } })).data,
   listSettings: async () => 
     (await api.get<WaSettings[]>('/whatsapp/settings/list')).data,
+  createSettings: async (payload: Partial<WaSettings> & { access_token?: string; webhook_secret?: string }) =>
+    (await api.post<WaSettings>('/whatsapp/settings', payload)).data,
   updateSettings: async (settingsId: string, payload: Partial<WaSettings> & { access_token?: string; webhook_secret?: string; regenerate_webhook_token?: boolean; regenerate_verify_token?: boolean }) =>
     (await api.put<WaSettings>(`/whatsapp/settings/${settingsId}`, payload)).data,
   checkHealth: async (settingsId: string) =>
@@ -227,6 +229,7 @@ export const whatsappApi = {
   removeLabel: async (conversationId: string, labelId: string) =>
     (await api.delete<WaConversation>(`/whatsapp/conversations/${conversationId}/labels/${labelId}`)).data,
 
+  listTemplates: async () => (await api.get<WaTemplate[]>('/whatsapp/templates')).data,
   listQuickReplies: async () => (await api.get<QuickReply[]>('/whatsapp/quick-replies')).data,
   createQuickReply: async (payload: { shortcut: string; text: string }) =>
     (await api.post<QuickReply>('/whatsapp/quick-replies', payload)).data,

@@ -112,6 +112,13 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
     }
   };
 
+  const handleSelectPresentOnly = () => {
+    const presentIds = employees.filter((emp) => emp.is_present_today).map((emp) => emp.id);
+    setSelectedUserIds(presentIds);
+  };
+
+  const presentCount = employees.filter((e) => e.is_present_today).length;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -240,16 +247,29 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
 
           {/* Assignees Checklist */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Select Assignees</label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Select Assignees ({selectedUserIds.length} of {employees.length})
+              </label>
               {employees.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSelectAll}
-                  className="text-xs font-semibold text-brand-400 hover:text-brand-300 cursor-pointer"
-                >
-                  {selectedUserIds.length === employees.length ? 'Deselect All' : 'Select All'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSelectPresentOnly}
+                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 cursor-pointer flex items-center gap-1"
+                    title="Select only employees marked present today"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    Present Only ({presentCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSelectAll}
+                    className="text-xs font-semibold text-brand-400 hover:text-brand-300 cursor-pointer"
+                  >
+                    {selectedUserIds.length === employees.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -269,22 +289,36 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                   return (
                     <label 
                       key={emp.id} 
-                      className="flex items-center gap-2.5 py-2.5 cursor-pointer text-xs text-slate-300 hover:text-slate-100 transition-colors"
+                      className="flex items-center justify-between gap-2.5 py-2.5 cursor-pointer text-xs text-slate-300 hover:text-slate-100 transition-colors"
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleUser(emp.id)}
-                        className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-brand-500/20 cursor-pointer"
-                      />
-                      <div className="overflow-hidden">
-                        <span className="font-semibold block">
-                          {emp.first_name || ''} {emp.last_name || ''}
-                        </span>
-                        <span className="text-[10px] text-slate-500 block">
-                          {emp.email}
-                        </span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleUser(emp.id)}
+                          className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-brand-500/20 cursor-pointer shrink-0"
+                        />
+                        <div className="overflow-hidden">
+                          <span className="font-semibold block truncate">
+                            {emp.first_name || ''} {emp.last_name || ''}
+                          </span>
+                          <span className="text-[10px] text-slate-500 block truncate">
+                            {emp.email}
+                          </span>
+                        </div>
                       </div>
+
+                      {emp.is_present_today ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Present
+                        </span>
+                      ) : (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                          Absent
+                        </span>
+                      )}
                     </label>
                   );
                 })}

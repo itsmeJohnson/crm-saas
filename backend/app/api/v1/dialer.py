@@ -34,7 +34,12 @@ def config_ready(cfg: dict | None) -> bool:
     if provider == "myoperator":
         return bool(cfg.get("company_id") and cfg.get("x_api_key")
                     and cfg.get("secret_token") and cfg.get("public_ivr_id"))
-    return bool(cfg.get("x_api_key"))
+    elif provider == "callerdesk":
+        return bool(
+            (cfg.get("authcode") or cfg.get("x_api_key") or cfg.get("authentication_token"))
+            and (cfg.get("deskphone") or cfg.get("default_caller_id"))
+        )
+    return bool(cfg.get("x_api_key") or cfg.get("authentication_token"))
 
 
 def _extract_call_id(call_res, fallback: str) -> str:
@@ -171,7 +176,8 @@ async def get_next_lead(
                 detail="Integrated outbound calling is not included in your plan. Please upgrade to enable click-to-call."
             )
         try:
-            call_sid = await trigger_provider_call(cfg, lead.phone, actor.phone, call_sid)
+            agent_phone = payload.agent_phone_number or actor.phone or (cfg or {}).get("user_uuid")
+            call_sid = await trigger_provider_call(cfg, lead.phone, agent_phone, call_sid)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -311,7 +317,8 @@ async def call_lead(
 
     call_sid = f"outbound-{uuid.uuid4()}"
     try:
-        call_sid = await trigger_provider_call(cfg, lead.phone, actor.phone, call_sid)
+        agent_phone = payload.agent_phone_number or actor.phone or (cfg or {}).get("user_uuid")
+        call_sid = await trigger_provider_call(cfg, lead.phone, agent_phone, call_sid)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   Settings as SettingsIcon, Loader2, Check, RefreshCw, Zap, Trash2, Plus, AlertTriangle, Play,
-  Shield, Wifi, Phone, CheckCircle2, Edit2, AlertCircle, Laptop, X, Heart, Activity, ShieldCheck, Clock
+  Shield, Wifi, Phone, CheckCircle2, Edit2, AlertCircle, Laptop, X, Heart, Activity, ShieldCheck, Clock,
+  Copy, Key, Globe, MessageSquare
 } from 'lucide-react';
 import { whatsappApi, WaSettings, QuickReply } from '../services/whatsappApi';
 import { extractErrorMessage } from '../utils/errors';
@@ -50,11 +51,29 @@ export const WhatsAppSettingsPage: React.FC = () => {
   // Onboarding Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
+  const [selectedProviderType, setSelectedProviderType] = useState<'gupshup' | 'meta'>('gupshup');
   const [showOAuthPopup, setShowOAuthPopup] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [discoveredNumbers, setDiscoveredNumbers] = useState<WaSettings[]>([]);
   const [selectedDefaultId, setSelectedDefaultId] = useState<string>('');
   const [, setWebhookVerifying] = useState(false);
+
+  // Gupshup form state
+  const [gupshupForm, setGupshupForm] = useState({
+    friendly_name: '',
+    app_name: '',
+    api_key: '',
+    sender_number: '',
+  });
+  const [gupshupSubmitting, setGupshupSubmitting] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [showEditCredentialsModal, setShowEditCredentialsModal] = useState(false);
+  const [editCredentialsForm, setEditCredentialsForm] = useState({
+    access_token: '',
+    business_account_id: '',
+    sender_number: '',
+    friendly_name: '',
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -86,7 +105,79 @@ export const WhatsAppSettingsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('provider') === 'gupshup') {
+      setSelectedProviderType('gupshup');
+      setWizardOpen(true);
+      setWizardStep(1);
+    }
   }, []);
+
+  const handleConnectGupshup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gupshupForm.app_name.trim() || !gupshupForm.api_key.trim() || !gupshupForm.sender_number.trim()) {
+      setErrorMsg('Please provide Gupshup App Name, API Key, and Sender WhatsApp Number.');
+      return;
+    }
+    setGupshupSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const created = await whatsappApi.createSettings({
+        provider: 'gupshup',
+        friendly_name: gupshupForm.friendly_name.trim() || `${gupshupForm.app_name} (Gupshup)`,
+        business_account_id: gupshupForm.app_name.trim(),
+        phone_number_id: gupshupForm.app_name.trim(),
+        sender_number: gupshupForm.sender_number.trim().replace(/^\+/, ''),
+        access_token: gupshupForm.api_key.trim(),
+        is_default: true,
+        is_active: true,
+      });
+      const list = await whatsappApi.listSettings();
+      setSettingsList(list);
+      setActiveSettings(created);
+      setWizardStep(5);
+    } catch (err: any) {
+      setErrorMsg(extractErrorMessage(err, 'Failed to save Gupshup configuration.'));
+    } finally {
+      setGupshupSubmitting(false);
+    }
+  };
+
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSettings) return;
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      const payload: any = {
+        friendly_name: editCredentialsForm.friendly_name || activeSettings.friendly_name,
+        business_account_id: editCredentialsForm.business_account_id || activeSettings.business_account_id,
+        phone_number_id: editCredentialsForm.business_account_id || activeSettings.phone_number_id,
+        sender_number: editCredentialsForm.sender_number || activeSettings.sender_number,
+      };
+      if (editCredentialsForm.access_token.trim()) {
+        payload.access_token = editCredentialsForm.access_token.trim();
+      }
+      const updated = await whatsappApi.updateSettings(activeSettings.id, payload);
+      setActiveSettings(updated);
+      setSettingsList(prev => prev.map(s => s.id === updated.id ? updated : s));
+      setShowEditCredentialsModal(false);
+      setMsg('Gupshup credentials updated successfully.');
+      await runDiagnosticsFor(updated.id);
+    } catch (err: any) {
+      setErrorMsg(extractErrorMessage(err, 'Failed to update credentials.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const gupshupWebhookUrl = `${window.location.origin}/api/v1/whatsapp/webhook/gupshup`;
+
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(gupshupWebhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
+  };
 
   const loadMetrics = async () => {
     setLoadingMetrics(true);
@@ -371,22 +462,129 @@ export const WhatsAppSettingsPage: React.FC = () => {
         <div className="glass-panel border border-slate-800/80 rounded-2xl p-8 space-y-6">
           {/* STEP 1: AUTHORIZE */}
           {wizardStep === 1 && (
-            <div className="space-y-6 text-center">
-              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto shadow-md">
-                <Shield className="w-8 h-8" />
+            <div className="space-y-6">
+              {/* Provider Selection Tabs */}
+              <div className="flex p-1 bg-slate-900/90 border border-slate-800 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setSelectedProviderType('gupshup')}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    selectedProviderType === 'gupshup'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> Gupshup WhatsApp API
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProviderType('meta')}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    selectedProviderType === 'meta'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Laptop className="w-3.5 h-3.5" /> Meta Cloud API
+                </button>
               </div>
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-slate-100">Authorize Meta Business</h2>
-                <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-                  Link your Facebook Business account to import your registered WhatsApp Business numbers. All API keys, IDs, and tokens will configure automatically.
-                </p>
-              </div>
-              <button
-                onClick={handleLaunchMetaSignup}
-                className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-450 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg cursor-pointer"
-              >
-                <Laptop className="w-4 h-4" /> Connect with Meta
-              </button>
+
+              {selectedProviderType === 'gupshup' ? (
+                <form onSubmit={handleConnectGupshup} className="space-y-4 text-left">
+                  <div className="text-center space-y-1 pb-2">
+                    <h2 className="text-xl font-bold text-slate-100">Connect Gupshup WhatsApp</h2>
+                    <p className="text-xs text-slate-400">
+                      Configure your Gupshup Enterprise App credentials for telecalling & automated chatting.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Channel / Line Label
+                      </label>
+                      <input
+                        type="text"
+                        value={gupshupForm.friendly_name}
+                        onChange={(e) => setGupshupForm({ ...gupshupForm, friendly_name: e.target.value })}
+                        placeholder="e.g. Telecalling Desk 1"
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Gupshup App Name <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={gupshupForm.app_name}
+                        onChange={(e) => setGupshupForm({ ...gupshupForm, app_name: e.target.value })}
+                        placeholder="e.g. mytelecallingapp"
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <span className="text-[10px] text-slate-500">Your registered WhatsApp App Name in Gupshup Enterprise Console</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Gupshup API Key / Token <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={gupshupForm.api_key}
+                        onChange={(e) => setGupshupForm({ ...gupshupForm, api_key: e.target.value })}
+                        placeholder="vsk_live_... or API token"
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <span className="text-[10px] text-slate-500">Encrypted at rest with AES-256</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Sender WhatsApp Number <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={gupshupForm.sender_number}
+                        onChange={(e) => setGupshupForm({ ...gupshupForm, sender_number: e.target.value })}
+                        placeholder="e.g. 919876543210 (country code without +)"
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={gupshupSubmitting}
+                    className="w-full mt-4 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-450 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg cursor-pointer"
+                  >
+                    {gupshupSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Connect Gupshup Channel
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-6 text-center">
+                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto shadow-md">
+                    <Shield className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold text-slate-100">Authorize Meta Business</h2>
+                    <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                      Link your Facebook Business account to import your registered WhatsApp Business numbers. All API keys, IDs, and tokens will configure automatically.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleLaunchMetaSignup}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-450 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg cursor-pointer"
+                  >
+                    <Laptop className="w-4 h-4" /> Connect with Meta
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -506,11 +704,42 @@ export const WhatsAppSettingsPage: React.FC = () => {
                 <Check className="w-10 h-10" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-xl font-bold text-slate-100">Connection Ready!</h2>
+                <h2 className="text-xl font-bold text-slate-100">
+                  {activeSettings?.provider === 'gupshup' ? 'Gupshup Line Connected!' : 'Connection Ready!'}
+                </h2>
                 <p className="text-sm text-slate-400 max-w-md mx-auto">
-                  Your WhatsApp Business integrations have configured automatically. Templates and webhooks are active.
+                  {activeSettings?.provider === 'gupshup'
+                    ? 'Your Gupshup WhatsApp account is linked and ready for telecalling chats.'
+                    : 'Your WhatsApp Business integrations have configured automatically. Templates and webhooks are active.'}
                 </p>
               </div>
+
+              {activeSettings?.provider === 'gupshup' && (
+                <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl text-left space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Gupshup Webhook Callback URL</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyWebhook}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> {copiedWebhook ? 'Copied!' : 'Copy URL'}
+                    </button>
+                  </div>
+                  <div className="p-2.5 bg-slate-950/80 border border-slate-850 rounded-lg font-mono text-xs text-emerald-300 break-all select-all">
+                    {gupshupWebhookUrl}
+                  </div>
+                  <div className="text-[11px] text-slate-400 space-y-1 bg-slate-950/30 p-2.5 rounded-lg border border-slate-900">
+                    <p className="font-semibold text-slate-300">Gupshup Dashboard Action Required:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-slate-400">
+                      <li>Go to Gupshup Enterprise Dashboard → Select your App</li>
+                      <li>In <strong>Settings → Callback URL</strong>, paste the URL above</li>
+                      <li>Enable <strong>Inbound Messages</strong> and <strong>Message Events (Sent, Delivered, Read, Failed)</strong></li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleExitWizard}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-450 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg cursor-pointer"
@@ -728,14 +957,77 @@ export const WhatsAppSettingsPage: React.FC = () => {
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${saving ? 'animate-spin' : ''}`} /> Refresh Metadata
                   </button>
-                  <button
-                    onClick={() => { setSelectedDefaultId(activeSettings.id); setWizardOpen(true); setWizardStep(1); }}
-                    className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 py-2 px-3 rounded-xl text-xs font-semibold transition cursor-pointer"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-teal-400" /> Reconnect
-                  </button>
+                  {activeSettings.provider === 'gupshup' ? (
+                    <button
+                      onClick={() => {
+                        setEditCredentialsForm({
+                          friendly_name: activeSettings.friendly_name || '',
+                          business_account_id: activeSettings.business_account_id || '',
+                          sender_number: activeSettings.sender_number || '',
+                          access_token: '',
+                        });
+                        setShowEditCredentialsModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 py-2 px-3 rounded-xl text-xs font-semibold transition cursor-pointer"
+                    >
+                      <Key className="w-3.5 h-3.5 text-purple-400" /> Edit Credentials
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setSelectedDefaultId(activeSettings.id); setWizardOpen(true); setWizardStep(1); }}
+                      className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 py-2 px-3 rounded-xl text-xs font-semibold transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-teal-400" /> Reconnect
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Gupshup Webhook Configuration Card */}
+              {activeSettings.provider === 'gupshup' && (
+                <div className="p-5 bg-gradient-to-r from-purple-950/20 to-slate-900/40 border border-purple-800/30 rounded-2xl space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                          Gupshup Inbound & Status Webhook
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase">Configured</span>
+                        </h4>
+                        <p className="text-xs text-slate-400">Receive customer replies, inbound attachments, and message read receipts.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyWebhook}
+                      className="inline-flex items-center gap-1.5 bg-purple-900/40 hover:bg-purple-900/60 border border-purple-700/50 text-purple-200 py-2 px-3 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> {copiedWebhook ? 'Copied!' : 'Copy Webhook URL'}
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl font-mono text-xs text-purple-300 break-all select-all flex items-center justify-between">
+                    <span>{gupshupWebhookUrl}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-400 pt-1">
+                    <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-xl space-y-1">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" /> Inbound Messages
+                      </span>
+                      <p className="text-[11px] text-slate-500">Auto-links inbound customer text and media messages to CRM leads and creates telecaller conversation threads.</p>
+                    </div>
+                    <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-xl space-y-1">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" /> Delivery & Read Receipts (DLR)
+                      </span>
+                      <p className="text-[11px] text-slate-500">Tracks sent, delivered, read, and failed statuses in real-time on all outbound telecaller messages.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Connection Status Card Summary */}
               <div className="p-5 bg-slate-900/30 border border-slate-800/60 rounded-2xl space-y-4">
@@ -1153,6 +1445,99 @@ export const WhatsAppSettingsPage: React.FC = () => {
               No monitoring statistics found. Connect a WhatsApp Business account to initialize stats.
             </div>
           )}
+        </div>
+      )}
+
+      {/* Edit Gupshup Credentials Modal */}
+      {showEditCredentialsModal && activeSettings && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in duration-200">
+            <div className="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-purple-400" />
+                <h3 className="text-sm font-bold text-slate-100">Update Gupshup Credentials</h3>
+              </div>
+              <button
+                onClick={() => setShowEditCredentialsModal(false)}
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCredentials} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Line Label
+                </label>
+                <input
+                  type="text"
+                  value={editCredentialsForm.friendly_name}
+                  onChange={(e) => setEditCredentialsForm({ ...editCredentialsForm, friendly_name: e.target.value })}
+                  placeholder="e.g. Telecalling Desk 1"
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Gupshup App Name
+                </label>
+                <input
+                  type="text"
+                  value={editCredentialsForm.business_account_id}
+                  onChange={(e) => setEditCredentialsForm({ ...editCredentialsForm, business_account_id: e.target.value })}
+                  placeholder="e.g. mytelecallingapp"
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Gupshup API Key / Token
+                </label>
+                <input
+                  type="password"
+                  value={editCredentialsForm.access_token}
+                  onChange={(e) => setEditCredentialsForm({ ...editCredentialsForm, access_token: e.target.value })}
+                  placeholder="Leave empty to keep existing encrypted token"
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-purple-500"
+                />
+                <span className="text-[10px] text-slate-500">Only fill this if you rotated your API key on Gupshup</span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Sender WhatsApp Number
+                </label>
+                <input
+                  type="text"
+                  value={editCredentialsForm.sender_number}
+                  onChange={(e) => setEditCredentialsForm({ ...editCredentialsForm, sender_number: e.target.value })}
+                  placeholder="e.g. 919876543210"
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditCredentialsModal(false)}
+                  className="flex-1 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2.5 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+                >
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save Credentials
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

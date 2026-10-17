@@ -50,28 +50,49 @@ class AssignmentService:
         if not config.is_active:
             return None
 
-        # Fetch active Employees sorted by ID to maintain a persistent queue order
+        # Fetch active Employees/Agents sorted by ID to maintain a persistent queue order
         user_query = select(User).filter(
             User.organization_id == lead.organization_id,
-            User.role == "Employee",
+            User.role.in_(["Employee", "TeamLeader"]),
             User.is_active == True,
             User.is_deleted == False
         ).order_by(User.id)
         result = await self.db.execute(user_query)
-        active_employees = result.scalars().all()
+        active_employees = list(result.scalars().all())
 
         if not active_employees:
+            return None
+
+        # Attendance check:
+        # Auto-assignment only routes to agents who have marked attendance today (present/late/half_day,
+        # clocked in, not clocked out). Any employee who hasn't clocked in is considered absent.
+        from datetime import datetime, timezone
+        from app.models.attendance import AttendanceRecord
+
+        today = datetime.now(timezone.utc).date()
+        present_query = select(AttendanceRecord.user_id).filter(
+            AttendanceRecord.organization_id == lead.organization_id,
+            AttendanceRecord.work_date == today,
+            AttendanceRecord.clock_in_at.is_not(None),
+            AttendanceRecord.clock_out_at.is_(None),
+            AttendanceRecord.status.in_(["present", "late", "half_day"])
+        )
+        present_user_ids = set((await self.db.execute(present_query)).scalars().all())
+        present_employees = [u for u in active_employees if u.id in present_user_ids]
+
+        if not present_employees:
+            # Nobody has marked attendance today; consider absent and return None
             return None
 
         # Branch-wise routing: when the lead belongs to a branch and that branch
         # has active reps, rotate only within the branch using an independent
         # per-branch cursor. Otherwise fall back to the org-wide pool and cursor.
         branch_key = str(lead.branch_id) if lead.branch_id else None
-        pool = active_employees
+        pool = present_employees
         cursor_user_id = config.last_assigned_user_id
         branch_scoped = False
         if branch_key:
-            branch_pool = [u for u in active_employees if getattr(u, "branch_id", None) == lead.branch_id]
+            branch_pool = [u for u in present_employees if getattr(u, "branch_id", None) == lead.branch_id]
             if branch_pool:
                 pool = branch_pool
                 cursor_user_id = (config.branch_cursors or {}).get(branch_key)
@@ -213,8 +234,30 @@ class AssignmentService:
                 assignee_ids=req.assignee_ids
             )
 
+        # If only_present is requested, filter down to users who marked attendance today
+        effective_assignee_ids = list(req.assignee_ids)
+        if getattr(req, "only_present", False):
+            from datetime import datetime, timezone
+            from app.models.attendance import AttendanceRecord
+            today = datetime.now(timezone.utc).date()
+            present_query = select(AttendanceRecord.user_id).filter(
+                AttendanceRecord.organization_id == actor.organization_id,
+                AttendanceRecord.user_id.in_(req.assignee_ids),
+                AttendanceRecord.work_date == today,
+                AttendanceRecord.clock_in_at.is_not(None),
+                AttendanceRecord.clock_out_at.is_(None),
+                AttendanceRecord.status.in_(["present", "late", "half_day"])
+            )
+            present_ids = set((await self.db.execute(present_query)).scalars().all())
+            effective_assignee_ids = [uid for uid in req.assignee_ids if uid in present_ids]
+            if not effective_assignee_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="None of the selected assignees have marked attendance today."
+                )
+
         num_leads = len(sliced_leads)
-        num_assignees = len(req.assignee_ids)
+        num_assignees = len(effective_assignee_ids)
 
         # 5. Distribute leads according to strategy
         assigned_lead_ids = []
@@ -224,7 +267,7 @@ class AssignmentService:
             r = num_leads % num_assignees
             
             idx = 0
-            for i, assignee_id in enumerate(req.assignee_ids):
+            for i, assignee_id in enumerate(effective_assignee_ids):
                 chunk_size = k + (1 if i < r else 0)
                 for _ in range(chunk_size):
                     lead = sliced_leads[idx]
@@ -236,7 +279,7 @@ class AssignmentService:
         elif req.strategy == "RANGE":
             # Distribute interleaved (round-robin)
             for idx, lead in enumerate(sliced_leads):
-                assignee_id = req.assignee_ids[idx % num_assignees]
+                assignee_id = effective_assignee_ids[idx % num_assignees]
                 lead.assigned_user_id = assignee_id
                 self.db.add(lead)
                 assigned_lead_ids.append(lead.id)

@@ -56,6 +56,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   const { users, fetchUsers } = useUserStore();
   const { user } = useAuthStore();
   const isEmployee = user?.role === 'Employee';
+  // Delete lead option only given to designations above Team Leader (Manager, OrgAdmin, SuperAdmin)
+  const canDeleteLead = user?.role === 'SuperAdmin' || user?.role === 'OrgAdmin' || user?.role === 'Manager';
 
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -374,13 +376,15 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={(e) => handleDelete(e, lead)}
-                          title="Delete lead"
-                          className="p-1.5 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {canDeleteLead && (
+                          <button
+                            onClick={(e) => handleDelete(e, lead)}
+                            title="Delete lead"
+                            className="p-1.5 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   )}
@@ -392,58 +396,111 @@ export const LeadTable: React.FC<LeadTableProps> = ({
       </div>
 
       {/* Mobile: card list */}
-      <div className="md:hidden divide-y divide-slate-800/70">
-        {sortedLeads.map((lead) => {
-          const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
-          return (
-            <div
-              key={lead.id}
-              onClick={() => onRowClick(lead)}
-              className="p-3.5 active:bg-slate-900/60 transition-colors cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  {!hideCheckboxes && (
-                    <input
-                      type="checkbox"
-                      checked={selectedLeadIds.includes(lead.id)}
-                      onChange={(e) => { e.stopPropagation(); toggleOne(lead.id, e.target.checked); }}
-                      className="w-3.5 h-3.5 rounded border-slate-700 text-brand-500 bg-slate-950"
-                    />
-                  )}
-                  <div>
-                    <p className="text-xs font-bold text-slate-100">{lead.title}</p>
-                    <p className="text-[11px] text-slate-400">{lead.company_name || contactFullName}</p>
+      <div className="md:hidden">
+        {!hideCheckboxes && sortedLeads.length > 0 && (
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950/80 border-b border-slate-800 text-xs">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) => toggleAll(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 cursor-pointer"
+              />
+              <span className="font-semibold text-slate-200">Select All ({sortedLeads.length})</span>
+            </label>
+            {selectedLeadIds.length > 0 && (
+              <span className="text-brand-400 font-semibold">{selectedLeadIds.length} selected</span>
+            )}
+          </div>
+        )}
+
+        <div className="divide-y divide-slate-800/70">
+          {sortedLeads.map((lead) => {
+            const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
+            return (
+              <div
+                key={lead.id}
+                onClick={() => onRowClick(lead)}
+                className="p-3.5 active:bg-slate-900/60 transition-colors cursor-pointer space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    {!hideCheckboxes && (
+                      <input
+                        type="checkbox"
+                        checked={selectedLeadIds.includes(lead.id)}
+                        onChange={(e) => { e.stopPropagation(); toggleOne(lead.id, e.target.checked); }}
+                        className="w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 cursor-pointer shrink-0"
+                      />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-slate-100">{lead.title}</p>
+                      <p className="text-[11px] text-slate-400">{lead.company_name || contactFullName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-xs font-bold text-emerald-400">
+                      {lead.value !== null ? formatMoney(lead.value) : '—'}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right font-mono">
-                  <span className="text-xs font-bold text-emerald-400">
-                    {lead.value !== null ? formatMoney(lead.value) : '—'}
-                  </span>
-                </div>
-              </div>
 
-              <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-800/60">
-                <div className="flex items-center gap-2">
-                  {stagePill(lead)}
-                  {priorityPill(lead.priority)}
-                </div>
-                <div className="flex items-center gap-2">
-                  {lead.phone && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onCallClick?.(lead.id); }}
-                      className="p-1 text-emerald-400"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-800/60">
+                  <div className="flex items-center gap-2">
+                    {stagePill(lead)}
+                    {priorityPill(lead.priority)}
+                  </div>
                   <span className="text-[11px] text-slate-400">{relativeTime(lead.created_at)}</span>
                 </div>
+
+                {/* Mobile Quick Action Buttons */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-xs">
+                  <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                    {ownerName(lead)}
+                  </div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {lead.phone && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onCallClick?.(lead.id)}
+                          className="p-1.5 text-emerald-400 border border-slate-800 hover:bg-emerald-500/10 rounded-lg"
+                          title="Call Lead"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onChatClick?.(lead, 'whatsapp')}
+                          className="p-1.5 text-emerald-400 border border-slate-800 hover:bg-emerald-500/10 rounded-lg"
+                          title="WhatsApp Chat"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={(e) => handleEdit(e, lead)}
+                      className="p-1.5 text-slate-300 border border-slate-800 hover:bg-slate-800 rounded-lg"
+                      title="Edit Lead"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    {canDeleteLead && (
+                      <button
+                        onClick={(e) => handleDelete(e, lead)}
+                        className="p-1.5 text-red-400 border border-slate-800 hover:bg-red-500/10 rounded-lg"
+                        title="Delete Lead"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

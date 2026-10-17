@@ -5,6 +5,7 @@ into native C-extension shared objects (.so) using Cython, then deletes the orig
 """
 import os
 import sys
+import shutil
 from setuptools import setup
 from setuptools.extension import Extension
 from Cython.Build import cythonize
@@ -12,6 +13,8 @@ from Cython.Build import cythonize
 def find_py_modules(root_dir="app"):
     modules = []
     for dirpath, _, filenames in os.walk(root_dir):
+        if "tests" in dirpath.split(os.sep):
+            continue
         for f in filenames:
             if f.endswith(".py") and not f.startswith("__init__"):
                 full_path = os.path.join(dirpath, f)
@@ -39,4 +42,7 @@ if __name__ == "__main__":
             if (f.endswith(".py") and not f.startswith("__init__")) or f.endswith(".c"):
                 os.remove(os.path.join(dirpath, f))
                 removed_count += 1
+    # Remove tests folder entirely from runtime image
+    if os.path.exists("app/tests"):
+        shutil.rmtree("app/tests", ignore_errors=True)
     print(f"Successfully deleted {removed_count} source/intermediate files. Protected binaries (.so) preserved.")

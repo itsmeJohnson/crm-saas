@@ -190,7 +190,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     section: 'workspace',
     trial: true,
     routes: [
-      { path: '/contacts', component: ContactsPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Patients Directory' } },
+      { path: '/contacts', component: ContactsPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT', sidebar: { name: 'Contacts Directory' } },
       { path: '/contacts/reports', component: ContactReportsPage, roles: ['OrgAdmin', 'Manager'], featureCode: 'LEAD_MANAGEMENT' }
     ]
   },

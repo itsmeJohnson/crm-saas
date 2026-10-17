@@ -142,6 +142,9 @@ class TelephonyConfigService:
         row = await self.get(organization_id)
         if row is None or not row.is_active:
             return None
+        auth = crypto.decrypt(row.authentication_token_enc)
+        x_api = crypto.decrypt(row.x_api_key_enc)
+        sec = crypto.decrypt(row.secret_token_enc)
         return {
             "provider": row.provider,
             "company_id": row.company_id,
@@ -149,10 +152,12 @@ class TelephonyConfigService:
             "call_type": row.call_type,
             "user_uuid": row.user_uuid,
             "default_caller_id": row.default_caller_id,
+            "deskphone": row.default_caller_id,
             "std_code": row.std_code,
             "webhook_url": row.webhook_url,
-            "authentication_token": crypto.decrypt(row.authentication_token_enc),
-            "x_api_key": crypto.decrypt(row.x_api_key_enc),
-            "secret_token": crypto.decrypt(row.secret_token_enc),
+            "authentication_token": auth,
+            "x_api_key": x_api,
+            "secret_token": sec,
             "webhook_secret": crypto.decrypt(row.webhook_secret_enc),
+            "authcode": x_api or auth or sec,
         }

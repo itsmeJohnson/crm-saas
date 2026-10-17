@@ -553,6 +553,11 @@ class LeadService:
     async def soft_delete_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
+        if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only Managers and Administrators have permission to delete leads."
+            )
 
         lead = await self.get_lead(actor, lead_id)
 

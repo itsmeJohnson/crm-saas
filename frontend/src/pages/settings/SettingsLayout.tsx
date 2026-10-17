@@ -18,7 +18,7 @@ const SECTIONS: { title: string; items: { label: string; to?: string; soon?: boo
     { label: 'Marketplace', to: '/settings/integrations' },
     { label: 'MyOperator', to: '/settings/calling' }, { label: 'Knowlarity', soon: true },
     { label: 'Exotel', soon: true }, { label: 'MSG91', soon: true },
-    { label: 'Twilio', soon: true }, { label: 'Gupshup', soon: true },
+    { label: 'Twilio', soon: true }, { label: 'Gupshup', to: '/whatsapp/settings?provider=gupshup' },
   ] },
   { title: 'Advanced', items: [
     { label: 'Security', soon: true }, { label: 'API Keys', soon: true },

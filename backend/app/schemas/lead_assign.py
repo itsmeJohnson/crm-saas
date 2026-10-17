@@ -9,6 +9,7 @@ class LeadBulkAssignRequest(BaseModel):
     strategy: Literal["RANGE", "SPLIT"]
     range_start: int | None = None
     range_end: int | None = None
+    only_present: bool = False
 
     @model_validator(mode="after")
     def validate_identifiers(self):

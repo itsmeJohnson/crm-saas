@@ -27,7 +27,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
   const [reportingUsers, setReportingUsers] = useState<UserResponse[]>([]);
   const [isFetchingManagers, setIsFetchingManagers] = useState(false);
 
-  const isTeamLeader = currentUser?.role === 'Employee' && currentUser?.is_team_leader;
+  const isTeamLeader = currentUser?.role === 'TeamLeader' || (currentUser?.role === 'Employee' && currentUser?.is_team_leader);
   const isManager = currentUser?.role === 'Manager';
   const isAdminOrSuper = currentUser?.role === 'OrgAdmin' || currentUser?.role === 'SuperAdmin';
 
@@ -86,14 +86,13 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
   }, [isOpen, currentUser, isTeamLeader, isManager, setValue]);
 
   const onSubmit = async (data: CreateFormInput) => {
-    if (!currentOrg) return;
+    if (!currentOrg && !currentUser) return;
     try {
-      const mappedRole = data.role === 'TeamLeader' ? 'Employee' : data.role;
       const payload: Parameters<typeof createUser>[0] = {
         email: data.email,
         first_name: data.first_name || undefined,
         last_name: data.last_name || undefined,
-        role: mappedRole,
+        role: data.role,
         password: data.password,
         reporting_to_id: data.reporting_to_id !== '' ? data.reporting_to_id : null,
       };
@@ -115,17 +114,17 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
         { value: 'OrgAdmin', label: 'Organization Admin' },
         { value: 'Manager', label: 'Manager' },
         { value: 'TeamLeader', label: 'Team Leader' },
-        { value: 'Employee', label: 'Employee' },
+        { value: 'Employee', label: 'Sales Agent / Telecaller' },
       ];
     }
     if (isManager) {
       return [
         { value: 'TeamLeader', label: 'Team Leader' },
-        { value: 'Employee', label: 'Employee' },
+        { value: 'Employee', label: 'Sales Agent / Telecaller' },
       ];
     }
     // Team Leaders can only create Employees
-    return [{ value: 'Employee', label: 'Employee' }];
+    return [{ value: 'Employee', label: 'Sales Agent / Telecaller' }];
   };
 
   // Filter reporting manager choices
@@ -138,12 +137,12 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
       return reportingUsers.filter((u) => u.role === 'OrgAdmin');
     }
     if (selectedRole === 'TeamLeader') {
-      // Team Leaders report to Managers
-      return reportingUsers.filter((u) => u.role === 'Manager');
+      // Team Leaders report to Managers or Admins
+      return reportingUsers.filter((u) => u.role === 'Manager' || u.role === 'OrgAdmin');
     }
     if (selectedRole === 'Employee') {
-      // Employees report to Team Leaders (Employees who report to a Manager)
-      return reportingUsers.filter((u) => u.role === 'Employee' && u.is_team_leader);
+      // Employees report to Team Leaders or Managers
+      return reportingUsers.filter((u) => u.role === 'TeamLeader' || (u.role === 'Employee' && u.is_team_leader) || u.role === 'Manager');
     }
     return [];
   };

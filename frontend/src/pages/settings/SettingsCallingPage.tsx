@@ -3,6 +3,7 @@ import { settingsApi, TelephonyConfig, TelephonyConfigUpdate } from '../../servi
 import { Phone, ShieldCheck, Loader2, CheckCircle, AlertCircle, Building2 } from 'lucide-react';
 
 const PROVIDERS = [
+  { id: 'callerdesk', label: 'Callerdesk', desc: 'Cloud Telephony Click2Call & Inbound Webhooks' },
   { id: 'myoperator', label: 'MyOperator', desc: 'Cloud Telephony OBD & IVR' },
   { id: 'exotel', label: 'Exotel', desc: 'Enterprise Cloud Calling API' },
   { id: 'knowlarity', label: 'Knowlarity', desc: 'SuperReceptionist Click-to-Call' },
@@ -170,6 +171,33 @@ export const SettingsCallingPage: React.FC = () => {
         <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">
           {PROVIDERS.find((p) => p.id === currentProvider)?.label || currentProvider} Credentials
         </h2>
+
+        {/* Callerdesk Fields */}
+        {currentProvider === 'callerdesk' && (
+          <div className="space-y-4">
+            <div className="p-3.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-start gap-3">
+              <Phone className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-300 space-y-1">
+                <p className="font-semibold text-indigo-300">Callerdesk Cloud Telephony (api.callerdesk.io)</p>
+                <p>
+                  Enables instantaneous <strong>Click-to-Call</strong> from lead profiles and <strong>real-time Inbound Call popups</strong> with call recording logs.
+                  Find your Authcode under <strong>Integration Settings</strong> in your Callerdesk dashboard.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {secretField('Auth Code / API Key', 'x_api_key', cfg?.has_x_api_key || cfg?.has_authentication_token || false)}
+              {textField('Deskphone / Virtual Number (DID)', 'default_caller_id', 'e.g. 0806924xxxx')}
+              {textField('Default Agent Number (fallback)', 'user_uuid', 'e.g. 9620194983')}
+              {textField('Callerdesk Webhook URL (Paste into Callerdesk)', 'webhook_url', `${window.location.origin}/api/v1/telephony/webhook`)}
+            </div>
+
+            <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 text-xs text-slate-400">
+              <span className="font-semibold text-slate-200">Webhook Configuration in Callerdesk:</span> Paste the Webhook URL above into your Callerdesk Dashboard &rarr; <em>API &amp; Integration</em> &rarr; <em>Webhooks</em> for both <em>Live Call</em> and <em>Call Report</em> to receive incoming popups and synced recordings.
+            </div>
+          </div>
+        )}
 
         {/* MyOperator Fields */}
         {currentProvider === 'myoperator' && (

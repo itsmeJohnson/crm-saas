@@ -29,9 +29,10 @@ from app.models.whatsapp import (
     whatsapp_conversation_labels
 )
 from app.core.crypto import encrypt, decrypt
+import httpx
 from app.services.audit_service import AuditService
 from app.services.notification_service import NotificationService
-from app.services.whatsapp_providers import get_provider, WhatsAppProvider
+from app.services.whatsapp_providers import get_provider, WhatsAppProvider, WaSendResult
 from app.services.queue_service import QueueService
 from app.core.storage import get_storage_provider, validate_and_sanitize_file
 from app.api.v1.telephony import ws_manager
@@ -154,6 +155,58 @@ class WhatsAppService:
         )
         return s
 
+    async def create_settings(self, actor: User, data: dict) -> WhatsAppSettings:
+        if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only privileged roles can configure WhatsApp.")
+        
+        provider = data.get("provider", "gupshup")
+        friendly_name = data.get("friendly_name") or f"{provider.capitalize()} Line"
+        s = WhatsAppSettings(
+            organization_id=actor.organization_id,
+            provider=provider,
+            friendly_name=friendly_name,
+            phone_number_id=data.get("phone_number_id") or data.get("business_account_id"),
+            business_account_id=data.get("business_account_id") or data.get("phone_number_id"),
+            sender_number=data.get("sender_number"),
+            webhook_token=secrets.token_urlsafe(24),
+            webhook_verify_token=secrets.token_urlsafe(16),
+            is_active=data.get("is_active", True),
+            is_default=data.get("is_default", False),
+            api_version=data.get("api_version", "v1"),
+            default_country_code=data.get("default_country_code", "+91"),
+            daily_limit=data.get("daily_limit", 10000),
+            quality_rating="GREEN",
+            messaging_limit="TIER_10K",
+            health_status="connected"
+        )
+        if data.get("access_token"):
+            s.access_token = encrypt(data["access_token"])
+        if data.get("webhook_secret"):
+            s.webhook_secret_enc = encrypt(data["webhook_secret"])
+            
+        self.db.add(s)
+        await self.db.flush()
+        await self.db.refresh(s)
+
+        if s.is_default:
+            from sqlalchemy import update
+            await self.db.execute(
+                update(WhatsAppSettings)
+                .filter(WhatsAppSettings.organization_id == actor.organization_id, WhatsAppSettings.id != s.id)
+                .values(is_default=False)
+            )
+            await self.db.flush()
+
+        await self.audit.log_event(
+            organization_id=actor.organization_id,
+            actor_user_id=actor.id,
+            action="WHATSAPP_SETTINGS_CREATE",
+            resource_type="settings",
+            resource_id=str(s.id),
+            action_metadata={"sender_number": s.sender_number, "provider": s.provider}
+        )
+        return s
+
     async def check_health(self, actor: User, settings_id: uuid.UUID) -> str:
         s = await self.get_settings(actor, settings_id)
         # Decrypt access token for checking health
@@ -161,6 +214,10 @@ class WhatsAppService:
         if s.provider == "meta" and decrypted_token:
             from app.services.whatsapp_providers import MetaWhatsAppProvider
             provider = MetaWhatsAppProvider(s.phone_number_id or "", s.business_account_id or "", decrypted_token, api_version=s.api_version or "v19.0")
+            status_val = await provider.check_health()
+        elif s.provider == "gupshup" and decrypted_token:
+            from app.services.whatsapp_providers import GupshupWhatsAppProvider
+            provider = GupshupWhatsAppProvider(s.business_account_id or s.phone_number_id or "", decrypted_token, s.sender_number or "")
             status_val = await provider.check_health()
         else:
             status_val = "connected" if s.is_active else "disconnected"
@@ -458,22 +515,44 @@ class WhatsAppService:
         tname = data.get("template_name")
         body = data.get("body") or ""
         variables = data.get("variables") or []
-        language = data.get("language") or "en_US"
+        language = data.get("language") or "en"
 
         if data.get("template_id"):
-            from app.models.communication import CommunicationTemplate
-            t = (await self.db.execute(select(CommunicationTemplate).filter(
-                CommunicationTemplate.id == data["template_id"],
-                CommunicationTemplate.organization_id == actor.organization_id,
-                CommunicationTemplate.is_deleted == False
+            # Check WhatsAppTemplate first
+            wt = (await self.db.execute(select(WhatsAppTemplate).filter(
+                WhatsAppTemplate.id == data["template_id"],
+                WhatsAppTemplate.organization_id == actor.organization_id,
+                WhatsAppTemplate.is_deleted == False
             ))).scalars().first()
-            if not t:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found.")
-            tname = tname or t.name
-            body = body or t.body
-            from app.services.template_service import TemplateService
-            await TemplateService.mark_used(self.db, t.id)
-            
+            if wt:
+                tname = tname or wt.name
+                body = body or wt.body_text
+                language = data.get("language") or wt.language or "en"
+            else:
+                from app.models.communication import CommunicationTemplate
+                t = (await self.db.execute(select(CommunicationTemplate).filter(
+                    CommunicationTemplate.id == data["template_id"],
+                    CommunicationTemplate.organization_id == actor.organization_id,
+                    CommunicationTemplate.is_deleted == False
+                ))).scalars().first()
+                if not t:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found.")
+                tname = tname or t.name
+                body = body or t.body
+                from app.services.template_service import TemplateService
+                await TemplateService.mark_used(self.db, t.id)
+                
+        if tname and not body:
+            wt = (await self.db.execute(select(WhatsAppTemplate).filter(
+                WhatsAppTemplate.name == tname,
+                WhatsAppTemplate.organization_id == actor.organization_id,
+                WhatsAppTemplate.is_deleted == False
+            ))).scalars().first()
+            if wt:
+                body = wt.body_text
+                if not data.get("language") and wt.language:
+                    language = wt.language
+
         if not tname:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="template_name or template_id is required.")
 
@@ -615,6 +694,9 @@ class WhatsAppService:
         if s.provider == "meta" and decrypted_token:
             from app.services.whatsapp_providers import MetaWhatsAppProvider
             provider = MetaWhatsAppProvider(s.phone_number_id or "", s.business_account_id or "", decrypted_token, api_version=s.api_version or "v19.0")
+        elif s.provider == "gupshup" and decrypted_token:
+            from app.services.whatsapp_providers import GupshupWhatsAppProvider
+            provider = GupshupWhatsAppProvider(s.business_account_id or s.phone_number_id or "", decrypted_token, s.sender_number or "")
         else:
             from app.services.whatsapp_providers import MockWhatsAppProvider
             provider = MockWhatsAppProvider()
@@ -624,7 +706,16 @@ class WhatsAppService:
         if msg.media_type == "text":
             result = await provider.send_text(to_number=conv.phone, body=msg.body or "")
         elif msg.media_type == "template":
-            result = await provider.send_template(to_number=conv.phone, template_name=msg.template_name or "",
+            target_tpl_id = msg.template_name or ""
+            tpl_rec = (await self.db.execute(select(WhatsAppTemplate).filter(
+                WhatsAppTemplate.name == msg.template_name,
+                WhatsAppTemplate.organization_id == s.organization_id,
+                WhatsAppTemplate.is_deleted == False
+            ))).scalars().first()
+            if tpl_rec and tpl_rec.meta_template_id:
+                target_tpl_id = tpl_rec.meta_template_id
+            
+            result = await provider.send_template(to_number=conv.phone, template_name=target_tpl_id,
                                                   language=language, variables=variables)
         else:
             # Fetch attachments
@@ -680,9 +771,140 @@ class WhatsAppService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signature verify token mismatch.")
         return challenge
 
+    async def handle_gupshup_webhook(self, payload: dict, token: str | None = None, raw_body: bytes | None = None) -> dict:
+        """Processes Gupshup Enterprise WhatsApp Webhook events (inbound messages, message-event/DLRs)."""
+        app_name = payload.get("app")
+        event_type = payload.get("type")
+        p = payload.get("payload", {})
+
+        # 1. Resolve matching Gupshup settings
+        s = None
+        if app_name:
+            res_s = await self.db.execute(select(WhatsAppSettings).filter(
+                WhatsAppSettings.provider == "gupshup",
+                (WhatsAppSettings.business_account_id == app_name) | (WhatsAppSettings.phone_number_id == app_name),
+                WhatsAppSettings.is_deleted == False
+            ))
+            s = res_s.scalars().first()
+
+        if not s:
+            dest_or_src = p.get("destination") or p.get("source") or ""
+            clean_num = dest_or_src.replace("+", "").replace(" ", "").replace("-", "")
+            if clean_num:
+                res_s = await self.db.execute(select(WhatsAppSettings).filter(
+                    WhatsAppSettings.provider == "gupshup",
+                    WhatsAppSettings.sender_number.like(f"%{clean_num[-10:]}%"),
+                    WhatsAppSettings.is_deleted == False
+                ))
+                s = res_s.scalars().first()
+
+        if not s:
+            res_s = await self.db.execute(select(WhatsAppSettings).filter(
+                WhatsAppSettings.provider == "gupshup",
+                WhatsAppSettings.is_deleted == False
+            ))
+            s = res_s.scalars().first()
+
+        if not s:
+            return {"status": "ignored", "reason": "No active Gupshup settings configured in CRM."}
+
+        if token and s.webhook_token and token != s.webhook_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Gupshup webhook token.")
+
+        org_id = s.organization_id
+        event_id = p.get("id") or f"gs_{payload.get('timestamp')}_{uuid.uuid4().hex[:8]}"
+
+        from app.repositories.whatsapp_repository import WhatsAppWebhookEventRepository
+        event_repo = WhatsAppWebhookEventRepository(self.db)
+        existing_event = await event_repo.get_by_event_id(event_id)
+        if existing_event and existing_event.status == "processed":
+            return {"status": "ignored", "reason": "Duplicate webhook event ID."}
+
+        from sqlalchemy.exc import IntegrityError
+        if not existing_event:
+            try:
+                async with self.db.begin_nested():
+                    event = WhatsAppWebhookEvent(
+                        organization_id=org_id,
+                        event_id=event_id,
+                        event_type=event_type or "messages",
+                        payload=payload,
+                        status="pending"
+                    )
+                    self.db.add(event)
+                    await self.db.flush()
+            except IntegrityError:
+                return {"status": "ignored", "reason": "Duplicate webhook event ID."}
+        else:
+            event = existing_event
+
+        try:
+            timestamp_ms = payload.get("timestamp")
+            dt_stamp = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc) if timestamp_ms else _now()
+
+            if event_type == "message":
+                from_number = p.get("source") or p.get("sender", {}).get("phone") or ""
+                wamid = p.get("id") or f"gs_{uuid.uuid4()}"
+                mtype = p.get("type", "text")
+                inner = p.get("payload", {})
+                if isinstance(inner, dict):
+                    body = inner.get("text") or inner.get("caption") or ""
+                    media_url = inner.get("url") or inner.get("originalUrl")
+                    file_name = inner.get("filename") or f"file_{wamid[-6:]}"
+                else:
+                    body = str(inner)
+                    media_url = None
+                    file_name = None
+
+                await self._process_webhook_inbound(
+                    s=s,
+                    from_number=from_number,
+                    body=body,
+                    wamid=wamid,
+                    media_type=mtype,
+                    media_id=media_url,
+                    file_name=file_name,
+                    timestamp=dt_stamp
+                )
+            elif event_type in ("message-event", "user-event"):
+                wamid = p.get("id")
+                raw_st = p.get("type", "").lower()
+                status_map = {
+                    "enqueued": "queued",
+                    "sent": "sent",
+                    "delivered": "delivered",
+                    "read": "read",
+                    "failed": "failed",
+                }
+                new_status = status_map.get(raw_st, "sent")
+                error_msg = p.get("cause")
+                if wamid:
+                    await self._process_webhook_status(
+                        org_id=org_id,
+                        wamid=wamid,
+                        new_status=new_status,
+                        timestamp=dt_stamp,
+                        error=error_msg
+                    )
+
+            event.status = "processed"
+            event.processed_at = _now()
+        except Exception as e:
+            logger.error("Failed to process Gupshup webhook %s: %s", event_id, str(e))
+            event.status = "failed"
+            event.error_message = str(e)
+
+        self.db.add(event)
+        await self.db.flush()
+        return {"status": event.status, "event_id": event_id}
+
     async def handle_webhook(self, payload: dict, signature: str | None = None, raw_body: bytes | None = None) -> dict:
         """Unified endpoint for Meta status and inbound payloads. Implements signature checking & idempotency."""
         import json
+        # Check if this is a Gupshup webhook payload
+        if payload.get("app") and not payload.get("entry"):
+            return await self.handle_gupshup_webhook(payload, raw_body=raw_body)
+
         # 1. Deduplication using Event ID (Meta events contain a unique ID)
         event_id = payload.get("entry", [{}])[0].get("id") or str(uuid.uuid4())
         
@@ -718,30 +940,31 @@ class WhatsAppService:
 
         org_id = s.organization_id
 
-        # Webhook signature validation - strictly enforced for registered tenants
-        if not signature or not signature.startswith("sha256="):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+        # Webhook signature validation - strictly enforced for direct Meta Graph API webhooks
+        if s.provider != "gupshup":
+            if not signature or not signature.startswith("sha256="):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
 
-        if not s.webhook_secret_enc:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+            if not s.webhook_secret_enc:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
 
-        decrypted_secret = decrypt(s.webhook_secret_enc)
-        if not decrypted_secret:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+            decrypted_secret = decrypt(s.webhook_secret_enc)
+            if not decrypted_secret:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
 
-        if not raw_body:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+            if not raw_body:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
 
-        import hmac
-        import hashlib
-        expected_sig = "sha256=" + hmac.new(
-            decrypted_secret.encode("utf-8"),
-            raw_body,
-            hashlib.sha256
-        ).hexdigest()
+            import hmac
+            import hashlib
+            expected_sig = "sha256=" + hmac.new(
+                decrypted_secret.encode("utf-8"),
+                raw_body,
+                hashlib.sha256
+            ).hexdigest()
 
-        if not hmac.compare_digest(expected_sig, signature):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
+            if not hmac.compare_digest(expected_sig, signature):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature.")
 
         # Idempotency checks
         from app.repositories.whatsapp_repository import WhatsAppWebhookEventRepository
@@ -1036,14 +1259,25 @@ class WhatsAppService:
         await self.db.flush()
         await self._sync_activity(msg, conv, creator)
 
-        # Enqueue media download job if attachment present
+        # Enqueue media download job or create direct attachment if URL present
         if media_id:
-            await QueueService(self.db).enqueue(
-                organization_id=org_id,
-                job_type="send_whatsapp",  # Enqueues in whatsapp queue
-                payload={"action": "download_media", "media_id": media_id, "message_id": str(msg.id), "file_name": file_name},
-                created_by=creator
-            )
+            if str(media_id).startswith("http://") or str(media_id).startswith("https://"):
+                att = WhatsAppAttachment(
+                    organization_id=org_id,
+                    message_id=msg.id,
+                    media_url=str(media_id),
+                    media_type=media_type or "image",
+                    file_name=file_name or "attachment"
+                )
+                self.db.add(att)
+                await self.db.flush()
+            else:
+                await QueueService(self.db).enqueue(
+                    organization_id=org_id,
+                    job_type="send_whatsapp",  # Enqueues in whatsapp queue
+                    payload={"action": "download_media", "media_id": media_id, "message_id": str(msg.id), "file_name": file_name},
+                    created_by=creator
+                )
 
         # Notify owner/assigned user
         target = conv.assigned_user_id or creator
@@ -1125,13 +1359,16 @@ class WhatsAppService:
             
         conv = await self.db.get(WhatsAppConversation, msg.conversation_id)
         s = await self.db.get(WhatsAppSettings, conv.whatsapp_settings_id)
+        decrypted_token = decrypt(s.access_token) if (s and s.access_token) else ""
         
-        decrypted_token = decrypt(s.access_token) if s.access_token else ""
-        if s.provider != "meta" or not decrypted_token:
+        if s.provider == "gupshup" and decrypted_token:
+            from app.services.whatsapp_providers import GupshupWhatsAppProvider
+            provider = GupshupWhatsAppProvider(s.business_account_id or s.phone_number_id or "", decrypted_token, s.sender_number or "")
+        elif s.provider == "meta" and decrypted_token:
+            from app.services.whatsapp_providers import MetaWhatsAppProvider
+            provider = MetaWhatsAppProvider(s.phone_number_id or "", s.business_account_id or "", decrypted_token, api_version=s.api_version or "v19.0")
+        else:
             return
-            
-        from app.services.whatsapp_providers import MetaWhatsAppProvider
-        provider = MetaWhatsAppProvider(s.phone_number_id or "", s.business_account_id or "", decrypted_token, api_version=s.api_version or "v19.0")
         
         # Download raw bytes
         content = await provider.download_media(media_id=media_id)
@@ -1234,13 +1471,16 @@ class WhatsAppService:
         s = await self.get_settings(actor, settings_id)
         decrypted_token = decrypt(s.access_token) if s.access_token else ""
         
-        if s.provider != "meta" or not decrypted_token:
+        if s.provider == "gupshup" and decrypted_token:
+            from app.services.whatsapp_providers import GupshupWhatsAppProvider
+            provider = GupshupWhatsAppProvider(s.business_account_id or s.phone_number_id or "", decrypted_token, s.sender_number or "")
+        elif s.provider == "meta" and decrypted_token:
+            from app.services.whatsapp_providers import MetaWhatsAppProvider
+            provider = MetaWhatsAppProvider(s.phone_number_id or "", s.business_account_id or "", decrypted_token, api_version=s.api_version or "v19.0")
+        else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail="Meta credentials are required to sync templates.")
+                                detail="Active provider credentials (Meta or Gupshup) are required to sync templates.")
                                 
-        from app.services.whatsapp_providers import MetaWhatsAppProvider
-        provider = MetaWhatsAppProvider(s.phone_number_id or "", s.business_account_id or "", decrypted_token, api_version=s.api_version or "v19.0")
-        
         meta_templates = await provider.sync_templates()
         local_templates = []
         
@@ -1534,11 +1774,26 @@ class WhatsAppService:
     async def _get_or_create_conversation(self, org_id: uuid.UUID, phone: str, settings_id: uuid.UUID,
                                           contact_id=None, lead_id=None, whatsapp_contact_id=None, display_name=None) -> WhatsAppConversation:
         phone = (phone or "").strip()
+        digits = "".join(c for c in phone if c.isdigit())
+        last10 = digits[-10:] if len(digits) >= 10 else digits
+        canonical_phone = f"91{last10}" if len(last10) == 10 else phone
+
+        or_conditions = [
+            WhatsAppConversation.phone == phone,
+            WhatsAppConversation.phone == canonical_phone,
+        ]
+        if last10:
+            or_conditions.append(WhatsAppConversation.phone.like(f"%{last10}"))
+        if lead_id:
+            or_conditions.append(WhatsAppConversation.lead_id == lead_id)
+        if contact_id:
+            or_conditions.append(WhatsAppConversation.contact_id == contact_id)
+
         res = await self.db.execute(select(WhatsAppConversation).filter(
             WhatsAppConversation.organization_id == org_id,
-            WhatsAppConversation.phone == phone,
             WhatsAppConversation.whatsapp_settings_id == settings_id,
-            WhatsAppConversation.is_deleted == False
+            WhatsAppConversation.is_deleted == False,
+            or_(*or_conditions)
         ))
         conv = res.scalars().first()
         if not conv:
@@ -2085,6 +2340,22 @@ class WhatsAppService:
         """Syncs single account quality rating, limits, and capabilities from Meta."""
         s = await self.get_settings(actor, settings_id)
         decrypted_token = decrypt(s.access_token) if s.access_token else ""
+        if s.provider == "gupshup" and decrypted_token:
+            from app.services.whatsapp_providers import GupshupWhatsAppProvider
+            provider = GupshupWhatsAppProvider(s.business_account_id or s.phone_number_id or "", decrypted_token, s.sender_number or "")
+            s.health_status = await provider.check_health()
+            s.capabilities = {
+                "supports_templates": provider.supports_templates,
+                "supports_reactions": provider.supports_reactions,
+                "supports_location": provider.supports_location,
+                "supports_contacts": provider.supports_contacts,
+                "supports_catalog": provider.supports_catalog,
+                "supports_payments": provider.supports_payments
+            }
+            self.db.add(s)
+            await self.db.flush()
+            return
+
         if s.provider != "meta" or not decrypted_token:
             return
             
@@ -2253,6 +2524,57 @@ class WhatsAppService:
                 "media_detail": "Mock media uploaded and verified successfully.",
                 "business_verification_status": "verified",
                 "capabilities": ["whatsapp_business_messaging", "whatsapp_business_management"]
+            }
+
+        # Gupshup Diagnostics
+        if s.provider == "gupshup":
+            from app.services.whatsapp_providers import GupshupWhatsAppProvider
+            provider = GupshupWhatsAppProvider(
+                s.business_account_id or s.phone_number_id or "",
+                decrypted_token,
+                s.sender_number or ""
+            )
+            api_reachable = "red"
+            latency_ms = 0
+            token_valid = "red"
+            token_detail = "Failed to query Gupshup API"
+            start_time = time.perf_counter()
+            try:
+                health = await provider.check_health()
+                latency_ms = int((time.perf_counter() - start_time) * 1000)
+                if health == "connected":
+                    api_reachable = "green"
+                    token_valid = "green"
+                    token_detail = "Gupshup API Key verified successfully."
+                elif health in ("rate_limited", "maintenance"):
+                    api_reachable = "green"
+                    token_valid = "yellow"
+                    token_detail = f"Rate limited or maintenance: {health}"
+                else:
+                    token_detail = "Gupshup reported expired or invalid API key."
+            except Exception as e:
+                token_detail = f"Network or Gupshup API error: {str(e)}"
+
+            res_tmpl = await self.db.execute(select(func.count(WhatsAppTemplate.id)).filter(
+                WhatsAppTemplate.organization_id == actor.organization_id,
+                WhatsAppTemplate.is_deleted == False
+            ))
+            tmpl_count = res_tmpl.scalar() or 0
+
+            return {
+                "webhook_reachable": "green",
+                "token_valid": token_valid,
+                "phone_verified": "green" if s.sender_number else "yellow",
+                "graph_api_reachable": api_reachable,
+                "template_sync": "green" if tmpl_count > 0 else "yellow",
+                "graph_latency_ms": latency_ms,
+                "webhook_detail": "Gupshup Webhook ready at /api/v1/whatsapp/webhook/gupshup",
+                "token_detail": token_detail,
+                "phone_detail": f"Sender: {s.sender_number or 'Not set'}. App: {s.business_account_id or s.phone_number_id or 'Not set'}",
+                "media_upload_status": "green",
+                "media_detail": "Gupshup media integration ready.",
+                "business_verification_status": "verified" if token_valid == "green" else "unverified",
+                "capabilities": ["whatsapp_business_messaging", "templates", "media"]
             }
 
         # 1. Graph API Connectivity & Latency check

@@ -346,7 +346,12 @@ async def delete_lead(
     actor: Annotated[User, Depends(require_active_user)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Soft delete lead from organization database."""
+    """Soft delete lead from organization database. Only designations above Team Leader (Manager, Admin) allowed."""
+    if actor.role not in ("SuperAdmin", "OrgAdmin", "Manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Managers and Administrators have permission to delete leads."
+        )
     lead_service = LeadService(db, actor.organization_id)
     return await lead_service.soft_delete_lead(actor, lead_id)
 
