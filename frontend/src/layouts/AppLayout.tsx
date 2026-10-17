@@ -38,8 +38,17 @@ export const AppLayout: React.FC = () => {
 
   const TRIAL_MODE = true;
   const inTelecalling = isTelecallingMode();
+  const isBaselineTelecaller = user?.role === 'Employee' && !user?.is_team_leader;
 
-  const NAV_GROUPS = inTelecalling
+  const TELECALLER_ALLOWED_ITEMS = new Set([
+    'Leads & Enquiries',
+    'Phone Calling',
+    'WhatsApp Center',
+    'Communications',
+    'Tasks & Reminders',
+  ]);
+
+  const NAV_GROUPS = (inTelecalling || isBaselineTelecaller)
     ? TELECALLING_NAV_GROUPS
     : [
         'Clinical Operations', 'Patient Engagement', 'Clinic Management',
@@ -51,7 +60,7 @@ export const AppLayout: React.FC = () => {
       .filter((r) => r.sidebar)
       .map((r) => {
         const itemName = r.sidebar!.name;
-        const resolvedGroup = inTelecalling
+        const resolvedGroup = (inTelecalling || isBaselineTelecaller)
           ? (TELECALLING_ITEM_GROUP_MAP[itemName] || r.sidebar!.group || mod.group)
           : (r.sidebar!.group || mod.group);
         return {
@@ -74,8 +83,15 @@ export const AppLayout: React.FC = () => {
     if (!user) return false;
     // Client dedicated deployment: hide platform administration section
     if (item.group === 'Platform' || item.module === 'platform_core') return false;
+
+    // Strict RBAC filtering for baseline telecaller: only expose authorized modules
+    if (isBaselineTelecaller) {
+      if (!TELECALLER_ALLOWED_ITEMS.has(item.name)) return false;
+    }
+
     if (item.roles) {
-      const hasRole = item.roles.includes(user.role);
+      const isSuper = user.role === 'SuperAdmin';
+      const hasRole = isSuper || item.roles.includes(user.role);
       const isTeamLeaderUsers = item.name === 'Staff & Team' && user.role === 'Employee' && user.is_team_leader;
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
@@ -246,7 +262,7 @@ export const AppLayout: React.FC = () => {
     }
   };
 
-  const getGroupName = (g: string) => inTelecalling ? g : ((groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g);
+  const getGroupName = (g: string) => (inTelecalling || isBaselineTelecaller) ? g : ((groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g);
   const getItemName = (n: string) => (itemTranslations[industry] ?? itemTranslations['generic'])[n] ?? n;
   const getSubSuiteLabel = () => {
     switch (industry) {

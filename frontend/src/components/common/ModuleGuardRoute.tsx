@@ -66,7 +66,10 @@ export const ModuleGuardRoute: React.FC<ModuleGuardRouteProps> = ({ moduleKey })
 
   if (matchingRoute && user.role !== 'SuperAdmin') {
     if (matchingRoute.roles && !matchingRoute.roles.includes(user.role)) {
-      return <AccessDeniedView title="Access Denied" subtitle="You do not have the required role to view this page." icon={ShieldAlert} />;
+      const isTeamLeaderUsers = matchingRoute.roles.includes('TeamLeader') && user.role === 'Employee' && user.is_team_leader;
+      if (!isTeamLeaderUsers) {
+        return <AccessDeniedView title="Access Denied" subtitle="You do not have the required role to view this page." icon={ShieldAlert} />;
+      }
     }
     if (matchingRoute.featureCode && !features.includes(matchingRoute.featureCode)) {
       return <AccessDeniedView title="Feature Restricted" subtitle="This feature is not enabled on your current subscription plan." icon={ShieldAlert} />;

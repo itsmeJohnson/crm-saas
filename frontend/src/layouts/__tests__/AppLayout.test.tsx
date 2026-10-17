@@ -36,7 +36,8 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
           enabled_modules: [
             'dashboard', 'leads', 'patients', 'appointments', 'treatments',
             'treatment_plans', 'recall', 'dentists', 'clinical_reports',
-            'billing', 'communications', 'reports', 'admin_core', 'pipelines'
+            'billing', 'communications', 'reports', 'admin_core', 'pipelines',
+            'tasks'
           ]
         },
         fetchBootstrap: vi.fn(),
@@ -106,17 +107,18 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     expect(screen.queryByText('Subscription')).toBeNull();
   });
 
-  it('renders only standard links, hiding both Users and Organization settings for Employee role', () => {
+  it('enforces strict RBAC navigation groups for baseline Telecaller Employee role', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: any) => {
       const state = {
         user: {
           first_name: 'Charlie',
-          last_name: 'Employee',
-          email: 'emp@democorp.com',
+          last_name: 'Telecaller',
+          email: 'contact@johnsonsoftwares.com',
           role: 'Employee',
+          is_team_leader: false,
         },
         organization: { name: 'Demo Corp' },
-        features: ['LEAD_MANAGEMENT', 'SALES_PIPELINE', 'ROLE_BASED_ACCESS'],
+        features: ['LEAD_MANAGEMENT', 'CLICK_TO_CALL', 'WHATSAPP_MESSAGING', 'ROLE_BASED_ACCESS'],
         logout: vi.fn(),
       };
       return selector ? selector(state) : state;
@@ -125,11 +127,51 @@ describe('AppLayout Component - Sidebar Role Visibility', () => {
     setupMetadataMock();
     renderWithRouter(<AppLayout />);
 
-    expect(screen.getByText('Dashboard')).toBeDefined();
+    // 1. Navigation Groups visible for Telecaller
+    expect(screen.getByText('Lead Management')).toBeDefined();
+    expect(screen.getByText('Dialer Console')).toBeDefined();
+    expect(screen.getByText('Follow-ups & Reminders')).toBeDefined();
+
+    // 2. EXPOSE / SHOW in Telecaller Menu
     expect(screen.getByText('Leads & Enquiries')).toBeDefined();
-    expect(screen.getByText('Staff & Team')).toBeDefined();
+    expect(screen.getByText('Phone Calling')).toBeDefined();
+    expect(screen.getByText('WhatsApp Center')).toBeDefined();
+    expect(screen.getByText('Communications')).toBeDefined();
+    expect(screen.getByText('Tasks & Reminders')).toBeDefined();
+
+    // 3. REMOVE / HIDE from Telecaller Menu
+    expect(screen.queryByText('Billing & Invoices')).toBeNull();
+    expect(screen.queryByText('Marketing ROI')).toBeNull();
+    expect(screen.queryByText('Voice Broadcast')).toBeNull();
+    expect(screen.queryByText('Staff & Team')).toBeNull();
+    expect(screen.queryByText('Dashboard')).toBeNull();
     expect(screen.queryByText('Pipelines')).toBeNull();
     expect(screen.queryByText('Organization')).toBeNull();
     expect(screen.queryByText('Billing & Account')).toBeNull();
+    expect(screen.queryByText('Campaign Analytics')).toBeNull();
+    expect(screen.queryByText('Administration')).toBeNull();
+  });
+
+  it('allows TeamLeader employee to view Staff & Team', () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
+      const state = {
+        user: {
+          first_name: 'David',
+          last_name: 'Lead',
+          email: 'lead@johnsonsoftwares.com',
+          role: 'Employee',
+          is_team_leader: true,
+        },
+        organization: { name: 'Demo Corp' },
+        features: ['LEAD_MANAGEMENT', 'CLICK_TO_CALL', 'WHATSAPP_MESSAGING', 'ROLE_BASED_ACCESS'],
+        logout: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    });
+
+    setupMetadataMock();
+    renderWithRouter(<AppLayout />);
+
+    expect(screen.getByText('Staff & Team')).toBeDefined();
   });
 });

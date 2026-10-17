@@ -279,7 +279,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/calling/reports', component: CallingReportsPage, featureCode: 'CLICK_TO_CALL' },
       { path: '/sms', component: SmsPage, featureCode: 'SMS_MESSAGING' },
       { path: '/sms/reports', component: SmsReportsPage, featureCode: 'SMS_MESSAGING' },
-      { path: '/voice', component: VoicePage, featureCode: 'VOICE_BROADCAST', sidebar: { name: 'Voice Broadcast', icon: Megaphone } },
+      { path: '/voice', component: VoicePage, featureCode: 'VOICE_BROADCAST', roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Voice Broadcast', icon: Megaphone } },
       { path: '/whatsapp', component: WhatsAppPage, featureCode: 'WHATSAPP_MESSAGING', sidebar: { name: 'WhatsApp Center', icon: MessageCircle } },
       { path: '/whatsapp/reports', component: WhatsAppReportsPage, featureCode: 'WHATSAPP_MESSAGING' },
       { path: '/whatsapp/settings', component: WhatsAppSettingsPage, featureCode: 'WHATSAPP_MESSAGING', roles: ['OrgAdmin'] },
@@ -308,7 +308,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     group: 'Growth & Analytics',
     section: 'workspace',
     trial: true,
-    routes: [{ path: '/marketing', component: MarketingPage, sidebar: { name: 'Marketing ROI' } }]
+    routes: [{ path: '/marketing', component: MarketingPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Marketing ROI' } }]
   },
 
   // ── Dental-Specific Industry Modules ──
@@ -388,7 +388,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
     section: 'workspace',
     trial: true,
     routes: [
-      { path: '/staff', component: StaffPage, sidebar: { name: 'Staff & Team', group: 'Clinic Management', icon: UsersRound } },
+      { path: '/staff', component: StaffPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Staff & Team', group: 'Clinic Management', icon: UsersRound } },
       { path: '/settings', component: SettingsLayout, roles: ['SuperAdmin', 'OrgAdmin'], isNestedRouteContainer: true, sidebar: { name: 'Clinic Settings', group: 'Administration', icon: Settings }, nestedRoutes: [
         { path: '', component: SettingsHome, index: true },
         { path: 'integrations', component: IntegrationMarketplacePage },
@@ -409,7 +409,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/organization', component: Profile, roles: ['OrgAdmin'], sidebar: { name: 'Organization', icon: Building, group: 'Administration' } },
       { path: '/branches', component: BranchTerritoryPage, roles: ['OrgAdmin', 'Manager'] },
       // Billing Operations
-      { path: '/billing', component: BillingPage, sidebar: { name: 'Billing & Invoices', group: 'Clinical Operations', icon: Receipt } },
+      { path: '/billing', component: BillingPage, roles: ['OrgAdmin', 'Manager'], sidebar: { name: 'Billing & Invoices', group: 'Clinical Operations', icon: Receipt } },
       { path: '/billing/settings', component: InvoiceSettingsPage, roles: ['OrgAdmin', 'Manager'] }
     ]
   },

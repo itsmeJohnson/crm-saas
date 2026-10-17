@@ -17,7 +17,7 @@ export const TELECALLING_ITEM_GROUP_MAP: Record<string, string> = {
   "Contacts Directory": "Lead Management",
   "Lead Capture": "Lead Management",
   "Websites": "Lead Management",
-  "Billing & Invoices": "Lead Management",
+  "Billing & Invoices": "Administration",
   "Companies": "Lead Management",
   "Customers": "Lead Management",
   "Pipelines": "Lead Management",

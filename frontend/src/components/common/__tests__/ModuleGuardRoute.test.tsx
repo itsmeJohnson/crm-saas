@@ -127,4 +127,101 @@ describe('ModuleGuardRoute Component', () => {
     expect(screen.getByText('Access Denied')).toBeDefined();
     expect(screen.queryByText('Treatment Master Rendered')).toBeNull();
   });
+
+  it('blocks direct URL access to /billing for Telecaller Employee role and displays Access Denied (403)', () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
+      const state = { user: { role: 'Employee', is_team_leader: false }, features: [] };
+      return selector ? selector(state) : state;
+    });
+
+    vi.mocked(useMetadataStore).mockImplementation((selector: any) => {
+      const state = {
+        loaded: true,
+        crmConfig: {
+          industry: 'telecalling',
+          template: 'telecalling',
+          enabled_modules: ['admin_core', 'leads'],
+        },
+      };
+      return selector ? selector(state) : state;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/billing']}>
+        <Routes>
+          <Route element={<ModuleGuardRoute moduleKey="admin_core" />}>
+            <Route path="/billing" element={<div>Billing Invoicing Rendered</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Access Denied')).toBeDefined();
+    expect(screen.getByText('You do not have the required role to view this page.')).toBeDefined();
+    expect(screen.queryByText('Billing Invoicing Rendered')).toBeNull();
+  });
+
+  it('allows direct URL access to /billing for OrgAdmin role', () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
+      const state = { user: { role: 'OrgAdmin' }, features: [] };
+      return selector ? selector(state) : state;
+    });
+
+    vi.mocked(useMetadataStore).mockImplementation((selector: any) => {
+      const state = {
+        loaded: true,
+        crmConfig: {
+          industry: 'telecalling',
+          template: 'telecalling',
+          enabled_modules: ['admin_core', 'leads'],
+        },
+      };
+      return selector ? selector(state) : state;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/billing']}>
+        <Routes>
+          <Route element={<ModuleGuardRoute moduleKey="admin_core" />}>
+            <Route path="/billing" element={<div>Billing Invoicing Rendered</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Billing Invoicing Rendered')).toBeDefined();
+    expect(screen.queryByText('Access Denied')).toBeNull();
+  });
+
+  it('blocks direct URL access to /marketing for Telecaller Employee role', () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: any) => {
+      const state = { user: { role: 'Employee', is_team_leader: false }, features: [] };
+      return selector ? selector(state) : state;
+    });
+
+    vi.mocked(useMetadataStore).mockImplementation((selector: any) => {
+      const state = {
+        loaded: true,
+        crmConfig: {
+          industry: 'telecalling',
+          template: 'telecalling',
+          enabled_modules: ['reports'],
+        },
+      };
+      return selector ? selector(state) : state;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/marketing']}>
+        <Routes>
+          <Route element={<ModuleGuardRoute moduleKey="reports" />}>
+            <Route path="/marketing" element={<div>Marketing Page Rendered</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Access Denied')).toBeDefined();
+    expect(screen.queryByText('Marketing Page Rendered')).toBeNull();
+  });
 });
