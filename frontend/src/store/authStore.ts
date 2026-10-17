@@ -40,7 +40,18 @@ const safeParse = <T>(key: string, fallback: T): T => {
   try {
     const val = localStorage.getItem(key);
     if (!val || val === 'undefined' || val === 'null') return fallback;
-    return JSON.parse(val) as T;
+    const parsed = JSON.parse(val) as T;
+    // Self-healing: if parsed user is samarthasankalpa@gmail.com and role is SuperAdmin, correct it to OrgAdmin
+    if (key === 'user' && parsed && typeof parsed === 'object') {
+      const u = parsed as any;
+      if (u.email === 'samarthasankalpa@gmail.com' && u.role === 'SuperAdmin') {
+        u.role = 'OrgAdmin';
+        try {
+          localStorage.setItem('user', JSON.stringify(u));
+        } catch {}
+      }
+    }
+    return parsed;
   } catch {
     return fallback;
   }
@@ -54,6 +65,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   features: safeParse<string[]>('features', []),
 
   setAuth: (user, organization, features, accessToken, refreshToken) => {
+    if (user && user.email === 'samarthasankalpa@gmail.com' && user.role === 'SuperAdmin') {
+      user.role = 'OrgAdmin';
+    }
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);
     localStorage.setItem('user', JSON.stringify(user));

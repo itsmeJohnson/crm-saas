@@ -43,10 +43,18 @@ export const AppLayout: React.FC = () => {
   useEffect(() => {
     if (user) {
       api.get('/auth/me').then((res) => {
-        const fresh = res.data;
-        if (fresh && fresh.role && fresh.role !== user.role) {
-          useAuthStore.setState({ user: { ...user, ...fresh } });
-          localStorage.setItem('user', JSON.stringify({ ...user, ...fresh }));
+        const freshUser = res.data?.user || (res.data?.role ? res.data : null);
+        if (freshUser && freshUser.role) {
+          const targetRole = (freshUser.email === 'samarthasankalpa@gmail.com' && freshUser.role === 'SuperAdmin')
+            ? 'OrgAdmin'
+            : freshUser.role;
+          const merged = { ...user, ...freshUser, role: targetRole };
+          if (merged.role !== user.role || merged.email !== user.email) {
+            useAuthStore.setState({ user: merged });
+            try {
+              localStorage.setItem('user', JSON.stringify(merged));
+            } catch {}
+          }
         }
       }).catch(() => {});
     }
@@ -54,9 +62,12 @@ export const AppLayout: React.FC = () => {
 
   const TRIAL_MODE = true;
   const inTelecalling = isTelecallingMode();
-  const isBaselineTelecaller = user?.role === 'Employee' && !user?.is_team_leader;
-  const isSuperAdmin = user?.role === 'SuperAdmin';
-  const isManagerOrTL = user?.role === 'Manager' || user?.role === 'TeamLeader' || (user?.role === 'Employee' && user?.is_team_leader);
+  const effectiveRole = (user?.email === 'samarthasankalpa@gmail.com' && user?.role === 'SuperAdmin')
+    ? 'OrgAdmin'
+    : (user?.role ?? 'Staff');
+  const isBaselineTelecaller = effectiveRole === 'Employee' && !user?.is_team_leader;
+  const isSuperAdmin = effectiveRole === 'SuperAdmin' && user?.email !== 'samarthasankalpa@gmail.com';
+  const isManagerOrTL = effectiveRole === 'Manager' || effectiveRole === 'TeamLeader' || (effectiveRole === 'Employee' && user?.is_team_leader);
 
   const TELECALLER_ALLOWED_ITEMS = new Set([
     'Leads & Enquiries',
@@ -108,7 +119,7 @@ export const AppLayout: React.FC = () => {
       .filter((r) => r.sidebar)
       .map((r) => {
         const rawItemName = r.sidebar!.name;
-        const itemName = (rawItemName === 'Global Settings' && user?.role !== 'SuperAdmin')
+        const itemName = (rawItemName === 'Global Settings' && !isSuperAdmin)
           ? 'Settings'
           : rawItemName;
         const resolvedGroup = (inTelecalling || isBaselineTelecaller || isSuperAdmin || isManagerOrTL)
@@ -136,7 +147,7 @@ export const AppLayout: React.FC = () => {
     // Platform administration section is reserved for SuperAdmin only
     if (
       (item.group === 'Platform' || item.group === 'Platform Administration' || item.module === 'platform_core') &&
-      user.role !== 'SuperAdmin'
+      !isSuperAdmin
     ) {
       return false;
     }
@@ -157,15 +168,14 @@ export const AppLayout: React.FC = () => {
     }
 
     if (item.roles) {
-      const isSuper = user.role === 'SuperAdmin';
-      const hasRole = isSuper || item.roles.includes(user.role);
-      const isTeamLeaderUsers = item.name === 'Staff & Team' && user.role === 'Employee' && user.is_team_leader;
+      const hasRole = isSuperAdmin || item.roles.includes(effectiveRole);
+      const isTeamLeaderUsers = item.name === 'Staff & Team' && effectiveRole === 'Employee' && user.is_team_leader;
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
-    if (item.featureCode && user.role !== 'SuperAdmin') {
+    if (item.featureCode && !isSuperAdmin) {
       if (!features.includes(item.featureCode)) return false;
     }
-    if (TRIAL_MODE && user.role !== 'SuperAdmin' && item.section !== 'billing' && !item.trial) {
+    if (TRIAL_MODE && !isSuperAdmin && item.section !== 'billing' && !item.trial) {
       return false;
     }
     // Hide dental/clinical-only modules when the workspace is not that industry —
@@ -176,7 +186,7 @@ export const AppLayout: React.FC = () => {
       return false;
     }
     // Gating by resolved modules config
-    if (crmConfig && item.module && user.role !== 'SuperAdmin') {
+    if (crmConfig && item.module && !isSuperAdmin) {
       const alwaysEnabled = item.module === 'admin_core' || item.module === 'platform_core' || item.module === 'billing';
       if (!alwaysEnabled && !crmConfig.enabled_modules.includes(item.module)) return false;
     }
@@ -317,13 +327,13 @@ export const AppLayout: React.FC = () => {
     },
     telecalling: {
       SuperAdmin: 'Super Admin',
-      OrgAdmin: 'Call Center Admin',
+      OrgAdmin: 'Org Admin',
       Manager: 'Floor Manager',
       Employee: user?.is_team_leader ? 'Team Lead' : 'Telecaller',
     },
     generic: {
       SuperAdmin: 'Super Admin',
-      OrgAdmin: 'Workspace Admin',
+      OrgAdmin: 'Org Admin',
       Manager: 'Manager',
       Employee: user?.is_team_leader ? 'Lead Employee' : 'Staff Member',
     }
@@ -353,7 +363,7 @@ export const AppLayout: React.FC = () => {
     }
   };
 
-  const displayRole = (roleLabel[industry] ?? roleLabel['generic'])[user?.role ?? ''] ?? user?.role ?? 'Staff';
+  const displayRole = (roleLabel[industry] ?? roleLabel['generic'])[effectiveRole] ?? effectiveRole;
 
   const sidebarContent = (
     <div className="flex flex-col h-full select-none">
@@ -365,12 +375,12 @@ export const AppLayout: React.FC = () => {
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-slate-100 block truncate">
-              {user?.role === 'SuperAdmin' && user?.email !== 'samarthasankalpa@gmail.com'
+              {isSuperAdmin
                 ? 'CRM Enterprise · Secure Multi-Tenant Platform'
                 : (organization?.name || 'Samartha Sankalpa Solutions')}
             </span>
             <span className="text-[10px] text-slate-400 font-medium tracking-wide block">
-              {user?.role === 'SuperAdmin' && user?.email !== 'samarthasankalpa@gmail.com'
+              {isSuperAdmin
                 ? 'System Infrastructure & Multi-Tenant Control'
                 : 'Telecalling Suite'}
             </span>
