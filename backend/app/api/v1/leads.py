@@ -4,10 +4,12 @@ from datetime import datetime
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, Query, status, UploadFile, File, Response, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.user import User
+from app.models.organization import Organization
 from app.schemas.lead import (
     LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
@@ -545,7 +547,7 @@ async def get_import_template(
     else:
         csv_text = LeadImportService.generate_csv_template(vertical)
         return StreamingResponse(
-            io.StringIO(csv_text),
+            iter([csv_text]),
             media_type="text/csv",
             headers={"Content-Disposition": f"attachment; filename=leads_template{filename_suffix}.csv"}
         )
