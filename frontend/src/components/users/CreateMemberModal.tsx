@@ -35,6 +35,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
     register,
     handleSubmit,
     setValue,
+    clearErrors,
     watch,
     reset,
     formState: { errors },
@@ -50,6 +51,13 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
   });
 
   const selectedRole = watch('role');
+
+  // Clear reporting_to_id validation error when switching to a role where it is optional
+  useEffect(() => {
+    if (selectedRole !== 'Employee') {
+      clearErrors('reporting_to_id');
+    }
+  }, [selectedRole, clearErrors]);
 
   // Load potential managers when modal opens
   useEffect(() => {
@@ -94,7 +102,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
         last_name: data.last_name || undefined,
         role: data.role,
         password: data.password,
-        reporting_to_id: data.reporting_to_id !== '' ? data.reporting_to_id : null,
+        reporting_to_id: data.reporting_to_id && data.reporting_to_id.trim() !== '' ? data.reporting_to_id : null,
       };
 
       await createUser(payload);
@@ -133,16 +141,23 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
       return []; // OrgAdmin reports to no one
     }
     if (selectedRole === 'Manager') {
-      // Managers report to OrgAdmin
-      return reportingUsers.filter((u) => u.role === 'OrgAdmin');
+      // Managers report to OrgAdmin / SuperAdmin
+      return reportingUsers.filter((u) => u.role === 'OrgAdmin' || u.role === 'SuperAdmin');
     }
     if (selectedRole === 'TeamLeader') {
       // Team Leaders report to Managers or Admins
-      return reportingUsers.filter((u) => u.role === 'Manager' || u.role === 'OrgAdmin');
+      return reportingUsers.filter((u) => u.role === 'Manager' || u.role === 'OrgAdmin' || u.role === 'SuperAdmin');
     }
     if (selectedRole === 'Employee') {
       // Employees report to Team Leaders or Managers
-      return reportingUsers.filter((u) => u.role === 'TeamLeader' || (u.role === 'Employee' && u.is_team_leader) || u.role === 'Manager');
+      const leaders = reportingUsers.filter(
+        (u) => u.role === 'TeamLeader' || (u.role === 'Employee' && u.is_team_leader) || u.role === 'Manager'
+      );
+      if (leaders.length > 0) {
+        return leaders;
+      }
+      // If agency only has OrgAdmin appointed so far, allow selecting OrgAdmin
+      return reportingUsers.filter((u) => u.role === 'OrgAdmin' || u.role === 'SuperAdmin');
     }
     return [];
   };
@@ -282,7 +297,14 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
           {selectedRole !== 'OrgAdmin' && (
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>Reporting Manager</span>
+                <span>
+                  Reporting Manager{' '}
+                  {selectedRole === 'Employee' ? (
+                    <span className="text-red-400">*</span>
+                  ) : (
+                    <span className="text-xs font-normal text-slate-500 lowercase">(optional)</span>
+                  )}
+                </span>
                 {isFetchingManagers && <Loader2 className="w-3 h-3 animate-spin text-brand-400" />}
               </label>
 
@@ -295,11 +317,15 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
               ) : (
                 <select
                   {...register('reporting_to_id', {
-                    required: selectedRole !== 'OrgAdmin' ? 'Reporting Manager is required' : false,
+                    required: selectedRole === 'Employee' ? 'Reporting Manager is required for Sales Agents' : false,
                   })}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
                 >
-                  <option value="">-- Select Reporting Manager --</option>
+                  <option value="">
+                    {selectedRole === 'Employee'
+                      ? '-- Select Reporting Manager * --'
+                      : '-- None / Top Level (Optional) --'}
+                  </option>
                   {managerOptions.map((mgr) => (
                     <option key={mgr.id} value={mgr.id}>
                       {mgr.first_name} {mgr.last_name} ({mgr.role}

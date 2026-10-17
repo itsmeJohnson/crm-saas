@@ -31,6 +31,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
     register,
     handleSubmit,
     setValue,
+    clearErrors,
     watch,
     reset,
     formState: { errors },
@@ -44,6 +45,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
       reporting_to_id: '',
     },
   });
+
+  const watchRole = watch('role');
+
+  // Clear reporting_to_id validation error when switching to a role where it is optional
+  useEffect(() => {
+    if (watchRole !== 'Employee') {
+      clearErrors('reporting_to_id');
+    }
+  }, [watchRole, clearErrors]);
 
   // Load potential managers when modal opens
   useEffect(() => {
@@ -68,11 +78,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
       setValue('email', user.email);
       setValue('first_name', user.first_name || '');
       setValue('last_name', user.last_name || '');
-      let initialRole = user.role;
-      if (user.role === 'Employee' && user.is_team_leader) {
-        initialRole = 'TeamLeader';
-      }
-      setValue('role', initialRole);
+      setValue('role', user.role);
       setValue('password', '');
       setValue('reporting_to_id', user.reporting_to_id || '');
     }
@@ -81,13 +87,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
   const onSubmit = async (data: EditFormInput) => {
     if (!user) return;
     try {
-      const mappedRole = data.role === 'TeamLeader' ? 'Employee' : data.role;
       const payload: Parameters<typeof updateUser>[1] = {
         email: data.email,
         first_name: data.first_name || null,
         last_name: data.last_name || null,
-        role: mappedRole,
-        reporting_to_id: data.reporting_to_id !== '' ? data.reporting_to_id : null,
+        role: data.role,
+        reporting_to_id: data.reporting_to_id && data.reporting_to_id.trim() !== '' ? data.reporting_to_id : null,
       };
       if (data.password && data.password.trim() !== '') {
         payload.password = data.password;
@@ -133,22 +138,26 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
     ];
   };
 
-  const watchRole = watch('role');
-
   const getReportingManagerOptions = () => {
     if (watchRole === 'OrgAdmin') {
       return [];
     }
     if (watchRole === 'Manager') {
-      return reportingUsers.filter((u) => u.role === 'OrgAdmin' && u.id !== user?.id);
+      return reportingUsers.filter((u) => (u.role === 'OrgAdmin' || u.role === 'SuperAdmin') && u.id !== user?.id);
     }
     if (watchRole === 'TeamLeader') {
-      return reportingUsers.filter((u) => u.role === 'Manager' && u.id !== user?.id);
+      return reportingUsers.filter(
+        (u) => (u.role === 'Manager' || u.role === 'OrgAdmin' || u.role === 'SuperAdmin') && u.id !== user?.id
+      );
     }
     if (watchRole === 'Employee') {
-      return reportingUsers.filter(
-        (u) => u.role === 'Employee' && u.is_team_leader && u.id !== user?.id
+      const leaders = reportingUsers.filter(
+        (u) => (u.role === 'TeamLeader' || (u.role === 'Employee' && u.is_team_leader) || u.role === 'Manager') && u.id !== user?.id
       );
+      if (leaders.length > 0) {
+        return leaders;
+      }
+      return reportingUsers.filter((u) => (u.role === 'OrgAdmin' || u.role === 'SuperAdmin') && u.id !== user?.id);
     }
     return [];
   };
@@ -258,17 +267,28 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
           {watchRole !== 'OrgAdmin' && (
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>Reporting Manager</span>
+                <span>
+                  Reporting Manager{' '}
+                  {watchRole === 'Employee' ? (
+                    <span className="text-red-400">*</span>
+                  ) : (
+                    <span className="text-xs font-normal text-slate-500 lowercase">(optional)</span>
+                  )}
+                </span>
                 {isFetchingManagers && <Loader2 className="w-3 h-3 animate-spin text-brand-400" />}
               </label>
 
               <select
                 {...register('reporting_to_id', {
-                  required: watchRole !== 'OrgAdmin' ? 'Reporting Manager is required' : false,
+                  required: watchRole === 'Employee' ? 'Reporting Manager is required for Sales Agents' : false,
                 })}
                 className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
               >
-                <option value="">-- Select Reporting Manager --</option>
+                <option value="">
+                  {watchRole === 'Employee'
+                    ? '-- Select Reporting Manager * --'
+                    : '-- None / Top Level (Optional) --'}
+                </option>
                 {managerOptions.map((mgr) => (
                   <option key={mgr.id} value={mgr.id}>
                     {mgr.first_name} {mgr.last_name} ({mgr.role}

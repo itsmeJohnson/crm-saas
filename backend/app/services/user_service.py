@@ -670,6 +670,11 @@ class UserService:
             return
 
         if reporting_to_id is None:
+            if role == "Employee":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Sales agents must have an assigned reporting manager or team leader"
+                )
             return
 
         if user_id and reporting_to_id == user_id:
@@ -699,32 +704,7 @@ class UserService:
             if parent.role not in ("OrgAdmin", "SuperAdmin"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Managers must report to a Super Admin (OrgAdmin)"
-                )
-
-        elif role == "Employee":
-            if parent.role == "Manager":
-                # Valid TL
-                pass
-            elif parent.role == "Employee":
-                # Parent is Employee, must be a TL (so parent must report to a Manager)
-                if not parent.reporting_to_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Telecallers must report to a Team Leader who reports to a Manager"
-                    )
-                grandparent = await self.user_repo.get_user_by_id(organization_id, parent.reporting_to_id)
-                if not grandparent or grandparent.role != "Manager":
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Telecallers must report to a Team Leader who reports to a Manager"
-                    )
-            elif parent.role in ("TeamLeader",):
-                pass
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Employees must report to either a Manager (TL) or a Team Leader (Agent)"
+                    detail="Managers must report to an Administrator (OrgAdmin)"
                 )
 
         elif role == "TeamLeader":
@@ -732,6 +712,18 @@ class UserService:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Team Leaders must report to a Manager or Administrator"
+                )
+
+        elif role == "Employee":
+            if parent.role in ("Manager", "TeamLeader", "OrgAdmin", "SuperAdmin"):
+                pass
+            elif parent.role == "Employee":
+                # Parent is Employee (acting as Team Leader)
+                pass
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Sales agents must report to a Team Leader, Manager, or Administrator"
                 )
 
     async def replace_employee(
