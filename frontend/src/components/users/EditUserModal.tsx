@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { X, ShieldAlert, Loader2, KeyRound } from 'lucide-react';
+import { X, ShieldAlert, Loader2, KeyRound, UserCheck } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
 import { useAuthStore } from '../../store/authStore';
 import { userApi, UserResponse } from '../../services/userApi';
@@ -49,6 +49,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
   });
 
   const watchRole = watch('role');
+  const isSelf = currentUser?.id === user?.id;
+  const isAgentSelf = isSelf && currentUser?.role !== 'OrgAdmin';
 
   // Clear reporting_to_id validation error when switching to a role where it is optional
   useEffect(() => {
@@ -95,11 +97,20 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
         email: data.email,
         first_name: data.first_name || null,
         last_name: data.last_name || null,
-        role: data.role,
-        reporting_to_id: data.reporting_to_id && data.reporting_to_id.trim() !== '' ? data.reporting_to_id : null,
-        allowed_ip_whitelist: data.allowed_ip_whitelist && data.allowed_ip_whitelist.trim() !== '' ? data.allowed_ip_whitelist.trim() : null,
-        registered_device_uuid: data.registered_device_uuid && data.registered_device_uuid.trim() !== '' ? data.registered_device_uuid.trim() : null,
+        role: user.role,
       };
+
+      // Only allow managerial changes when NOT an agent editing their own profile
+      if (!isAgentSelf) {
+        payload.role = data.role;
+        payload.reporting_to_id = data.reporting_to_id && data.reporting_to_id.trim() !== '' ? data.reporting_to_id : null;
+        payload.allowed_ip_whitelist = data.allowed_ip_whitelist && data.allowed_ip_whitelist.trim() !== '' ? data.allowed_ip_whitelist.trim() : null;
+        payload.registered_device_uuid = data.registered_device_uuid && data.registered_device_uuid.trim() !== '' ? data.registered_device_uuid.trim() : null;
+      } else {
+        // Preserving existing reporting structure for agents/self
+        payload.reporting_to_id = user.reporting_to_id || null;
+      }
+
       if (data.password && data.password.trim() !== '') {
         payload.password = data.password;
       }
@@ -113,13 +124,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
 
   if (!isOpen || !user) return null;
 
-  const isSelf = currentUser?.id === user.id;
-
   // Determine if caller can edit the role field
   const canEditRole = () => {
     if (!currentUser) return false;
     if (isSelf) {
-      return currentUser.role === 'OrgAdmin'; // Only admin can change own role (but demoting self requires other admin, handled on backend)
+      return currentUser.role === 'OrgAdmin'; // Only admin can change own role
     }
     if (currentUser.role === 'OrgAdmin') return true; // Admins can change other roles
     if (currentUser.role === 'Manager' && user.role === 'Employee') return true; // Managers can change employee roles
@@ -136,7 +145,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
         { value: 'Employee', label: 'Employee' },
       ];
     }
-    // Managers can toggle between Manager/TeamLeader/Employee roles for employees
     return [
       { value: 'Manager', label: 'Manager' },
       { value: 'TeamLeader', label: 'Team Leader' },
@@ -170,6 +178,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
 
   const managerOptions = getReportingManagerOptions();
 
+  // Find assigned reporting manager for display
+  const assignedManager = reportingUsers.find((u) => u.id === user.reporting_to_id);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
       <div className="w-full max-w-md glass-panel border border-slate-800/90 rounded-2xl shadow-2xl relative overflow-hidden">
@@ -192,7 +203,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           {error && (
             <div className="p-3.5 bg-red-950/20 border border-red-900/30 rounded-xl flex items-start gap-2.5 text-sm text-red-400">
               <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
@@ -262,48 +273,72 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
                 ))}
               </select>
             ) : (
-              <div className="w-full px-3.5 py-2.5 bg-slate-900/40 border border-slate-800/80 rounded-xl text-sm text-slate-500 select-none">
-                {user.role} (Role locked)
+              <div className="w-full px-3.5 py-2.5 bg-slate-900/40 border border-slate-800/80 rounded-xl text-sm text-slate-400 select-none flex items-center justify-between">
+                <span>{user.role}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700/60">
+                  Role Locked
+                </span>
                 <input type="hidden" {...register('role')} />
               </div>
             )}
           </div>
 
-          {/* Reporting manager selection */}
+          {/* Reporting Manager Section */}
           {watchRole !== 'OrgAdmin' && (
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                 <span>
                   Reporting Manager{' '}
-                  {watchRole === 'Employee' ? (
+                  {!isAgentSelf && watchRole === 'Employee' ? (
                     <span className="text-red-400">*</span>
-                  ) : (
-                    <span className="text-xs font-normal text-slate-500 lowercase">(optional)</span>
-                  )}
+                  ) : null}
                 </span>
                 {isFetchingManagers && <Loader2 className="w-3 h-3 animate-spin text-brand-400" />}
               </label>
 
-              <select
-                {...register('reporting_to_id', {
-                  required: watchRole === 'Employee' ? 'Reporting Manager is required for Sales Agents' : false,
-                })}
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
-              >
-                <option value="">
-                  {watchRole === 'Employee'
-                    ? '-- Select Reporting Manager * --'
-                    : '-- None / Top Level (Optional) --'}
-                </option>
-                {managerOptions.map((mgr) => (
-                  <option key={mgr.id} value={mgr.id}>
-                    {mgr.first_name} {mgr.last_name} ({mgr.role}
-                    {mgr.reporting_to_id && mgr.role === 'Employee' ? ' - TL' : ''})
-                  </option>
-                ))}
-              </select>
-              {errors.reporting_to_id && (
-                <p className="mt-1 text-xs text-red-400">{errors.reporting_to_id.message}</p>
+              {/* Agent Self-Profile: READ-ONLY DISPLAY, NO SELECTABLE DROPDOWN */}
+              {isAgentSelf ? (
+                <div className="w-full px-3.5 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-sm text-slate-200 flex items-center justify-between select-none">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <UserCheck className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span className="font-medium text-slate-200 truncate">
+                      {assignedManager
+                        ? `${assignedManager.first_name || ''} ${assignedManager.last_name || ''} (${assignedManager.role}${assignedManager.reporting_to_id && assignedManager.role === 'Employee' ? ' - TL' : ''})`.trim()
+                        : user.reporting_to_id
+                          ? 'Assigned Manager'
+                          : 'Not Assigned / Direct'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                    Manager Assigned
+                  </span>
+                  <input type="hidden" {...register('reporting_to_id')} />
+                </div>
+              ) : (
+                /* Admin/Manager editing staff member: Selectable Dropdown */
+                <>
+                  <select
+                    {...register('reporting_to_id', {
+                      required: watchRole === 'Employee' ? 'Reporting Manager is required for Sales Agents' : false,
+                    })}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                  >
+                    <option value="">
+                      {watchRole === 'Employee'
+                        ? '-- Select Reporting Manager * --'
+                        : '-- None / Top Level (Optional) --'}
+                    </option>
+                    {managerOptions.map((mgr) => (
+                      <option key={mgr.id} value={mgr.id}>
+                        {mgr.first_name} {mgr.last_name} ({mgr.role}
+                        {mgr.reporting_to_id && mgr.role === 'Employee' ? ' - TL' : ''})
+                      </option>
+                    ))}
+                  </select>
+                  {errors.reporting_to_id && (
+                    <p className="mt-1 text-xs text-red-400">{errors.reporting_to_id.message}</p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -332,47 +367,49 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
             )}
           </div>
 
-          {/* Floor IP Whitelisting & Device Binding */}
-          <div className="pt-3 border-t border-slate-800/80 space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
-              <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Floor Security &amp; Device Binding</span>
-            </div>
+          {/* Floor IP Whitelisting & Device Binding - HIDDEN for agent self-profile */}
+          {!isAgentSelf && (currentUser?.role === 'OrgAdmin' || currentUser?.role === 'Manager') && (
+            <div className="pt-3 border-t border-slate-800/80 space-y-3">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Floor Security &amp; Device Binding</span>
+              </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                Floor IP Whitelist (Comma-separated)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 192.168.1.0/24, 203.0.113.5 (Blank = Any IP)"
-                {...register('allowed_ip_whitelist')}
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
-              />
-              <p className="mt-1 text-[10px] text-slate-500">Restricts user login exclusively to floor network coordinates.</p>
-            </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  Floor IP Whitelist (Comma-separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 192.168.1.0/24, 203.0.113.5 (Blank = Any IP)"
+                  {...register('allowed_ip_whitelist')}
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">Restricts user login exclusively to floor network coordinates.</p>
+              </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                Registered Device UUID (Smartphone Binding)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. a8b4c2e1-9f33-40a2-b210-998877665544"
-                {...register('registered_device_uuid')}
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
-              />
-              <p className="mt-1 text-[10px] text-slate-500">Locks calling floor logins to this registered smartphone/machine hardware ID.</p>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  Registered Device UUID (Smartphone Binding)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. a8b4c2e1-9f33-40a2-b210-998877665544"
+                  {...register('registered_device_uuid')}
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">Locks calling floor logins to this registered smartphone/machine hardware ID.</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800/60">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-900/80 active:bg-slate-900/50 border border-slate-800 hover:border-slate-700 rounded-xl text-sm font-medium text-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl text-sm font-medium text-slate-200 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>

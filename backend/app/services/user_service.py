@@ -346,6 +346,15 @@ class UserService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="You cannot deactivate yourself"
                 )
+            if actor.role in ("Employee", "TeamLeader", "Telecaller"):
+                if "reporting_to_id" in update_data and update_data["reporting_to_id"] != target_user.reporting_to_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Agents cannot change their own reporting manager"
+                    )
+                # Strip out floor security and device binding fields if self-updating
+                update_data.pop("allowed_ip_whitelist", None)
+                update_data.pop("registered_device_uuid", None)
         else:
             is_tl = await self.is_team_leader(actor)
             PermissionService.check_user_management_permission(
