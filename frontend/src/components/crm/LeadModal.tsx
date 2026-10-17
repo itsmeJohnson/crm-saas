@@ -11,6 +11,7 @@ import { X, Loader2, MessageCircle, Copy } from 'lucide-react';
 import { whatsappHref } from '../../utils/whatsapp';
 import { leadApi } from '../../services/leadApi';
 import { currencySymbol } from '../../utils/currency';
+import { useAuthStore } from '../../store/authStore';
 
 const leadSchema = z.object({
   title: z.string().min(1, 'Lead Title is required').max(255),
@@ -40,6 +41,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   onClose,
   lead
 }) => {
+  const { user } = useAuthStore();
+  const isEmployee = user?.role === 'Employee';
   const { createLead, updateLead } = useLeadStore();
   const { users, fetchUsers } = useUserStore();
   const { pipelines, customFields, fetchBootstrap, getPipelineForStage } = useMetadataStore();
@@ -206,7 +209,11 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       };
 
       // Safeguard: omit phone number if it contains asterisks to avoid overwriting real number in DB
-      if (values.phone && !values.phone.includes('*')) {
+      if (isEmployee && lead) {
+        // Telecallers/agents are strictly forbidden from altering or deleting customer phone numbers
+        payload.phone = lead.phone;
+        payload.assigned_user_id = lead.assigned_user_id;
+      } else if (values.phone && !values.phone.includes('*')) {
         payload.phone = values.phone;
       } else if (values.phone === '') {
         payload.phone = null;
@@ -310,6 +317,10 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                   <span className="text-[10px] text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 select-none">
                     Protected Number
                   </span>
+                ) : isEmployee ? (
+                  <span className="text-[10px] text-slate-400 font-medium bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 select-none">
+                    Locked (Telecaller)
+                  </span>
                 ) : whatsappHref(lead?.phone, `Hi ${lead?.first_name || ''}`.trim()) && (
                   <a
                     href={whatsappHref(lead?.phone, `Hi ${lead?.first_name || ''}`.trim())!}
@@ -327,8 +338,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                 maxLength={20}
                 {...register('phone')}
                 placeholder="e.g. +1 555-0900"
-                readOnly={lead?.phone?.includes('*')}
-                className={`w-full px-4 py-3 rounded-xl glass-input ${lead?.phone?.includes('*') ? 'opacity-60 cursor-not-allowed border-slate-800/80 focus:border-slate-800/80' : ''}`}
+                readOnly={lead?.phone?.includes('*') || isEmployee}
+                className={`w-full px-4 py-3 rounded-xl glass-input ${lead?.phone?.includes('*') || isEmployee ? 'opacity-60 cursor-not-allowed border-slate-800/80 focus:border-slate-800/80' : ''}`}
               />
             </div>
           </div>
@@ -399,7 +410,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Assign Owner</label>
               <select
                 {...register('assigned_user_id')}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+                disabled={isEmployee}
+                className={`w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50 ${isEmployee ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <option value="">Unassigned</option>
                 {activeUsers.map(u => (
@@ -408,6 +420,9 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                   </option>
                 ))}
               </select>
+              {isEmployee && (
+                <p className="text-[10px] text-slate-500 mt-1">Lead owner can only be reassigned by Team Leader or Admin.</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Pipeline</label>

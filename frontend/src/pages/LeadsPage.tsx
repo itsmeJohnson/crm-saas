@@ -34,14 +34,14 @@ import { api } from '../services/api';
 
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
-  // Bulk import (CSV, XLSX, Google Sheets) enabled for administrative operations
-  const canBulkImport = true;
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
   const { agentState, callSpecificLead, error: dialerError } = useDialerStore();
   const [callError, setCallError] = useState<string | null>(null);
 
   const isTL = user?.role === 'TeamLeader' || (user as any)?.is_team_leader || dashboardData?.role === 'TeamLeader';
   const isPrivileged = !user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL;
+  // Bulk import (CSV, XLSX, Google Sheets) enabled for administrative operations
+  const canBulkImport = isPrivileged;
   // Telecallers (Employees) can place a manual click-to-call to their own leads.
   const canManualCall = user?.role === 'Employee';
 
@@ -407,25 +407,25 @@ export const LeadsPage: React.FC = () => {
           )}
 
           {/* More Actions Dropdown (Export CSV, XLSX, Custom Fields) */}
-          <div className="relative">
-            <button
-              onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 rounded-lg text-xs font-semibold text-slate-200 shadow-2xs transition-all cursor-pointer"
-              title="Export and configuration options"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5 text-slate-400" />
-              <span>Actions</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
+          {isPrivileged && (
+            <div className="relative">
+              <button
+                onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 rounded-lg text-xs font-semibold text-slate-200 shadow-2xs transition-all cursor-pointer"
+                title="Export and configuration options"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                <span>Actions</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
 
-            {isActionsMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setIsActionsMenuOpen(false)}
-                />
-                <div className="absolute right-0 mt-1.5 w-56 bg-[#111a2e] border border-[#1e293b] rounded-xl shadow-xl z-40 py-1 divide-y divide-[#1e293b]">
-                  {isPrivileged && (
+              {isActionsMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsActionsMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-1.5 w-56 bg-[#111a2e] border border-[#1e293b] rounded-xl shadow-xl z-40 py-1 divide-y divide-[#1e293b]">
                     <div className="py-1">
                       <button
                         onClick={() => {
@@ -439,8 +439,6 @@ export const LeadsPage: React.FC = () => {
                         <span>{isAllocating ? 'Allocating Leads...' : 'Round-Robin Lead Split'}</span>
                       </button>
                     </div>
-                  )}
-                  {isPrivileged && (
                     <div className="py-1">
                       <button
                         onClick={() => {
@@ -465,8 +463,6 @@ export const LeadsPage: React.FC = () => {
                         <span>Export to Excel (.xlsx)</span>
                       </button>
                     </div>
-                  )}
-                  {isPrivileged && (
                     <div className="py-1">
                       <button
                         onClick={() => {
@@ -479,11 +475,11 @@ export const LeadsPage: React.FC = () => {
                         <span>Custom Fields</span>
                       </button>
                     </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Primary CTA: Add Deal */}
           {isPrivileged && (

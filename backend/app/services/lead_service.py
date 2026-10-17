@@ -906,6 +906,39 @@ class LeadService:
                 },
             })
 
+        # E: Include WhatsApp conversation messages for this lead
+        try:
+            from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
+            wa_conv_res = await self.db.execute(
+                select(WhatsAppConversation).filter(
+                    WhatsAppConversation.organization_id == actor.organization_id,
+                    WhatsAppConversation.lead_id == lead.id
+                )
+            )
+            conv_ids = [c.id for c in wa_conv_res.scalars().all()]
+            if conv_ids:
+                wa_msg_res = await self.db.execute(
+                    select(WhatsAppMessage).filter(
+                        WhatsAppMessage.conversation_id.in_(conv_ids)
+                    ).order_by(WhatsAppMessage.created_at.desc()).limit(50)
+                )
+                for wm in wa_msg_res.scalars().all():
+                    events.append({
+                        "type": "whatsapp",
+                        "id": str(wm.id),
+                        "timestamp": wm.created_at,
+                        "title": f"WhatsApp ({wm.direction})",
+                        "description": wm.body or f"[{wm.media_type}]",
+                        "actor_user_id": None,
+                        "event_metadata": {
+                            "direction": wm.direction,
+                            "status": wm.wa_status,
+                            "media_type": wm.media_type,
+                        }
+                    })
+        except Exception:
+            pass
+
         events.sort(key=lambda e: e["timestamp"], reverse=True)
         return events
 

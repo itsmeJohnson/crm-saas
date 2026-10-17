@@ -39,7 +39,7 @@ export interface LeadResponse {
 }
 
 export interface LeadTimelineEvent {
-  type: 'note' | 'activity' | 'audit' | 'task' | 'reminder';
+  type: 'note' | 'activity' | 'audit' | 'task' | 'reminder' | 'whatsapp';
   id: string;
   timestamp: string;
   title: string;

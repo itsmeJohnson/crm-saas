@@ -10,7 +10,11 @@ import {
   FileText,
   UserCheck,
   LogOut,
-  MessageCircle
+  MessageCircle,
+  History,
+  Sparkles,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
@@ -19,6 +23,8 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { dashboardApi } from '../../services/dashboardApi';
 import { OmniChannelChatDrawer } from '../crm/OmniChannelChatDrawer';
+import { leadApi, LeadTimelineEvent } from '../../services/leadApi';
+import { useUserStore } from '../../store/userStore';
 
 export const DialerConsole: React.FC = () => {
   const {
@@ -73,6 +79,13 @@ export const DialerConsole: React.FC = () => {
   });
   const [pendingBreakReason, setPendingBreakReason] = useState<string | null>(null);
   const [showActiveBreakMenu, setShowActiveBreakMenu] = useState(false);
+
+  // Lead Timeline & Conversation History state
+  const { users, fetchUsers } = useUserStore();
+  const [timelineEvents, setTimelineEvents] = useState<LeadTimelineEvent[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [historyFilterDays, setHistoryFilterDays] = useState<7 | 30 | 'all'>(7);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
 
 
@@ -134,6 +147,35 @@ export const DialerConsole: React.FC = () => {
     };
   }, [agentState, stateTimestamp]);
 
+  // Fetch users list for resolving agent names
+  useEffect(() => {
+    if (users.length === 0) fetchUsers();
+  }, []);
+
+  // Fetch timeline whenever current lead changes
+  useEffect(() => {
+    if (!currentLead?.id) {
+      setTimelineEvents([]);
+      return;
+    }
+    let isMounted = true;
+    setTimelineLoading(true);
+    leadApi.getTimeline(currentLead.id)
+      .then((data) => {
+        if (isMounted) setTimelineEvents(data);
+      })
+      .catch((err) => {
+        console.warn('Could not fetch lead timeline in dialer console:', err);
+      })
+      .finally(() => {
+        if (isMounted) setTimelineLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentLead?.id]);
+
   // Reset form inputs when current lead changes
   useEffect(() => {
     if (!currentLead) {
@@ -150,6 +192,44 @@ export const DialerConsole: React.FC = () => {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const resolveActorName = (actorId: string | null) => {
+    if (!actorId) return null;
+    const u = users.find((x) => x.id === actorId);
+    return u ? (`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email) : null;
+  };
+
+  const formatEventTime = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diffDays === 0) return `Today at ${timeStr}`;
+    if (diffDays === 1) return `Yesterday at ${timeStr}`;
+    if (diffDays < 7) return `${diffDays}d ago at ${timeStr}`;
+    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} at ${timeStr}`;
+  };
+
+  const callHistoryEvents = timelineEvents.filter(
+    (ev) => ev.type === 'activity' && (ev.title.toLowerCase().includes('call') || (ev.event_metadata as any)?.activity_type === 'Call')
+  );
+
+  const totalCallTouches = callHistoryEvents.length;
+  const isFreshLead = totalCallTouches === 0 && (currentLead?.status === 'New' || !currentLead?.status);
+  const latestPriorCall = callHistoryEvents[0];
+
+  const filteredHistoryEvents = timelineEvents.filter((ev) => {
+    if (historyFilterDays === 'all') return true;
+    const cutoff = Date.now() - historyFilterDays * 24 * 60 * 60 * 1000;
+    return new Date(ev.timestamp).getTime() >= cutoff;
+  });
+
+  const visibleHistoryEvents = showAllHistory
+    ? filteredHistoryEvents
+    : filteredHistoryEvents.slice(0, 3);
 
 
 
@@ -484,7 +564,20 @@ export const DialerConsole: React.FC = () => {
               <div className="bg-gradient-to-r from-indigo-950/40 to-violet-950/40 border-b border-slate-800 p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Active Lead Context</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Active Lead Context</span>
+                      {isFreshLead ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <Sparkles className="w-3 h-3" />
+                          Fresh Lead • 1st Call
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          <History className="w-3 h-3" />
+                          Follow-Up Call • Attempt #{totalCallTouches + 1}
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-2xl font-bold text-slate-100 mt-1">
                       {currentLead?.first_name || currentLead?.last_name
                         ? `${currentLead?.first_name || ''} ${currentLead?.last_name || ''}`.trim()
@@ -516,6 +609,180 @@ export const DialerConsole: React.FC = () => {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Previous Conversations & Lead History Section */}
+              <div className="border-b border-slate-800 bg-slate-950/40 p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-indigo-400" />
+                    <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+                      Previous Conversations &amp; Customer History
+                    </h4>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
+                      {timelineEvents.length} {timelineEvents.length === 1 ? 'interaction' : 'interactions'}
+                    </span>
+                  </div>
+
+                  {/* Filter range buttons (7 days, 30 days, all) */}
+                  <div className="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilterDays(7)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                        historyFilterDays === 7
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilterDays(30)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                        historyFilterDays === 30
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilterDays('all')}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                        historyFilterDays === 'all'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      All History
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Guidance Banner */}
+                {isFreshLead ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-emerald-300">Fresh Lead • First-Time Call</p>
+                      <p className="text-xs text-emerald-200/80 mt-0.5">
+                        This customer has not been contacted before. Introduce the company, verify their interest, and record their response below.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-indigo-950/30 border border-indigo-800/40 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        Follow-Up Call • Attempt #{totalCallTouches + 1}
+                      </span>
+                      {latestPriorCall && (
+                        <span className="text-xs text-slate-300">
+                          Last called {formatEventTime(latestPriorCall.timestamp)}
+                          {resolveActorName(latestPriorCall.actor_user_id) && ` by ${resolveActorName(latestPriorCall.actor_user_id)}`}
+                        </span>
+                      )}
+                    </div>
+                    {latestPriorCall?.description && (
+                      <span className="text-xs text-indigo-300 italic truncate max-w-md">
+                        "{latestPriorCall.description.split('\n')[0]}"
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Timeline Feed */}
+                {timelineLoading ? (
+                  <div className="py-6 text-center text-xs text-slate-400">Loading conversation history...</div>
+                ) : filteredHistoryEvents.length === 0 ? (
+                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-400">
+                      No interactions recorded in the selected period ({historyFilterDays === 'all' ? 'all time' : `past ${historyFilterDays} days`}).
+                    </p>
+                    {historyFilterDays !== 'all' && timelineEvents.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFilterDays('all')}
+                        className="mt-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                      >
+                        View all {timelineEvents.length} older interactions
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {visibleHistoryEvents.map((ev) => (
+                      <div
+                        key={ev.id}
+                        className="bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 hover:border-slate-700/80 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            {ev.type === 'activity' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                                <Phone className="w-3 h-3" /> Call
+                              </span>
+                            ) : ev.type === 'whatsapp' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                <MessageCircle className="w-3 h-3" /> WhatsApp
+                              </span>
+                            ) : ev.type === 'note' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                                <FileText className="w-3 h-3" /> Note
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                                <Clock className="w-3 h-3" /> {ev.title}
+                              </span>
+                            )}
+                            <span className="text-xs font-semibold text-slate-200">
+                              {ev.title}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                            {resolveActorName(ev.actor_user_id) && (
+                              <span className="bg-slate-800/80 px-2 py-0.5 rounded text-slate-300 font-medium">
+                                Agent: {resolveActorName(ev.actor_user_id)}
+                              </span>
+                            )}
+                            <span>{formatEventTime(ev.timestamp)}</span>
+                          </div>
+                        </div>
+
+                        {ev.description && (
+                          <div className="text-xs text-slate-300 bg-slate-950/60 rounded-lg p-2.5 border border-slate-800/60 whitespace-pre-line mt-1">
+                            {ev.description}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Show More / Show Less Button */}
+                    {filteredHistoryEvents.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllHistory(!showAllHistory)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        {showAllHistory ? (
+                          <>
+                            <ChevronUp className="w-3.5 h-3.5" />
+                            Show Less History
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3.5 h-3.5" />
+                            Show More Previous History ({filteredHistoryEvents.length - 3} older interactions)
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Disposition Form */}
