@@ -75,11 +75,9 @@ async def trigger_provider_call(cfg: dict, customer_number: str, agent_number: s
 
 
 async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
-    if user.role != "Employee" or not user.reporting_to_id:
-        return False
-    parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
-    parent_role = parent_res.scalar()
-    return parent_role == "Employee"
+    if user.role in ("Employee", "TeamLeader", "Telecaller", "Manager", "OrgAdmin"):
+        return True
+    return False
 
 @router.post("/next-lead", response_model=LeadResponse)
 async def get_next_lead(

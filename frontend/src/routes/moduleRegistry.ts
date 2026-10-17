@@ -397,7 +397,7 @@ export const MODULES_REGISTRY: ModuleDefinition[] = [
       { path: '/departments', component: DepartmentsPage, roles: ['OrgAdmin', 'Manager'] },
       { path: '/teams', component: TeamsPage },
       { path: '/users', component: UsersPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], featureCode: 'ROLE_BASED_ACCESS' },
-      { path: '/attendance', component: AttendancePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Attendance', icon: Clock, group: 'Administration' } },
+      { path: '/attendance', component: AttendancePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader', 'Employee'], sidebar: { name: 'Attendance', icon: Clock, group: 'Administration' } },
       { path: '/leaves', component: LeavePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Leaves', icon: CalendarDays, group: 'Administration' } },
       { path: '/shifts', component: ShiftManagementPage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Shifts', icon: Clock, group: 'Administration' } },
       { path: '/performance', component: PerformancePage, roles: ['OrgAdmin', 'Manager', 'TeamLeader'], sidebar: { name: 'Performance', icon: Activity, group: 'Administration' } },

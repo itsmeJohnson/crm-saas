@@ -23,8 +23,18 @@ export const EmployeeHeroCard: React.FC<{
   summary: EmployeeSummary | null;
   name: string;
   loading?: boolean;
-}> = ({ summary, name, loading }) => {
-  const online = !!summary?.is_online;
+  attendanceRecord?: { clock_in_at?: string | null; clock_out_at?: string | null } | null;
+  onClockIn?: () => void;
+  clockingIn?: boolean;
+}> = ({ summary, name, loading, attendanceRecord, onClockIn, clockingIn }) => {
+  const online = Boolean(
+    (attendanceRecord?.clock_in_at && !attendanceRecord?.clock_out_at) ||
+    summary?.is_online
+  );
+  const checkInAt = attendanceRecord?.clock_in_at || summary?.check_in_at;
+  const workingMinutes = typeof summary?.working_minutes === 'number'
+    ? summary.working_minutes
+    : (checkInAt ? Math.max(0, Math.floor((Date.now() - new Date(checkInAt).getTime()) / 60000)) : 0);
 
   const stats = [
     { label: 'Calls Today', value: summary?.calls_made_today ?? summary?.today_calls ?? 0, icon: Phone, tone: 'text-sky-400' },
@@ -51,7 +61,7 @@ export const EmployeeHeroCard: React.FC<{
               {summary?.employee_name || name || 'Welcome'}
             </h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${online ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-600/20 text-slate-400'}`}>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${online ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-slate-600/20 text-slate-400 border border-slate-700/50'}`}>
                 <span className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
                 {online ? 'Online' : 'Offline'}
               </span>
@@ -59,15 +69,29 @@ export const EmployeeHeroCard: React.FC<{
           </div>
         </div>
 
-        {/* check-in + working duration */}
-        <div className="flex items-center gap-5">
-          <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end"><LogIn className="w-3 h-3" /> Check-In</p>
-            <p className="text-lg font-bold text-slate-100 mt-0.5">{fmtTime(summary?.check_in_at)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end"><Clock className="w-3 h-3" /> Working</p>
-            <p className="text-lg font-bold text-slate-100 mt-0.5">{fmtDuration(summary?.working_minutes)}</p>
+        {/* check-in + working duration or Quick Check-In CTA */}
+        <div className="flex items-center gap-4 flex-wrap">
+          {!online && onClockIn && (
+            <button
+              onClick={onClockIn}
+              disabled={clockingIn}
+              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+            >
+              <LogIn className="w-4 h-4" />
+              {clockingIn ? 'Marking Attendance...' : 'Check In Now'}
+            </button>
+          )}
+
+          <div className="flex items-center gap-5 bg-slate-900/50 border border-slate-800/80 rounded-xl px-4 py-2">
+            <div className="text-right">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end"><LogIn className="w-3 h-3 text-emerald-400" /> Check-In</p>
+              <p className="text-base font-bold text-slate-100 mt-0.5">{fmtTime(checkInAt)}</p>
+            </div>
+            <div className="w-[1px] h-7 bg-slate-800" />
+            <div className="text-right">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end"><Clock className="w-3 h-3 text-brand-400" /> Working</p>
+              <p className="text-base font-bold text-slate-100 mt-0.5">{fmtDuration(workingMinutes)}</p>
+            </div>
           </div>
         </div>
       </div>

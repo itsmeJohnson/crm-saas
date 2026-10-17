@@ -299,7 +299,9 @@ class DashboardService:
         from app.models.attendance import AttendanceRecord
         att = (await self.db.execute(select(AttendanceRecord).filter(
             AttendanceRecord.organization_id == org, AttendanceRecord.is_deleted == False,
-            AttendanceRecord.user_id == actor.id, AttendanceRecord.work_date == today))).scalars().first()
+            AttendanceRecord.user_id == actor.id,
+            AttendanceRecord.work_date >= today - timedelta(days=1)
+        ).order_by(AttendanceRecord.created_at.desc()))).scalars().first()
         check_in_at = att.clock_in_at if att else None
         check_out_at = att.clock_out_at if att else None
         is_online = bool(check_in_at and not check_out_at)

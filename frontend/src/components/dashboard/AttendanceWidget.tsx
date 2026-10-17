@@ -20,13 +20,23 @@ export const AttendanceWidget: React.FC = () => {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const handleSync = () => load();
+    window.addEventListener('attendance-updated', handleSync);
+    return () => window.removeEventListener('attendance-updated', handleSync);
+  }, [load]);
+
   const rec = today?.record;
   const clockedIn = !!rec?.clock_in_at && !rec?.clock_out_at;
   const done = !!rec?.clock_out_at;
 
   const act = async (fn: () => Promise<any>) => {
     setBusy(true);
-    try { await fn(); load(); } catch { /* surfaced on the full page */ } finally { setBusy(false); }
+    try {
+      await fn();
+      window.dispatchEvent(new CustomEvent('attendance-updated'));
+      load();
+    } catch { /* surfaced on the full page */ } finally { setBusy(false); }
   };
 
   return (

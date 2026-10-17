@@ -351,14 +351,14 @@ export const AppLayout: React.FC = () => {
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-slate-100 block truncate">
-              {user?.role === 'SuperAdmin'
+              {user?.role === 'SuperAdmin' && user?.email !== 'samarthasankalpa@gmail.com'
                 ? 'CRM Enterprise · Secure Multi-Tenant Platform'
-                : (organization?.name || 'SmileCare Dental')}
+                : (organization?.name || 'Samartha Sankalpa Solutions')}
             </span>
             <span className="text-[10px] text-slate-400 font-medium tracking-wide block">
-              {user?.role === 'SuperAdmin'
+              {user?.role === 'SuperAdmin' && user?.email !== 'samarthasankalpa@gmail.com'
                 ? 'System Infrastructure & Multi-Tenant Control'
-                : getSubSuiteLabel()}
+                : 'Telecalling Suite'}
             </span>
           </div>
         </div>

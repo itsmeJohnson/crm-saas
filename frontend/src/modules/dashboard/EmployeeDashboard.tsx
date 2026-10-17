@@ -32,29 +32,64 @@ export const EmployeeDashboard: React.FC = () => {
   const [todayAttendance, setTodayAttendance] = useState<MyToday | null>(null);
   const [clockingIn, setClockingIn] = useState(false);
 
-  const checkAttendance = useCallback(() => {
-    attendanceApi.myToday()
-      .then(setTodayAttendance)
-      .catch(() => {});
+  const checkAttendance = useCallback(async () => {
+    try {
+      const att = await attendanceApi.myToday();
+      setTodayAttendance(att);
+      return att;
+    } catch {
+      return null;
+    }
   }, []);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    checkAttendance();
-    dashboardApi.getEmployeeSummary().then(setSummary).catch(() => {}).finally(() => setLoading(false));
+    try {
+      await Promise.allSettled([
+        checkAttendance(),
+        dashboardApi.getEmployeeSummary().then(setSummary)
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }, [checkAttendance]);
 
   useEffect(() => { load(); }, [load]);
 
-  const isClockedIn = !!todayAttendance?.record?.clock_in_at && !todayAttendance?.record?.clock_out_at;
+  // Reactive listener for cross-widget attendance events
+  useEffect(() => {
+    const handleSync = () => {
+      checkAttendance();
+      dashboardApi.getEmployeeSummary().then(setSummary).catch(() => {});
+    };
+    window.addEventListener('attendance-updated', handleSync);
+    return () => window.removeEventListener('attendance-updated', handleSync);
+  }, [checkAttendance]);
+
+  const isClockedIn = Boolean(
+    (todayAttendance?.record?.clock_in_at && !todayAttendance?.record?.clock_out_at) ||
+    summary?.is_online
+  );
 
   const handleQuickClockIn = async () => {
     setClockingIn(true);
     try {
-      await attendanceApi.clockIn();
-      checkAttendance();
-    } catch (e) {
+      const res = await attendanceApi.clockIn();
+      // Instantly reactively update local state
+      setTodayAttendance((prev) => ({
+        work_date: res.work_date || new Date().toISOString().split('T')[0],
+        record: res,
+        shift: prev?.shift || null,
+        on_break: false,
+      }));
+      window.dispatchEvent(new CustomEvent('attendance-updated'));
+      await Promise.allSettled([
+        checkAttendance(),
+        dashboardApi.getEmployeeSummary().then(setSummary)
+      ]);
+    } catch (e: any) {
       console.error(e);
+      alert(e?.response?.data?.detail || e?.message || 'Check-in failed');
     } finally {
       setClockingIn(false);
     }
@@ -80,7 +115,14 @@ export const EmployeeDashboard: React.FC = () => {
       </div>
 
       {/* Employee hero card — large, prominent, immediately after login */}
-      <EmployeeHeroCard summary={summary} name={user?.first_name || ''} loading={loading} />
+      <EmployeeHeroCard
+        summary={summary}
+        name={user?.first_name || ''}
+        loading={loading}
+        attendanceRecord={todayAttendance?.record}
+        onClockIn={handleQuickClockIn}
+        clockingIn={clockingIn}
+      />
 
       {/* Agent Cockpit: Calling Option & Progressive Dialer */}
       <div className="glass-panel border border-slate-800/90 rounded-2xl p-6 shadow-2xl relative overflow-hidden space-y-4">

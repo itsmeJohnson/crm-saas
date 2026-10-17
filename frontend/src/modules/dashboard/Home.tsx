@@ -8,6 +8,7 @@ const SuperAdminTelemetryDashboard = lazy(() => import('./SuperAdminTelemetryDas
 export const Home: React.FC = () => {
   const { user } = useAuthStore();
   const role = user?.role;
+  const isSamarthaTenantAdmin = user?.email === 'samarthasankalpa@gmail.com';
 
   return (
     <div className="space-y-6">
@@ -23,7 +24,7 @@ export const Home: React.FC = () => {
       }>
         {role === 'Employee' || role === 'TeamLeader' ? (
           <EmployeeDashboard />
-        ) : role === 'SuperAdmin' ? (
+        ) : (role === 'SuperAdmin' && !isSamarthaTenantAdmin) ? (
           <SuperAdminTelemetryDashboard />
         ) : (
           <DentalDashboard />
