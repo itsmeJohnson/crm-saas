@@ -79,6 +79,46 @@ class RedisClient:
         except Exception as e:
             logger.warning(f"Redis delete_pattern failed: {e}")
             return 0
+
+    async def sadd(self, key: str, *values) -> int:
+        await self.connect()
+        if not self.client:
+            return 0
+        try:
+            return await self.client.sadd(key, *values)
+        except Exception as e:
+            logger.warning(f"Redis sadd failed: {e}")
+            return 0
+
+    async def srem(self, key: str, *values) -> int:
+        await self.connect()
+        if not self.client:
+            return 0
+        try:
+            return await self.client.srem(key, *values)
+        except Exception as e:
+            logger.warning(f"Redis srem failed: {e}")
+            return 0
+
+    async def smembers(self, key: str) -> set:
+        await self.connect()
+        if not self.client:
+            return set()
+        try:
+            return await self.client.smembers(key)
+        except Exception as e:
+            logger.warning(f"Redis smembers failed: {e}")
+            return set()
+
+    async def ping(self) -> bool:
+        await self.connect()
+        if not self.client:
+            return False
+        try:
+            return await self.client.ping()
+        except Exception as e:
+            logger.warning(f"Redis ping failed: {e}")
+            return False
     @asynccontextmanager
     async def lock(self, lock_name: str, lease_time: int = 60, acquire_timeout: float = 10.0):
         """
