@@ -13,6 +13,7 @@ import { WhatsAppLiveNotifier } from '../components/communications/WhatsAppLiveN
 import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
+import { TELECALLING_NAV_GROUPS, TELECALLING_ITEM_GROUP_MAP, isTelecallingMode } from '../config/navigation';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -36,26 +37,35 @@ export const AppLayout: React.FC = () => {
   }, [user, metadataLoaded, fetchBootstrap]);
 
   const TRIAL_MODE = true;
+  const inTelecalling = isTelecallingMode();
 
-  const NAV_GROUPS = [
-    'Clinical Operations', 'Patient Engagement', 'Clinic Management',
-    'Growth & Analytics', 'Administration'
-  ];
+  const NAV_GROUPS = inTelecalling
+    ? TELECALLING_NAV_GROUPS
+    : [
+        'Clinical Operations', 'Patient Engagement', 'Clinic Management',
+        'Growth & Analytics', 'Administration'
+      ];
 
   const allNavItems = MODULES_REGISTRY.flatMap((mod) =>
     mod.routes
       .filter((r) => r.sidebar)
-      .map((r) => ({
-        name: r.sidebar!.name,
-        path: r.path,
-        icon: r.sidebar!.icon || mod.icon,
-        section: mod.section,
-        group: r.sidebar!.group || mod.group,
-        trial: mod.trial,
-        module: mod.key,
-        roles: r.roles,
-        featureCode: r.featureCode,
-      }))
+      .map((r) => {
+        const itemName = r.sidebar!.name;
+        const resolvedGroup = inTelecalling
+          ? (TELECALLING_ITEM_GROUP_MAP[itemName] || r.sidebar!.group || mod.group)
+          : (r.sidebar!.group || mod.group);
+        return {
+          name: itemName,
+          path: r.path,
+          icon: r.sidebar!.icon || mod.icon,
+          section: mod.section,
+          group: resolvedGroup,
+          trial: mod.trial,
+          module: mod.key,
+          roles: r.roles,
+          featureCode: r.featureCode,
+        };
+      })
   );
 
   const features = useAuthStore((state) => state.features);
@@ -236,7 +246,7 @@ export const AppLayout: React.FC = () => {
     }
   };
 
-  const getGroupName = (g: string) => (groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g;
+  const getGroupName = (g: string) => inTelecalling ? g : ((groupTranslations[industry] ?? groupTranslations['generic'])[g] ?? g);
   const getItemName = (n: string) => (itemTranslations[industry] ?? itemTranslations['generic'])[n] ?? n;
   const getSubSuiteLabel = () => {
     switch (industry) {
