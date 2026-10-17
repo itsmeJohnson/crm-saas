@@ -18,6 +18,8 @@ export interface UserResponse {
   seat_number?: string | null;
   inactive_reason?: string | null;
   phone?: string | null;
+  allowed_ip_whitelist?: string | null;
+  registered_device_uuid?: string | null;
 }
 
 export interface ReplaceEmployeeRequest {
@@ -97,6 +99,8 @@ export const userApi = {
     is_active?: boolean;
     password?: string;
     reporting_to_id?: string | null;
+    allowed_ip_whitelist?: string | null;
+    registered_device_uuid?: string | null;
   }) => {
     const response = await api.patch<UserResponse>(`/users/${userId}`, payload);
     return response.data;

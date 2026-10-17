@@ -19,14 +19,12 @@ async def require_active_user(
             detail="User account is deactivated"
         )
     
-    # Check if the user is a Telecaller (Employee reporting to a TL/Employee)
+    # Check if the user is a Telecaller/Employee (mask phone for data anti-poaching security)
     mask_phone = False
-    if current_user.role == "Employee" and current_user.reporting_to_id:
-        parent_query = select(User.role).filter(User.id == current_user.reporting_to_id)
-        res = await db.execute(parent_query)
-        parent_role = res.scalar()
-        if parent_role == "Employee":
-            mask_phone = True
+    if current_user.role in ("Employee",):
+        mask_phone = True
+    elif current_user.role not in ("OrgAdmin", "SuperAdmin", "Manager", "TeamLeader"):
+        mask_phone = True
             
     mask_phone_ctx.set(mask_phone)
     from app.core.tenant_context import TenantContext

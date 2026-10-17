@@ -20,10 +20,12 @@ describe('ScheduledReportsWidget', () => {
   it('renders active ratio, success rate and failed count', async () => {
     vi.mocked(scheduledReportsApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('Scheduled Reports')).toBeDefined());
-    expect(screen.getByText('3/4')).toBeDefined();
-    expect(screen.getByText('85%')).toBeDefined();
-    expect(screen.getByText('2')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText('Scheduled Reports')).toBeDefined();
+      expect(screen.getByText('3/4')).toBeDefined();
+      expect(screen.getByText('85%')).toBeDefined();
+      expect(screen.getByText('2')).toBeDefined();
+    });
   });
 
   it('shows an empty state when no schedules exist', async () => {

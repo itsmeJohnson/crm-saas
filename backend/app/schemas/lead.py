@@ -116,6 +116,17 @@ class LeadBulkUpdateResponse(BaseModel):
     updated_count: int
     lead_ids: list[uuid.UUID]
 
+class LeadRoundRobinAllocateRequest(BaseModel):
+    lead_ids: list[uuid.UUID] = Field(..., min_length=1)
+    agent_ids: list[uuid.UUID] | None = None
+    only_active_present: bool = True
+
+class LeadRoundRobinAllocateResponse(BaseModel):
+    total_leads: int
+    allocated_count: int
+    agents_count: int
+    distribution: dict[str, int]
+
 from app.schemas.pipeline import PipelineStageResponse
 
 class LeadResponse(LeadBase):
@@ -144,14 +155,13 @@ class LeadResponse(LeadBase):
         from app.core.context import mask_phone_ctx
         if mask_phone_ctx.get():
             phone_clean = phone.strip()
-            if phone_clean.startswith("+"):
-                if len(phone_clean) <= 5:
-                    return "+" + "*" * (len(phone_clean) - 1)
-                return phone_clean[:3] + "*" * (len(phone_clean) - 5) + phone_clean[-2:]
-            else:
-                if len(phone_clean) <= 4:
-                    return "*" * len(phone_clean)
-                return phone_clean[:2] + "*" * (len(phone_clean) - 4) + phone_clean[-2:]
+            digits = "".join(filter(str.isdigit, phone_clean))
+            if len(digits) >= 10:
+                first_5 = digits[-10:-5]
+                return f"+91 {first_5} •••••"
+            elif len(phone_clean) > 4:
+                return f"{phone_clean[:2]} •••••"
+            return "•••••"
         return phone
 
     @field_serializer("custom_fields")
@@ -164,17 +174,12 @@ class LeadResponse(LeadBase):
             masked = dict(custom_fields)
             for key, val in masked.items():
                 if isinstance(val, str) and ("phone" in key.lower() or "mobile" in key.lower()):
-                    phone_clean = val.strip()
-                    if phone_clean.startswith("+"):
-                        if len(phone_clean) <= 5:
-                            masked[key] = "+" + "*" * (len(phone_clean) - 1)
-                        else:
-                            masked[key] = phone_clean[:3] + "*" * (len(phone_clean) - 5) + phone_clean[-2:]
+                    digits = "".join(filter(str.isdigit, val.strip()))
+                    if len(digits) >= 10:
+                        first_5 = digits[-10:-5]
+                        masked[key] = f"+91 {first_5} •••••"
                     else:
-                        if len(phone_clean) <= 4:
-                            masked[key] = "*" * len(phone_clean)
-                        else:
-                            masked[key] = phone_clean[:2] + "*" * (len(phone_clean) - 4) + phone_clean[-2:]
+                        masked[key] = "•••••"
             return masked
         return custom_fields
 

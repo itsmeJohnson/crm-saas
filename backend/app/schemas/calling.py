@@ -13,6 +13,7 @@ class CallItem(BaseModel):
     status: str
     duration: Optional[int] = None
     recording_url: Optional[str] = None
+    has_recording: bool = False
     tags: List[str] = []
     timestamp: datetime
     agent_id: Optional[str] = None

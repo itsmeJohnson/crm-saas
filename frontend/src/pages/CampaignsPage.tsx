@@ -35,6 +35,7 @@ const CreateModal: React.FC<{ onClose: () => void; onCreated: (c: Campaign) => v
   const [cost, setCost] = useState('0');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [preview, setPreview] = useState<number | null>(null);
+  const [dialingMode, setDialingMode] = useState<'preview_10s' | 'predictive_autodial'>('predictive_autodial');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +67,8 @@ const CreateModal: React.FC<{ onClose: () => void; onCreated: (c: Campaign) => v
         name, channel, template_id: templateId || undefined, body: body || undefined, subject: subject || undefined,
         audience_type: 'filter', entity_type: 'lead', audience_definition: audienceDef(),
         cost_per_message: parseFloat(cost) || 0,
+        dialing_mode: channel === 'Call' ? dialingMode : undefined,
+        preview_timer_seconds: channel === 'Call' && dialingMode === 'preview_10s' ? 10 : undefined,
       });
       onCreated(c);
     } catch (e: any) { setError(extractErrorMessage(e, 'Failed to create campaign')); } finally { setSaving(false); }
@@ -105,6 +108,40 @@ const CreateModal: React.FC<{ onClose: () => void; onCreated: (c: Campaign) => v
               )}
             </>
           )}
+          {channel === 'Call' && (
+            <div className="p-3 bg-[#080b14] border border-[#1e293b] rounded-xl space-y-2">
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                Multi-Mode Dialing Switch
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDialingMode('predictive_autodial')}
+                  className={`p-2.5 rounded-lg border text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
+                    dialingMode === 'predictive_autodial'
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/30'
+                      : 'bg-[#111a2e] border-[#1e293b] text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>Predictive Autodial</span>
+                  <span className="text-[10px] font-normal opacity-80">High-velocity floor queue</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDialingMode('preview_10s')}
+                  className={`p-2.5 rounded-lg border text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
+                    dialingMode === 'preview_10s'
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/30'
+                      : 'bg-[#111a2e] border-[#1e293b] text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>10s Preview Dialing</span>
+                  <span className="text-[10px] font-normal opacity-80">Pre-call scrutiny timer</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-3 bg-slate-950/50 border border-slate-800/70 rounded-lg space-y-2">
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Audience (leads)</p>
             <div className="grid grid-cols-2 gap-2">

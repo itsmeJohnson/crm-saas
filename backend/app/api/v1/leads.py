@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.organization import Organization
 from app.schemas.lead import (
     LeadResponse, LeadCreate, LeadUpdate, LeadBulkUpdateRequest, LeadBulkUpdateResponse,
+    LeadRoundRobinAllocateRequest, LeadRoundRobinAllocateResponse,
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
     LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
     FollowUpCreate, SalesKPISummaryResponse, KanbanBoardResponse, KanbanStageCardsResponse,
@@ -210,6 +211,144 @@ async def bulk_update_leads(
     fields = req.fields.model_dump(exclude_unset=True, exclude_none=True)
     result = await lead_service.bulk_update(actor, req.lead_ids, fields)
     return LeadBulkUpdateResponse(**result)
+
+@router.post("/allocate/round-robin", response_model=LeadRoundRobinAllocateResponse)
+async def allocate_leads_round_robin(
+    req: LeadRoundRobinAllocateRequest,
+    actor: Annotated[User, Depends(require_tl_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Deterministic Lead Allocation: Bulk round-robin splitting across logged-in, active agents."""
+    from app.models.lead import Lead
+    from app.models.attendance import Attendance
+    from app.models.user_session import UserSession
+    from app.services.notification_service import NotificationService
+    from datetime import date
+    import itertools
+
+    stmt = select(Lead).where(
+        Lead.id.in_(req.lead_ids),
+        Lead.organization_id == actor.organization_id,
+        Lead.is_deleted == False
+    ).order_by(Lead.created_at.asc())
+    res = await db.execute(stmt)
+    leads = list(res.scalars().all())
+    if not leads:
+        raise HTTPException(status_code=404, detail="No matching leads found for allocation.")
+
+    if req.agent_ids and len(req.agent_ids) > 0:
+        agent_q = select(User).where(
+            User.id.in_(req.agent_ids),
+            User.organization_id == actor.organization_id,
+            User.is_active == True,
+            User.is_deleted == False
+        )
+    else:
+        agent_q = select(User).where(
+            User.organization_id == actor.organization_id,
+            User.role.in_(["Employee", "TeamLeader"]),
+            User.is_active == True,
+            User.is_deleted == False
+        )
+    agent_res = await db.execute(agent_q)
+    eligible_agents = list(agent_res.scalars().all())
+
+    if req.only_active_present and len(eligible_agents) > 1:
+        today_date = date.today()
+        att_res = await db.execute(
+            select(Attendance.user_id).where(
+                Attendance.organization_id == actor.organization_id,
+                Attendance.date == today_date,
+                Attendance.status.in_(["PRESENT", "HALF_DAY"])
+            )
+        )
+        present_uids = set(att_res.scalars().all())
+        sess_res = await db.execute(
+            select(UserSession.user_id).where(
+                UserSession.is_active == True,
+                UserSession.user_id.in_([a.id for a in eligible_agents])
+            )
+        )
+        active_uids = present_uids.union(set(sess_res.scalars().all()))
+        filtered_agents = [a for a in eligible_agents if a.id in active_uids]
+        if filtered_agents:
+            eligible_agents = filtered_agents
+
+    if not eligible_agents:
+        raise HTTPException(
+            status_code=400,
+            detail="No active callers found on the floor to allocate leads to."
+        )
+
+    agent_cycle = itertools.cycle(eligible_agents)
+    distribution: dict[str, int] = {str(a.id): 0 for a in eligible_agents}
+
+    for lead in leads:
+        target_agent = next(agent_cycle)
+        lead.assigned_user_id = target_agent.id
+        db.add(lead)
+        distribution[str(target_agent.id)] += 1
+
+    await db.commit()
+
+    notifier = NotificationService(db)
+    for agent in eligible_agents:
+        count = distribution.get(str(agent.id), 0)
+        if count > 0:
+            try:
+                await notifier.create_notification(
+                    organization_id=actor.organization_id,
+                    user_id=agent.id,
+                    category="lead",
+                    title="New Leads Allocated (Round-Robin)",
+                    body=f"You have been allocated {count} fresh lead(s) for telecalling.",
+                    link_url="/leads"
+                )
+            except Exception:
+                pass
+
+    return LeadRoundRobinAllocateResponse(
+        total_leads=len(req.lead_ids),
+        allocated_count=len(leads),
+        agents_count=len(eligible_agents),
+        distribution=distribution
+    )
+
+@router.get("/callbacks/mature")
+async def get_mature_callbacks(
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Check for scheduled callback reminders due right now (remind_at <= now()).
+    Drives hard screen takeover and dial list slot #1 injection.
+    """
+    from datetime import datetime, timezone
+    from app.models.lead_reminder import LeadReminder
+    now = datetime.now(timezone.utc)
+    stmt = select(LeadReminder).join(Lead, LeadReminder.lead_id == Lead.id).where(
+        LeadReminder.user_id == actor.id,
+        LeadReminder.is_sent == False,
+        LeadReminder.remind_at <= now,
+        Lead.is_deleted == False
+    ).order_by(LeadReminder.remind_at.asc()).limit(5)
+    res = await db.execute(stmt)
+    reminders = list(res.scalars().all())
+
+    mature_list = []
+    for r in reminders:
+        lead_res = await db.execute(select(Lead).where(Lead.id == r.lead_id))
+        lead = lead_res.scalar_one_or_none()
+        if lead:
+            mature_list.append({
+                "reminder_id": str(r.id),
+                "lead_id": str(lead.id),
+                "lead_name": f"{lead.first_name or ''} {lead.last_name}".strip(),
+                "phone": lead.phone,
+                "remind_at": r.remind_at.isoformat(),
+                "note": r.note or "Scheduled Follow-up Callback",
+                "status": lead.status,
+            })
+    return {"callbacks": mature_list, "count": len(mature_list)}
 
 # --- Lead Reports ---
 

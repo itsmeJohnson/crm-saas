@@ -78,17 +78,21 @@ class CallingService:
         total = len(acts)
         acts = acts[skip:skip + limit]
 
+        can_listen = actor.role in ("SuperAdmin", "OrgAdmin", "Manager", "TeamLeader")
         names = await self._names({a.assigned_user_id or a.created_by for a in acts})
         lead_titles = await self._lead_titles({a.lead_id for a in acts if a.lead_id})
-        items = [self._item(a, names, lead_titles) for a in acts]
+        items = [self._item(a, names, lead_titles, can_listen) for a in acts]
         return {"items": items, "total": total}
 
-    def _item(self, a: Activity, names: dict, lead_titles: dict) -> dict:
+    def _item(self, a: Activity, names: dict, lead_titles: dict, can_listen: bool = False) -> dict:
         uid = a.assigned_user_id or a.created_by
+        # Role-Gated Presigned Audio Vault: Hidden from basic callers/telecallers
+        recording_val = a.recording_url if can_listen else None
         return {
             "id": str(a.id), "subject": a.subject, "description": a.description,
             "direction": a.call_direction, "disposition": a.call_disposition, "status": a.status,
-            "duration": a.call_duration, "recording_url": a.recording_url,
+            "duration": a.call_duration, "recording_url": recording_val,
+            "has_recording": bool(a.recording_url),
             "tags": list(a.call_tags or []), "timestamp": a.created_at,
             "agent_id": str(uid) if uid else None, "agent_name": names.get(uid),
             "lead_id": str(a.lead_id) if a.lead_id else None,

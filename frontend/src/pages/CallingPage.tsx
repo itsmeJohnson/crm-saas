@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   PhoneCall, PhoneIncoming, PhoneOutgoing, PhoneMissed, Loader2, Search,
-  Tag, Play, Pause, Users, ChevronLeft, ChevronRight, X, Check,
+  Tag, Play, Pause, Users, ChevronLeft, ChevronRight, X, Check, Radio,
 } from 'lucide-react';
 import { callingApi, CallItem, CallQueue } from '../services/callingApi';
 import { useAuthStore } from '../store/authStore';
 import { extractErrorMessage } from '../utils/errors';
+import { LiveFloorWarRoom } from '../components/crm/LiveFloorWarRoom';
 
 const PAGE_SIZE = 25;
 
@@ -135,16 +136,19 @@ const TagEditor: React.FC<{ item: CallItem; onSaved: (updated: CallItem) => void
   );
 };
 
-/* ── Recording playback ── */
-const RecordingCell: React.FC<{ url: string | null }> = ({ url }) => {
+/* ── Recording playback (Role-gated) ── */
+const RecordingCell: React.FC<{ url: string | null; canMonitor: boolean }> = ({ url, canMonitor }) => {
   const [open, setOpen] = useState(false);
+  if (!canMonitor) {
+    return <span className="text-slate-500 text-xs italic">Restricted</span>;
+  }
   if (!url) return <span className="text-slate-600 text-xs">—</span>;
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
         title="Play recording"
-        className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60 hover:text-brand-400 hover:border-brand-500/40 cursor-pointer"
+        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white cursor-pointer transition"
       >
         <Play className="w-3 h-3" /> Play
       </button>
@@ -175,6 +179,7 @@ export const CallingPage: React.FC = () => {
   const [missedOnly, setMissedOnly] = useState(false);
   const [recordedOnly, setRecordedOnly] = useState(false);
   const [allTags, setAllTags] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'war_room' | 'history'>(canMonitor ? 'war_room' : 'history');
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -225,7 +230,38 @@ export const CallingPage: React.FC = () => {
         <p className="text-sm text-slate-400 mt-1">Call history, recordings, tags, and the live dialing queue.</p>
       </div>
 
-      {canMonitor && <QueueMonitor />}
+      {canMonitor && (
+        <div className="flex items-center gap-2 border-b border-[#1e293b] pb-3">
+          <button
+            onClick={() => setViewMode('war_room')}
+            className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              viewMode === 'war_room'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-white bg-[#080b14] border border-[#1e293b]'
+            }`}
+          >
+            <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <span>Floor War Room & Audio Vault</span>
+          </button>
+          <button
+            onClick={() => setViewMode('history')}
+            className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              viewMode === 'history'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-white bg-[#080b14] border border-[#1e293b]'
+            }`}
+          >
+            <PhoneCall className="w-4 h-4" />
+            <span>Call History Logs</span>
+          </button>
+        </div>
+      )}
+
+      {canMonitor && viewMode === 'war_room' ? (
+        <LiveFloorWarRoom />
+      ) : (
+        <>
+          {canMonitor && <QueueMonitor />}
 
       {/* Filters */}
       <div className="glass-panel border border-slate-800/85 rounded-2xl p-4 flex flex-wrap items-center gap-3">
@@ -314,7 +350,7 @@ export const CallingPage: React.FC = () => {
                       <TagEditor item={item} onSaved={onTagsSaved} />
                     </div>
                     <div className="shrink-0">
-                      <RecordingCell url={item.recording_url} />
+                      <RecordingCell url={item.recording_url} canMonitor={canMonitor} />
                     </div>
                   </div>
                 </div>
@@ -358,7 +394,7 @@ export const CallingPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-slate-400 font-mono text-xs">{formatDuration(item.duration)}</td>
                       <td className="px-4 py-3"><TagEditor item={item} onSaved={onTagsSaved} /></td>
-                      <td className="px-4 py-3"><RecordingCell url={item.recording_url} /></td>
+                      <td className="px-4 py-3"><RecordingCell url={item.recording_url} canMonitor={canMonitor} /></td>
                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(item.timestamp).toLocaleString()}</td>
                     </tr>
                   ))}
@@ -385,6 +421,8 @@ export const CallingPage: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 };

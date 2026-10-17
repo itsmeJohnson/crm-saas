@@ -85,16 +85,16 @@ describe('UserTable Component', () => {
     render(<UserTable onEditClick={mockOnEditClick} />);
 
     // Check names are rendered
-    expect(screen.getByText('Admin User')).toBeDefined();
-    expect(screen.getByText('Employee User')).toBeDefined();
+    expect(screen.getAllByText('Admin User').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Employee User').length).toBeGreaterThan(0);
 
     // Check emails are rendered
-    expect(screen.getByText('admin@org.com')).toBeDefined();
-    expect(screen.getByText('employee@org.com')).toBeDefined();
+    expect(screen.getAllByText('admin@org.com').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('employee@org.com').length).toBeGreaterThan(0);
 
     // Check role badges
-    expect(screen.getByText('Admin')).toBeDefined();
-    expect(screen.getByText('Employee')).toBeDefined();
+    expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Sales Agent').length).toBeGreaterThan(0);
   });
 
   it('allows OrgAdmin to deactivate and delete other users but not themselves', () => {

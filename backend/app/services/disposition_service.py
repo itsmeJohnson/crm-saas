@@ -140,6 +140,41 @@ class DispositionService:
         from app.services.workflow_service import WorkflowService
         await WorkflowService(db).run("call_disposition", lead, actor)
 
+        # 3.8. Automated Omnichannel Follow-Up (WhatsApp Rich Dispatch with SMS carrier fallback)
+        if getattr(payload, "dispatch_omnichannel_followup", False) and lead.phone:
+            try:
+                import logging
+                _log = logging.getLogger(__name__)
+                from app.services.whatsapp_service import WhatsAppService
+                from app.services.sms_service import SmsService
+                wa_service = WhatsAppService(db)
+                customer_name = f"{lead.first_name or ''} {lead.last_name}".strip()
+                followup_body = (
+                    payload.followup_custom_note
+                    or f"Hi {customer_name}, thank you for your time today. Let us know if you need any further assistance!"
+                )
+                wa_dispatched = False
+                try:
+                    await wa_service.send_text(actor, {
+                        "to": lead.phone,
+                        "body": followup_body,
+                        "lead_id": str(lead.id)
+                    })
+                    wa_dispatched = True
+                except Exception as wa_err:
+                    _log.info("WhatsApp delivery check failed (%s). Triggering intelligent SMS carrier fallback.", wa_err)
+
+                if not wa_dispatched:
+                    sms_service = SmsService(db)
+                    await sms_service.send_sms(actor, {
+                        "to": lead.phone,
+                        "body": followup_body[:160],
+                        "lead_id": str(lead.id)
+                    })
+            except Exception as omni_err:
+                import logging
+                logging.getLogger(__name__).warning("Omnichannel follow-up execution error: %s", omni_err)
+
         # 4. Transition agent's Redis state to IDLE
         state_service = AgentStateService()
         await state_service.set_agent_state(actor.organization_id, actor.id, "IDLE")

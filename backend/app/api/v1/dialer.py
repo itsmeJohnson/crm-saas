@@ -111,46 +111,73 @@ async def get_next_lead(
     # number comes back around instead of being lost after one attempt.
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    RETRYABLE_DISPOSITIONS = ["RNR", "Switch Off", "Busy"]
-    filters = [
-        Lead.organization_id == actor.organization_id,
-        Lead.is_deleted == False,
-        or_(
-            Lead.status == "New",
-            and_(
-                Lead.status.in_(RETRYABLE_DISPOSITIONS),
-                Lead.call_attempts_count <= 4,
-                or_(Lead.available_at.is_(None), Lead.available_at <= now),
-            ),
-        ),
-    ]
 
-    if payload.collective_pooling:
-        filters.append(
-            or_(
-                Lead.assigned_user_id == actor.id,
-                and_(
-                    Lead.assigned_user_id.is_(None),
-                    Lead.created_by == actor.reporting_to_id
-                )
+    # 2.5 Priority Slot #1: Callback Engine check for mature scheduled callback leads
+    from app.models.lead_reminder import LeadReminder
+    cb_stmt = select(LeadReminder).where(
+        LeadReminder.user_id == actor.id,
+        LeadReminder.is_sent == False,
+        LeadReminder.remind_at <= now
+    ).order_by(LeadReminder.remind_at.asc()).limit(1)
+    cb_res = await db.execute(cb_stmt)
+    mature_reminder = cb_res.scalar_one_or_none()
+
+    lead = None
+    if mature_reminder:
+        from sqlalchemy.orm import selectinload
+        cb_lead_res = await db.execute(
+            select(Lead).options(selectinload(Lead.stage)).filter(
+                Lead.id == mature_reminder.lead_id,
+                Lead.organization_id == actor.organization_id,
+                Lead.is_deleted == False
             )
         )
-    else:
-        filters.append(Lead.assigned_user_id == actor.id)
+        lead = cb_lead_res.scalars().first()
+        if lead:
+            mature_reminder.is_sent = True
+            db.add(mature_reminder)
 
-    from sqlalchemy.orm import selectinload
-    query = select(Lead).options(selectinload(Lead.stage)).filter(*filters)
+    if not lead:
+        RETRYABLE_DISPOSITIONS = ["RNR", "Switch Off", "Busy"]
+        filters = [
+            Lead.organization_id == actor.organization_id,
+            Lead.is_deleted == False,
+            or_(
+                Lead.status == "New",
+                and_(
+                    Lead.status.in_(RETRYABLE_DISPOSITIONS),
+                    Lead.call_attempts_count <= 4,
+                    or_(Lead.available_at.is_(None), Lead.available_at <= now),
+                ),
+            ),
+        ]
 
-    # Dialect-aware locking for high throughput on PostgreSQL and compatibility with SQLite
-    dialect_name = getattr(db.bind, "dialect", None)
-    is_postgresql = dialect_name and getattr(dialect_name, "name", "") == "postgresql"
-    if is_postgresql:
-        query = query.with_for_update(skip_locked=True)
+        if payload.collective_pooling:
+            filters.append(
+                or_(
+                    Lead.assigned_user_id == actor.id,
+                    and_(
+                        Lead.assigned_user_id.is_(None),
+                        Lead.created_by == actor.reporting_to_id
+                    )
+                )
+            )
+        else:
+            filters.append(Lead.assigned_user_id == actor.id)
 
-    query = query.order_by(Lead.created_at.asc(), Lead.id.asc()).limit(1)
+        from sqlalchemy.orm import selectinload
+        query = select(Lead).options(selectinload(Lead.stage)).filter(*filters)
 
-    result = await db.execute(query)
-    lead = result.scalars().first()
+        # Dialect-aware locking for high throughput on PostgreSQL and compatibility with SQLite
+        dialect_name = getattr(db.bind, "dialect", None)
+        is_postgresql = dialect_name and getattr(dialect_name, "name", "") == "postgresql"
+        if is_postgresql:
+            query = query.with_for_update(skip_locked=True)
+
+        query = query.order_by(Lead.created_at.asc(), Lead.id.asc()).limit(1)
+
+        result = await db.execute(query)
+        lead = result.scalars().first()
 
     if not lead:
         raise HTTPException(

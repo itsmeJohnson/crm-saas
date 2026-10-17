@@ -1,0 +1,32 @@
+{
+  "name": "CRM Enterprise · Telecalling Platform",
+  "short_name": "CRM Enterprise",
+  "description": "Enterprise Telecalling CRM tailored for high-velocity calling floors and tenant operations.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080b14",
+  "theme_color": "#6366f1",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dialer Console",
+      "short_name": "Dialer",
+      "description": "Open high-velocity telecalling dialer",
+      "url": "/calling",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Leads & Enquiries",
+      "short_name": "Leads",
+      "description": "Assigned lead queue",
+      "url": "/leads",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

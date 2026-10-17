@@ -5,6 +5,7 @@ from app.schemas.user import UserResponse
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    device_uuid: str | None = None
 
 class RegisterTenantRequest(BaseModel):
     company_name: str = Field(..., max_length=255)

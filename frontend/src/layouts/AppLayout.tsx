@@ -12,6 +12,8 @@ import { InboundCallPopup } from '../components/crm/InboundCallPopup';
 import { WhatsAppLiveNotifier } from '../components/communications/WhatsAppLiveNotifier';
 import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { NotificationBell } from '../components/notifications/NotificationBell';
+import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
+import { CallbackTakeoverModal } from '../components/crm/CallbackTakeoverModal';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { TELECALLING_NAV_GROUPS, TELECALLING_ITEM_GROUP_MAP, isTelecallingMode } from '../config/navigation';
 
@@ -344,7 +346,7 @@ export const AppLayout: React.FC = () => {
       {/* ── Minimalist Brand Header ── */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold flex-shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold flex-shrink-0">
             {BrandIcon()}
           </div>
           <div className="min-w-0">
@@ -381,7 +383,7 @@ export const AppLayout: React.FC = () => {
                 onClick={() => toggleGroup(group)}
                 className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
               >
-                <span className={groupActive ? 'text-cyan-400' : ''}>{getGroupName(group)}</span>
+                <span className={groupActive ? 'text-indigo-400 font-bold' : ''}>{getGroupName(group)}</span>
                 <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isCollapsed ? '-rotate-90' : ''}`} />
               </button>
               {!isCollapsed && (
@@ -397,7 +399,7 @@ export const AppLayout: React.FC = () => {
                         onClick={() => setIsMobileOpen(false)}
                         className={`crm-nav-item ${isActive ? 'crm-nav-item--active' : ''}`}
                       >
-                        <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                        <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
                         <span className="truncate">{getItemName(item.name)}</span>
                       </Link>
                     );
@@ -464,6 +466,8 @@ export const AppLayout: React.FC = () => {
       <ReadOnlyBanner />
       <InboundCallPopup />
       <WhatsAppLiveNotifier />
+      <ActiveCallDisposition />
+      <CallbackTakeoverModal />
 
       {/* ── Desktop Minimalist Sidebar ── */}
       <aside className="hidden md:flex md:w-56 crm-sidebar flex-col z-20 flex-shrink-0">

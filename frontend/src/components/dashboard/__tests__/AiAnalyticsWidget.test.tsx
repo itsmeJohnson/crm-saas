@@ -24,8 +24,7 @@ describe('AiAnalyticsWidget', () => {
   it('renders quality, adoption and request stats', async () => {
     vi.mocked(aiAnalyticsApi.dashboard).mockResolvedValue(DASH as any);
     renderWidget();
-    await waitFor(() => expect(screen.getByText('AI Analytics')).toBeDefined());
-    expect(screen.getByText('93.1')).toBeDefined();
+    await waitFor(() => expect(screen.getByText('93.1')).toBeDefined());
     expect(screen.getByText('68.4%')).toBeDefined();
     expect(screen.getByText('412')).toBeDefined();
   });

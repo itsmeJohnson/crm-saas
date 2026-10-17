@@ -18,6 +18,8 @@ interface EditFormInput {
   role: string;
   password?: string;
   reporting_to_id: string;
+  allowed_ip_whitelist?: string;
+  registered_device_uuid?: string;
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onClose }) => {
@@ -81,6 +83,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
       setValue('role', user.role);
       setValue('password', '');
       setValue('reporting_to_id', user.reporting_to_id || '');
+      setValue('allowed_ip_whitelist', (user as any).allowed_ip_whitelist || '');
+      setValue('registered_device_uuid', (user as any).registered_device_uuid || '');
     }
   }, [user, setValue, isOpen]);
 
@@ -93,6 +97,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
         last_name: data.last_name || null,
         role: data.role,
         reporting_to_id: data.reporting_to_id && data.reporting_to_id.trim() !== '' ? data.reporting_to_id : null,
+        allowed_ip_whitelist: data.allowed_ip_whitelist && data.allowed_ip_whitelist.trim() !== '' ? data.allowed_ip_whitelist.trim() : null,
+        registered_device_uuid: data.registered_device_uuid && data.registered_device_uuid.trim() !== '' ? data.registered_device_uuid.trim() : null,
       };
       if (data.password && data.password.trim() !== '') {
         payload.password = data.password;
@@ -324,6 +330,40 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onCl
             {errors.password && (
               <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
             )}
+          </div>
+
+          {/* Floor IP Whitelisting & Device Binding */}
+          <div className="pt-3 border-t border-slate-800/80 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
+              <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Floor Security &amp; Device Binding</span>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                Floor IP Whitelist (Comma-separated)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 192.168.1.0/24, 203.0.113.5 (Blank = Any IP)"
+                {...register('allowed_ip_whitelist')}
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+              />
+              <p className="mt-1 text-[10px] text-slate-500">Restricts user login exclusively to floor network coordinates.</p>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                Registered Device UUID (Smartphone Binding)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. a8b4c2e1-9f33-40a2-b210-998877665544"
+                {...register('registered_device_uuid')}
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50"
+              />
+              <p className="mt-1 text-[10px] text-slate-500">Locks calling floor logins to this registered smartphone/machine hardware ID.</p>
+            </div>
           </div>
 
           {/* Buttons */}

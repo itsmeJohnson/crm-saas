@@ -29,7 +29,7 @@ class CallLeadRequest(TelephonyCreds):
     is dialed server-side so it is never exposed to a masked telecaller."""
 
 class AgentStateUpdate(BaseModel):
-    state: Literal["IDLE", "ACTIVE_CALLING", "BREAK"] = Field(..., description="The state to transition to: 'IDLE', 'ACTIVE_CALLING', 'BREAK'")
+    state: Literal["IDLE", "RINGING", "ACTIVE_CALLING", "ON_CALL", "BREAK"] = Field(..., description="The state to transition to: 'IDLE', 'RINGING', 'ACTIVE_CALLING', 'ON_CALL', 'BREAK'")
     metadata: Dict[str, Any] | None = Field(default=None, description="Optional metadata (e.g. break_reason: 'Lunch')")
 
 class AgentStateResponse(BaseModel):
@@ -55,6 +55,9 @@ class CallDispositionRequest(BaseModel):
     status: CallDispositionStatus
     remarks: str = Field(..., min_length=1, description="Remarks are required and must not be empty.")
     custom_pipeline_stage_id: Optional[uuid.UUID] = Field(default=None, description="Pipeline stage to advance to when status is Picked or Interested.")
+    dispatch_omnichannel_followup: bool = Field(default=False, description="Whether to trigger 2-second WhatsApp rich follow-up with intelligent SMS carrier fallback.")
+    followup_template_name: Optional[str] = None
+    followup_custom_note: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_picked_stage(self) -> "CallDispositionRequest":

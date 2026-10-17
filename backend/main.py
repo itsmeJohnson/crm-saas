@@ -101,6 +101,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.super_admin import router as super_admin_router
 from app.api.v1.subscription import router as subscription_router
 from app.api.v1.telephony import router as telephony_router
+from app.api.v1.sim_sync import router as sim_sync_router
 from app.api.v1.portal import router as portal_router
 from app.api.v1.billing_webhook import router as billing_webhook_router
 from app.api.v1.notifications import router as notifications_router
@@ -551,6 +552,7 @@ app.include_router(analytics_router,       prefix=f"{settings.API_V1_STR}/analyt
 app.include_router(super_admin_router,     prefix=f"{settings.API_V1_STR}/super-admin",     tags=["super-admin"])
 app.include_router(subscription_router,    prefix=f"{settings.API_V1_STR}/tenant",          tags=["subscription"])
 app.include_router(telephony_router,       prefix=f"{settings.API_V1_STR}/telephony",       tags=["telephony"])
+app.include_router(sim_sync_router,        prefix=f"{settings.API_V1_STR}/telephony/sim",   tags=["sim-sync"])
 app.include_router(portal_router,          prefix=f"{settings.API_V1_STR}/portal",          tags=["portal"])
 app.include_router(billing_webhook_router, prefix=f"{settings.API_V1_STR}/billing/webhook", tags=["billing-webhook"])
 app.include_router(notifications_router,   prefix=f"{settings.API_V1_STR}/notifications",   tags=["notifications"])

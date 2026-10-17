@@ -32,6 +32,8 @@ class CampaignResponse(BaseModel):
     cost_per_message: float
     revenue: float
     max_retries: int
+    dialing_mode: str = "preview_10s"
+    preview_timer_seconds: int = 10
     created_by: uuid.UUID
     created_at: datetime
 
@@ -49,6 +51,8 @@ class CampaignCreate(BaseModel):
     entity_type: str = Field("lead", max_length=20)  # lead|contact
     cost_per_message: float = 0
     max_retries: int = Field(2, ge=0, le=10)
+    dialing_mode: Optional[str] = Field("preview_10s", pattern="^(preview_10s|predictive_autodial)$")
+    preview_timer_seconds: Optional[int] = Field(10, ge=3, le=60)
 
 
 class CampaignUpdate(BaseModel):
@@ -63,6 +67,8 @@ class CampaignUpdate(BaseModel):
     entity_type: Optional[str] = None
     cost_per_message: Optional[float] = None
     max_retries: Optional[int] = Field(None, ge=0, le=10)
+    dialing_mode: Optional[str] = Field(None, pattern="^(preview_10s|predictive_autodial)$")
+    preview_timer_seconds: Optional[int] = Field(None, ge=3, le=60)
 
 
 class AudiencePreviewReq(BaseModel):

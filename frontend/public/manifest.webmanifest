@@ -1,13 +1,13 @@
 {
-  "name": "CRM — Leads & Pipeline",
-  "short_name": "CRM",
-  "description": "Manage leads, pipeline, appointments and follow-ups on the go.",
+  "name": "CRM Enterprise · Telecalling Platform",
+  "short_name": "CRM Enterprise",
+  "description": "Enterprise Telecalling CRM tailored for high-velocity calling floors and tenant operations.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#0e1015",
-  "theme_color": "#4F46E5",
+  "background_color": "#080b14",
+  "theme_color": "#6366f1",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
@@ -15,10 +15,17 @@
   ],
   "shortcuts": [
     {
-      "name": "Scan & Redeem Voucher",
-      "short_name": "Scan Voucher",
-      "description": "Open the floor-staff voucher scanner",
-      "url": "/staff/redeem",
+      "name": "Dialer Console",
+      "short_name": "Dialer",
+      "description": "Open high-velocity telecalling dialer",
+      "url": "/calling",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Leads & Enquiries",
+      "short_name": "Leads",
+      "description": "Assigned lead queue",
+      "url": "/leads",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]

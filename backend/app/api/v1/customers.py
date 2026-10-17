@@ -228,7 +228,7 @@ async def customer_timeline(
 @router.get("/{company_id}/timeline/export")
 async def export_customer_timeline(
     company_id: uuid.UUID,
-    actor: Annotated[User, Depends(_rw)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)],
     types: str | None = Query(None),
     search: str | None = Query(None),

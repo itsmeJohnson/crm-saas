@@ -169,7 +169,10 @@ class CampaignService:
             audience_definition=data.get("audience_definition"), segment_id=data.get("segment_id"),
             entity_type=data.get("entity_type", "lead"),
             cost_per_message=Decimal(str(data.get("cost_per_message", 0) or 0)),
-            max_retries=data.get("max_retries", 2), created_by=actor.id)
+            max_retries=data.get("max_retries", 2),
+            dialing_mode=data.get("dialing_mode", "preview_10s"),
+            preview_timer_seconds=int(data.get("preview_timer_seconds", 10) or 10),
+            created_by=actor.id)
         self.db.add(c)
         await self.db.flush()
         await self.db.refresh(c)
@@ -180,7 +183,8 @@ class CampaignService:
         if c.status not in ("draft", "scheduled", "paused"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"A {c.status} campaign cannot be edited.")
         for k in ("name", "description", "subject", "body", "template_id", "audience_type",
-                  "audience_definition", "segment_id", "entity_type", "max_retries"):
+                  "audience_definition", "segment_id", "entity_type", "max_retries",
+                  "dialing_mode", "preview_timer_seconds"):
             if k in data and data[k] is not None:
                 setattr(c, k, data[k])
         if "cost_per_message" in data and data["cost_per_message"] is not None:

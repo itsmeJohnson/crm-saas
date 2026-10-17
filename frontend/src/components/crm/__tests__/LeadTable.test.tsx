@@ -15,6 +15,15 @@ vi.mock('../../../store/userStore', () => ({
   useUserStore: vi.fn(),
 }));
 
+vi.mock('../../../store/authStore', () => {
+  const state = {
+    user: { id: 'admin-1', role: 'OrgAdmin' },
+    organization: { currency: 'INR' },
+  };
+  const mockFn = Object.assign(vi.fn(() => state), { getState: () => state });
+  return { useAuthStore: mockFn };
+});
+
 describe('LeadTable Component', () => {
   const mockLeads: LeadResponse[] = [
     {
@@ -40,8 +49,8 @@ describe('LeadTable Component', () => {
       stage_id: 'stage-1',
       custom_fields: null,
       created_by: 'user-1',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: '2026-01-02T10:00:00.000Z',
+      updated_at: '2026-01-02T10:00:00.000Z',
     },
     {
       id: 'lead-2',
@@ -66,8 +75,8 @@ describe('LeadTable Component', () => {
       stage_id: 'stage-1',
       custom_fields: null,
       created_by: 'user-1',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: '2026-01-01T10:00:00.000Z',
+      updated_at: '2026-01-01T10:00:00.000Z',
     },
   ];
 

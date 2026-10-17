@@ -26,6 +26,8 @@ class UserUpdate(BaseModel):
     department_id: uuid.UUID | None = None
     branch_id: uuid.UUID | None = None
     custom_role_id: uuid.UUID | None = None
+    registered_device_uuid: str | None = None
+    allowed_ip_whitelist: str | None = None
 
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
@@ -42,6 +44,8 @@ class UserResponse(UserBase):
     seat_number: str | None = None
     inactive_reason: str | None = None
     mfa_enabled: bool = False
+    registered_device_uuid: str | None = None
+    allowed_ip_whitelist: str | None = None
 
 class ReplaceEmployeeRequest(BaseModel):
     old_user_id: uuid.UUID

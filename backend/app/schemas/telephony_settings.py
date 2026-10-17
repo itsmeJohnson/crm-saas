@@ -42,7 +42,7 @@ class TelephonyConfigResponse(BaseModel):
 class TelephonyConfigUpdate(BaseModel):
     """Write-only update. All fields optional; a blank/None secret leaves the
     stored value unchanged (so the UI never has to re-send credentials)."""
-    provider: Optional[str] = Field(default=None, pattern="^(myoperator|knowlarity|exotel|callerdesk|tata_smartflo|airtel_iq|ozonetel|custom_webhook)$")
+    provider: Optional[str] = Field(default=None, pattern="^(myoperator|knowlarity|exotel|callerdesk|twilio|msg91|tata_smartflo|airtel_iq|ozonetel|custom_webhook)$")
     is_active: Optional[bool] = None
 
     company_id: Optional[str] = None

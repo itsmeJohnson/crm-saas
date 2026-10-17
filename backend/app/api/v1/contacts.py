@@ -64,7 +64,7 @@ async def list_contacts(
 
 @router.get("/export")
 async def export_contacts(
-    actor: Annotated[User, Depends(_rw)],
+    actor: Annotated[User, Depends(_oa_or_mgr)],
     db: Annotated[AsyncSession, Depends(get_db)],
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
     search: str | None = Query(None),

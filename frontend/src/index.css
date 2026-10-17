@@ -19,35 +19,36 @@
   --slate-900:  15  23  42;
   --slate-950:   2   6  23;
 
-  /* Minimalist Dark Palette */
-  --bg-app:         #090a0f;
-  --bg-surface:     #0e1017;
-  --bg-card:        #12151e;
-  --bg-card-hover:  #171b26;
-  --bg-subtle:      #161922;
-  --bg-input:       #0e1017;
-  --bg-inset:       #0b0d13;
+  /* Enterprise Luxury Dark Palette (Default) */
+  --bg-app:         #080b14; /* Deep Space Dark */
+  --bg-surface:     #111a2e; /* Surface/Cards */
+  --bg-card:        #111a2e;
+  --bg-card-hover:  #18233d;
+  --bg-subtle:      #131c33;
+  --bg-input:       #0d1424;
+  --bg-inset:       #0b101d;
   
-  --border-color:   rgba(255, 255, 255, 0.08);
-  --border-strong:  rgba(255, 255, 255, 0.14);
-  --border-subtle:  rgba(255, 255, 255, 0.05);
+  --border-color:   #1e293b;
+  --border-strong:  #334155;
+  --border-subtle:  #162138;
 
   --text-primary:   #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted:     #64748b;
 
-  /* Subtle Minimalist Shadows */
-  --shadow-subtle:      0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-card:        0 4px 20px -2px rgba(0, 0, 0, 0.5);
-  --shadow-card-hover:  0 10px 30px -4px rgba(0, 0, 0, 0.6);
-  --shadow-modal:       0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  /* Primary & Semantic Accents */
+  --primary-accent: #6366f1; /* Indigo Blue */
+  --primary-glow:   rgba(99, 102, 241, 0.25);
+  --success-accent: #10b981; /* Emerald */
 
-  /* Primary Accent: Electric Cyan & Mint */
-  --primary-accent: #06b6d4;
-  --primary-glow:   rgba(6, 182, 212, 0.2);
+  /* Subtle Minimalist Shadows */
+  --shadow-subtle:      0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card:        0 4px 20px -2px rgba(0, 0, 0, 0.55);
+  --shadow-card-hover:  0 10px 30px -4px rgba(0, 0, 0, 0.65);
+  --shadow-modal:       0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(99, 102, 241, 0.2);
 }
 
-/* ── Light Mode (Minimalist Clean Alabaster) ──────────────── */
+/* ── Light Mode (Slate Ice Light) ──────────────── */
 .light {
   --slate-950: 248 250 252;
   --slate-900: 255 255 255;
@@ -61,12 +62,12 @@
   --slate-100:  15  23  42;
   --slate-50:    2   6  23;
 
-  /* Minimalist Light Palette */
-  --bg-app:         #f8fafc;
-  --bg-surface:     #ffffff;
+  /* Slate Ice Light Palette */
+  --bg-app:         #f8fafc; /* Slate Ice Light */
+  --bg-surface:     #ffffff; /* Surface/Cards */
   --bg-card:        #ffffff;
-  --bg-card-hover:  #f8fafc;
-  --bg-subtle:      #f1f5f9;
+  --bg-card-hover:  #f1f5f9;
+  --bg-subtle:      #f8fafc;
   --bg-input:       #ffffff;
   --bg-inset:       #f1f5f9;
 
@@ -74,15 +75,19 @@
   --border-strong:  #cbd5e1;
   --border-subtle:  #f1f5f9;
 
-  --text-primary:   #0f172a;
+  --text-primary:   #0f172a; /* Text Primary */
   --text-secondary: #475569;
   --text-muted:     #94a3b8;
+
+  --primary-accent: #4f46e5; /* Primary Accent Light */
+  --primary-glow:   rgba(79, 70, 229, 0.2);
+  --success-accent: #10b981;
 
   /* Light Shadows */
   --shadow-subtle:      0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-card:        0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-card-hover:  0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-  --shadow-modal:       0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-modal:       0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
 
   background-color: var(--bg-app);
   color: var(--text-primary);
@@ -177,15 +182,17 @@
 
 /* Primary Vibrant Button */
 .neo-btn-primary, .minimal-btn-primary {
-  background: #06b6d4;
+  background: #6366f1;
   color: #ffffff !important;
-  border: 1px solid #0891b2;
+  border: 1px solid #4f46e5;
   border-radius: 0.625rem;
   font-size: 0.8125rem;
   font-weight: 600;
   padding: 0.5rem 1rem;
+  min-height: 44px;
+  min-width: 44px;
   transition: all 0.15s ease;
-  box-shadow: 0 1px 3px rgba(6, 182, 212, 0.25);
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.25);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -194,8 +201,8 @@
 }
 
 .neo-btn-primary:hover, .minimal-btn-primary:hover {
-  background: #0891b2;
-  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.35);
+  background: #4f46e5;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
 }
 
 .neo-btn-primary:active, .minimal-btn-primary:active {
@@ -222,6 +229,7 @@
   color: var(--text-primary);
   border-radius: 0.625rem;
   padding: 0.5rem 0.875rem;
+  min-height: 44px;
   font-size: 0.8125rem;
   transition: all 0.15s ease;
   outline: none;
@@ -229,8 +237,8 @@
 }
 
 .glass-input:focus, .neo-input:focus, .minimal-input:focus {
-  border-color: #06b6d4;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
 .glass-input::placeholder, .neo-input::placeholder, .minimal-input::placeholder {
@@ -245,11 +253,102 @@
 }
 
 /* ────────────────────────────────────────────────────────────
-   Sidebar & Navigation (Minimalist Linear Style)
+   Metric & Console Cards (Minimalist with backdrop-blur-md)
+──────────────────────────────────────────────────────────── */
+.crm-metric-card {
+  background: rgba(17, 26, 46, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 0.875rem;
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 1rem 1.25rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.light .crm-metric-card {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.crm-metric-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* ────────────────────────────────────────────────────────────
+   Lead & Log Lists: Dense Zero-Waste Layout & Zebra Striping
+──────────────────────────────────────────────────────────── */
+.crm-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.crm-table th {
+  padding: 0.625rem 0.875rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+
+.crm-table-row {
+  transition: background-color 0.12s ease;
+}
+
+.crm-table-row:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+.light .crm-table-row:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+.crm-table-row:hover {
+  background-color: rgba(99, 102, 241, 0.08) !important;
+}
+
+.crm-table td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+/* Contrast Mapped Status Pills */
+.crm-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Sidebar & Navigation (High-Contrast with Left Border Marker)
 ──────────────────────────────────────────────────────────── */
 .crm-sidebar {
   background-color: var(--bg-surface);
   border-right: 1px solid var(--border-color);
+}
+
+.crm-nav-group-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 0.5rem 0.75rem 0.25rem 0.75rem;
 }
 
 .crm-nav-item {
@@ -264,6 +363,8 @@
   transition: all 0.15s ease;
   cursor: pointer;
   text-decoration: none;
+  border-left: 2px solid transparent;
+  min-height: 40px;
 }
 
 .crm-nav-item:hover {
@@ -272,14 +373,39 @@
 }
 
 .crm-nav-item--active {
-  background-color: rgba(6, 182, 212, 0.1);
-  color: #06b6d4 !important;
+  background-color: rgba(99, 102, 241, 0.12) !important;
+  color: #818cf8 !important;
   font-weight: 600;
+  border-left: 2px solid #6366f1 !important;
+  box-shadow: inset 1px 0 8px rgba(99, 102, 241, 0.15);
+}
+
+.crm-nav-item--active svg {
+  color: #6366f1 !important;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.4));
 }
 
 .light .crm-nav-item--active {
-  background-color: #e0f2fe;
-  color: #0284c7 !important;
+  background-color: rgba(79, 70, 229, 0.1) !important;
+  color: #4f46e5 !important;
+  border-left: 2px solid #4f46e5 !important;
+}
+
+.light .crm-nav-item--active svg {
+  color: #4f46e5 !important;
+}
+
+/* Touch Targets SLA: min 44x44px clickable areas on mobile */
+@media (max-width: 768px) {
+  .crm-touch-target,
+  button,
+  a[role="button"],
+  select,
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* ────────────────────────────────────────────────────────────

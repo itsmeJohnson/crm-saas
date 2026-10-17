@@ -49,6 +49,8 @@ class Campaign(BaseModel):
     cost_per_message: Mapped[float] = mapped_column(Numeric(12, 4), default=0, nullable=False)
     revenue: Mapped[float] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     max_retries: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    dialing_mode: Mapped[str] = mapped_column(String(30), default="preview_10s", nullable=False)  # preview_10s | predictive_autodial
+    preview_timer_seconds: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
 

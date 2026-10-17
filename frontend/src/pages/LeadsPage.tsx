@@ -13,7 +13,7 @@ import { SavedFilters } from '../components/crm/SavedFilters';
 import { leadApi } from '../services/leadApi';
 import { LeadResponse, LeadReport } from '../services/leadApi';
 import { normalizeFieldOptions } from '../services/metadataApi';
-import { Plus, X, User, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, TrendingUp, MessageCircle, FileSpreadsheet, MoreHorizontal, ChevronDown, ChevronUp, Clock, Target, AlertTriangle, CheckCircle2, PhoneCall } from 'lucide-react';
+import { Plus, X, User, Users, Mail, DollarSign, Compass, Upload, ArrowRightLeft, Download, Flame, Phone, LayoutGrid, List, SlidersHorizontal, TrendingUp, MessageCircle, FileSpreadsheet, MoreHorizontal, ChevronDown, ChevronUp, Clock, Target, AlertTriangle, CheckCircle2, PhoneCall } from 'lucide-react';
 import { OmniChannelChatDrawer } from '../components/crm/OmniChannelChatDrawer';
 import { useUserStore } from '../store/userStore';
 import { useMetadataStore } from '../store/metadataStore';
@@ -30,14 +30,14 @@ import { useAnalyticsStore } from '../store/analyticsStore';
 import { BulkAssignModal } from '../components/crm/BulkAssignModal';
 import { LeadTransferModal } from '../components/crm/LeadTransferModal';
 import { useDialerStore } from '../store/dialerStore';
-import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
+import { api } from '../services/api';
 
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
   // Bulk import (CSV, XLSX, Google Sheets) enabled for administrative operations
   const canBulkImport = true;
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
-  const { agentState, currentLead, callSpecificLead, error: dialerError } = useDialerStore();
+  const { agentState, callSpecificLead, error: dialerError } = useDialerStore();
   const [callError, setCallError] = useState<string | null>(null);
 
   const isTL = user?.role === 'TeamLeader' || (user as any)?.is_team_leader || dashboardData?.role === 'TeamLeader';
@@ -107,6 +107,21 @@ export const LeadsPage: React.FC = () => {
   };
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isAllocating, setIsAllocating] = useState(false);
+
+  const handleRoundRobinAllocate = async () => {
+    if (!window.confirm('Run deterministic bulk round-robin allocation of leads across currently active/logged-in floor agents?')) return;
+    setIsAllocating(true);
+    try {
+      const res = await api.post('/leads/allocate/round-robin', { only_active_present_callers: true });
+      alert(`Success: Allocated ${res.data.allocated_count} leads across ${res.data.active_callers_count} active agents!`);
+      fetchLeads();
+    } catch (e: any) {
+      alert(e.response?.data?.detail || e.message || 'Round-robin allocation failed');
+    } finally {
+      setIsAllocating(false);
+    }
+  };
 
   const handleExport = async (format: 'csv' | 'xlsx') => {
     setIsExporting(true);
@@ -409,31 +424,48 @@ export const LeadsPage: React.FC = () => {
                   className="fixed inset-0 z-30"
                   onClick={() => setIsActionsMenuOpen(false)}
                 />
-                <div className="absolute right-0 mt-1.5 w-52 bg-slate-900 border border-slate-700/90 rounded-xl shadow-xl z-40 py-1 divide-y divide-slate-800">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        handleExport('csv');
-                        setIsActionsMenuOpen(false);
-                      }}
-                      disabled={isExporting}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-emerald-400 transition-colors cursor-pointer text-left"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Export to CSV</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExport('xlsx');
-                        setIsActionsMenuOpen(false);
-                      }}
-                      disabled={isExporting}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-emerald-400 transition-colors cursor-pointer text-left"
-                    >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Export to Excel (.xlsx)</span>
-                    </button>
-                  </div>
+                <div className="absolute right-0 mt-1.5 w-56 bg-[#111a2e] border border-[#1e293b] rounded-xl shadow-xl z-40 py-1 divide-y divide-[#1e293b]">
+                  {isPrivileged && (
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          handleRoundRobinAllocate();
+                        }}
+                        disabled={isAllocating}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-indigo-300 hover:bg-[#18233d] transition-colors cursor-pointer text-left"
+                      >
+                        <Users className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{isAllocating ? 'Allocating Leads...' : 'Round-Robin Lead Split'}</span>
+                      </button>
+                    </div>
+                  )}
+                  {isPrivileged && (
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          handleExport('csv');
+                          setIsActionsMenuOpen(false);
+                        }}
+                        disabled={isExporting}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-[#18233d] hover:text-emerald-400 transition-colors cursor-pointer text-left"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Export to CSV</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleExport('xlsx');
+                          setIsActionsMenuOpen(false);
+                        }}
+                        disabled={isExporting}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-[#18233d] hover:text-emerald-400 transition-colors cursor-pointer text-left"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Export to Excel (.xlsx)</span>
+                      </button>
+                    </div>
+                  )}
                   {isPrivileged && (
                     <div className="py-1">
                       <button
@@ -441,7 +473,7 @@ export const LeadsPage: React.FC = () => {
                           setIsFieldsOpen(true);
                           setIsActionsMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-brand-400 transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-[#18233d] hover:text-brand-400 transition-colors cursor-pointer text-left"
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
                         <span>Custom Fields</span>
@@ -916,10 +948,7 @@ export const LeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Active Call Control/Disposition */}
-              {agentState === 'ACTIVE_CALLING' && currentLead?.id === detailLead.id && (
-                <ActiveCallDisposition />
-              )}
+
 
               {/* Telecalling Quick Call Disposition Logger */}
               <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2.5">

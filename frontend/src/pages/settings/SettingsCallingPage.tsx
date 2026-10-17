@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { settingsApi, TelephonyConfig, TelephonyConfigUpdate } from '../../services/settingsApi';
-import { Phone, ShieldCheck, Loader2, CheckCircle, AlertCircle, Building2 } from 'lucide-react';
+import { api } from '../../services/api';
+import { Phone, ShieldCheck, Loader2, CheckCircle, AlertCircle, Building2, Smartphone, Key } from 'lucide-react';
 
 const PROVIDERS = [
   { id: 'callerdesk', label: 'Callerdesk', desc: 'Cloud Telephony Click2Call & Inbound Webhooks' },
   { id: 'myoperator', label: 'MyOperator', desc: 'Cloud Telephony OBD & IVR' },
+  { id: 'twilio', label: 'Twilio Voice (BYOK Global VoIP & SIP)', desc: 'Global Cloud Voice, Webhooks & Elastic SIP Trunking' },
+  { id: 'msg91', label: 'MSG91 Voice (BYOK Cloud Audio)', desc: 'Cloud Audio IVR & Transactional Voice Gateway' },
   { id: 'exotel', label: 'Exotel', desc: 'Enterprise Cloud Calling API' },
   { id: 'knowlarity', label: 'Knowlarity', desc: 'SuperReceptionist Click-to-Call' },
   { id: 'tata_smartflo', label: 'Tata Smartflo', desc: 'Tata Tele Business Cloud PBX' },
@@ -25,6 +28,27 @@ export const SettingsCallingPage: React.FC = () => {
   // Non-secret fields (controlled). Secrets are write-only (separate state, blank = unchanged).
   const [form, setForm] = useState<TelephonyConfigUpdate>({});
   const [secrets, setSecrets] = useState({ x_api_key: '', secret_token: '', authentication_token: '', webhook_secret: '' });
+  const [simToken, setSimToken] = useState<string | null>(null);
+  const [simDevices, setSimDevices] = useState<any[]>([]);
+
+  const fetchSimDevices = async () => {
+    try {
+      const res = await api.get('/telephony/sim/devices');
+      if (Array.isArray(res.data)) {
+        setSimDevices(res.data);
+      }
+    } catch (e) {}
+  };
+
+  const generateSimToken = async () => {
+    try {
+      const res = await api.post('/telephony/sim/tokens');
+      setSimToken(res.data.token);
+      fetchSimDevices();
+    } catch (e: any) {
+      alert(e.response?.data?.detail || 'Failed to generate SIM pairing token');
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -44,7 +68,10 @@ export const SettingsCallingPage: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetchSimDevices();
+  }, []);
 
   const save = async () => {
     setSaving(true); setBanner(null);
@@ -220,6 +247,25 @@ export const SettingsCallingPage: React.FC = () => {
           </div>
         )}
 
+        {/* Twilio BYOK Fields */}
+        {currentProvider === 'twilio' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {textField('Twilio Account SID', 'company_id', 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxx')}
+            {secretField('Twilio Auth Token', 'secret_token', cfg?.has_secret_token || false)}
+            {textField('Twilio Outbound Caller ID (E.164)', 'default_caller_id', 'e.g. +14155552671')}
+            {textField('Status Callback Webhook (optional)', 'webhook_url', `${window.location.origin}/api/v1/telephony/webhook`)}
+          </div>
+        )}
+
+        {/* MSG91 BYOK Fields */}
+        {currentProvider === 'msg91' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {secretField('MSG91 Auth Key', 'x_api_key', cfg?.has_x_api_key || false)}
+            {textField('Caller DID / Outbound Number', 'default_caller_id', 'e.g. 080XXXXXXXX')}
+            {textField('Status Callback Webhook (optional)', 'webhook_url', `${window.location.origin}/api/v1/telephony/webhook`)}
+          </div>
+        )}
+
         {/* Exotel Fields */}
         {currentProvider === 'exotel' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -309,6 +355,73 @@ export const SettingsCallingPage: React.FC = () => {
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 cursor-pointer">
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
+        </div>
+      </div>
+
+      {/* Android Mobile SIM App Synchronization */}
+      <div className="bg-[#111a2e] border border-[#1e293b] rounded-2xl p-4 sm:p-6 space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                Android Mobile SIM App Synchronization
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  GSM Background Token
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Direct GSM call synchronization: native mobile phone logs and call durations are ingested directly into the CRM database automatically.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={generateSimToken}
+            className="min-h-[40px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20 self-start sm:self-auto"
+          >
+            <Key className="w-3.5 h-3.5" />
+            Generate Pairing Token
+          </button>
+        </div>
+
+        {simToken && (
+          <div className="p-3.5 bg-[#080b14] border border-emerald-500/30 rounded-xl space-y-1.5">
+            <span className="text-[10px] uppercase font-bold text-emerald-400">Pairing Token (Valid for 90 Days)</span>
+            <div className="flex items-center justify-between gap-2">
+              <code className="text-xs font-mono text-emerald-300 select-all truncate">{simToken}</code>
+              <button
+                type="button"
+                onClick={() => { navigator.clipboard.writeText(simToken); alert('Pairing token copied to clipboard'); }}
+                className="px-3 py-1 text-xs font-bold bg-emerald-500/20 text-emerald-300 rounded-lg hover:bg-emerald-500/30 cursor-pointer"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Registered Devices List */}
+        <div className="space-y-2 pt-2 border-t border-[#1e293b]">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Registered Floor Smartphones</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {simDevices.length === 0 ? (
+              <p className="text-xs text-slate-500 col-span-full">No mobile SIM devices paired yet. Click "Generate Pairing Token" to register an Android device.</p>
+            ) : (
+              simDevices.map((dev: any) => (
+                <div key={dev.id} className="p-3 rounded-xl bg-[#080b14] border border-[#1e293b] space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white">{dev.device_model || 'Android Smartphone'}</span>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Active Sync</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px]">Caller: {dev.phone_number || 'SIM 1'}</p>
+                  <p className="text-slate-500 text-[10px]">Last Heartbeat: {new Date(dev.last_sync_at).toLocaleTimeString()}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

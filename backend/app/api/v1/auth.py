@@ -190,6 +190,42 @@ async def login(
         )
         raise
 
+    # ── Enterprise Floor IP Whitelisting & Device Binding Check ──
+    if user.allowed_ip_whitelist:
+        allowed_ips = [ip.strip() for ip in user.allowed_ip_whitelist.split(",") if ip.strip()]
+        client_ip = (ip_address or "").strip()
+        forwarded_for = request.headers.get("x-forwarded-for")
+        all_incoming = [client_ip] + ([ip.strip() for ip in forwarded_for.split(",")] if forwarded_for else [])
+        if not any(cand in allowed_ips for cand in all_incoming if cand):
+            await audit.log_event(
+                actor_id=user.id,
+                organization_id=user.organization_id,
+                event_type="AUTH_IP_REJECTED",
+                description=f"Floor network IP restriction blocked login from {ip_address}",
+                ip_address=ip_address,
+                browser_info=user_agent,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Login rejected: Your account is restricted to authorized call floor IP coordinates."
+            )
+
+    if user.registered_device_uuid:
+        incoming_dev_uuid = request_data.device_uuid or request.headers.get("x-device-uuid")
+        if not incoming_dev_uuid or incoming_dev_uuid.strip() != user.registered_device_uuid.strip():
+            await audit.log_event(
+                actor_id=user.id,
+                organization_id=user.organization_id,
+                event_type="AUTH_DEVICE_REJECTED",
+                description=f"Device binding rejected login. Expected {user.registered_device_uuid}, got {incoming_dev_uuid}",
+                ip_address=ip_address,
+                browser_info=user_agent,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Login rejected: Unregistered device UUID. Please contact your floor administrator to bind this device."
+            )
+
     # MFA check: if enabled, return a short-lived challenge token instead of full session
     if user.mfa_enabled:
         from app.core.security import create_mfa_challenge_token

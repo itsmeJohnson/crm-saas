@@ -1,7 +1,7 @@
 /* CRM service worker — enables PWA installability, offline app-shell, and web push.
  * Bump CACHE when the shell changes so old caches are cleared on activate. */
-const CACHE = 'crm-shell-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png'];
+const CACHE = 'crm-telecalling-shell-v2';
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
