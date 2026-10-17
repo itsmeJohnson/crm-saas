@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useNotificationStore } from '../../store/notificationStore';
 import { whatsappRealtime } from '../../services/whatsappRealtime';
 
 interface Popup {
@@ -9,6 +10,7 @@ interface Popup {
   conversationId: string;
   name: string;
   body: string;
+  isDocument?: boolean;
 }
 
 const AUTO_DISMISS_MS = 9000;
@@ -89,9 +91,16 @@ export const WhatsAppLiveNotifier: React.FC = () => {
       // Audio notification chime
       playChime();
 
+      // Instantly update the top Notification Bell unread badge & list
+      useNotificationStore.getState().fetchUnreadCount();
+      useNotificationStore.getState().fetchNotifications();
+      window.dispatchEvent(new CustomEvent('notification-received'));
+      window.dispatchEvent(new CustomEvent('whatsapp-inbound-message', { detail: data }));
+
       const conversationId: string = data.conversation_id;
       const name: string = data.display_name || data.from_number || 'WhatsApp contact';
-      const body: string = message.body || (message.media_type ? '📎 Attachment' : 'New message');
+      const isDocument = Boolean(message.media_type && message.media_type !== 'text');
+      const body: string = message.body || (isDocument ? '📎 Customer sent a document / attachment' : 'New WhatsApp message');
 
       // Desktop notification.
       try {
@@ -112,7 +121,7 @@ export const WhatsAppLiveNotifier: React.FC = () => {
 
       // In-app popup (works even when desktop notifications are denied).
       const key = `${conversationId}-${msgId || Date.now()}`;
-      setPopups((prev) => [{ key, conversationId, name, body }, ...prev].slice(0, 4));
+      setPopups((prev) => [{ key, conversationId, name, body, isDocument }, ...prev].slice(0, 4));
       window.setTimeout(() => {
         setPopups((prev) => prev.filter((p) => p.key !== key));
       }, AUTO_DISMISS_MS);
@@ -170,6 +179,11 @@ export const WhatsAppLiveNotifier: React.FC = () => {
             <strong style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {p.name}
             </strong>
+            {p.isDocument && (
+              <span style={{ fontSize: 10, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>
+                Document
+              </span>
+            )}
             <X
               style={{ width: 14, height: 14, opacity: 0.6 }}
               onClick={(e) => {

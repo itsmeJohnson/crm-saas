@@ -4,7 +4,7 @@ import {
   Check, CheckCheck, Clock, AlertTriangle, Phone,
   FileCheck, ShieldCheck, Download, ExternalLink,
   MessageCircle, MessageSquare, Loader2, LayoutTemplate,
-  Sparkles, CheckCircle2
+  Sparkles, CheckCircle2, FolderPlus, FolderCheck
 } from 'lucide-react';
 import { LeadResponse, leadApi } from '../../services/leadApi';
 import { whatsappApi, WaMessage, QuickReply, WaTemplate } from '../../services/whatsappApi';
@@ -30,6 +30,59 @@ interface ChatMessage {
   filename?: string;
   filesize?: number | null;
 }
+
+export interface DocRequestPreset {
+  id: string;
+  name: string;
+  badge: string;
+  desc: string;
+  messageText: string;
+}
+
+export const DOC_REQUEST_PRESETS: DocRequestPreset[] = [
+  {
+    id: 'aadhaar',
+    name: 'Aadhaar Card (Front & Back)',
+    badge: 'ID Proof',
+    desc: 'Government identity and address verification',
+    messageText: 'Dear customer, please send a clear photo or PDF of your Aadhaar Card (both Front & Back sides) here on WhatsApp to proceed with verification.',
+  },
+  {
+    id: 'pan',
+    name: 'PAN Card',
+    badge: 'Tax / Identity',
+    desc: 'Clear photo or scanned PDF copy',
+    messageText: 'Dear customer, kindly share a clear photo or copy of your PAN Card here on WhatsApp to complete your verification.',
+  },
+  {
+    id: 'bank_statement',
+    name: 'Bank Statement / Cheque',
+    badge: 'Banking',
+    desc: 'Latest 3-6 months statement or cancelled cheque',
+    messageText: 'Dear customer, please share your latest 3 to 6 months Bank Account Statement (PDF) or a Cancelled Cheque on this WhatsApp chat for account verification.',
+  },
+  {
+    id: 'salary_slip',
+    name: 'Salary Slips / Income Proof',
+    badge: 'Income',
+    desc: 'Last 3 months payslips or Form 16',
+    messageText: 'Dear customer, please upload your latest 3 months Salary Slips or Form 16 / Income Proof here on WhatsApp.',
+  },
+  {
+    id: 'address_proof',
+    name: 'Address Proof',
+    badge: 'Address',
+    desc: 'Electricity bill, rental agreement or voter ID',
+    messageText: 'Dear customer, please provide a valid Address Proof (Electricity Bill, Gas Bill, or Rental Agreement) here on WhatsApp.',
+  },
+  {
+    id: 'kyc_bundle',
+    name: 'Complete KYC Bundle (All-in-One)',
+    badge: 'Complete KYC',
+    desc: 'Aadhaar + PAN + Bank Statement + Address Proof',
+    messageText: 'Dear customer, to quickly complete your verification, please upload the following documents on this WhatsApp chat:\n1. Aadhaar Card (Front & Back)\n2. PAN Card\n3. Bank Statement (Last 3 Months)\n4. Address Proof\nThank you!',
+  },
+];
 
 const ONBOARDING_TEMPLATES = [
   {
@@ -83,6 +136,11 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<WaTemplate | null>(null);
   const [templateVars, setTemplateVars] = useState<string[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Document Collection state
+  const [showDocRequestModal, setShowDocRequestModal] = useState(false);
+  const [selectedDocPreset, setSelectedDocPreset] = useState<DocRequestPreset>(DOC_REQUEST_PRESETS[0]);
+  const [showDocsOnly, setShowDocsOnly] = useState(false);
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     chatEndRef.current?.scrollIntoView({ behavior });
@@ -341,6 +399,67 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     }
   };
 
+  const handleDirectSendText = async (messageText: string) => {
+    if (!lead || !lead.phone || !messageText.trim()) return;
+    setSending(true);
+    setError(null);
+    try {
+      if (channel === 'whatsapp') {
+        const res = await whatsappApi.sendText({
+          to_number: lead.phone,
+          body: messageText.trim(),
+          conversation_id: waConvId || undefined,
+          lead_id: lead.id,
+        });
+        const newMsg: ChatMessage = {
+          id: res.id || `local-${Date.now()}`,
+          channel: 'whatsapp',
+          direction: 'OUTBOUND',
+          body: messageText.trim(),
+          status: res.wa_status || 'sent',
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, newMsg]);
+      } else {
+        const res = await smsApi.send({
+          to_number: lead.phone,
+          body: messageText.trim(),
+          lead_id: lead.id,
+        });
+        const newMsg: ChatMessage = {
+          id: res.id || `local-${Date.now()}`,
+          channel: 'sms',
+          direction: 'OUTBOUND',
+          body: messageText.trim(),
+          status: res.sms_status || 'sent',
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, newMsg]);
+      }
+      setTimeout(() => scrollToBottom('smooth'), 50);
+    } catch (err: any) {
+      setError(extractErrorMessage(err, 'Failed to send message'));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendDocRequest = async (presetText: string, sendNow: boolean) => {
+    if (sendNow) {
+      await handleDirectSendText(presetText);
+      setShowDocRequestModal(false);
+    } else {
+      setText(presetText);
+      setShowDocRequestModal(false);
+    }
+  };
+
+  const collectedDocs = messages.filter((m) =>
+    Boolean(m.media_url || m.filename || (m.media_type && m.media_type !== 'text' && m.media_type !== 'template'))
+  );
+  const docCount = collectedDocs.length;
+  const displayedMessages = showDocsOnly ? collectedDocs : messages;
+
   const getFileBadge = (filename?: string, mediaType?: string) => {
     const ext = filename?.split('.').pop()?.toUpperCase() || '';
     if (ext === 'PDF' || mediaType === 'document') {
@@ -418,7 +537,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
           </div>
         </div>
 
-        {/* Channel Selector Tab Bar */}
+        {/* Channel Selector & Document Tools Tab Bar */}
         <div className="px-4 py-2 bg-slate-950/40 border-b border-slate-800/60 flex items-center justify-between gap-2 shrink-0">
           <div className="flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-semibold">
             <button
@@ -445,32 +564,78 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
             </button>
           </div>
 
-          <span className="text-[11px] text-slate-400 hidden sm:inline">
-            {channel === 'whatsapp' ? 'Verified Meta Cloud API' : 'Indian DLT Route'}
-          </span>
+          <div className="flex items-center gap-2">
+            {docCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDocsOnly(!showDocsOnly)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                  showDocsOnly
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Filter to show only files and documents exchanged"
+              >
+                <FolderCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Docs ({docCount})</span>
+              </button>
+            )}
+
+            {channel === 'whatsapp' && (
+              <button
+                type="button"
+                onClick={() => setShowDocRequestModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition cursor-pointer shadow-sm"
+                title="Send document collection request on WhatsApp"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Request Docs</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Chat Feed */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-950/20">
+          {showDocsOnly && (
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 animate-fade-in">
+              <div className="flex items-center gap-2">
+                <FolderCheck className="w-4 h-4 text-amber-400" />
+                <span>Showing {docCount} collected document(s) &amp; file(s)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDocsOnly(false)}
+                className="text-[11px] font-semibold underline hover:text-white cursor-pointer"
+              >
+                Show All Messages
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="py-20 text-center text-slate-400 flex flex-col items-center justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-emerald-400 mb-2" />
               <p className="text-xs">Loading conversation history...</p>
             </div>
-          ) : messages.length === 0 ? (
+          ) : displayedMessages.length === 0 ? (
             <div className="py-16 text-center text-slate-400 space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-slate-800/50 border border-slate-700/50 mx-auto flex items-center justify-center text-slate-500">
-                {channel === 'whatsapp' ? <MessageCircle className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
+                {showDocsOnly ? <FolderCheck className="w-6 h-6 text-amber-400" /> : channel === 'whatsapp' ? <MessageCircle className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-300">No previous messages</p>
+                <p className="text-sm font-semibold text-slate-300">
+                  {showDocsOnly ? 'No documents collected yet' : 'No previous messages'}
+                </p>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-                  Start the onboarding conversation below or select a quick verification template.
+                  {showDocsOnly
+                    ? 'Click "Request Docs" to prompt the lead to send KYC or onboarding documents on WhatsApp.'
+                    : 'Start the onboarding conversation below or select a quick verification template.'}
                 </p>
               </div>
             </div>
           ) : (
-            messages.map((m) => {
+            displayedMessages.map((m) => {
               const isOut = m.direction === 'OUTBOUND';
               const fileBadge = m.filename || m.media_url ? getFileBadge(m.filename, m.media_type) : null;
               const IconComp = fileBadge?.icon || FileText;
@@ -685,6 +850,20 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
               </button>
             )}
 
+            {/* Request Docs Button */}
+            {channel === 'whatsapp' && (
+              <button
+                type="button"
+                onClick={() => setShowDocRequestModal(true)}
+                disabled={sending}
+                title="Request KYC & Onboarding Documents via WhatsApp"
+                className="p-2.5 rounded-xl border bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 transition cursor-pointer shrink-0 flex items-center gap-1.5"
+              >
+                <FolderPlus className="w-4 h-4" />
+                <span className="text-xs font-semibold hidden md:inline">Request Docs</span>
+              </button>
+            )}
+
             {/* Input Textarea */}
             <textarea
               value={text}
@@ -838,6 +1017,106 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
                 >
                   {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   Send Template to {lead.phone}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Document Collection Modal */}
+        {showDocRequestModal && (
+          <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-sm p-4 flex flex-col justify-end sm:justify-center animate-fade-in">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-5 shadow-2xl max-h-[92%] flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <FolderPlus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">Collect Documents via WhatsApp</h3>
+                    <p className="text-[11px] text-slate-400">Send instant KYC &amp; document checklist to {contactName}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDocRequestModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="my-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>The customer can reply directly with camera photos or PDF files on WhatsApp.</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">Select Document Requirement:</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {DOC_REQUEST_PRESETS.map((p) => {
+                      const isSel = selectedDocPreset.id === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedDocPreset(p)}
+                          className={`text-left p-2.5 rounded-xl border transition cursor-pointer flex flex-col gap-1 ${
+                            isSel
+                              ? 'bg-emerald-500/15 border-emerald-500/50 text-slate-100 shadow-sm'
+                              : 'bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-200">{p.name}</span>
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-900/80 text-emerald-400 border border-emerald-500/20">
+                              {p.badge}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-tight">{p.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Message Preview */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1.5">WhatsApp Message Preview</label>
+                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs leading-relaxed relative">
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold mb-1">
+                      <MessageCircle className="w-3.5 h-3.5" /> Outbound WhatsApp Message
+                    </div>
+                    <p className="whitespace-pre-wrap text-slate-300">{selectedDocPreset.messageText}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDocRequestModal(false)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendDocRequest(selectedDocPreset.messageText, false)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-xl transition cursor-pointer"
+                >
+                  Insert in Composer
+                </button>
+                <button
+                  type="button"
+                  disabled={sending}
+                  onClick={() => handleSendDocRequest(selectedDocPreset.messageText, true)}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition cursor-pointer shadow-lg shadow-emerald-600/25 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Send WhatsApp Now
                 </button>
               </div>
             </div>

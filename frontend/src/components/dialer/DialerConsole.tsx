@@ -9,7 +9,8 @@ import {
   Building, 
   FileText,
   UserCheck,
-  LogOut
+  LogOut,
+  MessageCircle
 } from 'lucide-react';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
@@ -17,6 +18,7 @@ import { MaskedField } from '../common/MaskedField';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { dashboardApi } from '../../services/dashboardApi';
+import { OmniChannelChatDrawer } from '../crm/OmniChannelChatDrawer';
 
 export const DialerConsole: React.FC = () => {
   const {
@@ -51,6 +53,7 @@ export const DialerConsole: React.FC = () => {
   const [followUpPriority, setFollowUpPriority] = useState('Medium');
   const [collectivePooling, setCollectivePooling] = useState(false);
   const [showBreakMenu, setShowBreakMenu] = useState(false);
+  const [showChatDrawer, setShowChatDrawer] = useState(false);
 
   const [autoDial, setAutoDial] = useState(() => {
     if (typeof localStorage !== 'undefined') {
@@ -483,9 +486,22 @@ export const DialerConsole: React.FC = () => {
                     </p>
                   </div>
                   
-                  {/* Phone Row displaying premium MaskedField */}
-                  <div className="bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-xl flex items-center gap-2">
-                    <MaskedField value={currentLead?.phone || null} />
+                  {/* Phone & WhatsApp / Document collection trigger */}
+                  <div className="flex items-center gap-2">
+                    <div className="bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-xl flex items-center gap-2">
+                      <MaskedField value={currentLead?.phone || null} />
+                    </div>
+                    {currentLead?.phone && (
+                      <button
+                        type="button"
+                        onClick={() => setShowChatDrawer(true)}
+                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+                        title="Open WhatsApp chat & collect documents"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="hidden sm:inline">WhatsApp &amp; Docs</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -622,6 +638,14 @@ export const DialerConsole: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* WhatsApp & Document Collection Drawer */}
+      <OmniChannelChatDrawer
+        lead={currentLead}
+        isOpen={showChatDrawer}
+        onClose={() => setShowChatDrawer(false)}
+        initialChannel="whatsapp"
+      />
     </div>
   );
 };

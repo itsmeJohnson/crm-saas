@@ -1279,29 +1279,34 @@ class WhatsAppService:
                     created_by=creator
                 )
 
-        # Notify owner/assigned user
-        target = conv.assigned_user_id or creator
-        await self.notifier.create_notification(
-            organization_id=org_id,
-            user_id=target,
-            category="whatsapp",
-            title="New WhatsApp message",
-            body=f"WhatsApp from {name or caller}: {body[:80]}",
-            link_url=f"/whatsapp?conversationId={conv.id}"
-        )
+        # Notify assigned agent / lead owner / admin
+        target = conv.assigned_user_id or (lead.assigned_user_id if lead else None) or creator
+        if target:
+            await self.notifier.create_notification(
+                organization_id=org_id,
+                user_id=target,
+                category="whatsapp",
+                title=f"WhatsApp · {name or caller}",
+                body=f"New WhatsApp message from {name or caller}: {body[:80]}",
+                link_url=f"/whatsapp?conversationId={conv.id}",
+                action_metadata={
+                    "conversation_id": str(conv.id),
+                    "lead_id": str(lead.id) if lead else None,
+                    "phone": caller,
+                    "sender_name": name or caller
+                }
+            )
 
-        # Broadcast the inbound message over the existing WS channel (same shape
-        # as outbound sends) so open chats append it live AND the global inbound
-        # notifier can auto-open the conversation and raise a desktop alert. The
-        # message carries direction=INBOUND, which the notifier keys off.
+        # Broadcast the inbound message over the existing WS channel so open chats
+        # append it live AND the global inbound notifier raises in-app alerts for agents.
         await ws_manager.broadcast_to_organization({
             "type": "whatsapp_message",
             "conversation_id": str(conv.id),
             "message": self._msg_item(msg),
-            # Extra fields (ignored by the thread view) used by the global
-            # inbound notifier to label the desktop/popup alert.
             "display_name": name or caller,
             "from_number": caller,
+            "assigned_user_id": str(target) if target else None,
+            "lead_id": str(lead.id) if lead else None,
         }, org_id, self.db)
 
         # Trigger auto-reply on first inbound message
