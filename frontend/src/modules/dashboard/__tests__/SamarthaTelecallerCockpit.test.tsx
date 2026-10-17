@@ -1,13 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
-import React from 'react';
 import { EmployeeDashboard } from '../EmployeeDashboard';
 import { UploadZone } from '../../../components/leads/UploadZone';
 import { useAuthStore } from '../../../store/authStore';
 import { useDialerStore } from '../../../store/dialerStore';
 import { attendanceApi } from '../../../services/attendanceApi';
-import { dashboardApi } from '../../../services/dashboardApi';
 import { dialerApi } from '../../../services/dialerApi';
 import { leadImportApi } from '../../../services/leadImportApi';
 
