@@ -151,6 +151,11 @@ async def export_leads(
     include_archived: bool = Query(False),
 ):
     """Export the caller's visible leads (matching the same filters as listing) as CSV or Excel."""
+    if actor.role in ("Employee",):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: Exporting lead data is restricted to Organization Administrators and Managers."
+        )
     lead_service = LeadService(db, actor.organization_id)
     filters = {
         "search_query": search, "status": status, "assigned_user_id": assigned_user_id,
