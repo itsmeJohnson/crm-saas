@@ -33,12 +33,19 @@ class DispositionService:
                 detail="Lead not found."
             )
 
-        # 2. Scoping Check: verify lead is assigned to current agent
-        if lead.assigned_user_id != actor.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not authorized to submit a disposition for this lead."
-            )
+        # 2. Scoping Check: verify lead is assigned to current agent or allow admin/TL/unassigned takeover
+        if lead.assigned_user_id != actor.id and actor.role not in ("SuperAdmin", "OrgAdmin", "TeamLeader"):
+            if lead.assigned_user_id is None:
+                lead.assigned_user_id = actor.id
+                db.add(lead)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to submit a disposition for this lead."
+                )
+        elif lead.assigned_user_id is None:
+            lead.assigned_user_id = actor.id
+            db.add(lead)
 
         previous_stage_id = lead.stage_id
 

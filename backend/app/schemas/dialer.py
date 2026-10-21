@@ -69,3 +69,8 @@ class CallDispositionRequest(BaseModel):
         if self.status not in allows_stage and self.custom_pipeline_stage_id is not None:
             raise ValueError(f"custom_pipeline_stage_id can only be specified for Picked, Interested, Resolved, or Callback statuses.")
         return self
+
+class InboundLeadLookupRequest(BaseModel):
+    phone: str
+    caller_name: Optional[str] = None
+    call_id: Optional[str] = None

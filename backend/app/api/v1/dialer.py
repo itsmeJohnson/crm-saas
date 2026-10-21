@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, or_, and_
@@ -8,8 +9,9 @@ from app.core.database import get_db
 from app.middleware.permissions import require_active_user
 from app.models.user import User
 from app.models.lead import Lead
+from app.models.pipeline import PipelineStage
 from app.schemas.lead import LeadResponse
-from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest, CallLeadRequest
+from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest, CallLeadRequest, InboundLeadLookupRequest
 from app.services.agent_state_service import AgentStateService
 from app.services.disposition_service import DispositionService
 
@@ -394,24 +396,148 @@ async def call_lead(
     )
     return refetched.scalar_one()
 
+@router.post("/inbound-lead", response_model=LeadResponse)
+async def get_or_create_inbound_lead(
+    payload: InboundLeadLookupRequest,
+    actor: User = Depends(require_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Looks up or auto-creates an active lead for an incoming call from a customer.
+    Ensures that disposition logging always has a genuine database Lead record with UUID.
+    """
+    from sqlalchemy.orm import selectinload
+    raw_phone = (payload.phone or "").strip()
+    digits = re.sub(r"\D", "", raw_phone)
+    last_10 = digits[-10:] if len(digits) >= 10 else digits
+
+    lead = None
+    if last_10:
+        res = await db.execute(
+            select(Lead)
+            .options(selectinload(Lead.stage))
+            .filter(
+                Lead.organization_id == actor.organization_id,
+                Lead.is_deleted == False,
+                Lead.phone.like(f"%{last_10}%")
+            )
+            .order_by(Lead.updated_at.desc())
+            .limit(1)
+        )
+        lead = res.scalars().first()
+
+    if not lead:
+        stage_res = await db.execute(
+            select(PipelineStage.id).where(
+                PipelineStage.organization_id == actor.organization_id,
+                PipelineStage.is_deleted == False
+            ).order_by(PipelineStage.order_position.asc()).limit(1)
+        )
+        stage_id = stage_res.scalar_one_or_none()
+        clean_phone = raw_phone if raw_phone.startswith("+") else (f"+91{last_10}" if last_10 else raw_phone)
+        lead = Lead(
+            organization_id=actor.organization_id,
+            first_name=payload.caller_name or "Inbound",
+            last_name=f"Caller ({last_10 or 'Unknown'})",
+            title=f"Inbound Call from {clean_phone or 'Unknown'}",
+            phone=clean_phone or "+910000000000",
+            source="Inbound Call",
+            status="New",
+            stage_id=stage_id,
+            assigned_user_id=actor.id,
+            created_by=actor.id,
+        )
+        db.add(lead)
+        await db.commit()
+        await db.refresh(lead)
+
+    refetched = await db.execute(
+        select(Lead).options(selectinload(Lead.stage)).filter(Lead.id == lead.id)
+    )
+    return refetched.scalar_one()
+
+
 @router.post("/leads/{lead_id}/disposition", response_model=LeadResponse)
 async def submit_disposition(
-    lead_id: uuid.UUID,
+    lead_id: str,
     payload: CallDispositionRequest,
     actor: User = Depends(require_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Verify user is a Telecaller
+    # Verify user is allowed to submit dispositions (Telecaller, SuperAdmin, OrgAdmin, or TeamLeader)
     is_tele = await check_is_telecaller(actor, db)
-    if not is_tele:
+    if not is_tele and actor.role not in ("SuperAdmin", "OrgAdmin", "TeamLeader"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only Telecallers are allowed to submit dispositions."
         )
 
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(lead_id)
+    except (ValueError, AttributeError):
+        parsed_uuid = None
+
+    if parsed_uuid:
+        res = await db.execute(
+            select(Lead).filter(
+                Lead.id == parsed_uuid,
+                Lead.organization_id == actor.organization_id,
+                Lead.is_deleted == False
+            )
+        )
+        existing_lead = res.scalars().first()
+        if existing_lead:
+            lead = await DispositionService.submit_disposition(
+                db=db,
+                lead_id=parsed_uuid,
+                payload=payload,
+                actor=actor
+            )
+            return lead
+
+    # If lead_id is not a valid UUID or wasn't found by UUID (e.g. TeleCMI call_id string was passed),
+    # resolve by digits/phone or create prospective lead record so call disposition never gets blocked!
+    digits = re.sub(r"\D", "", lead_id or "")
+    last_10 = digits[-10:] if len(digits) >= 10 else None
+    matched_lead = None
+    if last_10:
+        res = await db.execute(
+            select(Lead).filter(
+                Lead.organization_id == actor.organization_id,
+                Lead.is_deleted == False,
+                Lead.phone.like(f"%{last_10}%")
+            ).order_by(Lead.updated_at.desc()).limit(1)
+        )
+        matched_lead = res.scalars().first()
+
+    if not matched_lead:
+        stage_res = await db.execute(
+            select(PipelineStage.id).where(
+                PipelineStage.organization_id == actor.organization_id,
+                PipelineStage.is_deleted == False
+            ).order_by(PipelineStage.order_position.asc()).limit(1)
+        )
+        stage_id = stage_res.scalar_one_or_none()
+        clean_phone = f"+91{last_10}" if last_10 else "+910000000000"
+        matched_lead = Lead(
+            organization_id=actor.organization_id,
+            first_name="Call",
+            last_name=f"Lead ({last_10 or lead_id[:8]})",
+            title=f"Call Session {lead_id[:8]}",
+            phone=clean_phone,
+            source="Phone Call",
+            status="Contacted",
+            stage_id=stage_id,
+            assigned_user_id=actor.id,
+            created_by=actor.id,
+        )
+        db.add(matched_lead)
+        await db.commit()
+        await db.refresh(matched_lead)
+
     lead = await DispositionService.submit_disposition(
         db=db,
-        lead_id=lead_id,
+        lead_id=matched_lead.id,
         payload=payload,
         actor=actor
     )

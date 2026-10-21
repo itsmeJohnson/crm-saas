@@ -220,6 +220,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       }
       startTimer(set, 0);
       if (lead && lead.phone) {
+        telecmiWebRTC.setOutboundPending(lead.phone);
         telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
       }
     } catch (err: any) {
@@ -244,7 +245,25 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     telecmiWebRTC.hangup();
     try {
       if (lead && lead.id) {
-        await dialerApi.submitDisposition(lead.id, dispositionData);
+        let targetLeadId = String(lead.id);
+        // If lead.id is not a genuine UUID (36 chars) or is a temporary inbound string,
+        // resolve or create a persistent DB lead record with UUID
+        if (targetLeadId.length !== 36 && lead.phone) {
+          try {
+            const dbLead = await dialerApi.getOrCreateInboundLead({
+              phone: lead.phone,
+              caller_name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
+              call_id: targetLeadId
+            });
+            if (dbLead && dbLead.id) {
+              targetLeadId = String(dbLead.id);
+              lead = dbLead;
+            }
+          } catch (resErr) {
+            console.warn('[Dialer] Could not resolve lead before disposition:', resErr);
+          }
+        }
+        await dialerApi.submitDisposition(targetLeadId, dispositionData);
       } else {
         // Orphaned active call session: reset agent back to IDLE so telecaller is never trapped
         await dialerApi.updateState({ state: 'IDLE' });
@@ -319,15 +338,34 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       console.warn('[Dialer] updateState failed, proceeding with in-browser active calling session:', e);
     }
     const incoming = get().incomingCall;
-    const targetLead = lead || incoming?.lead || {
-      id: incoming?.call_id || `inbound-${Date.now()}`,
-      first_name: incoming?.name || 'Inbound',
-      last_name: 'Caller',
-      phone: incoming?.from || '',
-      company: '',
-      title: 'Incoming Call',
-      status: 'Contacted',
-    };
+    let targetLead = lead || incoming?.lead;
+
+    if (!targetLead || !targetLead.id || String(targetLead.id).length !== 36) {
+      if (incoming?.from) {
+        try {
+          targetLead = await dialerApi.getOrCreateInboundLead({
+            phone: incoming.from,
+            caller_name: incoming.name,
+            call_id: incoming.call_id
+          });
+        } catch (fetchErr) {
+          console.warn('[Dialer] getOrCreateInboundLead failed, using fallback:', fetchErr);
+        }
+      }
+    }
+
+    if (!targetLead) {
+      targetLead = {
+        id: incoming?.call_id || `inbound-${Date.now()}`,
+        first_name: incoming?.name || 'Inbound',
+        last_name: 'Caller',
+        phone: incoming?.from || '',
+        company: '',
+        title: 'Incoming Call',
+        status: 'Contacted',
+      };
+    }
+
     const nowStr = new Date().toISOString();
     set({
       currentLead: targetLead,
@@ -377,6 +415,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
     startTimer(set, 0);
     if (lead && lead.phone) {
+      telecmiWebRTC.setOutboundPending(lead.phone);
       telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
     }
   },

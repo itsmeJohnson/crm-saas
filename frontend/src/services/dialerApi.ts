@@ -69,5 +69,10 @@ export const dialerApi = {
     }>('/dialer/webrtc-session');
     return response.data;
   },
+
+  getOrCreateInboundLead: async (payload: { phone: string; caller_name?: string; call_id?: string }) => {
+    const response = await api.post<LeadResponse>('/dialer/inbound-lead', payload);
+    return response.data;
+  },
 };
 

@@ -36,6 +36,26 @@ class TeleCMIWebRTCService {
   private activeCallNumber: string | null = null;
   private incomingCall: WebRTCIncomingCall | null = null;
   private config: WebRTCSessionConfig | null = null;
+  private isOutboundPending: boolean = false;
+  private outboundTimeout: any = null;
+
+  public setOutboundPending(targetPhone: string): void {
+    this.isOutboundPending = true;
+    this.activeCallNumber = targetPhone;
+    if (this.outboundTimeout) clearTimeout(this.outboundTimeout);
+    this.outboundTimeout = setTimeout(() => {
+      this.isOutboundPending = false;
+      this.outboundTimeout = null;
+    }, 35000);
+  }
+
+  public clearOutboundPending(): void {
+    this.isOutboundPending = false;
+    if (this.outboundTimeout) {
+      clearTimeout(this.outboundTimeout);
+      this.outboundTimeout = null;
+    }
+  }
 
   public getStatus(): WebRTCPhoneStatus {
     return this.status;
@@ -121,9 +141,21 @@ class TeleCMIWebRTCService {
         this.notify('ringing');
       });
 
-      // Handle Inbound Call from customer
+      // Handle Inbound Call from customer or Agent Bridge Leg
       this.piopiy.on('inComingCall', (data: any) => {
-        console.log('[WebRTC] Inbound call received:', data);
+        console.log('[WebRTC] Inbound call event received:', data);
+        if (this.isOutboundPending) {
+          console.log('[WebRTC] Auto-answering agent leg for outbound Click-to-Call to:', this.activeCallNumber);
+          this.clearOutboundPending();
+          try {
+            this.piopiy.answer();
+            this.notify('connected');
+          } catch (e) {
+            console.error('[WebRTC] Error auto-answering outbound call leg:', e);
+          }
+          return;
+        }
+
         const incoming: WebRTCIncomingCall = {
           from: data?.from || '',
           name: data?.name || '',
@@ -137,12 +169,14 @@ class TeleCMIWebRTCService {
 
       this.piopiy.on('answered', () => {
         console.log('[WebRTC] Call answered & audio connected!');
+        this.clearOutboundPending();
         this.incomingCall = null;
         this.notify('connected');
       });
 
       this.piopiy.on('ended', (data: any) => {
         console.log('[WebRTC] Call ended:', data);
+        this.clearOutboundPending();
         this.activeCallNumber = null;
         this.incomingCall = null;
         this.isMuted = false;
@@ -215,7 +249,7 @@ class TeleCMIWebRTCService {
       return false;
     }
 
-    this.activeCallNumber = digits;
+    this.setOutboundPending(digits);
     this.notify('calling', { phone: digits });
 
     try {
@@ -230,6 +264,7 @@ class TeleCMIWebRTCService {
   }
 
   public hangup(): void {
+    this.clearOutboundPending();
     if (this.piopiy) {
       try {
         this.piopiy.terminate();
