@@ -141,6 +141,13 @@ class LeadService:
         from app.services.workflow_service import WorkflowService
         await WorkflowService(self.db).run("lead_created", lead, actor)
 
+        # Auto-enroll in active email sequences triggered on lead_created
+        try:
+            from app.services.email_sequence_service import EmailSequenceService
+            await EmailSequenceService(self.db).auto_enroll_new_lead(lead)
+        except Exception:
+            pass
+
         # Open SLA clocks for any matching policy (best-effort, additive).
         try:
             from app.services.sla_service import SLAService
