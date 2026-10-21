@@ -291,6 +291,63 @@ class TeleCMIWebRTCService {
     }
     return this.isMuted;
   }
+
+  public sendDTMF(digit: string | number): void {
+    const tone = String(digit);
+    if (this.piopiy && typeof this.piopiy.sendDtmf === 'function') {
+      try {
+        this.piopiy.sendDtmf(tone);
+        console.log('[WebRTC] DTMF tone sent:', tone);
+      } catch (e) {
+        console.warn('[WebRTC] sendDtmf error:', e);
+      }
+    }
+    this.playDTMFAudio(tone);
+  }
+
+  private playDTMFAudio(tone: string): void {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      // Standard Dual-Tone Multi-Frequency (DTMF) map
+      const dtmfFreqs: Record<string, [number, number]> = {
+        '1': [697, 1209],
+        '2': [697, 1336],
+        '3': [697, 1477],
+        '4': [770, 1209],
+        '5': [770, 1336],
+        '6': [770, 1477],
+        '7': [852, 1209],
+        '8': [852, 1336],
+        '9': [852, 1477],
+        '*': [941, 1209],
+        '0': [941, 1336],
+        '#': [941, 1477],
+      };
+
+      const freqs = dtmfFreqs[tone] || [697, 1209];
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.frequency.setValueAtTime(freqs[0], ctx.currentTime);
+      osc2.frequency.setValueAtTime(freqs[1], ctx.currentTime);
+
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start();
+      osc2.start();
+      osc1.stop(ctx.currentTime + 0.2);
+      osc2.stop(ctx.currentTime + 0.2);
+    } catch {}
+  }
 }
 
 export const telecmiWebRTC = new TeleCMIWebRTCService();

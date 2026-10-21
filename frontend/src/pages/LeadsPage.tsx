@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useLeadStore } from '../store/leadStore';
 import { LeadTable } from '../components/crm/LeadTable';
 import { LeadModal } from '../components/crm/LeadModal';
@@ -33,7 +33,6 @@ import { useDialerStore } from '../store/dialerStore';
 import { api } from '../services/api';
 
 export const LeadsPage: React.FC = () => {
-  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
   const { agentState, callSpecificLead, error: dialerError } = useDialerStore();
@@ -52,12 +51,8 @@ export const LeadsPage: React.FC = () => {
 
   const handleManualCall = async (leadId: string) => {
     setCallError(null);
-    // Telephony is configured org-wide by an admin (Settings → Communication →
-    // Calling) and applied server-side. Agents send no credentials; if the org
-    // hasn't configured it, the backend returns a clear message.
     try {
       await callSpecificLead(leadId);
-      navigate('/calling');
     } catch (e: any) {
       setCallError(e.response?.data?.detail || 'Failed to place the call.');
     }

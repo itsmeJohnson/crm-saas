@@ -280,11 +280,9 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   {renderSortIcon('created_at')}
                 </div>
               </th>
-              {!isEmployee && (
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-right">
-                  Actions
-                </th>
-              )}
+              <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-right">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/70">
@@ -316,7 +314,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <p className="text-xs font-bold text-slate-100 group-hover:text-brand-400 transition-colors truncate">
                           {lead.title}
                         </p>
-                        <div className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-400 mt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
                           {contactFullName && <span className="text-slate-300 truncate">{contactFullName}</span>}
                           {contactFullName && lead.company_name && <span className="text-slate-600">•</span>}
                           {lead.company_name && (
@@ -324,6 +322,20 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                               <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
                               {lead.company_name}
                             </span>
+                          )}
+                          {lead.phone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCallClick?.(lead.id);
+                              }}
+                              title={`Click to call ${lead.phone}`}
+                              className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded transition-all cursor-pointer shadow-xs active:scale-95"
+                            >
+                              <Phone className="w-2.5 h-2.5 text-emerald-400" />
+                              <span>{lead.phone}</span>
+                            </button>
                           )}
                         </div>
                       </div>
@@ -346,29 +358,29 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     <span className="text-xs text-slate-400 whitespace-nowrap">{relativeTime(lead.created_at)}</span>
                   </td>
 
-                  {!isEmployee && (
-                    <td className="px-4 py-3 text-right align-middle" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                        {lead.phone && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => onCallClick?.(lead.id)}
-                              title={`Call ${lead.phone}`}
-                              className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onChatClick?.(lead, 'whatsapp')}
-                              title="WhatsApp / SMS chat"
-                              className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
+                  <td className="px-4 py-3 text-right align-middle" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                      {lead.phone && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onCallClick?.(lead.id)}
+                            title={`Call ${lead.phone}`}
+                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onChatClick?.(lead, 'whatsapp')}
+                            title="WhatsApp / SMS chat"
+                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                      {(!isEmployee || canDeleteLead) && (
                         <button
                           onClick={(e) => handleEdit(e, lead)}
                           title="Edit lead"
@@ -376,18 +388,18 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        {canDeleteLead && (
-                          <button
-                            onClick={(e) => handleDelete(e, lead)}
-                            title="Delete lead"
-                            className="p-1.5 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
+                      )}
+                      {canDeleteLead && (
+                        <button
+                          onClick={(e) => handleDelete(e, lead)}
+                          title="Delete lead"
+                          className="p-1.5 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}

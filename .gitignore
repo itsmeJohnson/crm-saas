@@ -49,3 +49,4 @@ backend/*.db*
 
 # Tooling
 .claude/
+scratch/

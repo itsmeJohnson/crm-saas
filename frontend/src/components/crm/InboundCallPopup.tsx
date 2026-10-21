@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { whatsappRealtime } from '../../services/whatsappRealtime';
-import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useDialerStore } from '../../store/dialerStore';
 import { leadApi } from '../../services/leadApi';
-import { PhoneCall, PhoneIncoming, X, Loader2, PhoneOff } from 'lucide-react';
+import { PhoneCall, PhoneIncoming, X, Loader2, PhoneOff, Building2, Tag, Layers } from 'lucide-react';
 
 interface InboundCallEvent {
   event: 'inbound_call';
@@ -13,12 +12,13 @@ interface InboundCallEvent {
   lead_name?: string;
   company_name?: string;
   phone: string;
+  stage_name?: string;
+  source?: string;
   activity_id?: string;
 }
 
 export const InboundCallPopup: React.FC = () => {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const { incomingCall, answerInboundCall, rejectInboundCall, initWebRTC } = useDialerStore();
   const [activeSocketCall, setActiveSocketCall] = useState<InboundCallEvent | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
@@ -32,22 +32,26 @@ export const InboundCallPopup: React.FC = () => {
     });
   }, [user, initWebRTC]);
 
-  // Unify incoming call from WebRTC SIP or Realtime WebSocket
+  // Unified caller details
   const currentIncoming = incomingCall ? {
     phone: incomingCall.from,
-    lead_name: incomingCall.lead?.first_name ? `${incomingCall.lead.first_name} ${incomingCall.lead.last_name || ''}`.trim() : (incomingCall.name || 'Incoming Customer Call'),
-    company_name: incomingCall.lead?.company || '',
+    lead_name: incomingCall.lead?.first_name ? `${incomingCall.lead.first_name} ${incomingCall.lead.last_name || ''}`.trim() : (incomingCall.name || 'Unknown Caller'),
+    company_name: incomingCall.lead?.company || incomingCall.lead?.company_name || '',
+    stage_name: incomingCall.lead?.stage?.name || incomingCall.lead?.status || 'New Lead',
+    source: incomingCall.lead?.source || 'Inbound Call',
     lead_id: incomingCall.lead?.id,
     call_sid: incomingCall.call_id,
   } : (activeSocketCall ? {
     phone: activeSocketCall.phone,
-    lead_name: activeSocketCall.lead_name || 'Incoming Cloud Call',
+    lead_name: activeSocketCall.lead_name || 'Unknown Caller',
     company_name: activeSocketCall.company_name || '',
+    stage_name: activeSocketCall.stage_name || 'New Lead',
+    source: activeSocketCall.source || 'Inbound Call',
     lead_id: activeSocketCall.lead_id,
     call_sid: activeSocketCall.call_sid,
   } : null);
 
-  // Play ringing chime while an incoming call is active
+  // Ringtone / Chime during inbound ringing
   useEffect(() => {
     if (!currentIncoming) {
       if (audioIntervalRef.current) {
@@ -98,7 +102,7 @@ export const InboundCallPopup: React.FC = () => {
     };
   }, [currentIncoming?.phone, currentIncoming?.call_sid]);
 
-  // Subscribe to real-time socket events
+  // Subscribe to real-time socket events for telephony
   useEffect(() => {
     if (!user) return;
 
@@ -133,7 +137,7 @@ export const InboundCallPopup: React.FC = () => {
 
       await answerInboundCall(lead);
       setActiveSocketCall(null);
-      navigate('/calling');
+      // Automatically minimizes popup into the active floating dialer widget
     } catch (e) {
       console.error('Failed to answer inbound call:', e);
       alert('Failed to answer inbound call. Please try again.');
@@ -155,7 +159,7 @@ export const InboundCallPopup: React.FC = () => {
           <PhoneIncoming className="w-5 h-5 text-emerald-300 animate-pulse" />
         </div>
 
-        {/* Caller Details */}
+        {/* Caller Details with Lead Name, Stage, Company, Source */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -166,15 +170,31 @@ export const InboundCallPopup: React.FC = () => {
           <h4 className="text-sm font-bold text-slate-100 mt-1 truncate">
             {currentIncoming.lead_name}
           </h4>
-          {currentIncoming.company_name ? (
-            <p className="text-xs text-slate-400 truncate">{currentIncoming.company_name}</p>
-          ) : null}
+          
           <p className="text-xs font-mono font-medium text-slate-300 mt-0.5">
             {currentIncoming.phone}
           </p>
-          <span className="inline-block mt-1 text-[10px] text-slate-400 font-medium">
-            via +91 7949817390
-          </span>
+
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/30">
+              <Layers className="w-3 h-3 text-indigo-400" />
+              {currentIncoming.stage_name}
+            </span>
+
+            {currentIncoming.company_name ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 truncate max-w-[130px]">
+                <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                {currentIncoming.company_name}
+              </span>
+            ) : null}
+
+            {currentIncoming.source ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60">
+                <Tag className="w-2.5 h-2.5 text-slate-400" />
+                {currentIncoming.source}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {/* Dismiss Button */}
@@ -187,7 +207,7 @@ export const InboundCallPopup: React.FC = () => {
         </button>
       </div>
 
-      {/* Action Buttons */}
+      {/* Action Buttons: Prominent Green Accept & Red Decline */}
       <div className="px-4 py-3 bg-slate-950/80 border-t border-slate-800/80 flex items-center justify-between gap-3">
         <button
           onClick={handleDeclineCall}
@@ -209,7 +229,7 @@ export const InboundCallPopup: React.FC = () => {
           ) : (
             <>
               <PhoneCall className="w-3.5 h-3.5" />
-              Answer Call
+              Accept Call
             </>
           )}
         </button>
