@@ -21,14 +21,21 @@ from app.services.analytics_service import AnalyticsService
 
 router = APIRouter()
 
-async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
-    if user.role in ("Employee", "Telecaller"):
-        return True
-    return False
-
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
     if user.role in ("TeamLeader", "Manager"):
         return True
+    if user.role == "Employee" and user.reporting_to_id:
+        parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+        parent_role = parent_res.scalar()
+        return parent_role == "Manager"
+    return False
+
+async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
+    if user.role == "Telecaller":
+        return True
+    if user.role == "Employee":
+        is_tl = await check_is_team_leader(user, db)
+        return not is_tl
     return False
 
 @router.get("/dashboard", response_model=UnifiedDashboardResponse)
