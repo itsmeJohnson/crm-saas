@@ -184,6 +184,11 @@ class LeadResponse(LeadBase):
         return custom_fields
 
 
+class LeadMergeRequest(BaseModel):
+    primary_id: uuid.UUID
+    secondary_id: uuid.UUID
+
+
 class FollowUpCreate(BaseModel):
     """One-shot follow-up capture: the outcome of this touch + the next one."""
     outcome: str = Field("Follow-up", max_length=40)

@@ -17,6 +17,7 @@ from app.schemas.lead import (
     LeadTimelineEvent, LeadAuditEvent, LeadAttachmentResponse,
     LeadConvertRequest, LeadConvertResponse, LeadReminderCreate, LeadReminderResponse,
     FollowUpCreate, SalesKPISummaryResponse, KanbanBoardResponse, KanbanStageCardsResponse,
+    LeadMergeRequest,
 )
 from app.schemas.saved_filter import SavedFilterCreate, SavedFilterUpdate, SavedFilterResponse
 from app.schemas.reports import LeadReportResponse
@@ -200,6 +201,16 @@ async def find_duplicate_leads(
     """Find existing leads that share the given email or phone within the organization."""
     lead_service = LeadService(db, actor.organization_id)
     return list(await lead_service.find_duplicates(actor, email=email, phone=phone, exclude_lead_id=exclude_lead_id))
+
+@router.post("/merge", response_model=LeadResponse)
+async def merge_leads(
+    req: LeadMergeRequest,
+    actor: Annotated[User, Depends(require_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Merge two duplicate leads: primary wins, secondary is soft-deleted."""
+    lead_service = LeadService(db, actor.organization_id)
+    return await lead_service.merge_leads(actor, req.primary_id, req.secondary_id)
 
 @router.post("/bulk-update", response_model=LeadBulkUpdateResponse)
 async def bulk_update_leads(

@@ -323,6 +323,69 @@ class LeadService:
             candidates = [c for c in candidates if c.assigned_user_id in allowed_user_ids]
         return candidates
 
+    async def merge_leads(self, actor: User, primary_id: uuid.UUID, secondary_id: uuid.UUID) -> Lead:
+        if not actor.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
+        if primary_id == secondary_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a lead with itself")
+
+        from sqlalchemy import select
+        primary = await self.get_lead(actor, primary_id)
+        secondary = await self.get_lead(actor, secondary_id)
+
+        # Fill blank scalar fields on primary from secondary
+        scalar_fields = (
+            "first_name", "last_name", "city", "email", "phone", "company_name",
+            "company_id", "title", "lost_reason", "source", "value", "priority",
+            "assigned_user_id", "pin_code", "branch_id", "territory_id",
+        )
+        for field in scalar_fields:
+            if hasattr(primary, field) and hasattr(secondary, field):
+                p_val = getattr(primary, field)
+                s_val = getattr(secondary, field)
+                if (p_val is None or p_val == "") and (s_val is not None and s_val != ""):
+                    setattr(primary, field, s_val)
+
+        # Merge custom_fields (primary wins)
+        merged_cf = dict(secondary.custom_fields or {})
+        merged_cf.update(primary.custom_fields or {})
+        primary.custom_fields = merged_cf or None
+
+        # Concatenate attachments
+        primary.attachments = (list(primary.attachments or []) + list(secondary.attachments or [])) or None
+
+        # Re-point related objects
+        from app.models.lead_reminder import LeadReminder
+        from app.models.note import Note
+        from app.models.activity import Activity
+        from app.models.task import Task
+        from app.models.calendar_event import CalendarEvent
+
+        for model in (LeadReminder, Note, Activity, Task, CalendarEvent):
+            res = await self.db.execute(select(model).filter(model.lead_id == secondary_id))
+            for obj in res.scalars().all():
+                obj.lead_id = primary_id
+                self.db.add(obj)
+
+        self.db.add(primary)
+
+        # Soft-delete secondary
+        secondary.is_deleted = True
+        secondary.deleted_at = datetime.now(timezone.utc)
+        self.db.add(secondary)
+        await self.db.flush()
+
+        await self.audit_service.log_event(
+            organization_id=actor.organization_id,
+            actor_user_id=actor.id,
+            action="LEAD_MERGED",
+            resource_type="lead",
+            resource_id=str(primary_id),
+            action_metadata={"merged_from": str(secondary_id)},
+        )
+        await DashboardService.invalidate_cache(actor.organization_id)
+        return primary
+
     async def archive_lead(self, actor: User, lead_id: uuid.UUID) -> Lead:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
