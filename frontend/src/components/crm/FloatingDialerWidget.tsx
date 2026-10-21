@@ -166,7 +166,7 @@ export const FloatingDialerWidget: React.FC = () => {
             dockSide === 'left' ? 'left-6' : 'right-6'
           } z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200 select-none`}
         >
-          <div className="bg-slate-950/95 border border-slate-700 shadow-2xl shadow-black/80 rounded-2xl px-3.5 py-2 flex items-center gap-3 backdrop-blur-xl ring-1 ring-white/10 text-white">
+          <div className="bg-gray-950/95 border border-gray-700 shadow-2xl shadow-black/80 rounded-2xl px-3.5 py-2 flex items-center gap-3 backdrop-blur-xl ring-1 ring-white/10 text-white">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md">
               <PhoneCall className="w-4 h-4 animate-pulse" />
             </div>
@@ -193,7 +193,7 @@ export const FloatingDialerWidget: React.FC = () => {
                   className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                     isMuted
                       ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white'
                   }`}
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
@@ -204,7 +204,7 @@ export const FloatingDialerWidget: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleDock}
-                className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer"
+                className="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white rounded-lg transition-all cursor-pointer"
                 title={dockSide === 'right' ? 'Dock to bottom-left' : 'Dock to bottom-right'}
               >
                 <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -251,9 +251,9 @@ export const FloatingDialerWidget: React.FC = () => {
           dockSide === 'left' ? 'left-6' : 'right-6'
         } z-[100] w-full max-w-sm sm:max-w-md animate-in slide-in-from-bottom-4 duration-200 select-none`}
       >
-        <div className="bg-slate-950 border border-slate-700 shadow-2xl shadow-black/80 rounded-2xl overflow-hidden backdrop-blur-xl ring-1 ring-white/10 text-white">
+        <div className="bg-gray-950 border border-gray-700 shadow-2xl shadow-black/80 rounded-2xl overflow-hidden backdrop-blur-xl ring-1 ring-white/10 text-white">
           {/* Header Bar */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-indigo-950/60 border-b border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="bg-gradient-to-r from-gray-900 via-gray-950 to-indigo-950/80 border-b border-gray-800/80 px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div
                 className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
@@ -292,7 +292,7 @@ export const FloatingDialerWidget: React.FC = () => {
                       ? 'Live Active'
                       : 'Wrap-Up'}
                   </span>
-                  <span className="text-[11px] text-slate-400 font-medium">
+                  <span className="text-[11px] text-gray-400 font-medium">
                     • {callDirection === 'INBOUND' ? 'Inbound' : 'Outbound'}
                   </span>
                 </div>
@@ -308,7 +308,7 @@ export const FloatingDialerWidget: React.FC = () => {
                   {reconnectCountdown}s
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400" title="WebRTC Connected">
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400" title="WebRTC Connected">
                   <Wifi className="w-3.5 h-3.5 text-emerald-400" />
                 </span>
               )}
@@ -318,7 +318,7 @@ export const FloatingDialerWidget: React.FC = () => {
                 type="button"
                 onClick={toggleDock}
                 title={dockSide === 'right' ? 'Dock dialer to bottom-left' : 'Dock dialer to bottom-right'}
-                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 rounded-lg transition-all cursor-pointer"
+                className="p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700/80 rounded-lg transition-all cursor-pointer"
               >
                 <ArrowLeftRight className="w-3.5 h-3.5" />
               </button>
@@ -329,7 +329,7 @@ export const FloatingDialerWidget: React.FC = () => {
                   type="button"
                   onClick={() => setIsMinimized(true)}
                   title="Minimize dialer"
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 rounded-lg transition-all cursor-pointer"
+                  className="p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700/80 rounded-lg transition-all cursor-pointer"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -395,15 +395,15 @@ export const FloatingDialerWidget: React.FC = () => {
           {callLifecycle === 'connected' && (
             <div className="p-4 space-y-4">
               {/* Call Timer Display */}
-              <div className="text-center py-3 bg-slate-900/90 border border-slate-800 rounded-xl">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Call Duration</p>
+              <div className="text-center py-3 bg-gray-900/90 border border-gray-800 rounded-xl">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Call Duration</p>
                 <div className="flex items-center justify-center gap-2 mt-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                   <p className="font-mono text-3xl font-black text-emerald-400 tracking-wider">
                     {formatDuration(callDuration)}
                   </p>
                 </div>
-                <p className="text-xs font-mono text-slate-300 mt-1 font-semibold">{leadPhone}</p>
+                <p className="text-xs font-mono text-gray-300 mt-1 font-semibold">{leadPhone}</p>
               </div>
 
               {/* Call Control Buttons */}
@@ -415,10 +415,10 @@ export const FloatingDialerWidget: React.FC = () => {
                   className={`flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
                     isMuted
                       ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 shadow-lg shadow-rose-950/30'
-                      : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800 hover:text-white'
+                      : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white'
                   }`}
                 >
-                  {isMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-slate-300" />}
+                  {isMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-gray-300" />}
                   <span>{isMuted ? 'Muted' : 'Mute'}</span>
                 </button>
 
@@ -429,7 +429,7 @@ export const FloatingDialerWidget: React.FC = () => {
                   className={`flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
                     isKeypadOpen
                       ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-300'
-                      : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800 hover:text-white'
+                      : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white'
                   }`}
                 >
                   <Grid className="w-4 h-4" />
@@ -440,7 +440,7 @@ export const FloatingDialerWidget: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowChatDrawer(true)}
-                  className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-emerald-400 hover:text-emerald-300 rounded-xl text-[11px] font-semibold transition-all cursor-pointer"
+                  className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 hover:text-emerald-300 rounded-xl text-[11px] font-semibold transition-all cursor-pointer"
                   title="WhatsApp & SMS Chat"
                 >
                   <MessageSquare className="w-4 h-4" />
@@ -461,15 +461,15 @@ export const FloatingDialerWidget: React.FC = () => {
 
               {/* Interactive DTMF Keypad Drawer */}
               {isKeypadOpen && (
-                <div className="pt-2 border-t border-slate-850 animate-in fade-in duration-150">
+                <div className="pt-2 border-t border-gray-800 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                       DTMF Keypad (IVR)
                     </span>
                     <button
                       type="button"
                       onClick={() => toggleKeypad(false)}
-                      className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer"
+                      className="text-gray-400 hover:text-gray-200 text-xs cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -480,7 +480,7 @@ export const FloatingDialerWidget: React.FC = () => {
                         key={digit}
                         type="button"
                         onClick={() => sendDTMF(digit)}
-                        className="py-2 bg-slate-900 hover:bg-slate-800 active:bg-indigo-600 active:text-white border border-slate-800 text-slate-200 font-bold text-sm rounded-lg transition-colors cursor-pointer"
+                        className="py-2 bg-gray-900 hover:bg-gray-800 active:bg-indigo-600 active:text-white border border-gray-800 text-gray-200 font-bold text-sm rounded-lg transition-colors cursor-pointer"
                       >
                         {digit}
                       </button>
@@ -494,13 +494,13 @@ export const FloatingDialerWidget: React.FC = () => {
           {/* ── STATE C: MANDATORY CALL DISPOSITION & WRAP-UP FORM ── */}
           {callLifecycle === 'disposition' && (
             <div className="p-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
-              <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-800/80">
+              <div className="flex items-start justify-between gap-2 pb-2 border-b border-gray-800/80">
                 <div>
                   <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
                     <UserCheck className="w-4 h-4 text-indigo-400" />
                     Call Disposition & Wrap-Up
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-gray-400 mt-0.5">
                     Call ended ({formatDuration(callDuration)}). Log the outcome to complete.
                   </p>
                 </div>
@@ -519,13 +519,13 @@ export const FloatingDialerWidget: React.FC = () => {
               <form onSubmit={handleFormSubmit} className="space-y-3">
                 {/* 1. Call Status */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-gray-300 mb-1">
                     Call Status <span className="text-rose-400">*</span>
                   </label>
                   <select
                     value={callStatus}
                     onChange={(e) => setCallStatus(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
+                    className="w-full bg-gray-900 border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
                   >
                     <option value="Answered">Answered (Connected)</option>
                     <option value="Busy">Busy</option>
@@ -537,13 +537,13 @@ export const FloatingDialerWidget: React.FC = () => {
 
                 {/* 2. Disposition Category */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-gray-300 mb-1">
                     Disposition Outcome <span className="text-rose-400">*</span>
                   </label>
                   <select
                     value={dispositionCategory}
                     onChange={(e) => setDispositionCategory(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
+                    className="w-full bg-gray-900 border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
                   >
                     <option value="Interested">Interested / Qualified</option>
                     <option value="Not Interested">Not Interested</option>
@@ -562,34 +562,34 @@ export const FloatingDialerWidget: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Date *</label>
+                        <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Date *</label>
                         <input
                           type="date"
                           value={followUpDate}
                           min={new Date().toISOString().split('T')[0]}
                           onChange={(e) => setFollowUpDate(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500"
+                          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Time *</label>
+                        <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Time *</label>
                         <input
                           type="time"
                           value={followUpTime}
                           onChange={(e) => setFollowUpTime(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500"
+                          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500"
                           required
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Priority</label>
+                      <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Priority</label>
                       <select
                         value={followUpPriority}
                         onChange={(e) => setFollowUpPriority(e.target.value as any)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white"
                       >
                         <option value="Low">Low Priority</option>
                         <option value="Medium">Medium Priority</option>
@@ -603,13 +603,13 @@ export const FloatingDialerWidget: React.FC = () => {
                 {/* 4. Advance Pipeline Stage (Optional) */}
                 {stages.length > 0 && (
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    <label className="block text-[11px] font-bold text-gray-300 mb-1">
                       Update Pipeline Stage (Optional)
                     </label>
                     <select
                       value={targetStageId}
                       onChange={(e) => setTargetStageId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
+                      className="w-full bg-gray-900 border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
                     >
                       <option value="">Keep Current Stage</option>
                       {stages.map((st) => (
@@ -623,7 +623,7 @@ export const FloatingDialerWidget: React.FC = () => {
 
                 {/* 5. Call Summary Notes */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-gray-300 mb-1">
                     Call Summary & Notes <span className="text-rose-400">*</span>
                   </label>
                   <textarea
@@ -632,7 +632,7 @@ export const FloatingDialerWidget: React.FC = () => {
                     onChange={(e) => setRemarks(e.target.value)}
                     placeholder="Enter call notes, customer reaction, next steps..."
                     required
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/30"
+                    className="w-full bg-gray-900 border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/30"
                   />
                 </div>
 
