@@ -16,7 +16,16 @@ interface DialerState {
   callDirection: 'INBOUND' | 'OUTBOUND' | null;
   webrtcStatus: WebRTCPhoneStatus;
   isMuted: boolean;
+  incomingCall: {
+    from: string;
+    name?: string;
+    call_id: string;
+    to_number?: string;
+    lead?: any;
+  } | null;
 
+  setIncomingCall: (call: any) => void;
+  rejectInboundCall: () => void;
   initWebRTC: () => Promise<void>;
   toggleMute: () => void;
   hangupWebRTC: () => void;
@@ -32,7 +41,7 @@ interface DialerState {
   }) => Promise<void>;
   goOnBreak: (reason: string) => Promise<void>;
   endBreak: () => Promise<void>;
-  answerInboundCall: (lead: LeadResponse) => Promise<void>;
+  answerInboundCall: (lead?: any) => Promise<void>;
   callSpecificLead: (
     leadId: string,
     creds?: CallCreds
@@ -71,10 +80,33 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   callDirection: null,
   webrtcStatus: 'idle',
   isMuted: false,
+  incomingCall: null,
+
+  setIncomingCall: (call) => set({ incomingCall: call }),
+
+  rejectInboundCall: () => {
+    telecmiWebRTC.reject();
+    set({ incomingCall: null });
+  },
 
   initWebRTC: async () => {
-    telecmiWebRTC.subscribe((status) => {
+    telecmiWebRTC.subscribe((status, details) => {
       set({ webrtcStatus: status, isMuted: telecmiWebRTC.getIsMuted() });
+      if (status === 'incoming' && details) {
+        set({ incomingCall: details });
+        if (details.from) {
+          leadApi.getLeads({ search: details.from, limit: 1 }).then((res: any) => {
+            const matched = res?.items?.[0] || null;
+            if (matched) {
+              set((s) => ({
+                incomingCall: s.incomingCall ? { ...s.incomingCall, lead: matched } : null
+              }));
+            }
+          }).catch(() => {});
+        }
+      } else if (status === 'ended' || status === 'idle') {
+        set({ incomingCall: null });
+      }
     });
     try {
       const session = await dialerApi.getWebRTCSession();
@@ -278,28 +310,38 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
   },
 
-  answerInboundCall: async (lead) => {
+  answerInboundCall: async (lead?: any) => {
     set({ isLoading: true, error: null });
+    telecmiWebRTC.answer();
     try {
       await dialerApi.updateState({ state: 'ACTIVE_CALLING' });
-      const nowStr = new Date().toISOString();
-      set({
-        currentLead: lead,
-        agentState: 'ACTIVE_CALLING',
-        callDirection: 'INBOUND',
-        stateTimestamp: nowStr,
-        isLoading: false,
-      });
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
-        localStorage.setItem('crm_dialer_call_direction', 'INBOUND');
-      }
-      startTimer(set, 0);
-    } catch (err: any) {
-      const errMsg = err.response?.data?.detail || err.message || 'Failed to answer inbound call';
-      set({ error: errMsg, isLoading: false });
-      throw err;
+    } catch (e) {
+      console.warn('[Dialer] updateState failed, proceeding with in-browser active calling session:', e);
     }
+    const incoming = get().incomingCall;
+    const targetLead = lead || incoming?.lead || {
+      id: incoming?.call_id || `inbound-${Date.now()}`,
+      first_name: incoming?.name || 'Inbound',
+      last_name: 'Caller',
+      phone: incoming?.from || '',
+      company: '',
+      title: 'Incoming Call',
+      status: 'Contacted',
+    };
+    const nowStr = new Date().toISOString();
+    set({
+      currentLead: targetLead,
+      agentState: 'ACTIVE_CALLING',
+      callDirection: 'INBOUND',
+      stateTimestamp: nowStr,
+      incomingCall: null,
+      isLoading: false,
+    });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_dialer_current_lead', JSON.stringify(targetLead));
+      localStorage.setItem('crm_dialer_call_direction', 'INBOUND');
+    }
+    startTimer(set, 0);
   },
 
   // Manually call a specific already-known lead from the Leads list (any status),

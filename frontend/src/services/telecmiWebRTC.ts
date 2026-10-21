@@ -6,6 +6,7 @@ export type WebRTCPhoneStatus =
   | 'registered'
   | 'calling'
   | 'ringing'
+  | 'incoming'
   | 'connected'
   | 'ended'
   | 'error';
@@ -18,6 +19,13 @@ export interface WebRTCSessionConfig {
   agent_name?: string;
 }
 
+export interface WebRTCIncomingCall {
+  from: string;
+  name?: string;
+  call_id: string;
+  to_number?: string;
+}
+
 type Listener = (status: WebRTCPhoneStatus, details?: any) => void;
 
 class TeleCMIWebRTCService {
@@ -26,6 +34,7 @@ class TeleCMIWebRTCService {
   private listeners: Set<Listener> = new Set();
   private isMuted: boolean = false;
   private activeCallNumber: string | null = null;
+  private incomingCall: WebRTCIncomingCall | null = null;
   private config: WebRTCSessionConfig | null = null;
 
   public getStatus(): WebRTCPhoneStatus {
@@ -40,14 +49,17 @@ class TeleCMIWebRTCService {
     return this.activeCallNumber;
   }
 
+  public getIncomingCall(): WebRTCIncomingCall | null {
+    return this.incomingCall;
+  }
+
   public getConfig(): WebRTCSessionConfig | null {
     return this.config;
   }
 
-
   public subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    listener(this.status);
+    listener(this.status, this.incomingCall);
     return () => this.listeners.delete(listener);
   }
 
@@ -96,20 +108,37 @@ class TeleCMIWebRTCService {
         this.notify('ringing');
       });
 
+      // Handle Inbound Call from customer
+      this.piopiy.on('inComingCall', (data: any) => {
+        console.log('[WebRTC] Inbound call received:', data);
+        const incoming: WebRTCIncomingCall = {
+          from: data?.from || '',
+          name: data?.name || '',
+          call_id: data?.call_id || '',
+          to_number: data?.to_number || '',
+        };
+        this.incomingCall = incoming;
+        this.activeCallNumber = incoming.from;
+        this.notify('incoming', incoming);
+      });
+
       this.piopiy.on('answered', () => {
         console.log('[WebRTC] Call answered & audio connected!');
+        this.incomingCall = null;
         this.notify('connected');
       });
 
       this.piopiy.on('ended', (data: any) => {
         console.log('[WebRTC] Call ended:', data);
         this.activeCallNumber = null;
+        this.incomingCall = null;
         this.isMuted = false;
         this.notify('ended', data);
       });
 
       this.piopiy.on('error', (err: any) => {
         console.error('[WebRTC] Call error:', err);
+        this.incomingCall = null;
         this.notify('error', err);
       });
 
@@ -125,6 +154,33 @@ class TeleCMIWebRTCService {
       console.error('[WebRTC] Failed to initialize PIOPIY client:', err);
       this.notify('error', err);
     }
+  }
+
+  public answer(): void {
+    if (this.piopiy) {
+      try {
+        console.log('[WebRTC] Answering incoming call session...');
+        this.piopiy.answer();
+        this.incomingCall = null;
+        this.notify('connected');
+      } catch (e) {
+        console.error('[WebRTC] Failed to answer incoming call:', e);
+      }
+    }
+  }
+
+  public reject(): void {
+    if (this.piopiy) {
+      try {
+        console.log('[WebRTC] Rejecting incoming call session...');
+        this.piopiy.reject();
+      } catch (e) {
+        console.error('[WebRTC] Failed to reject incoming call:', e);
+      }
+    }
+    this.incomingCall = null;
+    this.activeCallNumber = null;
+    this.notify('idle');
   }
 
   public async makeCall(rawPhone: string): Promise<boolean> {

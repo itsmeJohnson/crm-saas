@@ -494,6 +494,15 @@ export const DialerConsole: React.FC = () => {
                   <Phone className="w-10 h-10" />
                 </div>
                 <div>
+                  <div className="flex items-center justify-center gap-2 mb-1.5">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      callDirection === 'INBOUND'
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}>
+                      {callDirection === 'INBOUND' ? 'Inbound Customer Call' : 'Outbound Dial'}
+                    </span>
+                  </div>
                   <h3 className="text-xl font-bold text-slate-100">Live Call Active</h3>
                   <p className="text-sm text-slate-400 mt-1">Do not close this panel during call</p>
                 </div>
