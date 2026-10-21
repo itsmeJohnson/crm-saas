@@ -128,6 +128,7 @@ async def _handle_incoming_call_event(
     call_status: str = "Ringing",
     recording_url: Optional[str] = None,
     duration: int = 0,
+    raw_data: Optional[dict] = None,
 ) -> dict:
     """Handle an inbound call from customer to virtual number / DID."""
     digits = re.sub(r"\D", "", caller_phone or "")
@@ -200,18 +201,32 @@ async def _handle_incoming_call_event(
     assigned_user_id = lead.assigned_user_id
     created_by_user_id = lead.created_by
 
+    raw = raw_data or {}
+    hangup_reason = raw.get("hangup_reason")
+    report_type = str(raw.get("type") or "").lower()
+    norm_status = str(call_status).lower()
+
+    is_call_ended = (
+        bool(recording_url)
+        or duration > 0
+        or report_type == "cdr"
+        or bool(hangup_reason)
+        or norm_status in ("completed", "ended", "missed", "cancel", "cancelled", "hangup", "recv_bye", "sent_bye", "failed", "busy", "noanswer")
+    )
+
     # 3. Check if an activity already exists for this call_sid
     act_query = select(Activity).filter(Activity.call_sid == call_sid)
     act_res = await db.execute(act_query)
     activity = act_res.scalars().first()
 
     if not activity:
+        final_status = "Completed" if (duration > 0 or recording_url or norm_status == "answered") else ("Missed" if is_call_ended else "Planned")
         activity = Activity(
             organization_id=org_id,
             activity_type="Call",
             subject=f"Inbound Call from {lead.first_name or ''} {lead.last_name or ''}".strip(),
             description=f"Inbound call via virtual number {destination_number}. Status: {call_status}",
-            status="Completed" if recording_url else "Planned",
+            status=final_status,
             assigned_user_id=assigned_user_id,
             lead_id=lead.id,
             created_by=assigned_user_id or created_by_user_id,
@@ -234,13 +249,35 @@ async def _handle_incoming_call_event(
             activity.recording_url = recording_url
         if duration:
             activity.call_duration = duration
-        activity.status = "Completed" if recording_url else activity.status
+        if is_call_ended:
+            activity.status = "Completed" if (duration > 0 or recording_url or norm_status == "answered") else "Missed"
         db.add(activity)
 
     await db.commit()
     await db.refresh(activity)
 
-    # 4. Broadcast real-time incoming call popup alert via WebSockets
+    # If call has concluded or caller disconnected, broadcast inbound_call_ended to dismiss ringing popup
+    if is_call_ended:
+        disconnect_payload = {
+            "event": "inbound_call_ended",
+            "call_sid": call_sid,
+            "lead_id": str(lead.id),
+            "phone": lead.phone,
+            "status": activity.status,
+            "reason": hangup_reason or call_status,
+        }
+        if assigned_user_id:
+            await ws_manager.send_personal_message(disconnect_payload, str(assigned_user_id))
+        await ws_manager.broadcast_to_organization(disconnect_payload, org_id, db)
+
+        return {
+            "status": "ended",
+            "lead_id": str(lead.id),
+            "activity_id": str(activity.id),
+            "event": "inbound_call_ended"
+        }
+
+    # 4. Broadcast live ringing incoming call popup alert via WebSockets
     alert_payload = {
         "event": "inbound_call",
         "call_sid": call_sid,
@@ -387,6 +424,7 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
             call_status=call_status,
             recording_url=recording_url or None,
             duration=duration,
+            raw_data=data,
         )
     else:
         # Outbound Call Report / Recording Update Flow

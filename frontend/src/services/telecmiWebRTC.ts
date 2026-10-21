@@ -117,6 +117,15 @@ class TeleCMIWebRTCService {
     }
 
     try {
+      if (typeof document !== 'undefined' && !document.getElementById('telecmi_audio_tag')) {
+        const audio = document.createElement('audio');
+        audio.id = 'telecmi_audio_tag';
+        audio.autoplay = true;
+        (audio as any).playsInline = true;
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+      }
+
       this.notify('registering');
       this.piopiy = new PIOPIY({
         name: config.agent_name || 'Telecaller Agent',
@@ -124,6 +133,17 @@ class TeleCMIWebRTCService {
         autoplay: true,
         autoReboot: true,
         ringTime: 45,
+      });
+
+      this.piopiy.on('callStream', (data: any) => {
+        console.log('[WebRTC] Call audio stream received:', data);
+        if (data?.status && typeof document !== 'undefined') {
+          const remoteAudio = document.getElementById('telecmi_audio_tag') as HTMLAudioElement;
+          if (remoteAudio) {
+            remoteAudio.srcObject = data.status;
+            remoteAudio.play().catch((e) => console.warn('[WebRTC] Audio autoplay error:', e));
+          }
+        }
       });
 
       this.piopiy.on('login', () => {

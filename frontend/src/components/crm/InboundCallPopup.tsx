@@ -19,7 +19,7 @@ interface InboundCallEvent {
 
 export const InboundCallPopup: React.FC = () => {
   const { user } = useAuthStore();
-  const { incomingCall, answerInboundCall, rejectInboundCall, initWebRTC } = useDialerStore();
+  const { incomingCall, answerInboundCall, rejectInboundCall, initWebRTC, webrtcStatus, callLifecycle } = useDialerStore();
   const [activeSocketCall, setActiveSocketCall] = useState<InboundCallEvent | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
   const audioIntervalRef = useRef<any>(null);
@@ -31,6 +31,22 @@ export const InboundCallPopup: React.FC = () => {
       console.warn('[WebRTC] Background softphone init warning:', err);
     });
   }, [user, initWebRTC]);
+
+  // If softphone ended, connected, or is idle and not ringing, clear any socket-based ringing popup
+  useEffect(() => {
+    if (!incomingCall && (webrtcStatus === 'ended' || webrtcStatus === 'idle' || webrtcStatus === 'connected' || (callLifecycle && callLifecycle !== 'ringing'))) {
+      setActiveSocketCall(null);
+    }
+  }, [incomingCall, webrtcStatus, callLifecycle]);
+
+  // Auto-dismiss ringing popup after telecom ring timeout (40 seconds)
+  useEffect(() => {
+    if (!activeSocketCall) return;
+    const timeout = setTimeout(() => {
+      setActiveSocketCall(null);
+    }, 40000);
+    return () => clearTimeout(timeout);
+  }, [activeSocketCall]);
 
   // Unified caller details
   const currentIncoming = incomingCall ? {
@@ -111,6 +127,8 @@ export const InboundCallPopup: React.FC = () => {
       try {
         if (data && data.event === 'inbound_call') {
           setActiveSocketCall(data as InboundCallEvent);
+        } else if (data && (data.event === 'inbound_call_ended' || data.event === 'inbound_call_cancelled')) {
+          setActiveSocketCall(null);
         }
       } catch (e) {
         console.error('Failed to handle telephony socket message:', e);

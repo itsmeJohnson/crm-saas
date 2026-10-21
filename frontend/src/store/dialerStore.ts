@@ -172,19 +172,22 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         }
       } else if (status === 'ended') {
         stopTimer();
-        // Transition directly into disposition wrap-up form
-        if (get().currentLead) {
-          set({ callLifecycle: 'disposition', webrtcStatus: 'ended' });
+        const wasRinging = get().callLifecycle === 'ringing' || Boolean(get().incomingCall);
+        // If caller disconnected while ringing, dismiss cleanly to idle
+        if (!wasRinging && get().currentLead && get().callLifecycle === 'connected') {
+          set({ callLifecycle: 'disposition', webrtcStatus: 'ended', incomingCall: null });
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem('crm_dialer_lifecycle', 'disposition');
           }
         } else {
-          set({ callLifecycle: 'idle' });
+          set({ callLifecycle: 'idle', incomingCall: null, currentLead: null, agentState: 'IDLE' });
           if (typeof localStorage !== 'undefined') {
             localStorage.removeItem('crm_dialer_lifecycle');
+            localStorage.removeItem('crm_dialer_current_lead');
+            localStorage.removeItem('crm_dialer_call_direction');
+            localStorage.removeItem('crm_dialer_start_time');
           }
         }
-        set({ incomingCall: null });
       } else if (status === 'idle') {
         if (!get().currentLead || get().callLifecycle === 'idle' || get().callLifecycle === 'ringing') {
           set({ callLifecycle: 'idle', incomingCall: null });
