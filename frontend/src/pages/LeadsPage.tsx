@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useLeadStore } from '../store/leadStore';
 import { LeadTable } from '../components/crm/LeadTable';
 import { LeadModal } from '../components/crm/LeadModal';
@@ -33,6 +33,7 @@ import { useDialerStore } from '../store/dialerStore';
 import { api } from '../services/api';
 
 export const LeadsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
   const { agentState, callSpecificLead, error: dialerError } = useDialerStore();
@@ -56,6 +57,7 @@ export const LeadsPage: React.FC = () => {
     // hasn't configured it, the backend returns a clear message.
     try {
       await callSpecificLead(leadId);
+      navigate('/calling');
     } catch (e: any) {
       setCallError(e.response?.data?.detail || 'Failed to place the call.');
     }

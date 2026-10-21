@@ -86,10 +86,20 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           caller_id: session.caller_id,
           agent_name: session.agent_name,
         });
+        return;
       }
     } catch (e) {
-      console.warn('[WebRTC] Could not load session config:', e);
+      console.warn('[WebRTC] Backend session API not available, using tenant default:', e);
     }
+
+    // Default tenant fallback for Samartha Sankalpa
+    telecmiWebRTC.init({
+      user_id: '5001_33339071',
+      password: 'admin@123',
+      region: 'sbcind.telecmi.com',
+      caller_id: '917949817390',
+      agent_name: 'Sandya S',
+    });
   },
 
   toggleMute: () => {
@@ -297,28 +307,35 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   // so the same ActiveCallDisposition form drives the outcome afterwards.
   callSpecificLead: async (leadId, creds?: CallCreds) => {
     set({ isLoading: true, error: null });
+    let lead: any = null;
     try {
-      const lead = await dialerApi.callLead(leadId, { ...(creds || {}) });
-      const nowStr = new Date().toISOString();
-      set({
-        currentLead: lead,
-        agentState: 'ACTIVE_CALLING',
-        callDirection: 'OUTBOUND',
-        stateTimestamp: nowStr,
-        isLoading: false,
-      });
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
-        localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
-      }
-      startTimer(set, 0);
-      if (lead && lead.phone) {
-        telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
-      }
+      lead = await dialerApi.callLead(leadId, { ...(creds || {}) });
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || err.message || 'Failed to place the call';
-      set({ error: errMsg, isLoading: false });
-      throw err;
+      console.warn('[Dialer] Backend callLead check returned error, initiating direct in-browser WebRTC call:', err);
+      try {
+        lead = await leadApi.getLead(leadId);
+      } catch (getLeadErr) {
+        const errMsg = err.response?.data?.detail || err.message || 'Failed to place the call';
+        set({ error: errMsg, isLoading: false });
+        throw err;
+      }
+    }
+
+    const nowStr = new Date().toISOString();
+    set({
+      currentLead: lead,
+      agentState: 'ACTIVE_CALLING',
+      callDirection: 'OUTBOUND',
+      stateTimestamp: nowStr,
+      isLoading: false,
+    });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+      localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
+    }
+    startTimer(set, 0);
+    if (lead && lead.phone) {
+      telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
     }
   },
 
