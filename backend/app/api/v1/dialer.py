@@ -326,11 +326,18 @@ async def call_lead(
     lead = res.scalars().first()
     if not lead:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
-    if lead.assigned_user_id != actor.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only call leads assigned to you."
-        )
+    if lead.assigned_user_id != actor.id and actor.role not in ("SuperAdmin", "OrgAdmin", "TeamLeader"):
+        if lead.assigned_user_id is None:
+            lead.assigned_user_id = actor.id
+            db.add(lead)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only call leads assigned to you."
+            )
+    elif lead.assigned_user_id is None:
+        lead.assigned_user_id = actor.id
+        db.add(lead)
     if not lead.phone:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This lead has no phone number.")
 
@@ -426,6 +433,7 @@ async def get_webrtc_session(
         caller_id = cfg.get("default_caller_id") or "917949817390"
         user_uuid = cfg.get("user_uuid") or f"5001_{appid}"
         agent_password = cfg.get("agent_password") or "admin@123"
+        agent_name = f"{actor.first_name or ''} {actor.last_name or ''}".strip() or actor.email or "Telecaller Agent"
         return {
             "enabled": True,
             "provider": "telecmi",
@@ -433,7 +441,7 @@ async def get_webrtc_session(
             "password": agent_password,
             "region": "sbcind.telecmi.com",
             "caller_id": caller_id,
-            "agent_name": actor.name or "Telecaller Agent"
+            "agent_name": agent_name
         }
     return {"enabled": False, "provider": provider}
 
