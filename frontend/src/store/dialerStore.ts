@@ -255,7 +255,9 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             }
           }
         } else if (status === 'idle') {
-          if (!get().currentLead || get().callLifecycle === 'idle' || get().callLifecycle === 'ringing' || Boolean(get().incomingCall)) {
+          // Never wipe out an active incoming ringing call or connected conversation on background idle events!
+          const isBusy = get().callLifecycle === 'ringing' || Boolean(get().incomingCall) || get().callLifecycle === 'connected' || get().callLifecycle === 'disposition';
+          if (!isBusy && (!get().currentLead || get().callLifecycle === 'idle')) {
             set({ callLifecycle: 'idle', incomingCall: null, webrtcStatus: 'registered' });
           }
         }

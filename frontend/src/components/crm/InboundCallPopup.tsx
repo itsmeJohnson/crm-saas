@@ -37,12 +37,21 @@ export const InboundCallPopup: React.FC = () => {
     });
   }, [user, initWebRTC]);
 
-  // When call connects, ends, or transitions to disposition, clear ringing popup immediately
+  const webrtcStatus = useDialerStore((s) => s.webrtcStatus);
+
+  // When call connects or transitions to disposition, clear ringing popup immediately
   useEffect(() => {
-    if (callLifecycle === 'connected' || callLifecycle === 'disposition' || (callLifecycle === 'idle' && !incomingCall)) {
+    if (callLifecycle === 'connected' || callLifecycle === 'disposition') {
       setActiveSocketCall(null);
     }
-  }, [callLifecycle, incomingCall]);
+  }, [callLifecycle]);
+
+  // When softphone reports call has ended, clear ringing popup
+  useEffect(() => {
+    if (webrtcStatus === 'ended' && !incomingCall) {
+      setActiveSocketCall(null);
+    }
+  }, [webrtcStatus, incomingCall]);
 
   // Auto-dismiss ringing popup after telecom ring timeout (40 seconds)
   useEffect(() => {
