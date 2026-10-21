@@ -42,7 +42,7 @@ class LeadService:
 
         return lead
 
-    async def create_lead(self, actor: User, lead_data: dict) -> Lead:
+    async def create_lead(self, actor: User, lead_data: dict, inbound: bool = False, **kwargs) -> Lead:
         if not actor.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Actor is inactive")
 
@@ -126,13 +126,13 @@ class LeadService:
                 action_metadata={"title": lead.title, "status": lead.status}
             )
 
-        if assigned_user_id and assigned_user_id != actor.id:
+        if assigned_user_id and (assigned_user_id != actor.id or inbound):
             await self.notification_service.create_notification(
                 organization_id=actor.organization_id,
                 user_id=assigned_user_id,
                 category="lead",
-                title="New lead assigned to you",
-                body=f'"{lead.title}" was assigned to you.',
+                title="New inbound lead" if inbound else "New lead assigned to you",
+                body=f'"{lead.title}" arrived.' if inbound else f'"{lead.title}" was assigned to you.',
                 link_url=f"/leads?leadId={lead.id}",
                 action_metadata={"lead_id": str(lead.id)},
             )
