@@ -235,7 +235,8 @@ async def test_normalization_flows(client: AsyncClient, db: AsyncSession, captur
         "last_name": "Created",
         "role": "Employee",
         "password": "userpassword123",
-        "organization_id": str(admin_user.organization_id)
+        "organization_id": str(admin_user.organization_id),
+        "reporting_to_id": str(admin_user.id)
     }
     admin_create_res = await client.post("/api/v1/users/", json=admin_create_payload, headers=auth_headers)
     assert admin_create_res.status_code == 201
@@ -281,7 +282,8 @@ async def test_normalization_flows(client: AsyncClient, db: AsyncSession, captur
         "last_name": "User",
         "role": "Employee",
         "password": "securepassword123",
-        "phone": "+91 99999 99999"
+        "phone": "+91 99999 99999",
+        "reporting_to_id": str(admin_user.id)
     }
     # Fetch admin user from DB fresh to avoid session issues
     admin_user_fresh = await user_repo.get_user_by_id(admin_user.organization_id, admin_user.id)
