@@ -42,8 +42,8 @@ export const LeadsPage: React.FC = () => {
   const isPrivileged = !user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL;
   // Bulk import (CSV, XLSX, Google Sheets) enabled for administrative operations
   const canBulkImport = isPrivileged;
-  // Telecallers (Employees) can place a manual click-to-call to their own leads.
-  const canManualCall = user?.role === 'Employee';
+  // Click-to-call enabled for all active CRM agents & leadership.
+  const canManualCall = Boolean(user);
 
   const [chatLead, setChatLead] = useState<LeadResponse | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -903,9 +903,9 @@ export const LeadsPage: React.FC = () => {
                   <button
                     onClick={() => handleManualCall(detailLead.id)}
                     title="Place a call to this lead"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-500/10 border border-brand-500/30 hover:bg-brand-500/20 text-xs font-semibold text-brand-300 rounded-xl transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/20 border border-emerald-500/50 hover:bg-emerald-500/30 text-xs font-bold text-emerald-300 rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
                   >
-                    <Phone className="w-3.5 h-3.5" /> Call
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" /> Call
                   </button>
                 )}
                 {isPrivileged && !detailLead.converted_contact_id && (

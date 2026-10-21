@@ -231,12 +231,6 @@ class TeleCMIWebRTCService {
   }
 
   public async makeCall(rawPhone: string): Promise<boolean> {
-    if (!this.piopiy) {
-      console.error('[WebRTC] Phone not initialized');
-      this.notify('error', { message: 'Phone not initialized. Please wait for agent registration.' });
-      return false;
-    }
-
     let digits = (rawPhone || '').replace(/\D/g, '');
     if (digits.length === 10) {
       digits = '91' + digits;
@@ -251,16 +245,8 @@ class TeleCMIWebRTCService {
 
     this.setOutboundPending(digits);
     this.notify('calling', { phone: digits });
-
-    try {
-      console.log('[WebRTC] Placing outbound call directly from browser to:', digits);
-      this.piopiy.call(digits);
-      return true;
-    } catch (err: any) {
-      console.error('[WebRTC] Outbound call failed:', err);
-      this.notify('error', err);
-      return false;
-    }
+    console.log('[WebRTC] Outbound pending bridge leg registered for:', digits);
+    return true;
   }
 
   public hangup(): void {

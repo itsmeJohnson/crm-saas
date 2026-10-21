@@ -323,16 +323,10 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     set({ isLoading: true, error: null });
     let lead: any = null;
     try {
-      lead = await dialerApi.callLead(leadId, { ...(creds || {}) });
-    } catch (err: any) {
-      console.warn('[Dialer] Backend callLead check returned error, initiating direct in-browser WebRTC call:', err);
-      try {
-        lead = await leadApi.getLead(leadId);
-      } catch (getLeadErr) {
-        const errMsg = err.response?.data?.detail || err.message || 'Failed to place the call';
-        set({ error: errMsg, isLoading: false, callLifecycle: 'idle' });
-        throw err;
-      }
+      console.log('[Dialer] Placing click-to-call to lead:', leadId);
+      lead = await leadApi.getLead(leadId);
+    } catch (e) {
+      console.warn('[Dialer] Pre-fetch lead info failed:', e);
     }
 
     const nowStr = new Date().toISOString();
@@ -346,7 +340,11 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       isKeypadOpen: false,
     });
 
-    if (typeof localStorage !== 'undefined') {
+    if (lead?.phone) {
+      telecmiWebRTC.setOutboundPending(lead.phone);
+    }
+
+    if (typeof localStorage !== 'undefined' && lead) {
       localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
       localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
       localStorage.setItem('crm_dialer_lifecycle', 'initiating');
@@ -354,9 +352,25 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
 
     startTimer(set, 0);
-    if (lead && lead.phone) {
-      telecmiWebRTC.setOutboundPending(lead.phone);
-      telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
+
+    try {
+      const serverLead = await dialerApi.callLead(leadId, { ...(creds || {}) });
+      if (serverLead) {
+        set({ currentLead: serverLead });
+        if (serverLead.phone) {
+          telecmiWebRTC.setOutboundPending(serverLead.phone);
+        }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('crm_dialer_current_lead', JSON.stringify(serverLead));
+        }
+      }
+    } catch (err: any) {
+      console.error('[Dialer] Server callLead failed:', err);
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to initiate outbound call';
+      set({ error: errMsg, isLoading: false, callLifecycle: 'idle' });
+      telecmiWebRTC.clearOutboundPending();
+      stopTimer();
+      throw err;
     }
   },
 

@@ -6,7 +6,6 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { OmniChannelChatDrawer } from './OmniChannelChatDrawer';
 import {
-  Phone,
   PhoneCall,
   PhoneOff,
   Mic,
@@ -24,6 +23,7 @@ import {
   Calendar,
   X,
   Radio,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 export const FloatingDialerWidget: React.FC = () => {
@@ -51,6 +51,20 @@ export const FloatingDialerWidget: React.FC = () => {
 
   const [isMinimized, setIsMinimized] = useState(false);
   const [showChatDrawer, setShowChatDrawer] = useState(false);
+  const [dockSide, setDockSide] = useState<'right' | 'left'>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return (localStorage.getItem('crm_dialer_dock') as 'right' | 'left') || 'right';
+    }
+    return 'right';
+  });
+
+  const toggleDock = () => {
+    const nextSide = dockSide === 'right' ? 'left' : 'right';
+    setDockSide(nextSide);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_dialer_dock', nextSide);
+    }
+  };
 
   // Disposition form fields
   const [callStatus, setCallStatus] = useState<string>('Answered');
@@ -74,7 +88,7 @@ export const FloatingDialerWidget: React.FC = () => {
       setTargetStageId('');
       setFollowUpDate('');
       setFollowUpTime('');
-      setCallStatus(callDirection === 'INBOUND' ? 'Answered' : 'Answered');
+      setCallStatus('Answered');
       setDispositionCategory('Interested');
     }
   }, [currentLead?.id, callLifecycle]);
@@ -135,36 +149,48 @@ export const FloatingDialerWidget: React.FC = () => {
   const leadName = `${currentLead?.first_name || ''} ${currentLead?.last_name || 'Prospect'}`.trim() || 'Active Lead';
   const leadPhone = currentLead?.phone || '';
 
-  // ── 1. MINIMIZED FLOATING PILL (Allows seamless CRM navigation) ──
+  // ── 1. MINIMIZED FLOATING PILL ──
   if (isMinimized && callLifecycle !== 'disposition') {
     return (
       <>
-        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-3 duration-200">
-          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl shadow-indigo-950/40 p-3 flex items-center gap-3 max-w-sm">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-              callLifecycle === 'connected'
-                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
-                : 'bg-amber-500/15 border border-amber-500/30 text-amber-400 animate-pulse'
-            }`}>
-              <Phone className="w-4 h-4" />
+        {showChatDrawer && currentLead && (
+          <OmniChannelChatDrawer
+            lead={currentLead}
+            initialChannel="whatsapp"
+            isOpen={showChatDrawer}
+            onClose={() => setShowChatDrawer(false)}
+          />
+        )}
+        <div
+          className={`fixed bottom-6 ${
+            dockSide === 'left' ? 'left-6' : 'right-6'
+          } z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200 select-none`}
+        >
+          <div className="bg-slate-950/95 border border-slate-700 shadow-2xl shadow-black/80 rounded-2xl px-3.5 py-2 flex items-center gap-3 backdrop-blur-xl ring-1 ring-white/10 text-white">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md">
+              <PhoneCall className="w-4 h-4 animate-pulse" />
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 max-w-[150px] sm:max-w-[180px]">
               <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${callLifecycle === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'}`} />
-                <p className="text-xs font-bold text-slate-100 truncate">{leadName}</p>
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    callLifecycle === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
+                <p className="text-xs font-bold text-white truncate">{leadName}</p>
               </div>
-              <p className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
-                {leadPhone} • <span className="text-emerald-400 font-bold">{formatDuration(callDuration)}</span>
+              <p className="text-[11px] font-mono text-emerald-400 font-bold truncate mt-0.5">
+                {callLifecycle === 'connected' ? formatDuration(callDuration) : 'Initiating...'}
               </p>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               {callLifecycle === 'connected' && (
                 <button
                   type="button"
                   onClick={toggleMute}
-                  className={`p-2 rounded-xl border transition-all ${
+                  className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                     isMuted
                       ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
                       : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
@@ -177,11 +203,29 @@ export const FloatingDialerWidget: React.FC = () => {
 
               <button
                 type="button"
+                onClick={toggleDock}
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer"
+                title={dockSide === 'right' ? 'Dock to bottom-left' : 'Dock to bottom-right'}
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setIsMinimized(false)}
-                className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-md transition-all cursor-pointer"
+                className="p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm transition-all cursor-pointer"
                 title="Expand dialer"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={callLifecycle === 'connected' ? hangupWebRTC : cancelInitiatingCall}
+                className="p-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-sm transition-all cursor-pointer active:scale-95"
+                title={callLifecycle === 'connected' ? 'Hang Up' : 'Cancel'}
+              >
+                <PhoneOff className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -190,22 +234,36 @@ export const FloatingDialerWidget: React.FC = () => {
     );
   }
 
-  // ── 2. FULL FLOATING CARD COMPONENT (Bottom-Right Overlay) ──
+  // ── 2. FULL FLOATING CARD COMPONENT ──
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm sm:max-w-md animate-in slide-in-from-bottom-4 duration-200">
-        <div className="bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl shadow-slate-950/70 overflow-hidden backdrop-blur-xl ring-1 ring-slate-700/50">
-          
+      {showChatDrawer && currentLead && (
+        <OmniChannelChatDrawer
+          lead={currentLead}
+          initialChannel="whatsapp"
+          isOpen={showChatDrawer}
+          onClose={() => setShowChatDrawer(false)}
+        />
+      )}
+
+      <div
+        className={`fixed bottom-6 ${
+          dockSide === 'left' ? 'left-6' : 'right-6'
+        } z-[100] w-full max-w-sm sm:max-w-md animate-in slide-in-from-bottom-4 duration-200 select-none`}
+      >
+        <div className="bg-slate-950 border border-slate-700 shadow-2xl shadow-black/80 rounded-2xl overflow-hidden backdrop-blur-xl ring-1 ring-white/10 text-white">
           {/* Header Bar */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-indigo-950/40 border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-indigo-950/60 border-b border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                callLifecycle === 'connected'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : callLifecycle === 'disposition'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              }`}>
+              <div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                  callLifecycle === 'connected'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : callLifecycle === 'disposition'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                }`}
+              >
                 {callLifecycle === 'connected' ? (
                   <PhoneCall className="w-4 h-4 animate-pulse" />
                 ) : callLifecycle === 'disposition' ? (
@@ -217,13 +275,15 @@ export const FloatingDialerWidget: React.FC = () => {
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                    callLifecycle === 'connected'
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : callLifecycle === 'disposition'
-                      ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      callLifecycle === 'connected'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : callLifecycle === 'disposition'
+                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}
+                  >
                     {callLifecycle === 'initiating'
                       ? 'Initiating...'
                       : callLifecycle === 'ringing'
@@ -232,11 +292,11 @@ export const FloatingDialerWidget: React.FC = () => {
                       ? 'Live Active'
                       : 'Wrap-Up'}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[11px] text-slate-400 font-medium">
                     • {callDirection === 'INBOUND' ? 'Inbound' : 'Outbound'}
                   </span>
                 </div>
-                <h4 className="text-xs font-bold text-white truncate mt-0.5">{leadName}</h4>
+                <h4 className="text-sm font-bold text-white truncate mt-0.5">{leadName}</h4>
               </div>
             </div>
 
@@ -249,9 +309,19 @@ export const FloatingDialerWidget: React.FC = () => {
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400" title="WebRTC Connected">
-                  <Wifi className="w-3 h-3 text-emerald-400" />
+                  <Wifi className="w-3.5 h-3.5 text-emerald-400" />
                 </span>
               )}
+
+              {/* Dock Side Switcher (Dock Left / Dock Right to avoid covering open drawers) */}
+              <button
+                type="button"
+                onClick={toggleDock}
+                title={dockSide === 'right' ? 'Dock dialer to bottom-left' : 'Dock dialer to bottom-right'}
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 rounded-lg transition-all cursor-pointer"
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              </button>
 
               {/* Minimize button (disabled during mandatory wrap-up form) */}
               {callLifecycle !== 'disposition' && (
@@ -259,7 +329,7 @@ export const FloatingDialerWidget: React.FC = () => {
                   type="button"
                   onClick={() => setIsMinimized(true)}
                   title="Minimize dialer"
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/80 rounded-lg transition-all cursor-pointer"
+                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 rounded-lg transition-all cursor-pointer"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -269,10 +339,10 @@ export const FloatingDialerWidget: React.FC = () => {
 
           {/* Network Warning Banner */}
           {networkStatus === 'unstable' && (
-            <div className="bg-amber-500/15 border-b border-amber-500/30 px-3.5 py-2 flex items-center justify-between text-amber-300 text-xs animate-in slide-in-from-top-1">
+            <div className="bg-amber-500/20 border-b border-amber-500/30 px-3.5 py-2 flex items-center justify-between text-amber-300 text-xs animate-in slide-in-from-top-1">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-                <span className="font-semibold text-[11px]">Network unstable. Reconnecting...</span>
+                <span className="font-semibold text-xs">Network unstable. Reconnecting...</span>
               </div>
               <span className="font-mono text-xs font-bold text-amber-400">{reconnectCountdown}s</span>
             </div>
@@ -280,29 +350,39 @@ export const FloatingDialerWidget: React.FC = () => {
 
           {/* ── STATE A: INITIATING / RINGING ── */}
           {(callLifecycle === 'initiating' || callLifecycle === 'ringing') && (
-            <div className="p-5 text-center space-y-4">
-              <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
+            <div className="p-6 text-center space-y-4">
+              <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
                 <div className="absolute inset-0 rounded-full border-2 border-emerald-500/20 animate-ping" />
                 <div className="absolute inset-2 rounded-full border-2 border-emerald-500/40 animate-pulse" />
-                <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/20">
-                  <Radio className="w-6 h-6 animate-pulse" />
+                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-600/30 to-teal-500/30 border border-emerald-500/60 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20">
+                  <Radio className="w-7 h-7 animate-pulse text-emerald-300" />
                 </div>
               </div>
 
               <div>
-                <p className="text-sm font-bold text-white">{leadName}</p>
-                <p className="text-xs font-mono text-slate-400 mt-0.5">{leadPhone}</p>
-                <p className="text-[11px] font-medium text-emerald-400 mt-2 flex items-center justify-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <p className="text-base font-bold text-white tracking-wide">{leadName}</p>
+                <div className="mt-1">
+                  <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/30 px-3 py-1 rounded-full inline-block shadow-inner">
+                    {leadPhone}
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-emerald-400 mt-2.5 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
                   {callLifecycle === 'ringing' ? 'Customer phone is ringing...' : 'Connecting softphone bridge...'}
                 </p>
               </div>
+
+              {error && (
+                <div className="bg-red-500/15 border border-red-500/30 text-red-300 text-xs px-3 py-2 rounded-xl">
+                  {error}
+                </div>
+              )}
 
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={cancelInitiatingCall}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 hover:text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-600 hover:bg-red-500 active:scale-98 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/30 transition-all cursor-pointer"
                 >
                   <PhoneOff className="w-4 h-4" />
                   Cancel Call
@@ -315,15 +395,15 @@ export const FloatingDialerWidget: React.FC = () => {
           {callLifecycle === 'connected' && (
             <div className="p-4 space-y-4">
               {/* Call Timer Display */}
-              <div className="text-center py-2 bg-slate-950/60 border border-slate-800/80 rounded-xl">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Call Duration</p>
+              <div className="text-center py-3 bg-slate-900/90 border border-slate-800 rounded-xl">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Call Duration</p>
                 <div className="flex items-center justify-center gap-2 mt-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <p className="font-mono text-2xl font-black text-emerald-400 tracking-wider">
+                  <p className="font-mono text-3xl font-black text-emerald-400 tracking-wider">
                     {formatDuration(callDuration)}
                   </p>
                 </div>
-                <p className="text-xs font-mono text-slate-400 mt-1">{leadPhone}</p>
+                <p className="text-xs font-mono text-slate-300 mt-1 font-semibold">{leadPhone}</p>
               </div>
 
               {/* Call Control Buttons */}
@@ -335,7 +415,7 @@ export const FloatingDialerWidget: React.FC = () => {
                   className={`flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
                     isMuted
                       ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 shadow-lg shadow-rose-950/30'
-                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:bg-slate-750 hover:text-white'
+                      : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`}
                 >
                   {isMuted ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4 text-slate-300" />}
@@ -349,70 +429,60 @@ export const FloatingDialerWidget: React.FC = () => {
                   className={`flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
                     isKeypadOpen
                       ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-300'
-                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:bg-slate-750 hover:text-white'
+                      : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`}
                 >
-                  <Grid className="w-4 h-4 text-slate-300" />
+                  <Grid className="w-4 h-4" />
                   <span>Keypad</span>
                 </button>
 
-                {/* WhatsApp Chat Button */}
+                {/* Omnichannel Chat Trigger */}
                 <button
                   type="button"
                   onClick={() => setShowChatDrawer(true)}
-                  className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl border bg-slate-800/90 border-slate-700/80 text-slate-300 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-300 text-[11px] font-semibold transition-all cursor-pointer"
+                  className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-emerald-400 hover:text-emerald-300 rounded-xl text-[11px] font-semibold transition-all cursor-pointer"
+                  title="WhatsApp & SMS Chat"
                 >
-                  <MessageSquare className="w-4 h-4 text-emerald-400" />
-                  <span>WhatsApp</span>
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Chat</span>
                 </button>
 
                 {/* Hang Up Button */}
                 <button
                   type="button"
                   onClick={hangupWebRTC}
-                  className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold shadow-lg shadow-rose-950/50 transition-all cursor-pointer"
+                  className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-[11px] font-bold shadow-lg shadow-red-600/30 transition-all cursor-pointer active:scale-95"
+                  title="End Call & Open Wrap-Up Form"
                 >
                   <PhoneOff className="w-4 h-4" />
-                  <span>Hang Up</span>
+                  <span>End</span>
                 </button>
               </div>
 
-              {/* In-Call DTMF Dialpad Drawer */}
+              {/* Interactive DTMF Keypad Drawer */}
               {isKeypadOpen && (
-                <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">DTMF Keypad</span>
+                <div className="pt-2 border-t border-slate-850 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      DTMF Keypad (IVR)
+                    </span>
                     <button
                       type="button"
                       onClick={() => toggleKeypad(false)}
-                      className="p-1 hover:text-white rounded"
+                      className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { key: '1', sub: '' },
-                      { key: '2', sub: 'ABC' },
-                      { key: '3', sub: 'DEF' },
-                      { key: '4', sub: 'GHI' },
-                      { key: '5', sub: 'JKL' },
-                      { key: '6', sub: 'MNO' },
-                      { key: '7', sub: 'PQRS' },
-                      { key: '8', sub: 'TUV' },
-                      { key: '9', sub: 'WXYZ' },
-                      { key: '*', sub: '' },
-                      { key: '0', sub: '+' },
-                      { key: '#', sub: '' },
-                    ].map((btn) => (
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
                       <button
-                        key={btn.key}
+                        key={digit}
                         type="button"
-                        onClick={() => sendDTMF(btn.key)}
-                        className="py-2.5 bg-slate-800/90 hover:bg-indigo-600 hover:text-white border border-slate-700/80 active:scale-95 text-slate-200 rounded-xl font-bold transition-all flex flex-col items-center justify-center cursor-pointer"
+                        onClick={() => sendDTMF(digit)}
+                        className="py-2 bg-slate-900 hover:bg-slate-800 active:bg-indigo-600 active:text-white border border-slate-800 text-slate-200 font-bold text-sm rounded-lg transition-colors cursor-pointer"
                       >
-                        <span className="text-sm leading-none">{btn.key}</span>
-                        {btn.sub && <span className="text-[8px] text-slate-400 font-normal mt-0.5">{btn.sub}</span>}
+                        {digit}
                       </button>
                     ))}
                   </div>
@@ -421,162 +491,174 @@ export const FloatingDialerWidget: React.FC = () => {
             </div>
           )}
 
-          {/* ── STATE C: POST-CALL WRAP-UP & DISPOSITION FORM ── */}
+          {/* ── STATE C: MANDATORY CALL DISPOSITION & WRAP-UP FORM ── */}
           {callLifecycle === 'disposition' && (
-            <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div className="p-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
+              <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-800/80">
                 <div>
-                  <h5 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                    Call Summary & Wrap-Up
-                  </h5>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-indigo-400" />
+                    Call Disposition & Wrap-Up
+                  </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Duration: <span className="font-mono text-emerald-400 font-bold">{formatDuration(callDuration)}</span> • {callDirection}
+                    Call ended ({formatDuration(callDuration)}). Log the outcome to complete.
                   </p>
                 </div>
-                <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                  Required
+                <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-full font-bold">
+                  Mandatory
                 </span>
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl text-xs">
+                <div className="p-2.5 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <p>{error}</p>
+                  <span>{error}</span>
                 </div>
               )}
 
-              {/* Call Status Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  Call Status <span className="text-rose-400">*</span>
-                </label>
-                <select
-                  value={callStatus}
-                  onChange={(e) => setCallStatus(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl py-2 px-3 text-xs focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="Answered">Answered</option>
-                  <option value="Busy">Busy</option>
-                  <option value="No Answer">No Answer</option>
-                  <option value="Wrong Number">Wrong Number</option>
-                  <option value="Switched Off">Switched Off</option>
-                </select>
-              </div>
+              <form onSubmit={handleFormSubmit} className="space-y-3">
+                {/* 1. Call Status */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Call Status <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={callStatus}
+                    onChange={(e) => setCallStatus(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
+                  >
+                    <option value="Answered">Answered (Connected)</option>
+                    <option value="Busy">Busy</option>
+                    <option value="No Answer">No Answer / Ringing Not Responded</option>
+                    <option value="Wrong Number">Wrong Number</option>
+                    <option value="Switched Off">Switched Off / Out of Coverage</option>
+                  </select>
+                </div>
 
-              {/* Disposition Category Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  Disposition Category <span className="text-rose-400">*</span>
-                </label>
-                <select
-                  value={dispositionCategory}
-                  onChange={(e) => setDispositionCategory(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl py-2 px-3 text-xs focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="Interested">Interested</option>
-                  <option value="Not Interested">Not Interested</option>
-                  <option value="Callback Requested">Callback Requested</option>
-                  <option value="Follow-up Scheduled">Follow-up Scheduled</option>
-                </select>
-              </div>
+                {/* 2. Disposition Category */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Disposition Outcome <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={dispositionCategory}
+                    onChange={(e) => setDispositionCategory(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
+                  >
+                    <option value="Interested">Interested / Qualified</option>
+                    <option value="Not Interested">Not Interested</option>
+                    <option value="Callback Requested">Callback Requested</option>
+                    <option value="Follow-up Scheduled">Follow-up Scheduled</option>
+                  </select>
+                </div>
 
-              {/* Conditional Follow-up Date/Time Picker */}
-              {isFollowUp && (
-                <div className="p-3 bg-indigo-950/30 border border-indigo-500/30 rounded-xl space-y-2.5 animate-in fade-in duration-200">
-                  <p className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                    Schedule Callback / Follow-Up <span className="text-rose-400">*</span>
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">Date *</label>
-                      <input
-                        type="date"
-                        value={followUpDate}
-                        onChange={(e) => setFollowUpDate(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-1.5 px-2.5 text-xs focus:ring-1 focus:ring-indigo-500"
-                      />
+                {/* 3. Conditional Follow-up / Callback Fields */}
+                {isFollowUp && (
+                  <div className="p-3 bg-indigo-950/30 border border-indigo-500/30 rounded-xl space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-1.5 text-indigo-300 text-xs font-bold">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Schedule Follow-Up Details</span>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Date *</label>
+                        <input
+                          type="date"
+                          value={followUpDate}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setFollowUpDate(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Time *</label>
+                        <input
+                          type="time"
+                          value={followUpTime}
+                          onChange={(e) => setFollowUpTime(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">Time *</label>
-                      <input
-                        type="time"
-                        value={followUpTime}
-                        onChange={(e) => setFollowUpTime(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-1.5 px-2.5 text-xs focus:ring-1 focus:ring-indigo-500"
-                      />
+                      <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Priority</label>
+                      <select
+                        value={followUpPriority}
+                        onChange={(e) => setFollowUpPriority(e.target.value as any)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"
+                      >
+                        <option value="Low">Low Priority</option>
+                        <option value="Medium">Medium Priority</option>
+                        <option value="High">High Priority</option>
+                        <option value="Urgent">Urgent Priority</option>
+                      </select>
                     </div>
                   </div>
+                )}
+
+                {/* 4. Advance Pipeline Stage (Optional) */}
+                {stages.length > 0 && (
                   <div>
-                    <label className="block text-[10px] text-slate-400 mb-1">Priority</label>
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                      Update Pipeline Stage (Optional)
+                    </label>
                     <select
-                      value={followUpPriority}
-                      onChange={(e) => setFollowUpPriority(e.target.value as any)}
-                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-1.5 px-2.5 text-xs focus:ring-1 focus:ring-indigo-500"
+                      value={targetStageId}
+                      onChange={(e) => setTargetStageId(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
                     >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Urgent">Urgent</option>
+                      <option value="">Keep Current Stage</option>
+                      {stages.map((st) => (
+                        <option key={st.id} value={st.id}>
+                          Move to: {st.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
+                )}
+
+                {/* 5. Call Summary Notes */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Call Summary & Notes <span className="text-rose-400">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Enter call notes, customer reaction, next steps..."
+                    required
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/30"
+                  />
                 </div>
-              )}
 
-              {/* Advance Stage Selection (Optional) */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  Advance Stage (Optional)
-                </label>
-                <select
-                  value={targetStageId}
-                  onChange={(e) => setTargetStageId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl py-2 px-3 text-xs focus:ring-1 focus:ring-indigo-500"
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading || !remarks.trim() || followUpIncomplete}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
-                  <option value="">-- Keep Current Stage --</option>
-                  {stages.map((stage) => (
-                    <option key={stage.id} value={stage.id}>
-                      {stage.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Notes & Remarks */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  Call Notes & Remarks <span className="text-rose-400">*</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Summarize client feedback, action items, or discussion..."
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 rounded-xl py-2 px-3 text-xs focus:ring-1 focus:ring-indigo-500 resize-none"
-                />
-              </div>
-
-              {/* Submit Disposition */}
-              <button
-                type="submit"
-                disabled={!remarks.trim() || followUpIncomplete || isLoading}
-                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-emerald-950/40 text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <CheckCircle className="w-4 h-4" />
-                {isLoading ? 'Saving Disposition...' : 'Submit Disposition & Complete'}
-              </button>
-            </form>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Disposition...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Save & Complete Call</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>
-
-      <OmniChannelChatDrawer
-        lead={currentLead}
-        isOpen={showChatDrawer}
-        onClose={() => setShowChatDrawer(false)}
-        initialChannel="whatsapp"
-      />
     </>
   );
 };
