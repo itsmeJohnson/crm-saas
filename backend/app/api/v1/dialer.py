@@ -409,3 +409,31 @@ async def submit_disposition(
         actor=actor
     )
     return lead
+
+
+@router.get("/webrtc-session")
+async def get_webrtc_session(
+    actor: User = Depends(require_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Returns WebRTC connection parameters for the agent's browser softphone."""
+    cfg = await load_org_calling_config(db, actor)
+    if not cfg:
+        return {"enabled": False, "provider": None}
+    provider = cfg.get("provider")
+    if provider == "telecmi":
+        appid = cfg.get("company_id") or "33339071"
+        caller_id = cfg.get("default_caller_id") or "917949817390"
+        user_uuid = cfg.get("user_uuid") or f"5001_{appid}"
+        agent_password = cfg.get("agent_password") or "admin@123"
+        return {
+            "enabled": True,
+            "provider": "telecmi",
+            "user_id": user_uuid,
+            "password": agent_password,
+            "region": "sbcind.telecmi.com",
+            "caller_id": caller_id,
+            "agent_name": actor.name or "Telecaller Agent"
+        }
+    return {"enabled": False, "provider": provider}
+

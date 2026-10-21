@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { dialerApi, CallCreds } from '../services/dialerApi';
 import { LeadResponse, leadApi } from '../services/leadApi';
+import { telecmiWebRTC, WebRTCPhoneStatus } from '../services/telecmiWebRTC';
 
 export type AgentState = 'IDLE' | 'ACTIVE_CALLING' | 'BREAK';
 
@@ -13,7 +14,12 @@ interface DialerState {
   isLoading: boolean;
   error: string | null;
   callDirection: 'INBOUND' | 'OUTBOUND' | null;
-  
+  webrtcStatus: WebRTCPhoneStatus;
+  isMuted: boolean;
+
+  initWebRTC: () => Promise<void>;
+  toggleMute: () => void;
+  hangupWebRTC: () => void;
   fetchCurrentState: () => Promise<void>;
   startCalling: (
     collectivePooling?: boolean,
@@ -33,6 +39,7 @@ interface DialerState {
   ) => Promise<void>;
   resetStore: () => void;
 }
+
 
 let timerIntervalId: any = null;
 
@@ -62,6 +69,37 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   isLoading: false,
   error: null,
   callDirection: null,
+  webrtcStatus: 'idle',
+  isMuted: false,
+
+  initWebRTC: async () => {
+    telecmiWebRTC.subscribe((status) => {
+      set({ webrtcStatus: status, isMuted: telecmiWebRTC.getIsMuted() });
+    });
+    try {
+      const session = await dialerApi.getWebRTCSession();
+      if (session.enabled && session.provider === 'telecmi' && session.user_id && session.password) {
+        telecmiWebRTC.init({
+          user_id: session.user_id,
+          password: session.password,
+          region: session.region,
+          caller_id: session.caller_id,
+          agent_name: session.agent_name,
+        });
+      }
+    } catch (e) {
+      console.warn('[WebRTC] Could not load session config:', e);
+    }
+  },
+
+  toggleMute: () => {
+    const isMuted = telecmiWebRTC.toggleMute();
+    set({ isMuted });
+  },
+
+  hangupWebRTC: () => {
+    telecmiWebRTC.hangup();
+  },
 
   fetchCurrentState: async () => {
     set({ isLoading: true, error: null });
@@ -139,6 +177,9 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
       }
       startTimer(set, 0);
+      if (lead && lead.phone) {
+        telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
+      }
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to fetch next lead';
       set({ error: errMsg, isLoading: false });
@@ -158,6 +199,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
 
     set({ isLoading: true, error: null });
+    telecmiWebRTC.hangup();
     try {
       if (lead && lead.id) {
         await dialerApi.submitDisposition(lead.id, dispositionData);
@@ -270,6 +312,9 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         localStorage.setItem('crm_dialer_call_direction', 'OUTBOUND');
       }
       startTimer(set, 0);
+      if (lead && lead.phone) {
+        telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
+      }
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to place the call';
       set({ error: errMsg, isLoading: false });

@@ -56,4 +56,18 @@ export const dialerApi = {
     const response = await api.post<LeadResponse>(`/dialer/leads/${leadId}/call`, payload);
     return response.data;
   },
+
+  getWebRTCSession: async () => {
+    const response = await api.get<{
+      enabled: boolean;
+      provider: string | null;
+      user_id?: string;
+      password?: string;
+      region?: string;
+      caller_id?: string;
+      agent_name?: string;
+    }>('/dialer/webrtc-session');
+    return response.data;
+  },
 };
+
