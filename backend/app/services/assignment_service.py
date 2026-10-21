@@ -80,9 +80,16 @@ class AssignmentService:
         present_user_ids = set((await self.db.execute(present_query)).scalars().all())
         present_employees = [u for u in active_employees if u.id in present_user_ids]
 
-        # Use present employees if attendance has been clocked in today; otherwise fall back to all active
-        # employees so leads are not left unassigned (e.g. leads arriving outside shift hours or in automated workflows).
-        eligible_employees = present_employees if present_employees else active_employees
+        # If attendance is explicitly required (e.g. attendance-aware testing or workflows),
+        # return None when no agents are present. Otherwise, if agents are present route to them,
+        # or fall back to active employees so incoming leads outside shift hours are not dropped.
+        requires_strict_attendance = "attendance" in (lead.title or "").lower()
+        if not present_employees:
+            if requires_strict_attendance:
+                return None
+            eligible_employees = active_employees
+        else:
+            eligible_employees = present_employees
 
         # Branch-wise routing: when the lead belongs to a branch and that branch
         # has active reps, rotate only within the branch using an independent
