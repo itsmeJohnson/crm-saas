@@ -132,6 +132,12 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           const callId = incData?.call_id || `inbound-${Date.now()}`;
           const toNumber = incData?.to_number || '917949817390';
 
+          const currentIncoming = get().incomingCall;
+          // Deduplicate incoming call event if already ringing for this number/callId
+          if (currentIncoming && (currentIncoming.from === callerPhone || currentIncoming.call_id === callId)) {
+            return;
+          }
+
           // 1. Immediately trigger incoming call ringing UI
           set({
             incomingCall: {
@@ -185,7 +191,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
               localStorage.setItem('crm_dialer_lifecycle', 'disposition');
             }
           } else {
-            set({ callLifecycle: 'idle', incomingCall: null, currentLead: null, agentState: 'IDLE', callDirection: null });
+            set({ callLifecycle: 'idle', incomingCall: null, currentLead: null, agentState: 'IDLE', callDirection: null, webrtcStatus: 'registered' });
             if (typeof localStorage !== 'undefined') {
               localStorage.removeItem('crm_dialer_lifecycle');
               localStorage.removeItem('crm_dialer_current_lead');
@@ -195,7 +201,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           }
         } else if (status === 'idle') {
           if (!get().currentLead || get().callLifecycle === 'idle' || get().callLifecycle === 'ringing') {
-            set({ callLifecycle: 'idle', incomingCall: null });
+            set({ callLifecycle: 'idle', incomingCall: null, webrtcStatus: 'registered' });
           }
         }
       });

@@ -18,8 +18,13 @@ interface InboundCallEvent {
 }
 
 export const InboundCallPopup: React.FC = () => {
-  const { user } = useAuthStore();
-  const { incomingCall, answerInboundCall, rejectInboundCall, initWebRTC, webrtcStatus, callLifecycle } = useDialerStore();
+  const user = useAuthStore((s) => s.user);
+  const incomingCall = useDialerStore((s) => s.incomingCall);
+  const answerInboundCall = useDialerStore((s) => s.answerInboundCall);
+  const rejectInboundCall = useDialerStore((s) => s.rejectInboundCall);
+  const initWebRTC = useDialerStore((s) => s.initWebRTC);
+  const callLifecycle = useDialerStore((s) => s.callLifecycle);
+
   const [activeSocketCall, setActiveSocketCall] = useState<InboundCallEvent | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
   const audioIntervalRef = useRef<any>(null);
@@ -32,12 +37,12 @@ export const InboundCallPopup: React.FC = () => {
     });
   }, [user, initWebRTC]);
 
-  // When call connects or ends, clear any active socket ringing popup
+  // When call connects, clear any active socket ringing popup
   useEffect(() => {
-    if (callLifecycle === 'connected' || webrtcStatus === 'ended') {
+    if (callLifecycle === 'connected') {
       setActiveSocketCall(null);
     }
-  }, [callLifecycle, webrtcStatus]);
+  }, [callLifecycle]);
 
   // Auto-dismiss ringing popup after telecom ring timeout (40 seconds)
   useEffect(() => {
@@ -65,9 +70,11 @@ export const InboundCallPopup: React.FC = () => {
     call_sid: incomingCall?.call_id || activeSocketCall?.call_sid || '',
   } : null;
 
-  // Ringtone / Chime during inbound ringing
+  const normalizedPhone = (currentIncoming?.phone || '').replace(/\D/g, '').slice(-10);
+
+  // Ringtone / Chime during inbound ringing (keyed on normalizedPhone to prevent stuttering/flicker)
   useEffect(() => {
-    if (!currentIncoming) {
+    if (!normalizedPhone) {
       if (audioIntervalRef.current) {
         clearInterval(audioIntervalRef.current);
         audioIntervalRef.current = null;
@@ -114,7 +121,7 @@ export const InboundCallPopup: React.FC = () => {
         audioIntervalRef.current = null;
       }
     };
-  }, [currentIncoming?.phone, currentIncoming?.call_sid]);
+  }, [normalizedPhone]);
 
   // Subscribe to real-time socket events for telephony
   useEffect(() => {
@@ -124,7 +131,13 @@ export const InboundCallPopup: React.FC = () => {
     const unsubscribe = whatsappRealtime.subscribe((data) => {
       try {
         if (data && data.event === 'inbound_call') {
-          setActiveSocketCall(data as InboundCallEvent);
+          setActiveSocketCall((prev) => {
+            // Deduplicate: if already showing for this call, do not replace object reference
+            if (prev && (prev.call_sid === data.call_sid || (prev.phone && data.phone && prev.phone === data.phone))) {
+              return prev;
+            }
+            return data as InboundCallEvent;
+          });
         } else if (data && (data.event === 'inbound_call_ended' || data.event === 'inbound_call_cancelled')) {
           setActiveSocketCall(null);
         }
@@ -136,7 +149,7 @@ export const InboundCallPopup: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user?.id]);
 
   if (!user || !currentIncoming) return null;
 
@@ -153,7 +166,6 @@ export const InboundCallPopup: React.FC = () => {
 
       await answerInboundCall(lead);
       setActiveSocketCall(null);
-      // Automatically minimizes popup into the active floating dialer widget
     } catch (e) {
       console.error('Failed to answer inbound call:', e);
       alert('Failed to answer inbound call. Please try again.');
@@ -168,17 +180,20 @@ export const InboundCallPopup: React.FC = () => {
   };
 
   return (
-    <div className="fixed top-20 right-6 z-50 max-w-sm w-full bg-slate-900/95 border-2 border-emerald-500/50 rounded-2xl shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-6 duration-300 overflow-hidden ring-4 ring-emerald-500/10">
+    <div
+      key={normalizedPhone || 'inbound-call-card'}
+      className="fixed top-20 right-6 z-50 max-w-sm w-full bg-slate-900/95 border-2 border-emerald-500/50 rounded-2xl shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-4 duration-200 overflow-hidden ring-4 ring-emerald-500/10"
+    >
       <div className="p-4 flex items-start gap-3.5">
-        {/* Pulsing Inbound Ringing Icon */}
-        <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 animate-bounce">
+        {/* Steady Elegant Ringing Icon */}
+        <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-md">
           <PhoneIncoming className="w-5 h-5 text-emerald-300 animate-pulse" />
         </div>
 
         {/* Caller Details with Lead Name, Stage, Company, Source */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
               Incoming Call · Live
             </p>

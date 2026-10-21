@@ -16,7 +16,7 @@ export const CallbackTakeoverModal: React.FC = () => {
   const [matureCallbacks, setMatureCallbacks] = useState<CallbackLead[]>([]);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isDialing, setIsDialing] = useState(false);
-  const { callSpecificLead, currentLead, agentState } = useDialerStore();
+  const { callSpecificLead, currentLead, agentState, incomingCall } = useDialerStore();
 
   const checkMatureCallbacks = useCallback(async () => {
     try {
@@ -39,8 +39,8 @@ export const CallbackTakeoverModal: React.FC = () => {
     return () => clearInterval(interval);
   }, [checkMatureCallbacks]);
 
-  // If already on a call or no callbacks mature or dismissed, don't show
-  if (matureCallbacks.length === 0 || isDismissed || currentLead || agentState === 'ACTIVE_CALLING') {
+  // If already on a call, receiving an incoming call, no callbacks mature, or dismissed, don't show
+  if (matureCallbacks.length === 0 || isDismissed || currentLead || incomingCall || agentState === 'ACTIVE_CALLING') {
     return null;
   }
 
