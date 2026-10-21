@@ -34,6 +34,7 @@ export const FloatingDialerWidget: React.FC = () => {
     currentLead,
     callDuration,
     callDirection,
+    incomingCall,
     isMuted,
     isKeypadOpen,
     networkStatus,
@@ -93,6 +94,13 @@ export const FloatingDialerWidget: React.FC = () => {
       setDispositionCategory('Interested');
     }
   }, [currentLead?.id, callLifecycle]);
+
+  // ── INBOUND RINGING IS MANAGED EXCLUSIVELY BY InboundCallPopup ──
+  // If an incoming call is ringing or un-answered, do NOT show the floating dialer widget.
+  // Floating dialer will appear only after the agent answers (connected or wrap-up/disposition).
+  if (incomingCall || (callDirection === 'INBOUND' && callLifecycle !== 'connected' && callLifecycle !== 'disposition')) {
+    return null;
+  }
 
   // If there is no active lead and we are idle, don't show the widget
   if (!currentLead && callLifecycle === 'idle' && agentState !== 'ACTIVE_CALLING') {

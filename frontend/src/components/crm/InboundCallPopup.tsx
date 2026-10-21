@@ -32,12 +32,12 @@ export const InboundCallPopup: React.FC = () => {
     });
   }, [user, initWebRTC]);
 
-  // If softphone ended, connected, or is idle and not ringing, clear any socket-based ringing popup
+  // When call connects or ends, clear any active socket ringing popup
   useEffect(() => {
-    if (!incomingCall && (webrtcStatus === 'ended' || webrtcStatus === 'idle' || webrtcStatus === 'connected' || (callLifecycle && callLifecycle !== 'ringing'))) {
+    if (callLifecycle === 'connected' || webrtcStatus === 'ended') {
       setActiveSocketCall(null);
     }
-  }, [incomingCall, webrtcStatus, callLifecycle]);
+  }, [callLifecycle, webrtcStatus]);
 
   // Auto-dismiss ringing popup after telecom ring timeout (40 seconds)
   useEffect(() => {
@@ -48,24 +48,22 @@ export const InboundCallPopup: React.FC = () => {
     return () => clearTimeout(timeout);
   }, [activeSocketCall]);
 
-  // Unified caller details
-  const currentIncoming = incomingCall ? {
-    phone: incomingCall.from,
-    lead_name: incomingCall.lead?.first_name ? `${incomingCall.lead.first_name} ${incomingCall.lead.last_name || ''}`.trim() : (incomingCall.name || 'Unknown Caller'),
-    company_name: incomingCall.lead?.company || incomingCall.lead?.company_name || '',
-    stage_name: incomingCall.lead?.stage?.name || incomingCall.lead?.status || 'New Lead',
-    source: incomingCall.lead?.source || 'Inbound Call',
-    lead_id: incomingCall.lead?.id,
-    call_sid: incomingCall.call_id,
-  } : (activeSocketCall ? {
-    phone: activeSocketCall.phone,
-    lead_name: activeSocketCall.lead_name || 'Unknown Caller',
-    company_name: activeSocketCall.company_name || '',
-    stage_name: activeSocketCall.stage_name || 'New Lead',
-    source: activeSocketCall.source || 'Inbound Call',
-    lead_id: activeSocketCall.lead_id,
-    call_sid: activeSocketCall.call_sid,
-  } : null);
+  // Unified caller details - preserves identified lead information across softphone & websocket events
+  const currentIncoming = (incomingCall || activeSocketCall) ? {
+    phone: incomingCall?.from || activeSocketCall?.phone || '',
+    lead_name: (
+      incomingCall?.lead?.first_name
+        ? `${incomingCall.lead.first_name} ${incomingCall.lead.last_name || ''}`.trim()
+        : (activeSocketCall?.lead_name && activeSocketCall.lead_name !== 'Unknown Caller'
+            ? activeSocketCall.lead_name
+            : (incomingCall?.name && incomingCall.name !== 'Customer' ? incomingCall.name : (activeSocketCall?.lead_name || incomingCall?.name || 'Customer')))
+    ),
+    company_name: incomingCall?.lead?.company || incomingCall?.lead?.company_name || activeSocketCall?.company_name || '',
+    stage_name: incomingCall?.lead?.stage?.name || incomingCall?.lead?.status || activeSocketCall?.stage_name || 'New Lead',
+    source: incomingCall?.lead?.source || activeSocketCall?.source || 'Inbound Call',
+    lead_id: incomingCall?.lead?.id || activeSocketCall?.lead_id,
+    call_sid: incomingCall?.call_id || activeSocketCall?.call_sid || '',
+  } : null;
 
   // Ringtone / Chime during inbound ringing
   useEffect(() => {
