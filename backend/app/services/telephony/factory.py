@@ -6,12 +6,14 @@ from app.services.telephony.callerdesk import CallerdeskProvider
 from app.services.telephony.twilio import TwilioProvider
 from app.services.telephony.msg91 import Msg91Provider
 from app.services.telephony.custom_webhook import CustomWebhookProvider
+from app.services.telephony.telecmi import TeleCMIProvider
 
 _PROVIDERS = {
     "myoperator": MyOperatorProvider,
     "knowlarity": KnowlarityProvider,
     "exotel": ExotelProvider,
     "callerdesk": CallerdeskProvider,
+    "telecmi": TeleCMIProvider,
     "twilio": TwilioProvider,
     "msg91": Msg91Provider,
     "custom_webhook": CustomWebhookProvider,

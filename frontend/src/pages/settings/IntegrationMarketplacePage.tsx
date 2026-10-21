@@ -17,6 +17,9 @@ type Category = 'Calling' | 'SMS' | 'WhatsApp' | 'Email' | 'Payments' | 'CRM' | 
 const CATEGORIES: Category[] = ['Calling', 'SMS', 'WhatsApp', 'Email', 'Payments', 'CRM', 'AI', 'Marketing'];
 
 const CATALOG: Provider[] = [
+  { id: 'telecmi', name: 'TeleCMI (Connle)', logo: '📞', category: 'Calling', kind: 'route', route: '/settings/communication/calling',
+    description: 'Enterprise Cloud Telephony — Click2Call, WebRTC Softphones & Webhooks.',
+    features: ['Click-to-call', 'Softphone Dialing', 'Live Webhooks', 'Call Recording'] },
   { id: 'callerdesk', name: 'Callerdesk', logo: '📞', category: 'Calling', kind: 'route', route: '/settings/communication/calling',
     description: 'Cloud telephony — Click2Call, inbound IVR webhooks & call recordings.',
     features: ['Click-to-call', 'Live Popups', 'Inbound IVR', 'Call Recording'] },

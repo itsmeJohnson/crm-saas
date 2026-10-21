@@ -39,6 +39,12 @@ def config_ready(cfg: dict | None) -> bool:
             (cfg.get("authcode") or cfg.get("x_api_key") or cfg.get("authentication_token"))
             and (cfg.get("deskphone") or cfg.get("default_caller_id"))
         )
+    elif provider == "telecmi":
+        return bool(
+            (cfg.get("company_id") or cfg.get("appid"))
+            and (cfg.get("secret_token") or cfg.get("x_api_key") or cfg.get("authentication_token"))
+            and cfg.get("default_caller_id")
+        )
     return bool(cfg.get("x_api_key") or cfg.get("authentication_token"))
 
 

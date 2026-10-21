@@ -298,10 +298,12 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     data = await _extract_webhook_data(request)
     logger.info("Telephony webhook received [%s %s]: %s", request.method, request.url.path, data)
 
-    # 1. Normalize field aliases across providers (Callerdesk, Exotel, generic)
+    # 1. Normalize field aliases across providers (TeleCMI, Callerdesk, Exotel, generic)
     call_sid = (
         data.get("CallSid")
         or data.get("call_sid")
+        or data.get("cmiuuid")
+        or data.get("request_id")
         or data.get("Uniqueid")
         or data.get("sid_id")
         or data.get("campid")
@@ -312,6 +314,7 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     source_number = (
         data.get("SourceNumber")
         or data.get("from_number")
+        or data.get("caller")
         or data.get("From")
         or data.get("msisdn")
         or data.get("caller_num")
@@ -320,20 +323,24 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     dest_number = (
         data.get("DestinationNumber")
         or data.get("to_number")
+        or data.get("called")
         or data.get("To")
         or data.get("deskphone")
         or data.get("did_no")
         or ""
     )
+    agent_info = data.get("agent")
     agent_number = (
         data.get("DialWhomNumber")
         or data.get("agent_number")
         or data.get("member_num")
+        or (agent_info.get("agent_id") if isinstance(agent_info, dict) else str(agent_info or ""))
         or ""
     )
     recording_url = (
         data.get("CallRecordingUrl")
         or data.get("recording_url")
+        or data.get("recording")
         or data.get("RecordingUrl")
         or data.get("file")
         or ""
@@ -341,6 +348,7 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     raw_duration = (
         data.get("CallDuration")
         or data.get("TalkDuration")
+        or data.get("billsec")
         or data.get("duration")
         or "0"
     )
@@ -349,7 +357,7 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     except (ValueError, TypeError):
         duration = 0
 
-    call_status = str(data.get("Status") or data.get("status") or data.get("callstatus") or "ANSWER")
+    call_status = str(data.get("Status") or data.get("status") or data.get("event") or data.get("callstatus") or "ANSWER")
 
     # 2. Determine Call Flow: Inbound vs Outbound
     is_inbound = (
