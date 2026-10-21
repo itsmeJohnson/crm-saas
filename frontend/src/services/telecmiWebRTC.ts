@@ -75,6 +75,19 @@ class TeleCMIWebRTCService {
   }
 
   public init(config: WebRTCSessionConfig): void {
+    if (
+      this.piopiy &&
+      (this.status === 'registered' ||
+        this.status === 'connected' ||
+        this.status === 'calling' ||
+        this.status === 'ringing' ||
+        this.status === 'incoming') &&
+      this.config?.user_id === config.user_id
+    ) {
+      console.log('[WebRTC] Already initialized and connected for user:', config.user_id);
+      return;
+    }
+
     this.config = config;
     if (this.piopiy) {
       try {

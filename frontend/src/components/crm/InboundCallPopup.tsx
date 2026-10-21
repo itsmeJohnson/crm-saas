@@ -19,10 +19,18 @@ interface InboundCallEvent {
 export const InboundCallPopup: React.FC = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const { incomingCall, answerInboundCall, rejectInboundCall } = useDialerStore();
+  const { incomingCall, answerInboundCall, rejectInboundCall, initWebRTC } = useDialerStore();
   const [activeSocketCall, setActiveSocketCall] = useState<InboundCallEvent | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
   const audioIntervalRef = useRef<any>(null);
+
+  // Initialize WebRTC client so inbound SIP calls can ring anytime
+  useEffect(() => {
+    if (!user) return;
+    initWebRTC().catch((err) => {
+      console.warn('[WebRTC] Background softphone init warning:', err);
+    });
+  }, [user, initWebRTC]);
 
   // Unify incoming call from WebRTC SIP or Realtime WebSocket
   const currentIncoming = incomingCall ? {
