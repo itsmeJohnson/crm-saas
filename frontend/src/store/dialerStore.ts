@@ -122,7 +122,43 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     telecmiWebRTC.subscribe((status, _details) => {
       set({ webrtcStatus: status, isMuted: telecmiWebRTC.getIsMuted() });
 
-      if (status === 'calling') {
+      if (status === 'incoming') {
+        const incData = (_details || telecmiWebRTC.getIncomingCall()) as any;
+        const callerPhone = incData?.from || '';
+        const callerName = incData?.name || '';
+        const callId = incData?.call_id || `inbound-${Date.now()}`;
+        const toNumber = incData?.to_number || '917949817390';
+
+        // 1. Immediately trigger incoming call ringing UI
+        set({
+          incomingCall: {
+            from: callerPhone,
+            name: callerName || 'Customer',
+            call_id: callId,
+            to_number: toNumber,
+            lead: null,
+          },
+          callLifecycle: 'ringing',
+          callDirection: 'INBOUND',
+        });
+
+        // 2. Concurrently lookup or auto-create lead so details populate in popup
+        if (callerPhone) {
+          dialerApi.getOrCreateInboundLead({
+            phone: callerPhone,
+            caller_name: callerName,
+            call_id: callId,
+          }).then((lead) => {
+            if (lead) {
+              set((state) => ({
+                incomingCall: state.incomingCall ? { ...state.incomingCall, lead } : null,
+              }));
+            }
+          }).catch((err) => {
+            console.warn('[WebRTC] Inbound lead lookup error:', err);
+          });
+        }
+      } else if (status === 'calling') {
         set({ callLifecycle: 'initiating' });
       } else if (status === 'ringing') {
         set({ callLifecycle: 'ringing' });
@@ -150,7 +186,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         }
         set({ incomingCall: null });
       } else if (status === 'idle') {
-        if (!get().currentLead || get().callLifecycle === 'idle') {
+        if (!get().currentLead || get().callLifecycle === 'idle' || get().callLifecycle === 'ringing') {
           set({ callLifecycle: 'idle', incomingCall: null });
         }
       }

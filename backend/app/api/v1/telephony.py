@@ -303,6 +303,7 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
         data.get("CallSid")
         or data.get("call_sid")
         or data.get("cmiuuid")
+        or data.get("conversation_uuid")
         or data.get("request_id")
         or data.get("Uniqueid")
         or data.get("sid_id")
@@ -316,20 +317,23 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
         or data.get("from_number")
         or data.get("caller")
         or data.get("From")
+        or data.get("from")
         or data.get("msisdn")
         or data.get("caller_num")
         or ""
     )
     dest_number = (
-        data.get("DestinationNumber")
+        data.get("virtual_number")
+        or data.get("DestinationNumber")
         or data.get("to_number")
         or data.get("called")
         or data.get("To")
+        or data.get("to")
         or data.get("deskphone")
         or data.get("did_no")
         or ""
     )
-    agent_info = data.get("agent")
+    agent_info = data.get("agent") or data.get("user")
     agent_number = (
         data.get("DialWhomNumber")
         or data.get("agent_number")
@@ -337,17 +341,24 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
         or (agent_info.get("agent_id") if isinstance(agent_info, dict) else str(agent_info or ""))
         or ""
     )
-    recording_url = (
+    raw_rec = (
         data.get("CallRecordingUrl")
         or data.get("recording_url")
         or data.get("recording")
         or data.get("RecordingUrl")
         or data.get("file")
+        or data.get("filename")
         or ""
     )
+    if raw_rec and not str(raw_rec).startswith("http"):
+        recording_url = f"https://rest.telecmi.com/v2/recordings/{raw_rec}"
+    else:
+        recording_url = str(raw_rec) if raw_rec else ""
+
     raw_duration = (
         data.get("CallDuration")
         or data.get("TalkDuration")
+        or data.get("answeredsec")
         or data.get("billsec")
         or data.get("duration")
         or "0"
@@ -394,8 +405,17 @@ async def telephony_general_webhook(
     db: AsyncSession = Depends(get_db)
 ):
     """General telephony webhook endpoint supporting both GET & POST.
-    Handles Callerdesk, Exotel, Knowlarity, MyOperator Call Reports & Inbound events.
+    Handles TeleCMI, Callerdesk, Exotel, Knowlarity, MyOperator Call Reports & Inbound events.
     """
+    return await _process_unified_telephony_webhook(request, db)
+
+
+@router.api_route("/webhook/telecmi", methods=["GET", "POST"], status_code=status.HTTP_200_OK)
+async def telephony_telecmi_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Dedicated TeleCMI webhook endpoint for CDR and Notify events."""
     return await _process_unified_telephony_webhook(request, db)
 
 

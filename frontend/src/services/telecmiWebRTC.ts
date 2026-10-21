@@ -183,6 +183,23 @@ class TeleCMIWebRTCService {
         this.notify('ended', data);
       });
 
+      this.piopiy.on('hangup', (data: any) => {
+        console.log('[WebRTC] Call hangup event:', data);
+        this.clearOutboundPending();
+        this.activeCallNumber = null;
+        this.incomingCall = null;
+        this.isMuted = false;
+        this.notify('ended', data);
+      });
+
+      this.piopiy.on('missedCall', (data: any) => {
+        console.log('[WebRTC] Inbound missed call event:', data);
+        this.clearOutboundPending();
+        this.activeCallNumber = null;
+        this.incomingCall = null;
+        this.notify('idle', data);
+      });
+
       this.piopiy.on('error', (err: any) => {
         console.error('[WebRTC] Call error:', err);
         this.incomingCall = null;
