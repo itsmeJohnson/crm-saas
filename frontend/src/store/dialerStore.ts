@@ -184,14 +184,69 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         } else if (status === 'ended') {
           stopTimer();
           const wasRinging = get().callLifecycle === 'ringing' || Boolean(get().incomingCall);
-          // If caller disconnected while ringing, dismiss cleanly to idle
-          if (!wasRinging && get().currentLead && get().callLifecycle === 'connected') {
-            set({ callLifecycle: 'disposition', webrtcStatus: 'ended', incomingCall: null });
+          const wasConnected = get().callLifecycle === 'connected';
+          const isOutbound = get().callDirection === 'OUTBOUND';
+
+          // Scenario 1: Inbound ringing dropped before answer -> dismiss popup cleanly to idle
+          if (wasRinging && !isOutbound) {
+            set({
+              callLifecycle: 'idle',
+              incomingCall: null,
+              currentLead: null,
+              agentState: 'IDLE',
+              callDirection: null,
+              webrtcStatus: 'registered'
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('crm_dialer_lifecycle');
+              localStorage.removeItem('crm_dialer_current_lead');
+              localStorage.removeItem('crm_dialer_call_direction');
+              localStorage.removeItem('crm_dialer_start_time');
+            }
+            return;
+          }
+
+          // Scenario 2: Active conversation ended (either party hung up) OR Outbound call concluded -> Proceed to Disposition Wrap-Up
+          if (wasConnected || isOutbound) {
+            let lead = get().currentLead;
+            if (!lead && typeof localStorage !== 'undefined') {
+              try {
+                const cached = localStorage.getItem('crm_dialer_current_lead');
+                if (cached) lead = JSON.parse(cached);
+              } catch {}
+            }
+            if (!lead) {
+              const activeNum = telecmiWebRTC.getActiveCallNumber() || 'Customer';
+              lead = {
+                id: `call-${Date.now()}`,
+                first_name: activeNum,
+                last_name: '',
+                phone: activeNum,
+                title: 'Inbound Call',
+                status: 'Contacted',
+              } as any;
+            }
+
+            set({
+              callLifecycle: 'disposition',
+              currentLead: lead,
+              webrtcStatus: 'ended',
+              incomingCall: null,
+              agentState: 'ACTIVE_CALLING',
+            });
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+              localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
             }
           } else {
-            set({ callLifecycle: 'idle', incomingCall: null, currentLead: null, agentState: 'IDLE', callDirection: null, webrtcStatus: 'registered' });
+            set({
+              callLifecycle: 'idle',
+              incomingCall: null,
+              currentLead: null,
+              agentState: 'IDLE',
+              callDirection: null,
+              webrtcStatus: 'registered'
+            });
             if (typeof localStorage !== 'undefined') {
               localStorage.removeItem('crm_dialer_lifecycle');
               localStorage.removeItem('crm_dialer_current_lead');
@@ -200,7 +255,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             }
           }
         } else if (status === 'idle') {
-          if (!get().currentLead || get().callLifecycle === 'idle' || get().callLifecycle === 'ringing') {
+          if (!get().currentLead || get().callLifecycle === 'idle' || get().callLifecycle === 'ringing' || Boolean(get().incomingCall)) {
             set({ callLifecycle: 'idle', incomingCall: null, webrtcStatus: 'registered' });
           }
         }
@@ -434,7 +489,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
 
   answerInboundCall: async (lead?: any) => {
     set({ isLoading: true, error: null });
-    telecmiWebRTC.answer();
+    await telecmiWebRTC.answer();
     try {
       await dialerApi.updateState({ state: 'ACTIVE_CALLING' });
     } catch (e) {

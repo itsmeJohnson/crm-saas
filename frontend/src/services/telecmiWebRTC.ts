@@ -28,6 +28,44 @@ export interface WebRTCIncomingCall {
 
 type Listener = (status: WebRTCPhoneStatus, details?: any) => void;
 
+// ── Modern RTCPeerConnection Patch ──
+// TeleCMI / PIOPIY legacy SDK hooks onto 'onaddstream', which is deprecated and ignored
+// by modern Chromium (Chrome 110+) on macOS/Windows. This monkey-patch intercepts
+// native RTCPeerConnection instances to bind modern 'ontrack' events and add Google fallback STUN servers.
+if (typeof window !== 'undefined' && window.RTCPeerConnection) {
+  const OriginalRTCPeerConnection = window.RTCPeerConnection;
+  if (!(OriginalRTCPeerConnection as any).__telecmi_patched) {
+    const PatchedRTCPeerConnection = function (this: RTCPeerConnection, pcConfig?: RTCConfiguration) {
+      const enhancedConfig = { ...pcConfig };
+      const fallbackStun = [
+        { urls: 'stun:stunind.telecmi.com' },
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ];
+      enhancedConfig.iceServers = [...(enhancedConfig.iceServers || []), ...fallbackStun];
+
+      const pc = new OriginalRTCPeerConnection(enhancedConfig);
+
+      pc.addEventListener('track', (event: RTCTrackEvent) => {
+        console.log('[WebRTC Track] Remote audio track received:', event.track.kind);
+        const remoteStream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
+        const audioEl = document.getElementById('telecmi_audio_tag') as HTMLAudioElement;
+        if (audioEl) {
+          audioEl.srcObject = remoteStream;
+          audioEl.play().catch((err) => console.warn('[WebRTC Audio] Remote track play catch:', err));
+        }
+      });
+
+      return pc;
+    } as any;
+
+    PatchedRTCPeerConnection.prototype = OriginalRTCPeerConnection.prototype;
+    PatchedRTCPeerConnection.__telecmi_patched = true;
+    window.RTCPeerConnection = PatchedRTCPeerConnection;
+  }
+}
+
 class TeleCMIWebRTCService {
   private piopiy: any = null;
   private status: WebRTCPhoneStatus = 'idle';
@@ -77,6 +115,40 @@ class TeleCMIWebRTCService {
     return this.config;
   }
 
+  public ensureAudioElement(): HTMLAudioElement | null {
+    if (typeof document === 'undefined') return null;
+    let audio = document.getElementById('telecmi_audio_tag') as HTMLAudioElement;
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = 'telecmi_audio_tag';
+      audio.autoplay = true;
+      (audio as any).playsInline = true;
+      audio.style.position = 'fixed';
+      audio.style.top = '-9999px';
+      audio.style.left = '-9999px';
+      audio.style.width = '1px';
+      audio.style.height = '1px';
+      audio.style.opacity = '0';
+      audio.style.pointerEvents = 'none';
+      document.body.appendChild(audio);
+    }
+    return audio;
+  }
+
+  public async ensureMicrophonePermission(): Promise<boolean> {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+      }
+    } catch (e) {
+      console.warn('[WebRTC] Microphone permission query note:', e);
+      return false;
+    }
+    return false;
+  }
+
   public subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     listener(this.status, this.incomingCall);
@@ -117,14 +189,8 @@ class TeleCMIWebRTCService {
     }
 
     try {
-      if (typeof document !== 'undefined' && !document.getElementById('telecmi_audio_tag')) {
-        const audio = document.createElement('audio');
-        audio.id = 'telecmi_audio_tag';
-        audio.autoplay = true;
-        (audio as any).playsInline = true;
-        audio.style.display = 'none';
-        document.body.appendChild(audio);
-      }
+      this.ensureAudioElement();
+      this.ensureMicrophonePermission().catch(() => {});
 
       this.notify('registering');
       this.piopiy = new PIOPIY({
@@ -136,9 +202,9 @@ class TeleCMIWebRTCService {
       });
 
       this.piopiy.on('callStream', (data: any) => {
-        console.log('[WebRTC] Call audio stream received:', data);
+        console.log('[WebRTC] Call audio stream received via callStream:', data);
         if (data?.status && typeof document !== 'undefined') {
-          const remoteAudio = document.getElementById('telecmi_audio_tag') as HTMLAudioElement;
+          const remoteAudio = this.ensureAudioElement();
           if (remoteAudio) {
             remoteAudio.srcObject = data.status;
             remoteAudio.play().catch((e) => console.warn('[WebRTC] Audio autoplay error:', e));
@@ -240,16 +306,23 @@ class TeleCMIWebRTCService {
     }
   }
 
-  public answer(): void {
-    if (this.piopiy) {
-      try {
+  public async answer(): Promise<void> {
+    try {
+      const audio = this.ensureAudioElement();
+      if (audio) {
+        audio.play().catch(() => {});
+      }
+
+      await this.ensureMicrophonePermission();
+
+      if (this.piopiy) {
         console.log('[WebRTC] Answering incoming call session...');
         this.piopiy.answer();
         this.incomingCall = null;
         this.notify('connected');
-      } catch (e) {
-        console.error('[WebRTC] Failed to answer incoming call:', e);
       }
+    } catch (e) {
+      console.error('[WebRTC] Failed to answer incoming call:', e);
     }
   }
 
@@ -280,6 +353,9 @@ class TeleCMIWebRTCService {
       return false;
     }
 
+    this.ensureAudioElement();
+    await this.ensureMicrophonePermission();
+
     this.setOutboundPending(digits);
     this.notify('calling', { phone: digits });
     console.log('[WebRTC] Outbound pending bridge leg registered for:', digits);
@@ -295,6 +371,15 @@ class TeleCMIWebRTCService {
         console.warn('[WebRTC] Terminate failed:', e);
       }
     }
+
+    const audio = this.ensureAudioElement();
+    if (audio) {
+      try {
+        audio.pause();
+        audio.srcObject = null;
+      } catch {}
+    }
+
     this.activeCallNumber = null;
     this.isMuted = false;
     this.notify('ended');

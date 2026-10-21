@@ -37,12 +37,12 @@ export const InboundCallPopup: React.FC = () => {
     });
   }, [user, initWebRTC]);
 
-  // When call connects, clear any active socket ringing popup
+  // When call connects, ends, or transitions to disposition, clear ringing popup immediately
   useEffect(() => {
-    if (callLifecycle === 'connected') {
+    if (callLifecycle === 'connected' || callLifecycle === 'disposition' || (callLifecycle === 'idle' && !incomingCall)) {
       setActiveSocketCall(null);
     }
-  }, [callLifecycle]);
+  }, [callLifecycle, incomingCall]);
 
   // Auto-dismiss ringing popup after telecom ring timeout (40 seconds)
   useEffect(() => {
@@ -140,6 +140,7 @@ export const InboundCallPopup: React.FC = () => {
           });
         } else if (data && (data.event === 'inbound_call_ended' || data.event === 'inbound_call_cancelled')) {
           setActiveSocketCall(null);
+          useDialerStore.getState().setIncomingCall(null);
         }
       } catch (e) {
         console.error('Failed to handle telephony socket message:', e);
@@ -157,6 +158,12 @@ export const InboundCallPopup: React.FC = () => {
     if (isAnswering) return;
     setIsAnswering(true);
     try {
+      // 1. Unlock browser audio element immediately within user click gesture
+      const audio = document.getElementById('telecmi_audio_tag') as HTMLAudioElement;
+      if (audio) {
+        audio.play().catch(() => {});
+      }
+
       let lead = incomingCall?.lead;
       if (!lead && currentIncoming.lead_id) {
         try {
@@ -164,8 +171,8 @@ export const InboundCallPopup: React.FC = () => {
         } catch {}
       }
 
-      await answerInboundCall(lead);
       setActiveSocketCall(null);
+      await answerInboundCall(lead);
     } catch (e) {
       console.error('Failed to answer inbound call:', e);
       alert('Failed to answer inbound call. Please try again.');
@@ -175,8 +182,8 @@ export const InboundCallPopup: React.FC = () => {
   };
 
   const handleDeclineCall = () => {
-    rejectInboundCall();
     setActiveSocketCall(null);
+    rejectInboundCall();
   };
 
   return (
