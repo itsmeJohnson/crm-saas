@@ -4,6 +4,7 @@ import { usePipelineStore } from '../../store/pipelineStore';
 import { dashboardApi } from '../../services/dashboardApi';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
+import { useLeadStore } from '../../store/leadStore';
 import { OmniChannelChatDrawer } from './OmniChannelChatDrawer';
 import {
   PhoneCall,
@@ -88,7 +89,7 @@ export const FloatingDialerWidget: React.FC = () => {
       setTargetStageId('');
       setFollowUpDate('');
       setFollowUpTime('');
-      setCallStatus('Answered');
+      setCallStatus('Picked');
       setDispositionCategory('Interested');
     }
   }, [currentLead?.id, callLifecycle]);
@@ -139,6 +140,8 @@ export const FloatingDialerWidget: React.FC = () => {
       });
 
       try {
+        useLeadStore.getState().fetchLeads();
+        useLeadStore.getState().fetchKanbanBoard();
         useDashboardStore.getState().fetchSummary();
         useDashboardStore.getState().fetchRecentActivities();
         useAnalyticsStore.getState().fetchDashboardMetrics();
@@ -527,11 +530,11 @@ export const FloatingDialerWidget: React.FC = () => {
                     onChange={(e) => setCallStatus(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/30 cursor-pointer"
                   >
-                    <option value="Answered">Answered (Connected)</option>
+                    <option value="Picked">Answered (Connected)</option>
                     <option value="Busy">Busy</option>
-                    <option value="No Answer">No Answer / Ringing Not Responded</option>
-                    <option value="Wrong Number">Wrong Number</option>
-                    <option value="Switched Off">Switched Off / Out of Coverage</option>
+                    <option value="RNR">No Answer / Ringing Not Responded</option>
+                    <option value="Not Exist">Wrong Number / Does Not Exist</option>
+                    <option value="Switch Off">Switched Off / Out of Coverage</option>
                   </select>
                 </div>
 

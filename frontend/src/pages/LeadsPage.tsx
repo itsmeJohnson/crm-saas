@@ -865,15 +865,15 @@ export const LeadsPage: React.FC = () => {
             <div className="p-6 border-b border-slate-800 flex items-start justify-between gap-4">
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/30 flex items-center justify-center font-bold text-brand-300 text-lg shrink-0">
-                  {detailLead.title.substring(0, 2).toUpperCase()}
+                  {(detailLead.title || detailLead.first_name || 'LE').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="overflow-hidden">
                   <h2 className="text-xl font-bold text-slate-100 truncate">
-                    {detailLead.title}
+                    {detailLead.title || `${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'Lead'}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-1">
                     <span>
-                      {`${detailLead.first_name || ''} ${detailLead.last_name}`.trim()}
+                      {`${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'No Name'}
                     </span>
                     {detailLead.company_name && (
                       <>
@@ -937,7 +937,9 @@ export const LeadsPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {(callError || dialerError) && agentState !== 'ACTIVE_CALLING' && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
-                  {callError || dialerError}
+                  {typeof (callError || dialerError) === 'string'
+                    ? (callError || dialerError)
+                    : JSON.stringify(callError || dialerError)}
                 </div>
               )}
 

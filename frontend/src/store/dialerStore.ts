@@ -366,7 +366,14 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       }
     } catch (err: any) {
       console.error('[Dialer] Server callLead failed:', err);
-      const errMsg = err.response?.data?.detail || err.message || 'Failed to initiate outbound call';
+      let errMsg = 'Failed to initiate outbound call';
+      if (typeof err.response?.data?.detail === 'string') {
+        errMsg = err.response.data.detail;
+      } else if (Array.isArray(err.response?.data?.detail)) {
+        errMsg = err.response.data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+      } else if (err.message) {
+        errMsg = String(err.message);
+      }
       set({ error: errMsg, isLoading: false, callLifecycle: 'idle' });
       telecmiWebRTC.clearOutboundPending();
       stopTimer();
@@ -493,7 +500,14 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         localStorage.removeItem('crm_dialer_start_time');
       }
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || err.message || 'Failed to save call disposition';
+      let errMsg = 'Failed to save call disposition';
+      if (typeof err.response?.data?.detail === 'string') {
+        errMsg = err.response.data.detail;
+      } else if (Array.isArray(err.response?.data?.detail)) {
+        errMsg = err.response.data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+      } else if (err.message) {
+        errMsg = String(err.message);
+      }
       set({ error: errMsg, isLoading: false });
       throw err;
     }

@@ -64,12 +64,8 @@ class DispositionService:
                 )
                 dropped_res = await db.execute(dropped_query)
                 dropped_stage = dropped_res.scalar()
-                if not dropped_stage:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="The system 'Dropped' stage is missing for this organization."
-                    )
-                lead.stage_id = dropped_stage.id
+                if dropped_stage:
+                    lead.stage_id = dropped_stage.id
                 
         elif payload.status in {CallDispositionStatus.NOT_EXIST, CallDispositionStatus.OUT_OF_SERVICE, CallDispositionStatus.INBOUND_SPAM}:
             # Invalid entry or Spam: immediate drop
@@ -80,12 +76,8 @@ class DispositionService:
             )
             dropped_res = await db.execute(dropped_query)
             dropped_stage = dropped_res.scalar()
-            if not dropped_stage:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="The system 'Dropped' stage is missing for this organization."
-                )
-            lead.stage_id = dropped_stage.id
+            if dropped_stage:
+                lead.stage_id = dropped_stage.id
             
         elif payload.status in {CallDispositionStatus.PICKED, CallDispositionStatus.INBOUND_RESOLVED, CallDispositionStatus.INBOUND_CALLBACK, CallDispositionStatus.INBOUND_INTERESTED}:
             # Successful connection or inbound match: advance to specified custom stage if provided

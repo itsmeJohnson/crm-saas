@@ -17,6 +17,7 @@ import { RestaurantDashboard } from './pages/RestaurantDashboard';
 import { SubscriptionGateRoute } from './components/SubscriptionGateRoute';
 import { MODULES_REGISTRY } from './routes/moduleRegistry';
 import { ModuleGuardRoute } from './components/common/ModuleGuardRoute';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,7 +30,8 @@ const queryClient = new QueryClient({
 
 export const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Suspense fallback={
           <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg-app)] text-[var(--text-secondary)]">
@@ -114,6 +116,7 @@ export const App: React.FC = () => {
         </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 
