@@ -7,6 +7,8 @@ class LeadTransferRequest(BaseModel):
     destination_user_ids: List[uuid.UUID]
     quantity: int | None = None
     lead_ids: List[uuid.UUID] | None = None
+    reason: str | None = None
+    notes: str | None = None
 
     @model_validator(mode="after")
     def validate_input(self) -> 'LeadTransferRequest':

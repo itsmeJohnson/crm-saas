@@ -96,3 +96,11 @@ class InboundLeadLookupRequest(BaseModel):
     phone: str
     caller_name: Optional[str] = None
     call_id: Optional[str] = None
+
+class CallEndedRequest(BaseModel):
+    lead_id: Optional[uuid.UUID] = None
+    call_sid: Optional[str] = None
+    duration: int = Field(default=0, ge=0)
+    call_direction: Optional[str] = "OUTBOUND"
+    status: Optional[str] = "Completed"
+    recording_url: Optional[str] = None

@@ -414,6 +414,8 @@ export const leadApi = {
     destination_user_ids: string[];
     quantity?: number | null;
     lead_ids?: string[] | null;
+    reason?: string | null;
+    notes?: string | null;
   }) => {
     const response = await api.post<{ transferred_count: number; lead_ids: string[]; destination_user_ids: string[] }>('/leads/transfer', payload);
     return response.data;

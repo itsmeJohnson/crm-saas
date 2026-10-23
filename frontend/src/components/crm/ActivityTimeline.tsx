@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { activityApi, ActivityResponse } from '../../services/activityApi';
-// Let's import useUserStore from '../../store/userStore'
 import { useUserStore as useUsersListStore } from '../../store/userStore';
+import { whatsappRealtime } from '../../services/whatsappRealtime';
 import { Phone, Calendar, Mail, CheckSquare, Plus, Trash2, CheckCircle2, Circle, Loader2, AlertCircle } from 'lucide-react';
 
 interface ActivityTimelineProps {
@@ -57,6 +57,40 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     if (users.length === 0) {
       fetchUsers();
     }
+  }, [leadId, contactId, companyId]);
+
+  // Real-time listener for WhatsApp messages, calls, and activities
+  useEffect(() => {
+    const unsubscribe = whatsappRealtime.subscribe((data) => {
+      try {
+        if (!data) return;
+        const eventType = data.type || data.event;
+        if (eventType === 'whatsapp_message') {
+          // If message belongs to this lead, contact, or company
+          if (
+            (!leadId && !contactId && !companyId) ||
+            (leadId && data.lead_id === leadId) ||
+            (contactId && data.contact_id === contactId)
+          ) {
+            fetchActivities();
+          }
+        } else if (
+          eventType === 'inbound_call_ended' ||
+          eventType === 'call_completed' ||
+          eventType === 'activity_updated'
+        ) {
+          if (!leadId || data.lead_id === leadId) {
+            fetchActivities();
+          }
+        }
+      } catch (err) {
+        console.error('[ActivityTimeline] Realtime update error:', err);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [leadId, contactId, companyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {

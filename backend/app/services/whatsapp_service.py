@@ -498,6 +498,8 @@ class WhatsAppService:
         await ws_manager.broadcast_to_organization({
             "type": "whatsapp_message",
             "conversation_id": str(conv.id),
+            "lead_id": str(conv.lead_id) if conv.lead_id else None,
+            "contact_id": str(conv.contact_id) if conv.contact_id else None,
             "message": msg_dict
         }, actor.organization_id, self.db)
 
@@ -592,6 +594,8 @@ class WhatsAppService:
         await ws_manager.broadcast_to_organization({
             "type": "whatsapp_message",
             "conversation_id": str(conv.id),
+            "lead_id": str(conv.lead_id) if conv.lead_id else None,
+            "contact_id": str(conv.contact_id) if conv.contact_id else None,
             "message": msg_dict
         }, actor.organization_id, self.db)
 
@@ -670,6 +674,8 @@ class WhatsAppService:
         await ws_manager.broadcast_to_organization({
             "type": "whatsapp_message",
             "conversation_id": str(conv.id),
+            "lead_id": str(conv.lead_id) if conv.lead_id else None,
+            "contact_id": str(conv.contact_id) if conv.contact_id else None,
             "message": msg_dict
         }, actor.organization_id, self.db)
 

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { LeadResponse, leadApi } from '../../services/leadApi';
 import { whatsappApi, WaMessage, QuickReply, WaTemplate } from '../../services/whatsappApi';
+import { whatsappRealtime } from '../../services/whatsappRealtime';
 import { smsApi, SmsItem } from '../../services/smsApi';
 import { extractErrorMessage } from '../../utils/errors';
 
@@ -256,6 +257,57 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     }
   }, [isOpen, lead, channel, loadConversation, loadTemplates]);
 
+  // Real-time listener for incoming WhatsApp replies and status confirmations
+  useEffect(() => {
+    if (!isOpen || !lead) return;
+
+    const unsubscribe = whatsappRealtime.subscribe((data) => {
+      try {
+        if (!data) return;
+        const eventType = data.type || data.event;
+        if (eventType === 'whatsapp_message') {
+          const incomingMsg = data.message;
+          const msgLeadId = data.lead_id;
+          const msgConvId = data.conversation_id;
+
+          const isMatch = (msgLeadId && msgLeadId === lead.id) || (waConvId && msgConvId === waConvId);
+          if (isMatch) {
+            if (incomingMsg) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === incomingMsg.id)) {
+                  return prev.map((m) =>
+                    m.id === incomingMsg.id ? { ...m, status: incomingMsg.wa_status || m.status } : m
+                  );
+                }
+                const formatted: ChatMessage = {
+                  id: incomingMsg.id,
+                  channel: 'whatsapp',
+                  direction: incomingMsg.direction || 'INBOUND',
+                  body: incomingMsg.body || '',
+                  status: incomingMsg.wa_status || 'received',
+                  created_at: incomingMsg.created_at || new Date().toISOString(),
+                  media_type: incomingMsg.media_type,
+                  media_url: incomingMsg.attachments?.[0]?.media_url,
+                  filename: incomingMsg.attachments?.[0]?.file_name,
+                };
+                return [...prev, formatted];
+              });
+              setTimeout(() => scrollToBottom('smooth'), 50);
+            } else {
+              loadConversation();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[OmniChannelChatDrawer] Realtime error:', err);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isOpen, lead?.id, waConvId, loadConversation]);
+
   const handleSendTemplate = async (templateToUse?: WaTemplate) => {
     const tmpl = templateToUse || selectedTemplate;
     if (!tmpl || !lead || !lead.phone) return;
@@ -485,10 +537,10 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
       />
 
       {/* Drawer Container (Full screen on mobile, 520px wide on desktop) */}
-      <div className="relative w-full md:w-[520px] max-w-full h-full bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col z-10">
+      <div className="relative w-full md:w-[520px] max-w-full h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] shadow-2xl flex flex-col z-10 text-[var(--text-primary)]">
         
         {/* Header */}
-        <div className="p-4 border-b border-slate-800/80 bg-slate-900/95 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)] flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border ${
               channel === 'whatsapp' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
@@ -497,12 +549,12 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-100 truncate">{contactName}</h2>
+                <h2 className="text-sm font-bold text-[var(--text-primary)] truncate">{contactName}</h2>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> KYC Ready
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] truncate flex items-center gap-2 mt-0.5">
                 <span>{lead.phone || 'No phone'}</span>
                 {lead.company_name && <span>• {lead.company_name}</span>}
               </p>
@@ -514,7 +566,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
               <a
                 href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
                 title="Direct Phone Call"
-                className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition cursor-pointer"
+                className="p-2 border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl transition cursor-pointer"
               >
                 <Phone className="w-4 h-4" />
               </a>
@@ -524,13 +576,13 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               title="Open external WhatsApp Web"
-              className="p-2 border border-slate-800 hover:bg-emerald-500/10 text-emerald-400 rounded-xl transition cursor-pointer"
+              className="p-2 border border-[var(--border-color)] hover:bg-emerald-500/10 text-emerald-400 rounded-xl transition cursor-pointer"
             >
               <ExternalLink className="w-4 h-4" />
             </a>
             <button
               onClick={onClose}
-              className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition cursor-pointer"
+              className="p-2 border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-xl transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -538,8 +590,8 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         </div>
 
         {/* Channel Selector & Document Tools Tab Bar */}
-        <div className="px-4 py-2 bg-slate-950/40 border-b border-slate-800/60 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-semibold">
+        <div className="px-4 py-2 bg-[var(--bg-subtle)] border-b border-[var(--border-color)] flex items-center justify-between gap-2 shrink-0">
+          <div className="flex rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] p-0.5 text-xs font-semibold">
             <button
               type="button"
               onClick={() => setChannel('whatsapp')}
@@ -646,20 +698,20 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
                     className={`max-w-[85%] rounded-2xl p-3 text-sm border flex flex-col gap-1.5 shadow-sm ${
                       isOut
                         ? channel === 'whatsapp'
-                          ? 'bg-emerald-600/15 border-emerald-500/25 text-slate-100 rounded-br-none'
-                          : 'bg-indigo-600/15 border-indigo-500/25 text-slate-100 rounded-br-none'
-                        : 'bg-slate-800/90 border-slate-700/60 text-slate-200 rounded-bl-none'
+                          ? 'bg-emerald-500/10 border-emerald-500/25 text-[var(--text-primary)] rounded-br-none'
+                          : 'bg-indigo-500/10 border-indigo-500/25 text-[var(--text-primary)] rounded-br-none'
+                        : 'bg-[var(--bg-subtle)] border-[var(--border-color)] text-[var(--text-primary)] rounded-bl-none'
                     }`}
                   >
                     {/* Document / Image Card if attached */}
                     {(m.filename || m.media_url) && (
-                      <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center border shrink-0 ${fileBadge?.color}`}>
                           <IconComp className="w-5 h-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-slate-200 truncate">{m.filename || 'Document file'}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
+                          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{m.filename || 'Document file'}</p>
+                          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
                             {fileBadge?.label} {m.filesize ? `• ${(m.filesize / 1024).toFixed(1)} KB` : ''}
                           </p>
                         </div>
@@ -709,8 +761,8 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         </div>
 
         {/* Quick Onboarding Response Chips */}
-        <div className="px-3 pt-2 bg-slate-900 border-t border-slate-800/60 overflow-x-auto no-scrollbar flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0 mr-1">Quick:</span>
+        <div className="px-3 pt-2 bg-[var(--bg-surface)] border-t border-[var(--border-color)] overflow-x-auto no-scrollbar flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] shrink-0 mr-1">Quick:</span>
           {channel === 'whatsapp' && (
             <button
               type="button"
@@ -808,7 +860,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         )}
 
         {/* Composer Form */}
-        <form onSubmit={handleSend} className="p-3 border-t border-slate-800 bg-slate-900 shrink-0">
+        <form onSubmit={handleSend} className="p-3 border-t border-[var(--border-color)] bg-[var(--bg-surface)] shrink-0">
           <input
             type="file"
             ref={fileInputRef}
@@ -827,7 +879,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
               className={`p-2.5 rounded-xl border transition cursor-pointer shrink-0 ${
                 selectedFile
                   ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                  : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
               }`}
             >
               <Paperclip className="w-4 h-4" />
@@ -881,7 +933,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
                   : `Type ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} message to customer...`
               }
               disabled={sending}
-              className="flex-1 bg-slate-800/90 border border-slate-700 text-slate-200 py-2 px-3 rounded-xl text-xs sm:text-sm resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder:text-slate-500"
+              className="flex-1 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] py-2 px-3 rounded-xl text-xs sm:text-sm resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder:text-[var(--text-muted)]"
             />
 
             {/* Send Button */}

@@ -63,11 +63,11 @@ class AssignmentService:
         if not active_employees:
             return None
 
-        # Attendance check:
-        # Auto-assignment only routes to agents who have marked attendance today (present/late/half_day,
-        # clocked in, not clocked out). Any employee who hasn't clocked in is considered absent.
+        # Attendance & Availability check:
+        # Leads are ONLY distributed to agents who are currently "Punched In" and "Available".
         from datetime import datetime, timezone
         from app.models.attendance import AttendanceRecord
+        from app.services.agent_state_service import AgentStateService
 
         today = datetime.now(timezone.utc).date()
         present_query = select(AttendanceRecord.user_id).filter(
@@ -80,16 +80,25 @@ class AssignmentService:
         present_user_ids = set((await self.db.execute(present_query)).scalars().all())
         present_employees = [u for u in active_employees if u.id in present_user_ids]
 
-        # If attendance is explicitly required (e.g. attendance-aware testing or workflows),
-        # return None when no agents are present. Otherwise, if agents are present route to them,
-        # or fall back to active employees so incoming leads outside shift hours are not dropped.
-        requires_strict_attendance = "attendance" in (lead.title or "").lower()
         if not present_employees:
-            if requires_strict_attendance:
-                return None
-            eligible_employees = active_employees
-        else:
-            eligible_employees = present_employees
+            return None
+
+        # Filter for agents who are currently "Available" (state == "IDLE")
+        agent_state_svc = AgentStateService()
+        available_employees = []
+        for emp in present_employees:
+            try:
+                state_data = await agent_state_svc.get_agent_state(lead.organization_id, emp.id)
+                current_state = state_data.get("state", "IDLE")
+                if current_state == "IDLE":
+                    available_employees.append(emp)
+            except Exception:
+                available_employees.append(emp)
+
+        if not available_employees:
+            return None
+
+        eligible_employees = available_employees
 
         # Branch-wise routing: when the lead belongs to a branch and that branch
         # has active reps, rotate only within the branch using an independent

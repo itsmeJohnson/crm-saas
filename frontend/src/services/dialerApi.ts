@@ -74,5 +74,17 @@ export const dialerApi = {
     const response = await api.post<LeadResponse>('/dialer/inbound-lead', payload);
     return response.data;
   },
+
+  recordCallEnded: async (payload: {
+    lead_id?: string;
+    call_sid?: string;
+    duration: number;
+    call_direction?: string;
+    status?: string;
+    recording_url?: string;
+  }) => {
+    const response = await api.post<{ status: string; activity_id: string; duration: number }>('/dialer/call-ended', payload);
+    return response.data;
+  },
 };
 

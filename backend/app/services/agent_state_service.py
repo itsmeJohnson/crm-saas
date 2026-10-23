@@ -33,7 +33,7 @@ class AgentStateService:
         state: str, 
         metadata: dict = None
     ) -> dict:
-        allowed_states = {"IDLE", "RINGING", "ACTIVE_CALLING", "ON_CALL", "BREAK"}
+        allowed_states = {"IDLE", "RINGING", "ACTIVE_CALLING", "ON_CALL", "BREAK", "OFFLINE"}
         if state not in allowed_states:
             raise ValueError(f"Invalid state: {state}. Allowed states: {allowed_states}")
         
@@ -44,7 +44,10 @@ class AgentStateService:
             "metadata": metadata or {}
         }
         await redis_client.set(key, json.dumps(payload), ex=86400)
-        await redis_client.sadd(f"org:{org_id}:active_agents", str(user_id))
+        if state == "OFFLINE":
+            await redis_client.srem(f"org:{org_id}:active_agents", str(user_id))
+        else:
+            await redis_client.sadd(f"org:{org_id}:active_agents", str(user_id))
 
         # Real-time WebSocket state notification
         try:

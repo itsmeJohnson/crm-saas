@@ -183,6 +183,24 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           }
         } else if (status === 'ended') {
           stopTimer();
+          const finalDuration = get().callDuration || 0;
+          const currentLeadObj = get().currentLead;
+          const dir = get().callDirection || 'OUTBOUND';
+          const callId = _details?.call_id || _details?.callId || telecmiWebRTC.getActiveCallNumber() || undefined;
+
+          // Immediately persist call log metrics in database upon disconnected event
+          if (currentLeadObj?.id && String(currentLeadObj.id).length === 36) {
+            dialerApi.recordCallEnded({
+              lead_id: currentLeadObj.id,
+              call_sid: typeof callId === 'string' ? callId : undefined,
+              duration: finalDuration,
+              call_direction: dir,
+              status: finalDuration > 0 ? 'Completed' : 'Missed',
+            }).catch((err) => {
+              console.warn('[Dialer] Record call ended catch:', err);
+            });
+          }
+
           const wasRinging = get().callLifecycle === 'ringing' || Boolean(get().incomingCall);
           const wasConnected = get().callLifecycle === 'connected';
           const isOutbound = get().callDirection === 'OUTBOUND';

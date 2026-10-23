@@ -274,6 +274,14 @@ class AttendanceService:
         self.db.add(rec)
         await self.db.flush()
         await self.db.refresh(rec)
+
+        # Synchronize agent availability state to IDLE
+        try:
+            from app.services.agent_state_service import AgentStateService
+            await AgentStateService().set_agent_state(actor.organization_id, user_id, "IDLE")
+        except Exception:
+            pass
+
         await self.audit.log_event(organization_id=actor.organization_id, actor_user_id=actor.id,
                                    action="ATTENDANCE_RESUME_SHIFT", resource_type="attendance", resource_id=str(rec.id),
                                    action_metadata={"user_id": str(user_id)})
@@ -319,6 +327,14 @@ class AttendanceService:
         self.db.add(rec)
         await self.db.flush()
         await self.db.refresh(rec)
+
+        # Synchronize agent availability state to IDLE
+        try:
+            from app.services.agent_state_service import AgentStateService
+            await AgentStateService().set_agent_state(actor.organization_id, user_id, "IDLE")
+        except Exception:
+            pass
+
         # Workflow: attendance marked (+ late_login when applicable)
         from app.services.workflow_service import WorkflowService
         wf = WorkflowService(self.db)
@@ -369,6 +385,14 @@ class AttendanceService:
         self.db.add(rec)
         await self.db.flush()
         await self.db.refresh(rec)
+
+        # Synchronize agent availability state to OFFLINE
+        try:
+            from app.services.agent_state_service import AgentStateService
+            await AgentStateService().set_agent_state(actor.organization_id, user_id, "OFFLINE")
+        except Exception:
+            pass
+
         if rec.is_early_logout:
             await self._notify_manager(actor, user_id, "Early logout",
                                        f"{await self._name(user_id)} clocked out {rec.early_minutes} min early.")
@@ -405,6 +429,14 @@ class AttendanceService:
         self.db.add(AttendanceBreak(organization_id=actor.organization_id, attendance_id=rec.id,
                                     break_start=_now(), reason=reason))
         await self.db.flush()
+
+        # Synchronize agent availability state to BREAK
+        try:
+            from app.services.agent_state_service import AgentStateService
+            await AgentStateService().set_agent_state(actor.organization_id, actor.id, "BREAK", {"reason": reason})
+        except Exception:
+            pass
+
         return await self._serialize_record(rec)
 
     async def break_end(self, actor: User) -> dict:
@@ -416,6 +448,14 @@ class AttendanceService:
         if not await self._open_break(rec):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not currently on a break.")
         await self._close_open_break(rec, _now())
+
+        # Synchronize agent availability state to IDLE
+        try:
+            from app.services.agent_state_service import AgentStateService
+            await AgentStateService().set_agent_state(actor.organization_id, actor.id, "IDLE")
+        except Exception:
+            pass
+
         return await self._serialize_record(rec)
 
     # ================= Biometric ingest =================

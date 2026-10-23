@@ -277,7 +277,106 @@ async def _handle_incoming_call_event(
             "event": "inbound_call_ended"
         }
 
-    # 4. Broadcast live ringing incoming call popup alert via WebSockets
+    # 4. Intelligent Inbound Call Routing:
+    # Query lead: if assigned agent is Punched In and Available (IDLE), route directly to them.
+    # If assigned agent is offline/busy, or if it is a new lead, route to "Incoming Call Attend Team" queue.
+    from datetime import datetime, timezone
+    from app.models.attendance import AttendanceRecord
+    from app.services.agent_state_service import AgentStateService
+
+    target_user_ids: list[str] = []
+    routing_reason: str = "unassigned"
+
+    # Step A: If assigned_user_id exists, check if assigned agent is Punched In and Available
+    if assigned_user_id:
+        today = datetime.now(timezone.utc).date()
+        att_query = select(AttendanceRecord).filter(
+            AttendanceRecord.organization_id == org_id,
+            AttendanceRecord.user_id == assigned_user_id,
+            AttendanceRecord.work_date == today,
+            AttendanceRecord.clock_in_at.is_not(None),
+            AttendanceRecord.clock_out_at.is_(None),
+            AttendanceRecord.status.in_(["present", "late", "half_day"])
+        )
+        att_res = await db.execute(att_query)
+        att_rec = att_res.scalars().first()
+
+        if att_rec:
+            agent_state_svc = AgentStateService()
+            try:
+                st = await agent_state_svc.get_agent_state(org_id, assigned_user_id)
+                if st.get("state") == "IDLE":
+                    target_user_ids = [str(assigned_user_id)]
+                    routing_reason = "assigned_agent"
+            except Exception:
+                target_user_ids = [str(assigned_user_id)]
+                routing_reason = "assigned_agent"
+
+    # Step B: If assigned agent is offline/busy or unassigned, route to "Incoming Call Attend Team" queue
+    if not target_user_ids:
+        from app.models.team import Team, TeamMember
+        team_res = await db.execute(
+            select(Team.id).where(
+                Team.organization_id == org_id,
+                Team.status == "active",
+                or_(
+                    Team.name.ilike("%incoming%"),
+                    Team.name.ilike("%attend%"),
+                    Team.name.ilike("%inbound%"),
+                )
+            )
+        )
+        attend_team_ids = list(team_res.scalars().all())
+
+        candidate_ids = []
+        if attend_team_ids:
+            mem_res = await db.execute(
+                select(TeamMember.user_id).where(
+                    TeamMember.organization_id == org_id,
+                    TeamMember.team_id.in_(attend_team_ids)
+                )
+            )
+            candidate_ids = list(mem_res.scalars().all())
+
+        if not candidate_ids:
+            # Fall back to active floor agents
+            emp_res = await db.execute(
+                select(User.id).where(
+                    User.organization_id == org_id,
+                    User.role.in_(["Employee", "TeamLeader"]),
+                    User.is_active == True,
+                    User.is_deleted == False
+                )
+            )
+            candidate_ids = list(emp_res.scalars().all())
+
+        # Filter candidate agents who are currently Punched In & Available
+        today = datetime.now(timezone.utc).date()
+        punched_in_res = await db.execute(
+            select(AttendanceRecord.user_id).where(
+                AttendanceRecord.organization_id == org_id,
+                AttendanceRecord.user_id.in_(candidate_ids),
+                AttendanceRecord.work_date == today,
+                AttendanceRecord.clock_in_at.is_not(None),
+                AttendanceRecord.clock_out_at.is_(None),
+                AttendanceRecord.status.in_(["present", "late", "half_day"])
+            )
+        )
+        punched_in_uids = set(punched_in_res.scalars().all())
+
+        agent_state_svc = AgentStateService()
+        available_attend_agents = []
+        for uid in punched_in_uids:
+            try:
+                agent_st = await agent_state_svc.get_agent_state(org_id, uid)
+                if agent_st.get("state") == "IDLE":
+                    available_attend_agents.append(str(uid))
+            except Exception:
+                available_attend_agents.append(str(uid))
+
+        target_user_ids = available_attend_agents
+        routing_reason = "attend_team_queue" if attend_team_ids else "available_agents_queue"
+
     alert_payload = {
         "event": "inbound_call",
         "call_sid": call_sid,
@@ -288,18 +387,24 @@ async def _handle_incoming_call_event(
         "activity_id": str(activity.id),
         "status": call_status,
         "virtual_number": destination_number,
+        "routing_reason": routing_reason,
+        "assigned_user_id": str(assigned_user_id) if assigned_user_id else None,
     }
 
-    if assigned_user_id:
-        await ws_manager.send_personal_message(alert_payload, str(assigned_user_id))
-    # Always broadcast to organization so active telecallers see incoming ring
-    await ws_manager.broadcast_to_organization(alert_payload, org_id, db)
+    if target_user_ids:
+        for uid in target_user_ids:
+            await ws_manager.send_personal_message(alert_payload, uid)
+    else:
+        # Fallback to org broadcast if no agents are actively IDLE
+        await ws_manager.broadcast_to_organization(alert_payload, org_id, db)
 
     return {
         "status": "matched",
         "lead_id": str(lead.id),
         "activity_id": str(activity.id),
-        "event": "inbound_call"
+        "event": "inbound_call",
+        "routing_reason": routing_reason,
+        "routed_targets_count": len(target_user_ids)
     }
 
 

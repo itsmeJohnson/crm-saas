@@ -34,6 +34,25 @@ export default {
           900: '#212f85',
           950: '#161e6a',
         },
+        surface: 'var(--bg-surface)',
+        card: {
+          DEFAULT: 'var(--bg-card)',
+          hover: 'var(--bg-card-hover)',
+        },
+        subtle: 'var(--bg-subtle)',
+        input: 'var(--bg-input)',
+        inset: 'var(--bg-inset)',
+        border: {
+          DEFAULT: 'var(--border-color)',
+          strong: 'var(--border-strong)',
+          subtle: 'var(--border-subtle)',
+        },
+        primary: {
+          DEFAULT: 'var(--text-primary)',
+          accent: 'var(--primary-accent)',
+        },
+        secondary: 'var(--text-secondary)',
+        muted: 'var(--text-muted)',
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],

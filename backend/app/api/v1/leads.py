@@ -232,8 +232,9 @@ async def allocate_leads_round_robin(
 ):
     """Deterministic Lead Allocation: Bulk round-robin splitting across logged-in, active agents."""
     from app.models.lead import Lead
-    from app.models.attendance import Attendance
+    from app.models.attendance import AttendanceRecord
     from app.models.user_session import UserSession
+    from app.services.agent_state_service import AgentStateService
     from app.services.notification_service import NotificationService
     from datetime import date
     import itertools
@@ -265,13 +266,15 @@ async def allocate_leads_round_robin(
     agent_res = await db.execute(agent_q)
     eligible_agents = list(agent_res.scalars().all())
 
-    if req.only_active_present and len(eligible_agents) > 1:
+    if req.only_active_present:
         today_date = date.today()
         att_res = await db.execute(
-            select(Attendance.user_id).where(
-                Attendance.organization_id == actor.organization_id,
-                Attendance.date == today_date,
-                Attendance.status.in_(["PRESENT", "HALF_DAY"])
+            select(AttendanceRecord.user_id).where(
+                AttendanceRecord.organization_id == actor.organization_id,
+                AttendanceRecord.work_date == today_date,
+                AttendanceRecord.clock_in_at.is_not(None),
+                AttendanceRecord.clock_out_at.is_(None),
+                AttendanceRecord.status.in_(["present", "late", "half_day"])
             )
         )
         present_uids = set(att_res.scalars().all())
@@ -283,7 +286,20 @@ async def allocate_leads_round_robin(
         )
         active_uids = present_uids.union(set(sess_res.scalars().all()))
         filtered_agents = [a for a in eligible_agents if a.id in active_uids]
-        if filtered_agents:
+        
+        # Check AgentStateService availability
+        agent_state_svc = AgentStateService()
+        available_agents = []
+        for a in (filtered_agents or eligible_agents):
+            try:
+                st = await agent_state_svc.get_agent_state(actor.organization_id, a.id)
+                if st.get("state") == "IDLE":
+                    available_agents.append(a)
+            except Exception:
+                available_agents.append(a)
+        if available_agents:
+            eligible_agents = available_agents
+        elif filtered_agents:
             eligible_agents = filtered_agents
 
     if not eligible_agents:
@@ -909,11 +925,23 @@ async def transfer_leads(
     k = num_leads // num_destinations
     r = num_leads % num_destinations
 
+    # Fetch source user details for timeline context
+    source_user_res = await db.execute(
+        select(User).filter(
+            User.id == req.source_user_id,
+            User.organization_id == actor.organization_id
+        )
+    )
+    source_user = source_user_res.scalars().first()
+    source_name = f"{source_user.first_name or ''} {source_user.last_name or ''}".strip() or (source_user.email if source_user else "Previous Agent")
+
     idx = 0
     transferred_lead_ids = []
+    from app.models.activity import Activity
     for i, dest_id in enumerate(req.destination_user_ids):
         chunk_size = k + (1 if i < r else 0)
         dest_user = dest_users[dest_id]
+        dest_name = f"{dest_user.first_name or ''} {dest_user.last_name or ''}".strip() or dest_user.email
         for _ in range(chunk_size):
             lead = leads[idx]
             lead.assigned_user_id = dest_id
@@ -931,10 +959,24 @@ async def transfer_leads(
                     "assigned_user_id": str(dest_id),
                     "assigned_email": dest_user.email,
                     "previous_user_id": str(req.source_user_id),
-                    "reason": "lead_transfer",
+                    "reason": req.reason or "lead_transfer",
+                    "notes": req.notes,
                     "actor_id": str(actor.id)
                 }
             )
+
+            # Record Transfer context Activity on the lead timeline
+            transfer_activity = Activity(
+                organization_id=actor.organization_id,
+                activity_type="Task",
+                subject=f"Lead transferred to {dest_name}",
+                description=f"Transferred from {source_name} to {dest_name} by {actor.first_name or actor.email}. Reason: {req.reason or 'Manual Transfer'}. {f'Notes: {req.notes}' if req.notes else ''}".strip(),
+                status="Completed",
+                assigned_user_id=dest_id,
+                lead_id=lead.id,
+                created_by=actor.id
+            )
+            db.add(transfer_activity)
             idx += 1
 
         if chunk_size > 0 and dest_id != actor.id:

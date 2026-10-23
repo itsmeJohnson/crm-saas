@@ -28,6 +28,8 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
   const [selectedDestUserIds, setSelectedDestUserIds] = useState<string[]>([]);
   const [transferType, setTransferType] = useState<'SELECTED' | 'QUANTITY'>('SELECTED');
   const [quantity, setQuantity] = useState<number | ''>('');
+  const [transferReason, setTransferReason] = useState<string>('Territory Rebalance');
+  const [transferNotes, setTransferNotes] = useState<string>('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Fetch employees/downlines reporting to current user
@@ -37,6 +39,8 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
       setSelectedDestUserIds([]);
       setTransferType(selectedLeads.length > 0 ? 'SELECTED' : 'QUANTITY');
       setQuantity('');
+      setTransferReason('Territory Rebalance');
+      setTransferNotes('');
       setLocalError(null);
 
       const fetchEmployees = async () => {
@@ -87,6 +91,8 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
     let payload: any = {
       source_user_id: sourceUserId,
       destination_user_ids: selectedDestUserIds,
+      reason: transferReason,
+      notes: transferNotes.trim() || undefined,
     };
 
     if (transferType === 'SELECTED') {
@@ -135,16 +141,16 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
       <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800/80 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] z-10 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-[var(--bg-modal)] border border-[var(--border-color)] rounded-2xl shadow-2xl flex flex-col max-h-[90vh] z-10 overflow-hidden text-[var(--text-primary)]">
         {/* Header */}
-        <div className="px-6 py-4.5 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4.5 border-b border-[var(--border-color)] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/25 flex items-center justify-center">
-              <ArrowRightLeft className="w-5 h-5 text-brand-300" />
+              <ArrowRightLeft className="w-5 h-5 text-brand-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-100">Transfer Leads</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h3 className="text-lg font-bold text-[var(--text-primary)]">Transfer Leads</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 Reassign leads from a source owner to destination team members
               </p>
             </div>
@@ -152,7 +158,7 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
           <button 
             type="button"
             onClick={onClose} 
-            className="p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-950/50 text-slate-400 hover:text-slate-200 rounded-xl transition-all cursor-pointer"
+            className="p-1.5 border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-xl transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -171,9 +177,9 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Source User Dropdown */}
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Source Owner (From)</label>
+            <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">Source Owner (From)</label>
             {isLoadingEmployees ? (
-              <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] py-1">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 Fetching team...
               </div>
@@ -184,7 +190,7 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
                   setSourceUserId(e.target.value);
                   setSelectedDestUserIds(selectedDestUserIds.filter(id => id !== e.target.value));
                 }}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-brand-500/40"
+                className="w-full px-3 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:border-brand-500/40"
               >
                 {/* Team Leaders can also select themselves */}
                 {user && (
@@ -205,13 +211,13 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
 
           {/* Transfer Method */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Transfer Method</label>
+            <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Transfer Method</label>
             <div className="grid grid-cols-2 gap-3">
               <label 
                 className={`p-3 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
                   transferType === 'SELECTED' 
-                    ? 'border-brand-500/50 bg-brand-500/5 text-slate-200' 
-                    : 'border-slate-800 hover:border-slate-700 bg-slate-950/20 text-slate-400'
+                    ? 'border-brand-500/50 bg-brand-500/5 text-[var(--text-primary)]' 
+                    : 'border-[var(--border-color)] hover:border-[var(--border-strong)] bg-[var(--bg-subtle)] text-[var(--text-muted)]'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -226,7 +232,7 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
                   />
                   <span className="text-xs font-semibold">Selected Leads</span>
                 </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
+                <span className="text-[10px] text-[var(--text-muted)] mt-1 block">
                   Transfer the selected ({matchingSelectedLeads.length}) leads owned by source.
                 </span>
               </label>
@@ -234,8 +240,8 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
               <label 
                 className={`p-3 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
                   transferType === 'QUANTITY' 
-                    ? 'border-brand-500/50 bg-brand-500/5 text-slate-200' 
-                    : 'border-slate-800 hover:border-slate-700 bg-slate-950/20 text-slate-400'
+                    ? 'border-brand-500/50 bg-brand-500/5 text-[var(--text-primary)]' 
+                    : 'border-[var(--border-color)] hover:border-[var(--border-strong)] bg-[var(--bg-subtle)] text-[var(--text-muted)]'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -264,14 +270,14 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
                 <span>Specify Lead Count</span>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-semibold uppercase">Number of leads to transfer</label>
+                <label className="text-[10px] text-[var(--text-muted)] font-semibold uppercase">Number of leads to transfer</label>
                 <input
                   type="number"
                   min="1"
                   placeholder="e.g. 10"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-brand-500/40"
+                  className="w-full px-3 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:border-brand-500/40"
                 />
               </div>
             </div>
@@ -280,7 +286,7 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
           {/* Destination Checklist */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Destination Assignees (To)</label>
+              <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Destination Assignees (To)</label>
               {employees.length > 1 && (
                 <button
                   type="button"
@@ -293,16 +299,16 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
             </div>
 
             {isLoadingEmployees ? (
-              <div className="flex items-center justify-center py-8 text-slate-500 text-xs gap-2">
+              <div className="flex items-center justify-center py-8 text-[var(--text-muted)] text-xs gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
                 Loading assignees...
               </div>
             ) : employees.filter(emp => emp.id !== sourceUserId).length === 0 ? (
-              <div className="p-4 bg-slate-950/20 border border-slate-800 rounded-xl text-center text-xs text-slate-500">
+              <div className="p-4 bg-[var(--bg-subtle)] border border-[var(--border-color)] rounded-xl text-center text-xs text-[var(--text-muted)]">
                 No other team members available to receive leads.
               </div>
             ) : (
-              <div className="border border-slate-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-slate-850 bg-slate-950/20 px-3 py-1">
+              <div className="border border-[var(--border-color)] rounded-xl max-h-48 overflow-y-auto divide-y divide-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3 py-1">
                 {employees
                   .filter(emp => emp.id !== sourceUserId)
                   .map((emp) => {
@@ -310,19 +316,19 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
                     return (
                       <label 
                         key={emp.id} 
-                        className="flex items-center gap-2.5 py-2.5 cursor-pointer text-xs text-slate-300 hover:text-slate-100 transition-colors"
+                        className="flex items-center gap-2.5 py-2.5 cursor-pointer text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => handleToggleDestUser(emp.id)}
-                          className="w-4 h-4 rounded border-slate-800 text-brand-500 bg-slate-900 focus:ring-brand-500/20 cursor-pointer"
+                          className="w-4 h-4 rounded border-[var(--border-color)] text-brand-500 bg-[var(--bg-input)] focus:ring-brand-500/20 cursor-pointer"
                         />
                         <div className="overflow-hidden">
                           <span className="font-semibold block">
                             {emp.first_name || ''} {emp.last_name || ''}
                           </span>
-                          <span className="text-[10px] text-slate-500 block">
+                          <span className="text-[10px] text-[var(--text-muted)] block">
                             {emp.email}
                           </span>
                         </div>
@@ -333,12 +339,41 @@ export const LeadTransferModal: React.FC<LeadTransferModalProps> = ({
             )}
           </div>
 
+          {/* Transfer Reason & Notes */}
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1">
+              <label className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider">Transfer Reason</label>
+              <select
+                value={transferReason}
+                onChange={(e) => setTransferReason(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:border-brand-500/40"
+              >
+                <option value="Territory Rebalance">Territory Rebalance / Workload Distribution</option>
+                <option value="Agent On Leave">Agent On Leave / Absent</option>
+                <option value="Escalation to Specialist">Escalation to Specialist / Senior Rep</option>
+                <option value="Shift Handoff">Shift Handoff</option>
+                <option value="Customer Preference">Customer Request / Preference</option>
+                <option value="Other">Other Reason</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider">Handoff Notes & Context</label>
+              <textarea
+                rows={2}
+                placeholder="Add critical context, deal status, or caller instructions for the new agent..."
+                value={transferNotes}
+                onChange={(e) => setTransferNotes(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:border-brand-500/40 resize-none"
+              />
+            </div>
+          </div>
+
           {/* Footer Actions */}
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5">
+          <div className="pt-4 border-t border-[var(--border-color)] flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-900/80 active:bg-slate-900/60 rounded-xl text-xs font-semibold text-slate-300 transition-all cursor-pointer"
+              className="px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] rounded-xl text-xs font-semibold text-[var(--text-secondary)] transition-all cursor-pointer"
             >
               Cancel
             </button>

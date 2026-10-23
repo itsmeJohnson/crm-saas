@@ -17,6 +17,8 @@ import { CallbackTakeoverModal } from '../components/crm/CallbackTakeoverModal';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { TELECALLING_NAV_GROUPS, TELECALLING_ITEM_GROUP_MAP, isTelecallingMode } from '../config/navigation';
 import { api } from '../services/api';
+import { useDialerStore } from '../store/dialerStore';
+import { whatsappRealtime } from '../services/whatsappRealtime';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -58,7 +60,38 @@ export const AppLayout: React.FC = () => {
         }
       }).catch(() => {});
     }
+  }, [user]);
+
+  // Strategy A (Web Persistence): Accidental Refresh / Navigation Guard
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const activeLifecycle = useDialerStore.getState().callLifecycle;
+      if (
+        activeLifecycle === 'initiating' ||
+        activeLifecycle === 'ringing' ||
+        activeLifecycle === 'connected' ||
+        activeLifecycle === 'disposition'
+      ) {
+        e.preventDefault();
+        e.returnValue = 'A call is currently in progress or wrap-up disposition notes are pending. Refreshing or leaving will disconnect your session.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
+
+  // Strategy A (Web Persistence): Recover dialer active call state & initialize WebRTC/WS on app load
+  useEffect(() => {
+    if (user?.id) {
+      whatsappRealtime.connect(user.id);
+      useDialerStore.getState().fetchCurrentState().catch(() => {});
+      useDialerStore.getState().initWebRTC().catch(() => {});
+    }
+  }, [user?.id]);
 
   const TRIAL_MODE = true;
   const inTelecalling = isTelecallingMode();
@@ -374,12 +407,12 @@ export const AppLayout: React.FC = () => {
             {BrandIcon()}
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-sm tracking-tight text-slate-100 block truncate">
+            <span className="font-bold text-sm tracking-tight text-[var(--text-primary)] block truncate">
               {isSuperAdmin
                 ? 'CRM Enterprise · Secure Multi-Tenant Platform'
                 : (organization?.name || 'Samartha Sankalpa Solutions')}
             </span>
-            <span className="text-[10px] text-slate-400 font-medium tracking-wide block">
+            <span className="text-[10px] text-[var(--text-muted)] font-medium tracking-wide block">
               {isSuperAdmin
                 ? 'System Infrastructure & Multi-Tenant Control'
                 : 'Telecalling Suite'}
@@ -388,7 +421,7 @@ export const AppLayout: React.FC = () => {
         </div>
         <button
           onClick={() => setIsMobileOpen(false)}
-          className="md:hidden p-1 rounded-lg text-slate-400 hover:text-slate-200"
+          className="md:hidden p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
         >
           <X className="w-4 h-4" />
         </button>
@@ -466,17 +499,17 @@ export const AppLayout: React.FC = () => {
             {initials}
           </div>
           <div className="overflow-hidden flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-100 truncate leading-tight">
+            <p className="text-xs font-semibold text-[var(--text-primary)] truncate leading-tight">
               {user?.first_name} {user?.last_name}
             </p>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+            <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
               {displayRole}
             </p>
           </div>
           <button
             onClick={handleLogout}
             title="Sign Out"
-            className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            className="p-1.5 rounded text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
@@ -518,7 +551,7 @@ export const AppLayout: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileOpen(true)}
-              className="md:hidden p-1.5 rounded-lg border border-[var(--border-color)] text-slate-400"
+              className="md:hidden p-1.5 rounded-lg border border-[var(--border-color)] text-[var(--text-muted)]"
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -527,7 +560,7 @@ export const AppLayout: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 {industry === 'healthcare_dental' ? 'Live OPD' : 'Live'}
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-[var(--text-secondary)]">
                 {industry === 'healthcare_dental' ? 'Dr. Johnson Dev • Main Operatory' : `${displayRole} • ${getSubSuiteLabel()}`}
               </span>
             </div>
@@ -537,7 +570,7 @@ export const AppLayout: React.FC = () => {
             <button
               onClick={toggleTheme}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-              className="p-1.5 rounded-lg border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-slate-400 hover:text-slate-200 transition"
+              className="p-1.5 rounded-lg border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
             </button>

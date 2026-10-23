@@ -9,8 +9,8 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set) => {
-  // Read initial choice, default to 'dark'
-  const initialTheme = (localStorage.getItem('crm_theme') as Theme) || 'dark';
+  // Read initial choice, default to 'light' (primary theme)
+  const initialTheme = (localStorage.getItem('crm_theme') as Theme) || 'light';
 
   // Apply theme class immediately on startup
   if (initialTheme === 'light') {

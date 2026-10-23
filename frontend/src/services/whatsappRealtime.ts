@@ -15,9 +15,42 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let intentionalClose = false;
 const handlers = new Set<RealtimeHandler>();
 
+let reconnectAttempts = 0;
+let pingInterval: ReturnType<typeof setInterval> | null = null;
+
 function buildUrl(userId: string): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${window.location.host}/api/v1/telephony/ws/${userId}`;
+}
+
+function stopPing(): void {
+  if (pingInterval) {
+    clearInterval(pingInterval);
+    pingInterval = null;
+  }
+}
+
+function startPing(): void {
+  stopPing();
+  pingInterval = setInterval(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(JSON.stringify({ type: 'ping' }));
+      } catch {}
+    }
+  }, 25000);
+}
+
+function scheduleReconnect(): void {
+  if (intentionalClose || !currentUserId) return;
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+
+  // Exponential backoff with jitter: 1s, 2s, 4s, 8s, max 15s
+  const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 15000) + Math.random() * 500;
+  reconnectAttempts++;
+  reconnectTimer = setTimeout(() => {
+    open();
+  }, delay);
 }
 
 function open(): void {
@@ -31,6 +64,11 @@ function open(): void {
   intentionalClose = false;
   socket = new WebSocket(buildUrl(currentUserId));
 
+  socket.onopen = () => {
+    reconnectAttempts = 0;
+    startPing();
+  };
+
   socket.onmessage = (event) => {
     let data: any;
     try {
@@ -38,6 +76,9 @@ function open(): void {
     } catch {
       return;
     }
+    // Ignore ping/pong acknowledgments
+    if (data?.type === 'pong' || data?.type === 'ping') return;
+
     handlers.forEach((handler) => {
       try {
         handler(data);
@@ -48,11 +89,9 @@ function open(): void {
   };
 
   socket.onclose = () => {
+    stopPing();
     socket = null;
-    if (!intentionalClose && currentUserId) {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(open, 3000);
-    }
+    scheduleReconnect();
   };
 
   socket.onerror = () => {
@@ -62,6 +101,25 @@ function open(): void {
       /* ignore */
     }
   };
+}
+
+// Window & Network level active recovery listeners
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    if (!intentionalClose && currentUserId) {
+      reconnectAttempts = 0;
+      open();
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !intentionalClose && currentUserId) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        reconnectAttempts = 0;
+        open();
+      }
+    }
+  });
 }
 
 export const whatsappRealtime = {

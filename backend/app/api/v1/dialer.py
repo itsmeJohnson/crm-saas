@@ -11,7 +11,10 @@ from app.models.user import User
 from app.models.lead import Lead
 from app.models.pipeline import PipelineStage
 from app.schemas.lead import LeadResponse
-from app.schemas.dialer import NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest, CallLeadRequest, InboundLeadLookupRequest
+from app.schemas.dialer import (
+    NextLeadRequest, AgentStateUpdate, AgentStateResponse, CallDispositionRequest, 
+    CallLeadRequest, InboundLeadLookupRequest, CallEndedRequest
+)
 from app.services.agent_state_service import AgentStateService
 from app.services.disposition_service import DispositionService
 
@@ -562,4 +565,73 @@ async def get_webrtc_session(
             "agent_name": agent_name
         }
     return {"enabled": False, "provider": provider}
+
+
+@router.post("/call-ended")
+async def record_call_ended(
+    payload: CallEndedRequest,
+    actor: User = Depends(require_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Instantly persists disconnected call metrics (duration, status, recording) in Activity upon call termination."""
+    from app.models.activity import Activity
+    
+    activity = None
+    if payload.call_sid:
+        act_query = select(Activity).filter(
+            Activity.call_sid == str(payload.call_sid),
+            Activity.organization_id == actor.organization_id
+        )
+        act_res = await db.execute(act_query)
+        activity = act_res.scalars().first()
+
+    if not activity and payload.lead_id:
+        # Find latest pending or in-progress call activity on this lead
+        act_query = select(Activity).filter(
+            Activity.lead_id == payload.lead_id,
+            Activity.activity_type == "Call",
+            Activity.organization_id == actor.organization_id
+        ).order_by(Activity.created_at.desc())
+        act_res = await db.execute(act_query)
+        activity = act_res.scalars().first()
+
+    if not activity:
+        lead_name = "Lead"
+        if payload.lead_id:
+            lead_res = await db.execute(select(Lead).filter(Lead.id == payload.lead_id))
+            lead_obj = lead_res.scalars().first()
+            if lead_obj:
+                lead_name = f"{lead_obj.first_name or ''} {lead_obj.last_name or ''}".strip() or "Lead"
+        activity = Activity(
+            organization_id=actor.organization_id,
+            activity_type="Call",
+            subject=f"{payload.call_direction or 'Outbound'} Call - {lead_name}",
+            description=f"Call completed. Duration: {payload.duration}s",
+            status="Completed" if payload.duration > 0 else "Missed",
+            assigned_user_id=actor.id,
+            lead_id=payload.lead_id,
+            created_by=actor.id,
+            call_sid=str(payload.call_sid) if payload.call_sid else None,
+            call_direction=payload.call_direction or "OUTBOUND",
+            call_duration=payload.duration,
+            recording_url=payload.recording_url
+        )
+        db.add(activity)
+    else:
+        activity.call_duration = payload.duration
+        activity.status = "Completed" if payload.duration > 0 else "Missed"
+        if payload.recording_url:
+            activity.recording_url = payload.recording_url
+        if payload.call_direction:
+            activity.call_direction = payload.call_direction
+        db.add(activity)
+
+    await db.commit()
+    await db.refresh(activity)
+    logger.info(f"Persisted call metrics on disconnect: activity_id={activity.id}, duration={activity.call_duration}")
+    return {
+        "status": "success",
+        "activity_id": str(activity.id),
+        "duration": activity.call_duration
+    }
 
