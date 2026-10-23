@@ -162,15 +162,26 @@ async def get_next_lead(
         ]
 
         if payload.collective_pooling:
-            filters.append(
-                or_(
-                    Lead.assigned_user_id == actor.id,
-                    and_(
-                        Lead.assigned_user_id.is_(None),
-                        Lead.created_by == actor.reporting_to_id
+            if actor.reporting_to_id:
+                filters.append(
+                    or_(
+                        Lead.assigned_user_id == actor.id,
+                        and_(
+                            Lead.assigned_user_id.is_(None),
+                            or_(
+                                Lead.created_by == actor.reporting_to_id,
+                                Lead.created_by.isnot(None)
+                            )
+                        )
                     )
                 )
-            )
+            else:
+                filters.append(
+                    or_(
+                        Lead.assigned_user_id == actor.id,
+                        Lead.assigned_user_id.is_(None)
+                    )
+                )
         else:
             filters.append(Lead.assigned_user_id == actor.id)
 

@@ -14,6 +14,7 @@ import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { ActiveCallDisposition } from '../components/crm/ActiveCallDisposition';
 import { CallbackTakeoverModal } from '../components/crm/CallbackTakeoverModal';
+import { HeaderAttendanceControl } from '../components/common/HeaderAttendanceControl';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { TELECALLING_NAV_GROUPS, TELECALLING_ITEM_GROUP_MAP, isTelecallingMode } from '../config/navigation';
 import { api } from '../services/api';
@@ -567,6 +568,7 @@ export const AppLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <HeaderAttendanceControl />
             <button
               onClick={toggleTheme}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}

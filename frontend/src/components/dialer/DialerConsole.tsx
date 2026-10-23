@@ -28,6 +28,7 @@ import { useAnalyticsStore } from '../../store/analyticsStore';
 import { dashboardApi } from '../../services/dashboardApi';
 import { OmniChannelChatDrawer } from '../crm/OmniChannelChatDrawer';
 import { leadApi, LeadTimelineEvent } from '../../services/leadApi';
+import { dialerApi } from '../../services/dialerApi';
 import { useUserStore } from '../../store/userStore';
 
 export const DialerConsole: React.FC = () => {
@@ -66,7 +67,13 @@ export const DialerConsole: React.FC = () => {
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [reminderBefore, setReminderBefore] = useState(30); // minutes
   const [followUpPriority, setFollowUpPriority] = useState('Medium');
-  const [collectivePooling, setCollectivePooling] = useState(false);
+  const [collectivePooling, setCollectivePooling] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('crm_collective_pooling');
+      return saved !== null ? saved === 'true' : false;
+    }
+    return false;
+  });
   const [showBreakMenu, setShowBreakMenu] = useState(false);
   const [showChatDrawer, setShowChatDrawer] = useState(false);
 
@@ -96,7 +103,11 @@ export const DialerConsole: React.FC = () => {
   const [historyFilterDays, setHistoryFilterDays] = useState<7 | 30 | 'all'>(7);
   const [showAllHistory, setShowAllHistory] = useState(false);
 
-
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('crm_collective_pooling', String(collectivePooling));
+    }
+  }, [collectivePooling]);
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -243,13 +254,26 @@ export const DialerConsole: React.FC = () => {
 
 
 
+  const handleToggleCollectivePooling = (checked: boolean) => {
+    setCollectivePooling(checked);
+    try {
+      localStorage.setItem('crm_collective_pooling', String(checked));
+    } catch {}
+    dialerApi.updateState({
+      state: agentState,
+      metadata: { collective_pooling: checked }
+    }).catch(() => {});
+  };
+
   const handleStartDialing = async () => {
     setNextCallCountdown(null);
     try {
       // Credentials are org-level (Settings → Communication → Calling) and applied
       // server-side. Agents never send them.
       await startCalling(collectivePooling);
-    } catch (err) {}
+    } catch (err: any) {
+      console.warn('[Power Dialer] Auto-dial sequence handled:', err?.message || err);
+    }
   };
 
   const handleRequestBreak = async (reason: string) => {
@@ -392,7 +416,7 @@ export const DialerConsole: React.FC = () => {
                       id="collective-pooling"
                       type="checkbox"
                       checked={collectivePooling}
-                      onChange={(e) => setCollectivePooling(e.target.checked)}
+                      onChange={(e) => handleToggleCollectivePooling(e.target.checked)}
                       className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
                     />
                     <label htmlFor="collective-pooling" className="text-sm text-slate-300 font-medium cursor-pointer select-none">

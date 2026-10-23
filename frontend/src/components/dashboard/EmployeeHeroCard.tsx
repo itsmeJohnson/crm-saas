@@ -182,16 +182,29 @@ export const EmployeeHeroCard: React.FC<{
         </div>
       </div>
 
-      {/* stat grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <s.icon className={`w-3 h-3 ${s.tone}`} /> {s.label}
-            </p>
-            <p className={`text-2xl font-extrabold mt-1 ${loading ? 'text-slate-600 animate-pulse' : s.tone}`}>{s.value}</p>
-          </div>
-        ))}
+      {/* active agent metrics counter block */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${isPunchedIn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+            {isPunchedIn ? 'Live Agent Metrics • Calling Session Active' : 'Agent Daily Metrics Overview'}
+          </p>
+          {isPunchedIn && (
+            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+              Punched In • On Duty
+            </span>
+          )}
+        </div>
+        <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 ${isPunchedIn ? 'p-1 rounded-2xl bg-emerald-500/[0.02] border border-emerald-500/10' : ''}`}>
+          {stats.map((s) => (
+            <div key={s.label} className={`bg-slate-950/40 border rounded-xl p-3 transition-all ${isPunchedIn ? 'border-slate-800/80 shadow-sm hover:border-emerald-500/30' : 'border-slate-800/60'}`}>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <s.icon className={`w-3 h-3 ${s.tone}`} /> {s.label}
+              </p>
+              <p className={`text-2xl font-extrabold mt-1 ${loading ? 'text-slate-600 animate-pulse' : s.tone}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Confirmation Modal to Prevent Accidental Punch Out */}
