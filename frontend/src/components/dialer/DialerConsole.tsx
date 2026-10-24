@@ -292,7 +292,7 @@ export const DialerConsole: React.FC = () => {
 
   const handleDispositionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
+    const isStageRequired = (selectedStatus === 'Picked' || selectedStatus === 'Interested') && stages.length > 0;
     const isStageAllowed = ['Picked', 'Interested', 'Answered / Resolved', 'Callback Requested'].includes(selectedStatus || '');
     const followUp = selectedStatus === 'Follow-up' || selectedStatus === 'Call Back Later';
     if (!selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || (followUp && (!followUpDate || !followUpTime))) {
@@ -353,11 +353,11 @@ export const DialerConsole: React.FC = () => {
   const breakOptions = ['Lunch', 'Tea', 'Meeting', 'General'];
   const dispositionOptions = callDirection === 'INBOUND'
     ? ['Answered / Resolved', 'Callback Requested', 'Interested', 'Not Interested', 'Spam / Junk']
-    : ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked', 'Follow-up', 'Call Back Later'];
+    : ['RNR', 'Switch Off', 'Busy', 'Not Exist', 'Out of Service', 'Picked', 'Interested', 'Follow-up', 'Call Back Later'];
 
   // Outcomes that imply a next touch — the cockpit schedules the follow-up in place.
   const isFollowUpOutcome = selectedStatus === 'Follow-up' || selectedStatus === 'Call Back Later';
-  const isStageRequired = selectedStatus === 'Picked' || selectedStatus === 'Interested';
+  const isStageRequired = (selectedStatus === 'Picked' || selectedStatus === 'Interested') && stages.length > 0;
   const followUpIncomplete = isFollowUpOutcome && (!followUpDate || !followUpTime);
   const isSubmitDisabled = !selectedStatus || !remarks.trim() || (isStageRequired && !targetStageId) || followUpIncomplete || isLoading;
 
@@ -887,7 +887,13 @@ export const DialerConsole: React.FC = () => {
                       <button
                         key={opt}
                         type="button"
-                        onClick={() => setSelectedStatus(opt)}
+                        onClick={() => {
+                          setSelectedStatus(opt);
+                          if ((opt === 'Picked' || opt === 'Interested') && !targetStageId && stages.length > 0) {
+                            const eligible = stages.find((s) => s.name !== 'Fresh Leads') || stages[0];
+                            if (eligible) setTargetStageId(eligible.id);
+                          }
+                        }}
                         className={`py-3 px-4 text-sm font-medium rounded-xl border transition-all duration-150 text-center ${
                           selectedStatus === opt
                             ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'

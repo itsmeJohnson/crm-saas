@@ -37,6 +37,11 @@ export const dialerApi = {
     return response.data;
   },
 
+  getCurrentState: async () => {
+    const response = await api.get<AgentStateResponse>('/dialer/current-state');
+    return response.data;
+  },
+
   submitDisposition: async (
     leadId: string,
     payload: {

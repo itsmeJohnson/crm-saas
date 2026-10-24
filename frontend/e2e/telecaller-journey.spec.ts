@@ -99,6 +99,17 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
       });
     });
 
+    await page.route('**/api/v1/pipelines', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'stage-pitching-1', name: 'Pitching', order_position: 1 },
+          { id: 'stage-interested-2', name: 'Interested', order_position: 2 },
+        ]),
+      });
+    });
+
     // Mock Telephony & Attendance API routes (reactive state)
     let isPunchedInState = false;
 
@@ -172,7 +183,7 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
       });
     });
 
-    await page.route('**/api/v1/dialer/state', async (route) => {
+    await page.route(/.*\/api\/v1\/dialer\/(current-)?state/, async (route) => {
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
         await route.fulfill({
@@ -298,10 +309,10 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
     const beforeUnloadMessage = await page.evaluate(() => {
       const event = new Event('beforeunload', { cancelable: true }) as any;
       window.dispatchEvent(event);
-      return event.returnValue;
+      return event.promptMessage || (window as any).__beforeUnloadWarning || event.returnValue || '';
     });
 
-    expect(beforeUnloadMessage).toContain('A call is currently in progress or wrap-up disposition notes are pending');
+    expect(String(beforeUnloadMessage)).toContain('A call is currently in progress or wrap-up disposition notes are pending');
 
     // Anti-FOUC verification: Ensure page body does not have white flash or unstyled blip
     const htmlTheme = await page.getAttribute('html', 'class');

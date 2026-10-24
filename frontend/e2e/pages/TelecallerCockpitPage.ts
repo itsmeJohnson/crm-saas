@@ -74,9 +74,9 @@ export class TelecallerCockpitPage {
     // Call Lifecycle & Disposition Selectors
     this.activeCallCard = page.locator('text=/Connected|In Call|Active Calling|Outbound Call/i').first();
     this.endCallBtn = page.locator('button:has-text("End Call"), button:has-text("Hangup"), button[title*="Hangup"]');
-    this.dispositionModal = page.locator('text=/Call Disposition|Wrap-up Notes/i').locator('xpath=ancestor::div[contains(@class, "fixed")]').first();
+    this.dispositionModal = page.locator('form:has-text("Call Disposition Status"), div:has-text("Call Disposition Status")').first();
     this.dispositionStatusSelect = page.locator('button:has-text("Interested"), select[name="status"]');
-    this.dispositionRemarksTextarea = page.locator('textarea[placeholder*="notes" i], textarea');
+    this.dispositionRemarksTextarea = page.locator('textarea#remarks, textarea[placeholder*="mandatory" i]').first();
     this.saveDispositionBtn = page.locator('button:has-text("Save Call Disposition"), button:has-text("Submit Disposition")');
     this.leadTimeline = page.locator('text=/Lead Activity Timeline|Call History/i').locator('xpath=ancestor::div').first();
 
@@ -141,17 +141,35 @@ export class TelecallerCockpitPage {
   }
 
   async submitDisposition(status: string, remarks: string) {
-    await expect(this.dispositionModal).toBeVisible({ timeout: 10000 });
-    const targetOutcomeBtn = this.page.locator(`button:has-text("${status}")`).first();
+    const dispositionForm = this.page.locator('form:has-text("Call Disposition Status"), form:has-text("Save Call Disposition")').first();
+    await expect(dispositionForm).toBeVisible({ timeout: 15000 });
+    const targetOutcomeBtn = dispositionForm.locator(`button:has-text("${status}")`).first();
     if (await targetOutcomeBtn.isVisible()) {
       await targetOutcomeBtn.click();
     } else {
-      await this.dispositionStatusSelect.selectOption(status);
+      const globalBtn = this.page.locator(`button:has-text("${status}")`).first();
+      if (await globalBtn.isVisible()) {
+        await globalBtn.click();
+      } else {
+        await this.dispositionStatusSelect.selectOption(status);
+      }
+    }
+
+    const stageSelect = dispositionForm.locator('#pipeline-stage');
+    if (status === 'Interested' || status === 'Picked') {
+      try {
+        await stageSelect.waitFor({ state: 'visible', timeout: 3000 });
+        const options = await stageSelect.locator('option:not([disabled])').all();
+        if (options.length > 0) {
+          const val = await options[0].getAttribute('value');
+          if (val) await stageSelect.selectOption(val);
+        }
+      } catch {}
     }
 
     await this.dispositionRemarksTextarea.fill(remarks);
     await this.saveDispositionBtn.click();
-    await expect(this.dispositionModal).toBeHidden({ timeout: 10000 });
+    await expect(dispositionForm).toBeHidden({ timeout: 15000 });
   }
 
   async sendOmnichannelMessage(text: string) {

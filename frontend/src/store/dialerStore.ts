@@ -86,18 +86,76 @@ const stopTimer = () => {
   }
 };
 
+const getInitialLead = (): LeadResponse | null => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const cached = localStorage.getItem('crm_dialer_current_lead');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const getInitialLifecycle = (): CallLifecycle => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const cached = localStorage.getItem('crm_dialer_lifecycle') as CallLifecycle;
+    if (['initiating', 'ringing', 'connected', 'disposition'].includes(cached)) {
+      return cached;
+    }
+  }
+  return 'idle';
+};
+
+const getInitialAgentState = (): AgentState => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const cachedLifecycle = localStorage.getItem('crm_dialer_lifecycle');
+    if (['initiating', 'ringing', 'connected', 'disposition'].includes(cachedLifecycle as string)) {
+      return 'ACTIVE_CALLING';
+    }
+  }
+  return 'IDLE';
+};
+
+const getInitialCallDirection = (): 'INBOUND' | 'OUTBOUND' | null => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const cached = localStorage.getItem('crm_dialer_call_direction');
+    if (cached === 'INBOUND' || cached === 'OUTBOUND') {
+      return cached;
+    }
+  }
+  return null;
+};
+
+const getInitialStartTime = (): string | null => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return localStorage.getItem('crm_dialer_start_time');
+  }
+  return null;
+};
+
+const initialLead = getInitialLead();
+const initialLifecycle = getInitialLifecycle();
+const initialAgentState = getInitialAgentState();
+const initialCallDirection = getInitialCallDirection();
+const initialStartTime = getInitialStartTime();
+const initialDuration = (initialLifecycle === 'connected' && initialStartTime)
+  ? Math.max(0, Math.floor((Date.now() - new Date(initialStartTime).getTime()) / 1000))
+  : 0;
+
 export const useDialerStore = create<DialerState>((set, get) => ({
-  agentState: 'IDLE',
-  callLifecycle: 'idle',
+  agentState: initialAgentState,
+  callLifecycle: initialLifecycle,
   networkStatus: 'online',
   reconnectCountdown: 15,
-  currentLead: null,
+  currentLead: initialLead,
   breakReason: null,
-  callDuration: 0,
-  stateTimestamp: null,
+  callDuration: initialDuration,
+  stateTimestamp: initialStartTime,
   isLoading: false,
   error: null,
-  callDirection: null,
+  callDirection: initialCallDirection,
   webrtcStatus: 'idle',
   isMuted: false,
   isKeypadOpen: false,
@@ -349,7 +407,12 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   fetchCurrentState: async () => {
     set({ isLoading: true, error: null });
     try {
-      const data = await dialerApi.getState();
+      let data: any;
+      try {
+        data = await dialerApi.getCurrentState();
+      } catch {
+        data = await dialerApi.getState();
+      }
       
       let lead = get().currentLead;
       let direction = get().callDirection;

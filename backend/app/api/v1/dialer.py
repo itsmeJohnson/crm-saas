@@ -308,6 +308,7 @@ async def update_state(
         )
     return new_state
 
+@router.get("/current-state", response_model=AgentStateResponse)
 @router.get("/state", response_model=AgentStateResponse)
 async def get_state(
     actor: User = Depends(require_active_user),

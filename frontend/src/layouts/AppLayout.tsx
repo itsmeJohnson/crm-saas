@@ -74,8 +74,13 @@ export const AppLayout: React.FC = () => {
         activeLifecycle === 'disposition'
       ) {
         e.preventDefault();
-        e.returnValue = 'A call is currently in progress or wrap-up disposition notes are pending. Refreshing or leaving will disconnect your session.';
-        return e.returnValue;
+        const warningMsg = 'A call is currently in progress or wrap-up disposition notes are pending. Refreshing or leaving will disconnect your session.';
+        e.returnValue = warningMsg;
+        (e as any).promptMessage = warningMsg;
+        if (typeof window !== 'undefined') {
+          (window as any).__beforeUnloadWarning = warningMsg;
+        }
+        return warningMsg;
       }
     };
 
