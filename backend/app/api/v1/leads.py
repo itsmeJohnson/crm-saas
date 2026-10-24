@@ -77,7 +77,7 @@ async def get_kanban_stage_cards(
 @router.post("/", response_model=LeadResponse, status_code=status.HTTP_201_CREATED)
 async def create_lead(
     lead_in: LeadCreate,
-    actor: Annotated[User, Depends(require_active_user)],
+    actor: Annotated[User, Depends(require_tl_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new lead opportunity."""

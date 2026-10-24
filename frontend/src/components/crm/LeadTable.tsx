@@ -56,6 +56,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   const { users, fetchUsers } = useUserStore();
   const { user } = useAuthStore();
   const isEmployee = user?.role === 'Employee';
+  const isTL = Boolean(user && (user.role === 'TeamLeader' || (user.role === 'Employee' && Boolean((user as any).is_team_leader))));
+  const isPrivileged = Boolean(user && (user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL));
   // Delete lead option only given to designations above Team Leader (Manager, OrgAdmin, SuperAdmin)
   const canDeleteLead = user?.role === 'SuperAdmin' || user?.role === 'OrgAdmin' || user?.role === 'Manager';
 
@@ -211,17 +213,21 @@ export const LeadTable: React.FC<LeadTableProps> = ({
         </div>
         <p className="text-sm font-bold text-strong">No leads found in pipeline</p>
         <p className="text-xs text-muted mt-1 max-w-sm">
-          Try clearing your search filters or import leads to start your pipeline.
+          {isPrivileged
+            ? 'Try clearing your search filters or import leads to start your pipeline.'
+            : 'No leads currently assigned to you. Contact your Team Leader or Manager to assign leads.'}
         </p>
-        <button
-          onClick={() => {
-            const importBtn = document.querySelector<HTMLButtonElement>('[title*="Import"]');
-            if (importBtn) importBtn.click();
-          }}
-          className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs"
-        >
-          Import leads
-        </button>
+        {isPrivileged && (
+          <button
+            onClick={() => {
+              const importBtn = document.querySelector<HTMLButtonElement>('[title*="Import"]');
+              if (importBtn) importBtn.click();
+            }}
+            className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs"
+          >
+            Import leads
+          </button>
+        )}
       </div>
     );
   }

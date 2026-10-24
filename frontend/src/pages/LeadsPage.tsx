@@ -34,13 +34,13 @@ import { api } from '../services/api';
 
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
-  const { dashboardData, fetchDashboardMetrics } = useAnalyticsStore();
+  const { fetchDashboardMetrics } = useAnalyticsStore();
   const { agentState, callSpecificLead, error: dialerError } = useDialerStore();
   const [callError, setCallError] = useState<string | null>(null);
 
-  const isTL = user?.role === 'TeamLeader' || (user as any)?.is_team_leader || dashboardData?.role === 'TeamLeader';
-  const isPrivileged = !user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL;
-  // Bulk import (CSV, XLSX, Google Sheets) enabled for administrative operations
+  const isTL = Boolean(user && (user.role === 'TeamLeader' || (user.role === 'Employee' && Boolean((user as any).is_team_leader))));
+  const isPrivileged = Boolean(user && (user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL));
+  // Bulk import and lead creation enabled strictly for Team Leader and leadership
   const canBulkImport = isPrivileged;
   // Click-to-call enabled for all active CRM agents & leadership.
   const canManualCall = Boolean(user);

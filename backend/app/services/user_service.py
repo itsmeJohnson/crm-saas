@@ -54,15 +54,10 @@ class UserService:
 
     async def is_team_leader(self, user: User) -> bool:
         """Check if the user is a Team Leader."""
-        if getattr(user, "role", None) == "TeamLeader":
+        if getattr(user, "role", None) in ("TeamLeader", "Manager", "OrgAdmin", "SuperAdmin"):
             return True
         if user.role != "Employee":
             return False
-        if user.reporting_to_id:
-            parent_res = await self.db.execute(select(User.role).filter(User.id == user.reporting_to_id))
-            parent_role = parent_res.scalar()
-            if parent_role in ("Manager", "OrgAdmin"):
-                return True
         has_sub = (await self.db.execute(
             select(func.count(User.id)).filter(User.reporting_to_id == user.id, User.is_deleted == False)
         )).scalar() or 0

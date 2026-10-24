@@ -444,8 +444,8 @@ class WhatsAppService:
         
         is_internal = data.get("is_internal", False)
         
-        # Check 24-hour customer window for free-form customer messages (exempt mock provider)
-        if not is_internal and s.provider != "mock" and not self._window_open(conv):
+        # Check 24-hour customer window for free-form customer messages (exempt mock & gupshup enterprise gateway which auto-encapsulates into HSM template)
+        if not is_internal and s.provider not in ("mock", "gupshup") and not self._window_open(conv):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="The 24-hour customer window is closed. Send a template message to re-open the thread."

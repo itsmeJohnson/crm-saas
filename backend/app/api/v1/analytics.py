@@ -22,12 +22,13 @@ from app.services.analytics_service import AnalyticsService
 router = APIRouter()
 
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
-    if user.role in ("TeamLeader", "Manager"):
+    if user.role in ("SuperAdmin", "OrgAdmin", "Manager", "TeamLeader"):
         return True
-    if user.role == "Employee" and user.reporting_to_id:
-        parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
-        parent_role = parent_res.scalar()
-        return parent_role == "Manager"
+    if user.role == "Employee":
+        has_sub = (await db.execute(
+            select(func.count(User.id)).filter(User.reporting_to_id == user.id, User.is_deleted == False)
+        )).scalar() or 0
+        return has_sub > 0
     return False
 
 async def check_is_telecaller(user: User, db: AsyncSession) -> bool:

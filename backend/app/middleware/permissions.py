@@ -148,15 +148,11 @@ def require_feature(feature_code: str):
 
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
     """Check if the user is a Team Leader."""
-    if getattr(user, "role", None) == "TeamLeader":
+    if getattr(user, "role", None) in ("TeamLeader", "Manager", "OrgAdmin", "SuperAdmin"):
         return True
     if user.role != "Employee":
         return False
-    if user.reporting_to_id:
-        parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
-        parent_role = parent_res.scalar()
-        if parent_role in ("Manager", "OrgAdmin"):
-            return True
+    # An Employee is only a Team Leader if active team members report directly to them
     has_sub = (await db.execute(
         select(func.count(User.id)).filter(User.reporting_to_id == user.id, User.is_deleted == False)
     )).scalar() or 0
