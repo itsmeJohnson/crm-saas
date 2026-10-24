@@ -141,11 +141,11 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium">
         <span
-          className={`w-1.5 h-1.5 rounded-full ${
-            isUrgent ? 'bg-rose-500' : isHigh ? 'bg-amber-500' : priority === 'Low' ? 'bg-slate-500' : 'bg-blue-500'
+          className={`w-2 h-2 rounded-full ${
+            isUrgent ? 'bg-rose-500' : isHigh ? 'bg-amber-500' : priority === 'Low' ? 'bg-slate-400' : 'bg-blue-500'
           }`}
         />
-        <span className="text-slate-300">{priority || 'Medium'}</span>
+        <span className="text-slate-700 dark:text-slate-300">{priority || 'Medium'}</span>
       </span>
     );
   };
@@ -154,27 +154,27 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     const o = ownerFor(lead);
     return (
       <div className="flex items-center gap-2 min-w-0">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${o ? 'bg-brand-500/15 text-brand-300 border border-brand-500/25' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${o ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-brand-500/15 dark:text-brand-300 dark:border-brand-500/25' : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'}`}>
           {o ? initialsOf(o.first_name, o.last_name, 'U') : '—'}
         </div>
-        <span className="text-xs text-slate-300 truncate">{ownerName(lead)}</span>
+        <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{ownerName(lead)}</span>
       </div>
     );
   };
 
   const renderSortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3 text-slate-500 opacity-60" />;
+    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />;
     return sortOrder === 'asc' ? (
-      <ChevronUp className="w-3 h-3 text-brand-400" />
+      <ChevronUp className="w-3 h-3 text-indigo-600 dark:text-brand-400" />
     ) : (
-      <ChevronDown className="w-3 h-3 text-brand-400" />
+      <ChevronDown className="w-3 h-3 text-indigo-600 dark:text-brand-400" />
     );
   };
 
   if (isLoading && leads.length === 0) {
     return (
-      <div className="p-16 rounded-2xl border border-slate-800/80 bg-slate-900/60 flex flex-col items-center justify-center text-slate-400">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
+      <div className="p-16 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 shadow-xs">
+        <Loader2 className="w-8 h-8 text-indigo-600 dark:text-brand-500 animate-spin mb-4" />
         <p className="text-sm font-medium">Loading leads…</p>
       </div>
     );
@@ -182,22 +182,22 @@ export const LeadTable: React.FC<LeadTableProps> = ({
 
   if (error && leads.length === 0) {
     return (
-      <div className="p-12 rounded-2xl border border-red-900/30 bg-red-950/10 flex flex-col items-center justify-center text-red-400">
+      <div className="p-12 rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/10 flex flex-col items-center justify-center text-red-600 dark:text-red-400 shadow-xs">
         <AlertCircle className="w-8 h-8 mb-2" />
         <p className="font-semibold mb-1">Error Loading Leads</p>
-        <p className="text-xs text-red-400/80">{error}</p>
+        <p className="text-xs text-red-500/80">{error}</p>
       </div>
     );
   }
 
   if (leads.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 py-16 px-6 flex flex-col items-center justify-center text-center">
-        <div className="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-3">
-          <Inbox className="w-6 h-6 text-brand-400" />
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 py-16 px-6 flex flex-col items-center justify-center text-center shadow-xs">
+        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-3">
+          <Inbox className="w-6 h-6" />
         </div>
-        <p className="text-sm font-bold text-slate-200">No leads found</p>
-        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No leads found</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
           Try clearing your filters or create a new lead opportunity to start your pipeline.
         </p>
       </div>
@@ -210,12 +210,12 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     onSelectLeads(checked ? [...selectedLeadIds, id] : selectedLeadIds.filter((x) => x !== id));
 
   return (
-    <div className="bg-slate-900/60 rounded-xl border border-slate-800/80 overflow-hidden shadow-2xs">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
       {/* Desktop / Tablet Table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[850px]">
           <thead>
-            <tr className="border-b border-slate-800/90 bg-slate-950/60">
+            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
               {!hideCheckboxes && (
                 <th className="w-10 px-4 py-3">
                   <input
@@ -228,7 +228,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               )}
               <th
                 onClick={() => handleSort('title')}
-                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Lead</span>
@@ -237,7 +237,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('stage')}
-                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Stage</span>
@@ -246,7 +246,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('value')}
-                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-right cursor-pointer hover:text-slate-200 select-none"
+                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 text-right cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
               >
                 <div className="flex items-center justify-end gap-1.5">
                   <span>Value</span>
@@ -255,7 +255,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('priority')}
-                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Priority</span>
@@ -264,7 +264,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('owner')}
-                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Owner</span>
@@ -273,53 +273,53 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('created_at')}
-                className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 select-none"
+                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Created</span>
                   {renderSortIcon('created_at')}
                 </div>
               </th>
-              <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 text-right">
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 text-right">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/70">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
             {sortedLeads.map((lead) => {
               const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
               return (
                 <tr
                   key={lead.id}
                   onClick={() => onRowClick(lead)}
-                  className="hover:bg-slate-900/80 transition-colors cursor-pointer group"
+                  className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
                 >
                   {!hideCheckboxes && (
-                    <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="w-10 px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedLeadIds.includes(lead.id)}
                         onChange={(e) => toggleOne(lead.id, e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500/25 cursor-pointer"
                       />
                     </td>
                   )}
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-600 dark:text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                         {initialsOf(lead.title?.[0], lead.title?.[1], 'LD')}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-100 group-hover:text-brand-400 transition-colors truncate">
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-brand-400 transition-colors truncate">
                           {lead.title}
                         </p>
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                          {contactFullName && <span className="text-slate-300 truncate">{contactFullName}</span>}
-                          {contactFullName && lead.company_name && <span className="text-slate-600">•</span>}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {contactFullName && <span className="text-slate-700 dark:text-slate-300 font-medium truncate">{contactFullName}</span>}
+                          {contactFullName && lead.company_name && <span className="text-slate-400">•</span>}
                           {lead.company_name && (
-                            <span className="inline-flex items-center gap-1 truncate text-slate-400">
-                              <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span className="inline-flex items-center gap-1 truncate text-slate-500 dark:text-slate-400">
+                              <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
                               {lead.company_name}
                             </span>
                           )}
@@ -331,9 +331,9 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                 onCallClick?.(lead.id);
                               }}
                               title={`Click to call ${lead.phone}`}
-                              className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded transition-all cursor-pointer shadow-xs active:scale-95"
+                              className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:border-emerald-500/30 px-1.5 py-0.5 rounded transition-all cursor-pointer shadow-xs active:scale-95"
                             >
-                              <Phone className="w-2.5 h-2.5 text-emerald-400" />
+                              <Phone className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
                               <span>{lead.phone}</span>
                             </button>
                           )}
@@ -342,10 +342,10 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     </div>
                   </td>
 
-                  <td className="px-4 py-3 align-middle">{stagePill(lead)}</td>
+                  <td className="px-4 py-3.5 align-middle">{stagePill(lead)}</td>
 
-                  <td className="px-4 py-3 align-middle text-right font-mono">
-                    <span className="text-xs font-bold text-slate-200">
+                  <td className="px-4 py-3.5 align-middle text-right font-mono">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-200">
                       {lead.value !== null ? formatMoney(lead.value) : '—'}
                     </span>
                   </td>

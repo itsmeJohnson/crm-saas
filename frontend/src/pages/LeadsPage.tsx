@@ -502,109 +502,109 @@ export const LeadsPage: React.FC = () => {
 
       {/* 5 Enterprise Sales KPI Cards */}
       {showMetrics && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 animate-in fade-in duration-200">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 animate-in fade-in duration-200">
           {/* 1. Active Pipeline Value */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Active Pipeline
               </span>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <DollarSign className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
+                <DollarSign className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <p className="text-xl font-bold text-slate-100 tracking-tight">
+            <div className="mt-2 flex items-baseline justify-between">
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {formatMoney(salesKPIs.activePipelineValue)}
               </p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               {salesKPIs.activeDealsCount} active deals in funnel
             </p>
           </div>
 
           {/* 2. Weighted Sales Forecast */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Weighted Forecast
               </span>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                <Target className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20">
+                <Target className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <p className="text-xl font-bold text-slate-100 tracking-tight">
+            <div className="mt-2 flex items-baseline justify-between">
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {formatMoney(salesKPIs.weightedForecast)}
               </p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               Probability-adjusted
             </p>
           </div>
 
           {/* 3. Won Revenue This Month */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Won This Month
               </span>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                <TrendingUp className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-teal-50 text-teal-600 border border-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:border-teal-500/20">
+                <TrendingUp className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <p className="text-xl font-bold text-slate-100 tracking-tight">
+            <div className="mt-2 flex items-baseline justify-between">
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {formatMoney(salesKPIs.wonRevenueThisMonth)}
               </p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               {salesKPIs.wonDealsCount} deals closed won
             </p>
           </div>
 
           {/* 4. Win Rate */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Win Rate
               </span>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                <CheckCircle2 className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20">
+                <CheckCircle2 className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <p className="text-xl font-bold text-slate-100 tracking-tight">
+            <div className="mt-2 flex items-baseline justify-between">
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {salesKPIs.winRate}%
               </p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               Won vs total closed
             </p>
           </div>
 
           {/* 5. Overdue Follow-ups */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xs hover:border-slate-700 transition-all">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Overdue Follow-ups
               </span>
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                 salesKPIs.overdueFollowupsCount > 0
-                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20'
+                  : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
               }`}>
-                <AlertTriangle className="w-3.5 h-3.5" />
+                <AlertTriangle className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <p className={`text-xl font-bold tracking-tight ${
-                salesKPIs.overdueFollowupsCount > 0 ? 'text-rose-400' : 'text-slate-100'
+            <div className="mt-2 flex items-baseline justify-between">
+              <p className={`text-2xl font-bold tracking-tight ${
+                salesKPIs.overdueFollowupsCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'
               }`}>
                 {salesKPIs.overdueFollowupsCount}
               </p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               {salesKPIs.overdueFollowupsCount > 0 ? 'Requires attention' : 'All follow-ups current'}
             </p>
           </div>
@@ -628,7 +628,7 @@ export const LeadsPage: React.FC = () => {
                   value={filters.source}
                   onChange={(e) => setFilters({ source: e.target.value })}
                   placeholder="Filter source..."
-                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
+                  className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
                 />
               </div>
 
@@ -647,7 +647,7 @@ export const LeadsPage: React.FC = () => {
                       <select
                         value={val}
                         onChange={(e) => update(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
                       >
                         <option value="">{f.label}: All</option>
                         {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -658,7 +658,7 @@ export const LeadsPage: React.FC = () => {
                         value={val}
                         onChange={(e) => update(e.target.value)}
                         placeholder={f.label}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all"
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
                       />
                     )}
                   </div>
@@ -666,12 +666,12 @@ export const LeadsPage: React.FC = () => {
               })}
 
               {/* Include archived toggle */}
-              <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
+              <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
                 <input
                   type="checkbox"
                   checked={filters.include_archived}
                   onChange={(e) => setFilters({ include_archived: e.target.checked })}
-                  className="accent-brand-500 rounded"
+                  className="accent-indigo-600 rounded"
                 />
                 Show archived
               </label>
@@ -686,7 +686,7 @@ export const LeadsPage: React.FC = () => {
             <select
               value={filters.status}
               onChange={(e) => setFilters({ status: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all cursor-pointer"
+              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
             >
               <option value="All">All Statuses</option>
               <option value="New">New</option>
@@ -702,7 +702,7 @@ export const LeadsPage: React.FC = () => {
             <select
               value={filters.assigned_user_id}
               onChange={(e) => setFilters({ assigned_user_id: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all cursor-pointer"
+              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
             >
               <option value="All">All Owners</option>
               {activeUsers.map(u => (
@@ -718,7 +718,7 @@ export const LeadsPage: React.FC = () => {
             <select
               value={filters.priority}
               onChange={(e) => setFilters({ priority: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:bg-slate-900 focus:border-brand-500 shadow-2xs transition-all cursor-pointer"
+              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
             >
               <option value="All">All Priorities</option>
               <option value="Low">Low</option>
@@ -867,26 +867,35 @@ export const LeadsPage: React.FC = () => {
       {/* Slide-Over Drawer Details */}
       {isDetailOpen && detailLead && (
         <div className="fixed inset-0 z-40 overflow-hidden flex justify-end">
-          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity" onClick={() => setIsDetailOpen(false)}></div>
+          {/* Mobile backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity lg:hidden"
+            onClick={() => setIsDetailOpen(false)}
+          />
+          {/* Desktop backdrop: subtle transparent click-away that never washes out the table */}
+          <div
+            className="hidden lg:block absolute inset-0 bg-slate-900/10 transition-opacity"
+            onClick={() => setIsDetailOpen(false)}
+          />
           
-          <div className="relative w-full max-w-2xl bg-slate-900 border-l border-slate-800/80 shadow-2xl flex flex-col h-full z-10 animate-slide-in">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-full z-10 animate-slide-in text-slate-900 dark:text-slate-100">
             {/* Header */}
-            <div className="p-6 border-b border-slate-800 flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-500/20 to-indigo-500/20 border border-brand-500/30 flex items-center justify-center font-bold text-brand-300 text-lg shrink-0">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-white dark:bg-slate-900">
+              <div className="flex items-center gap-3.5 overflow-hidden">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/20 dark:border-indigo-500/30 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 text-lg shrink-0 shadow-xs">
                   {(detailLead.title || detailLead.first_name || 'LE').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="overflow-hidden">
-                  <h2 className="text-xl font-bold text-slate-100 truncate">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 truncate">
                     {detailLead.title || `${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'Lead'}
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-1">
-                    <span>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
                       {`${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'No Name'}
                     </span>
                     {detailLead.company_name && (
                       <>
-                        <span className="text-slate-600">•</span>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
                         <span className="truncate">{detailLead.company_name}</span>
                       </>
                     )}
@@ -903,7 +912,7 @@ export const LeadsPage: React.FC = () => {
                       setIsChatOpen(true);
                     }}
                     title="Open WhatsApp & SMS Chat window"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-300 rounded-xl transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:hover:bg-blue-500/20 dark:text-blue-300 rounded-xl transition-all cursor-pointer"
                   >
                     <MessageCircle className="w-3.5 h-3.5" /> Chat
                   </button>
@@ -912,15 +921,15 @@ export const LeadsPage: React.FC = () => {
                   <button
                     onClick={() => handleManualCall(detailLead.id)}
                     title="Place a call to this lead"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/20 border border-emerald-500/50 hover:bg-emerald-500/30 text-xs font-bold text-emerald-300 rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
                   >
-                    <Phone className="w-3.5 h-3.5 text-emerald-400" /> Call
+                    <Phone className="w-3.5 h-3.5 text-white" /> Call
                   </button>
                 )}
                 {isPrivileged && !detailLead.converted_contact_id && (
                   <button
                     onClick={() => handleConvert(detailLead)}
-                    className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-300 rounded-xl transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:hover:bg-emerald-500/20 dark:text-emerald-300 rounded-xl transition-all cursor-pointer"
                   >
                     Convert
                   </button>
@@ -928,14 +937,14 @@ export const LeadsPage: React.FC = () => {
                 {isPrivileged && (
                   <button
                     onClick={() => handleArchiveToggle(detailLead)}
-                    className="px-3 py-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-950/50 text-xs font-semibold text-slate-300 hover:text-slate-100 rounded-xl transition-all cursor-pointer"
+                    className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 rounded-xl transition-all cursor-pointer"
                   >
                     {detailLead.is_archived ? 'Restore' : 'Archive'}
                   </button>
                 )}
                 <button
                   onClick={() => setIsDetailOpen(false)}
-                  className="p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-950/50 text-slate-400 hover:text-slate-200 rounded-xl transition-all cursor-pointer"
+                  className="p-1.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl transition-all cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -945,56 +954,54 @@ export const LeadsPage: React.FC = () => {
             {/* Scrollable details view */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {(callError || dialerError) && agentState !== 'ACTIVE_CALLING' && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400 rounded-xl text-xs">
                   {typeof (callError || dialerError) === 'string'
                     ? (callError || dialerError)
                     : JSON.stringify(callError || dialerError)}
                 </div>
               )}
 
-
-
               {/* Telecalling Quick Call Disposition Logger */}
-              <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-2.5">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <PhoneCall className="w-4 h-4 text-brand-400" />
-                    <span className="text-xs font-bold text-slate-200">Log Call Disposition</span>
+                    <PhoneCall className="w-4 h-4 text-indigo-600 dark:text-brand-400" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Log Call Disposition</span>
                   </div>
                   <span className="text-[10px] text-slate-500 font-medium">One-click telecalling outcome</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     onClick={() => handleLogDisposition('Connected - Interested')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:border-emerald-500/30 dark:text-emerald-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Interested
                   </button>
                   <button
                     onClick={() => handleLogDisposition('Callback Scheduled')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                   >
                     <Clock className="w-3.5 h-3.5" />
                     Callback
                   </button>
                   <button
                     onClick={() => handleLogDisposition('No Answer / Busy')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:border-amber-500/30 dark:text-amber-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                   >
                     <AlertTriangle className="w-3.5 h-3.5" />
                     No Answer
                   </button>
                   <button
                     onClick={() => handleLogDisposition('Not Interested')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:border-rose-500/30 dark:text-rose-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                   >
                     <X className="w-3.5 h-3.5" />
                     Not Interested
                   </button>
                 </div>
                 {dispositionFeedback && (
-                  <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 pt-1 animate-in fade-in">
+                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 pt-1 animate-in fade-in">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     {dispositionFeedback}
                   </div>
@@ -1002,71 +1009,71 @@ export const LeadsPage: React.FC = () => {
               </div>
 
               {/* Quick Details Card */}
-              <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Opportunity Value</p>
-                  <p className="text-sm font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Opportunity Value</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5 flex items-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>{formattedValue}</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Lead Status</p>
-                  <span className="inline-flex mt-1.5 text-xs font-semibold text-brand-300">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Lead Status</p>
+                  <span className="inline-flex mt-1 text-xs font-bold text-indigo-600 dark:text-brand-300">
                     {detailLead.status}
                   </span>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Priority</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Priority</p>
                   <p className="text-sm font-semibold mt-0.5 flex items-center gap-1.5">
                     <Flame className={`w-3.5 h-3.5 ${
-                      detailLead.priority === 'Urgent' ? 'text-red-400'
-                      : detailLead.priority === 'High' ? 'text-amber-400'
-                      : detailLead.priority === 'Low' ? 'text-slate-500' : 'text-slate-400'
+                      detailLead.priority === 'Urgent' ? 'text-rose-600 dark:text-red-400'
+                      : detailLead.priority === 'High' ? 'text-amber-600 dark:text-amber-400'
+                      : detailLead.priority === 'Low' ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'
                     }`} />
-                    <span className="text-slate-200">{detailLead.priority}</span>
+                    <span className="text-slate-800 dark:text-slate-200">{detailLead.priority}</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Lead Score</p>
-                  <p className="text-sm font-semibold text-slate-200 mt-0.5">{detailLead.score}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Lead Score</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">{detailLead.score}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Lead Source</p>
-                  <p className="text-sm font-medium text-slate-200 mt-0.5 flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-indigo-400" />
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Lead Source</p>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mt-0.5 flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                     <span>{detailLead.source || '—'}</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Owner</p>
-                  <p className="text-sm font-medium text-slate-200 mt-0.5 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-brand-400" />
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Owner</p>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mt-0.5 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-indigo-600 dark:text-brand-400" />
                     {activeOwnerName}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Email</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email</p>
                   {detailLead.email ? (
                     <a
                       href={`mailto:${detailLead.email}`}
-                      className="text-sm font-medium text-brand-400 hover:text-brand-300 mt-0.5 flex items-center gap-1.5 truncate"
+                      className="text-sm font-medium text-indigo-600 dark:text-brand-400 hover:underline mt-0.5 flex items-center gap-1.5 truncate"
                     >
                       <Mail className="w-3.5 h-3.5" />
                       {detailLead.email}
                     </a>
                   ) : (
-                    <p className="text-sm font-medium text-slate-200 mt-0.5">—</p>
+                    <p className="text-sm font-medium text-slate-500 mt-0.5">—</p>
                   )}
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Phone</p>
-                  <p className="text-sm font-medium text-slate-200 mt-0.5">{detailLead.phone || '—'}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phone</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-0.5">{detailLead.phone || '—'}</p>
                 </div>
                 {detailLead.stage?.name && (
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Pipeline Stage</p>
-                    <p className="text-sm font-semibold text-indigo-400 mt-0.5">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pipeline Stage</p>
+                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       {detailLead.stage.name}
                     </p>
                   </div>
@@ -1087,15 +1094,15 @@ export const LeadsPage: React.FC = () => {
                 };
                 return (
                   <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Additional Details</p>
-                    <div className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Additional Details</p>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
                       {activeCf.map((f) => {
                         const v = cf[f.key];
                         const empty = v === undefined || v === null || v === '';
                         return (
                           <div key={f.id}>
-                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{f.label}</p>
-                            <p className={`text-sm font-medium mt-0.5 break-words ${empty ? 'text-slate-500' : 'text-slate-200'}`}>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{f.label}</p>
+                            <p className={`text-sm font-medium mt-0.5 break-words ${empty ? 'text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
                               {fmt(f)}
                             </p>
                           </div>
@@ -1106,24 +1113,24 @@ export const LeadsPage: React.FC = () => {
                 );
               })()}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/60">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200 dark:border-slate-800/60">
                 {/* Notes logs */}
-                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
                   <NotesPanel leadId={detailLead.id} />
                 </div>
 
                 {/* Unified activity timeline (notes + activities + audit + tasks + reminders) */}
-                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
                   <LeadTimeline leadId={detailLead.id} />
                 </div>
               </div>
 
               {/* Reminders + Attachments */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
                   <LeadReminders leadId={detailLead.id} />
                 </div>
-                <div className="glass-panel border border-slate-800/85 p-4.5 rounded-2xl">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
                   <LeadAttachments leadId={detailLead.id} />
                 </div>
               </div>

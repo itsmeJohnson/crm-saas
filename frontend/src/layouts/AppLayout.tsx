@@ -405,22 +405,22 @@ export const AppLayout: React.FC = () => {
   const displayRole = (roleLabel[industry] ?? roleLabel['generic'])[effectiveRole] ?? effectiveRole;
 
   const sidebarContent = (
-    <div className="flex flex-col h-full select-none">
-      {/* ── Minimalist Brand Header ── */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border-color)]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold flex-shrink-0">
+    <div className="flex flex-col h-full select-none bg-[var(--bg-sidebar)]">
+      {/* ── Modern Enterprise Brand Header ── */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/15 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0 shadow-xs">
             {BrandIcon()}
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-[var(--text-primary)] block truncate">
               {isSuperAdmin
-                ? 'CRM Enterprise · Secure Multi-Tenant Platform'
+                ? 'CRM Enterprise'
                 : (organization?.name || 'Samartha Sankalpa Solutions')}
             </span>
-            <span className="text-[10px] text-[var(--text-muted)] font-medium tracking-wide block">
+            <span className="text-[11px] text-[var(--text-muted)] font-medium tracking-wide block truncate">
               {isSuperAdmin
-                ? 'System Infrastructure & Multi-Tenant Control'
+                ? 'Multi-Tenant Control'
                 : 'Telecalling Suite'}
             </span>
           </div>
@@ -434,7 +434,7 @@ export const AppLayout: React.FC = () => {
       </div>
 
       {/* ── Navigation Tree ── */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {groupedWorkspace.map(({ group, items }) => {
           const isCollapsed = collapsedGroups.has(group);
           const groupActive = items.some((item) =>
@@ -444,10 +444,10 @@ export const AppLayout: React.FC = () => {
             <div key={group} className="space-y-0.5">
               <button
                 onClick={() => toggleGroup(group)}
-                className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
+                className="w-full flex items-center justify-between px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors cursor-pointer"
               >
-                <span className={groupActive ? 'text-indigo-400 font-bold' : ''}>{getGroupName(group)}</span>
-                <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isCollapsed ? '-rotate-90' : ''}`} />
+                <span className={groupActive ? 'text-indigo-600 dark:text-indigo-400 font-bold' : ''}>{getGroupName(group)}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isCollapsed ? '-rotate-90' : ''}`} />
               </button>
               {!isCollapsed && (
                 <div className="space-y-0.5">
@@ -533,7 +533,7 @@ export const AppLayout: React.FC = () => {
       <CallbackTakeoverModal />
 
       {/* ── Desktop Minimalist Sidebar ── */}
-      <aside className="hidden md:flex md:w-56 crm-sidebar flex-col z-20 flex-shrink-0">
+      <aside className="hidden md:flex md:w-64 crm-sidebar flex-col z-20 flex-shrink-0">
         {sidebarContent}
       </aside>
 

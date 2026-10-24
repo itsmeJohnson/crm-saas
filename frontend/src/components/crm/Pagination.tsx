@@ -54,13 +54,13 @@ export const Pagination: React.FC<PaginationProps> = ({
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 mt-6 px-2">
       {/* Page size selector and item counts */}
-      <div className="flex items-center gap-4 text-xs text-slate-400">
+      <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
         <div className="flex items-center gap-2">
           <span>Rows per page:</span>
           <select
             value={limit}
             onChange={(e) => onLimitChange?.(Number(e.target.value))}
-            className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-hidden focus:border-brand-500 cursor-pointer"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 cursor-pointer shadow-xs"
           >
             <option value={25}>25</option>
             <option value={50}>50</option>
@@ -70,11 +70,11 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         <div>
           Showing{' '}
-          <span className="font-semibold text-slate-200">
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
             {startItem.toLocaleString()} – {endItem.toLocaleString()}
           </span>{' '}
           of{' '}
-          <span className="font-semibold text-slate-200">
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
             {(totalCount !== undefined ? totalCount : total).toLocaleString()}
           </span>{' '}
           leads
@@ -89,8 +89,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           title="First page"
           className={`p-2 border rounded-xl text-xs font-medium transition-all ${
             !hasPrev
-              ? 'border-slate-800 bg-slate-900/30 text-slate-600 cursor-not-allowed'
-              : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-900/80 cursor-pointer'
+              ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-xs'
           }`}
         >
           <ChevronsLeft className="w-4 h-4" />
@@ -101,15 +101,15 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={!hasPrev}
           className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-medium transition-all ${
             !hasPrev
-              ? 'border-slate-800 bg-slate-900/30 text-slate-600 cursor-not-allowed'
-              : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-900/80 cursor-pointer'
+              ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-xs'
           }`}
         >
           <ChevronLeft className="w-4 h-4" />
           Previous
         </button>
 
-        <div className="px-3 py-1.5 text-xs font-semibold text-slate-300 border border-slate-800 bg-slate-950/70 rounded-xl">
+        <div className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl shadow-xs">
           Page {currentPage} of {totalPages}
         </div>
 
@@ -118,8 +118,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={!hasNext}
           className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-medium transition-all ${
             !hasNext
-              ? 'border-slate-800 bg-slate-900/30 text-slate-600 cursor-not-allowed'
-              : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-900/80 cursor-pointer'
+              ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-xs'
           }`}
         >
           Next
@@ -133,8 +133,8 @@ export const Pagination: React.FC<PaginationProps> = ({
             title="Last page"
             className={`p-2 border rounded-xl text-xs font-medium transition-all ${
               !hasNext
-                ? 'border-slate-800 bg-slate-900/30 text-slate-600 cursor-not-allowed'
-                : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-900/80 cursor-pointer'
+                ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-xs'
             }`}
           >
             <ChevronsRight className="w-4 h-4" />
