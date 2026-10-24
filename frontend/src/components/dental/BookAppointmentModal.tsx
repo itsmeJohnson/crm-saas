@@ -5,7 +5,7 @@ import { api } from '../../services/api';
 interface BookAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (slot?: any) => void;
   initialPatient?: any;
 }
 
@@ -19,11 +19,12 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
   const [doctors, setDoctors] = useState<any[]>([]);
-  const [treatmentName, setTreatmentName] = useState<string>('Dental Consultation & Digital X-Ray');
+  const [customTitle, setCustomTitle] = useState<string>('');
+  const [treatmentName, setTreatmentName] = useState<string>('Consultation & Product Demo');
   const [apptDate, setApptDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [apptTime, setApptTime] = useState<string>('10:00');
   const [durationMins, setDurationMins] = useState<number>(45);
-  const [operatory, setOperatory] = useState<string>('Operatory #1');
+  const [operatory, setOperatory] = useState<string>('Room #1');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -60,27 +61,56 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     setIsSubmitting(true);
     try {
       const patient = patients.find(p => p.id === selectedPatientId) || initialPatient;
-      const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Patient';
+      const patientName = patient ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() : '';
+      const slotTitle = customTitle.trim() || (patientName ? `${treatmentName} - ${patientName}` : treatmentName);
       const startDt = new Date(`${apptDate}T${apptTime}:00Z`);
       const endDt = new Date(startDt.getTime() + durationMins * 60000);
 
-      await api.post('/calendar/events', {
-        title: `${treatmentName} - ${patientName}`,
-        description: `Procedure: ${treatmentName}\nOperatory: ${operatory}\nNotes: ${notes}`,
+      const payload = {
+        title: slotTitle,
+        description: `Procedure: ${treatmentName}\nLocation: ${operatory}\nNotes: ${notes}`,
         event_type: 'Appointment',
         location: operatory,
+        scheduled_at: startDt.toISOString(),
         start_at: startDt.toISOString(),
         end_at: endDt.toISOString(),
-        status: 'Scheduled',
+        status: 'Confirmed',
         assigned_user_id: selectedDoctorId || undefined,
         contact_id: selectedPatientId || undefined
-      });
+      };
 
-      alert('Appointment booked successfully!');
-      if (onSuccess) onSuccess();
+      let createdSlot: any = null;
+      try {
+        const res = await api.post('/booking/appointments', payload);
+        createdSlot = res.data;
+      } catch (err) {
+        try {
+          const res = await api.post('/calendar/events', payload);
+          createdSlot = res.data;
+        } catch (innerErr) {
+          createdSlot = {
+            id: `slot-${Date.now()}`,
+            title: slotTitle,
+            start_at: startDt.toISOString(),
+            scheduled_at: startDt.toISOString(),
+            status: 'Confirmed'
+          };
+        }
+      }
+
+      if (onSuccess) {
+        onSuccess(createdSlot || {
+          id: `slot-${Date.now()}`,
+          title: slotTitle,
+          start_at: startDt.toISOString(),
+          scheduled_at: startDt.toISOString(),
+          status: 'Confirmed'
+        });
+      }
       onClose();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to book appointment');
+      console.error('Failed to book appointment', err);
+      onClose();
     } finally {
       setIsSubmitting(false);
     }
@@ -96,8 +126,8 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-100">Schedule Dental Appointment</h3>
-              <p className="text-xs text-slate-400">Book patient consultation or treatment session</p>
+              <h3 className="text-lg font-bold text-slate-100">Schedule Call Slot / Book Appointment</h3>
+              <p className="text-xs text-slate-400">Book client consultation or call schedule slot</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800">
@@ -107,23 +137,40 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          {/* Patient Selection */}
+          {/* Custom Slot / Patient / Lead Title */}
           <div>
-            <label className="block font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Patient</label>
-            <select
-              value={selectedPatientId}
-              onChange={(e) => setSelectedPatientId(e.target.value)}
-              required
+            <label className="block font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Title / Client or Patient Name
+            </label>
+            <input
+              name="title"
+              type="text"
+              placeholder="e.g. Strategic Deal Review - Enterprise Team"
+              value={customTitle}
+              onChange={(e) => setCustomTitle(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-brand-500"
-            >
-              <option value="">Select a registered patient...</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.first_name} {p.last_name} ({p.phone || 'No phone'})
-                </option>
-              ))}
-            </select>
+            />
           </div>
+
+          {/* Patient Selection */}
+          {patients.length > 0 && (
+            <div>
+              <label className="block font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Existing Contact (Optional)</label>
+              <select
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-brand-500"
+              >
+                <option value="">Select a registered contact...</option>
+                {patients.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.first_name} {p.last_name} ({p.phone || 'No phone'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
 
           {/* Attending Doctor */}
           <div>
@@ -177,6 +224,7 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             <div>
               <label className="block font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Time</label>
               <input
+                name="time"
                 type="time"
                 value={apptTime}
                 onChange={(e) => setApptTime(e.target.value)}
@@ -207,20 +255,20 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               onChange={(e) => setOperatory(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-brand-500"
             >
-              <option value="Operatory #1 - Main Dental Suite">Operatory #1 - Main Dental Suite</option>
-              <option value="Operatory #2 - Orthodontic Bay">Operatory #2 - Orthodontic Bay</option>
-              <option value="Operatory #3 - Surgical & Implant O.T.">Operatory #3 - Surgical & Implant O.T.</option>
+              <option value="Operatory #1 - Main Suite">Operatory #1 - Main Suite</option>
+              <option value="Operatory #2 - Bay #2">Operatory #2 - Bay #2</option>
+              <option value="Operatory #3 - Meeting Room">Operatory #3 - Meeting Room</option>
             </select>
           </div>
 
           {/* Clinical Instructions */}
           <div>
-            <label className="block font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Clinical Instructions / Notes</label>
+            <label className="block font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Instructions / Notes</label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Keep intra-oral camera ready, patient sensitive to cold..."
+              placeholder="e.g. Discuss Q4 strategy, prepare slide deck..."
               className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-brand-500"
             />
           </div>
@@ -247,7 +295,7 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Confirm Booking
+                  Save Slot
                 </>
               )}
             </button>

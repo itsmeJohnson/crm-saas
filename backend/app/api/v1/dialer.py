@@ -85,10 +85,24 @@ async def trigger_provider_call(cfg: dict, customer_number: str, agent_number: s
     return _extract_call_id(call_res, fallback_sid)
 
 
-async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
-    if user.role in ("Employee", "TeamLeader", "Telecaller", "Manager", "OrgAdmin"):
+async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
+    if user.role in ("TeamLeader", "Manager"):
         return True
+    if user.role == "Employee" and user.reporting_to_id:
+        parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
+        parent_role = parent_res.scalar()
+        return parent_role == "Manager"
     return False
+
+
+async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
+    if user.role == "Telecaller":
+        return True
+    if user.role == "Employee":
+        is_tl = await check_is_team_leader(user, db)
+        return not is_tl
+    return False
+
 
 @router.post("/next-lead", response_model=LeadResponse)
 async def get_next_lead(
@@ -345,21 +359,32 @@ async def call_lead(
     if lead.assigned_user_id is None:
         lead.assigned_user_id = actor.id
         db.add(lead)
+    elif lead.assigned_user_id != actor.id and actor.role not in ("SuperAdmin", "OrgAdmin", "TeamLeader"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only place calls to leads assigned to you."
+        )
     if not lead.phone:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This lead has no phone number.")
 
     # 3. Integrated click-to-call is a paid feature and needs org telephony config.
     cfg = await load_org_calling_config(db, actor)
+    if not cfg:
+        if getattr(payload, "knowlarity_api_key", None):
+            cfg = {"provider": "knowlarity", "x_api_key": payload.knowlarity_api_key}
+        elif getattr(payload, "myop_x_api_key", None):
+            cfg = {
+                "provider": "myoperator",
+                "x_api_key": payload.myop_x_api_key,
+                "company_id": getattr(payload, "myop_company_id", None),
+                "secret_token": getattr(payload, "myop_secret_key", None),
+                "public_ivr_id": getattr(payload, "myop_public_ivr_id", None)
+            }
     if not config_ready(cfg):
-        # Robust fallback for Samartha Sankalpa / TeleCMI integration
-        cfg = {
-            "provider": "telecmi",
-            "company_id": "33339071",
-            "appid": "33339071",
-            "secret_token": "5c7597c2-a2f7-46fe-b0dc-ce7920639607",
-            "default_caller_id": "917949817390",
-            "user_uuid": "5001_33339071",
-        }
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Telephony is not configured for your organization. Please configure a telephony provider in Settings."
+        )
 
     call_sid = f"outbound-{uuid.uuid4()}"
     try:

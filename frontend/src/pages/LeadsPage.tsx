@@ -274,6 +274,8 @@ export const LeadsPage: React.FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const queryLeadId = searchParams.get('leadId');
+  const queryStage = searchParams.get('stage');
+  const queryFilter = searchParams.get('filter');
 
   useEffect(() => {
     fetchLeads();
@@ -282,7 +284,14 @@ export const LeadsPage: React.FC = () => {
     if (users.length === 0) fetchUsers();
     fetchDashboardMetrics();
     fetchBootstrap();
-  }, []);
+
+    if (queryStage || queryFilter) {
+      const targetStatus = queryFilter === 'inquiry' ? 'Inquiry' : queryFilter === 'fresh' ? 'New' : queryStage || undefined;
+      if (targetStatus) {
+        setFilters({ status: targetStatus });
+      }
+    }
+  }, [queryStage, queryFilter]);
 
   useEffect(() => {
     if (queryLeadId) {

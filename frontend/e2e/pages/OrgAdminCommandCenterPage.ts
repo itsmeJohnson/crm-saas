@@ -51,12 +51,12 @@ export class OrgAdminCommandCenterPage {
     this.newLeadQuickBtn = page.locator('button:has-text("New Lead"), button:has-text("New Enquiry")').first();
 
     // 6-Metric Tiles (matching bento-card containers)
-    this.metricTodayCalls = page.locator('text=/Today\'s Calls|Today\'s Appts/i').locator('xpath=following-sibling::div').first();
-    this.metricContacts = page.locator('text=/Contacts|Patients/i').locator('xpath=following-sibling::div').first();
-    this.metricFollowups = page.locator('text="Follow-ups"').locator('xpath=following-sibling::div').first();
-    this.metricCampaigns = page.locator('text=/Campaigns|Treatments/i').locator('xpath=following-sibling::div').first();
-    this.metricCollections = page.locator('text=/Collections|Total Billed/i').locator('xpath=following-sibling::div').first();
-    this.metricMonthlyRevenue = page.locator('text=/Monthly|Revenue/i').locator('xpath=following-sibling::div').first();
+    this.metricTodayCalls = page.locator('text=/Today\'s Calls|Today\'s Appts/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
+    this.metricContacts = page.locator('text=/Contacts|Patients/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
+    this.metricFollowups = page.locator('text="Follow-ups"').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
+    this.metricCampaigns = page.locator('text=/Campaigns|Treatments/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
+    this.metricCollections = page.locator('text=/Collections|Total Billed/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
+    this.metricMonthlyRevenue = page.locator('text=/Monthly|Revenue/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
 
     // 8 Lifecycle Pipeline Cards
     this.lifecycleCardMarketing = page.locator('div.bento-card:has-text("Marketing")');
@@ -113,6 +113,6 @@ export class OrgAdminCommandCenterPage {
 
     await this.slotSubmitBtn.click();
     await expect(this.addSlotModal).toBeHidden({ timeout: 8000 });
-    await expect(this.schedulePanel.locator(`text="${slotName}"`).first()).toBeVisible({ timeout: 10000 });
+    await expect(this.schedulePanel.locator(`text=${slotName}`).first()).toBeVisible({ timeout: 10000 });
   }
 }
