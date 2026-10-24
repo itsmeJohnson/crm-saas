@@ -878,18 +878,18 @@ export const LeadsPage: React.FC = () => {
             onClick={() => setIsDetailOpen(false)}
           />
           
-          <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-full z-10 animate-slide-in text-slate-900 dark:text-slate-100">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-xl flex flex-col h-full z-10 animate-slide-in text-slate-900 dark:text-slate-100">
             {/* Header */}
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-white dark:bg-slate-900">
-              <div className="flex items-center gap-3.5 overflow-hidden">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/20 dark:border-indigo-500/30 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 text-lg shrink-0 shadow-xs">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-white dark:bg-slate-900 shrink-0">
+              <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/20 dark:border-indigo-500/30 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 text-sm shrink-0 shadow-xs">
                   {(detailLead.title || detailLead.first_name || 'LE').substring(0, 2).toUpperCase()}
                 </div>
-                <div className="overflow-hidden">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 truncate">
+                <div className="overflow-hidden min-w-0">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
                     {detailLead.title || `${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'Lead'}
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium flex items-center gap-1.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 truncate">
                     <span className="font-semibold text-slate-700 dark:text-slate-300">
                       {`${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'No Name'}
                     </span>
@@ -903,7 +903,7 @@ export const LeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {detailLead.phone && (
                   <button
                     onClick={() => {
@@ -912,24 +912,26 @@ export const LeadsPage: React.FC = () => {
                       setIsChatOpen(true);
                     }}
                     title="Open WhatsApp & SMS Chat window"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:hover:bg-blue-500/20 dark:text-blue-300 rounded-xl transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:hover:bg-blue-500/20 dark:text-blue-300 rounded-lg transition-all cursor-pointer shadow-xs"
                   >
-                    <MessageCircle className="w-3.5 h-3.5" /> Chat
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Chat</span>
                   </button>
                 )}
                 {canManualCall && agentState !== 'ACTIVE_CALLING' && detailLead.phone && (
                   <button
                     onClick={() => handleManualCall(detailLead.id)}
                     title="Place a call to this lead"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
                   >
-                    <Phone className="w-3.5 h-3.5 text-white" /> Call
+                    <Phone className="w-3.5 h-3.5 text-white" />
+                    <span>Call</span>
                   </button>
                 )}
                 {isPrivileged && !detailLead.converted_contact_id && (
                   <button
                     onClick={() => handleConvert(detailLead)}
-                    className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:hover:bg-emerald-500/20 dark:text-emerald-300 rounded-xl transition-all cursor-pointer"
+                    className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:hover:bg-emerald-500/20 dark:text-emerald-300 rounded-lg transition-all cursor-pointer shadow-xs"
                   >
                     Convert
                   </button>
@@ -937,22 +939,23 @@ export const LeadsPage: React.FC = () => {
                 {isPrivileged && (
                   <button
                     onClick={() => handleArchiveToggle(detailLead)}
-                    className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 rounded-xl transition-all cursor-pointer"
+                    className="px-2.5 py-1.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg transition-all cursor-pointer shadow-xs"
                   >
                     {detailLead.is_archived ? 'Restore' : 'Archive'}
                   </button>
                 )}
                 <button
                   onClick={() => setIsDetailOpen(false)}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl transition-all cursor-pointer"
+                  className="p-1.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-all cursor-pointer"
+                  title="Close drawer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Scrollable details view */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {(callError || dialerError) && agentState !== 'ACTIVE_CALLING' && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400 rounded-xl text-xs">
                   {typeof (callError || dialerError) === 'string'
@@ -1009,7 +1012,7 @@ export const LeadsPage: React.FC = () => {
               </div>
 
               {/* Quick Details Card */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                 <div>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Opportunity Value</p>
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5 flex items-center gap-1.5">
@@ -1095,7 +1098,7 @@ export const LeadsPage: React.FC = () => {
                 return (
                   <div>
                     <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Additional Details</p>
-                    <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                       {activeCf.map((f) => {
                         const v = cf[f.key];
                         const empty = v === undefined || v === null || v === '';
@@ -1113,24 +1116,24 @@ export const LeadsPage: React.FC = () => {
                 );
               })()}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200 dark:border-slate-800/60">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-200 dark:border-slate-800/60">
                 {/* Notes logs */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
                   <NotesPanel leadId={detailLead.id} />
                 </div>
 
                 {/* Unified activity timeline (notes + activities + audit + tasks + reminders) */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
                   <LeadTimeline leadId={detailLead.id} />
                 </div>
               </div>
 
               {/* Reminders + Attachments */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
                   <LeadReminders leadId={detailLead.id} />
                 </div>
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/85 p-4.5 rounded-2xl shadow-xs">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
                   <LeadAttachments leadId={detailLead.id} />
                 </div>
               </div>

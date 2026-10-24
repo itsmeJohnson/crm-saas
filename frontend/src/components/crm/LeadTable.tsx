@@ -305,18 +305,18 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     </td>
                   )}
 
-                  <td className="px-4 py-3.5">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-600 dark:text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                         {initialsOf(lead.title?.[0], lead.title?.[1], 'LD')}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-brand-400 transition-colors truncate">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
                           {lead.title}
                         </p>
                         <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                           {contactFullName && <span className="text-slate-700 dark:text-slate-300 font-medium truncate">{contactFullName}</span>}
-                          {contactFullName && lead.company_name && <span className="text-slate-400">•</span>}
+                          {contactFullName && lead.company_name && <span className="text-slate-300 dark:text-slate-600">•</span>}
                           {lead.company_name && (
                             <span className="inline-flex items-center gap-1 truncate text-slate-500 dark:text-slate-400">
                               <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
@@ -342,9 +342,9 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     </div>
                   </td>
 
-                  <td className="px-4 py-3.5 align-middle">{stagePill(lead)}</td>
+                  <td className="px-4 py-3 align-middle">{stagePill(lead)}</td>
 
-                  <td className="px-4 py-3.5 align-middle text-right font-mono">
+                  <td className="px-4 py-3 align-middle text-right font-mono">
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-200">
                       {lead.value !== null ? formatMoney(lead.value) : '—'}
                     </span>
@@ -355,7 +355,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   <td className="px-4 py-3 align-middle">{ownerBadge(lead)}</td>
 
                   <td className="px-4 py-3 align-middle">
-                    <span className="text-xs text-slate-400 whitespace-nowrap">{relativeTime(lead.created_at)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{relativeTime(lead.created_at)}</span>
                   </td>
 
                   <td className="px-4 py-3 text-right align-middle" onClick={(e) => e.stopPropagation()}>
@@ -366,7 +366,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                             type="button"
                             onClick={() => onCallClick?.(lead.id)}
                             title={`Call ${lead.phone}`}
-                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                            className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-500/40 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all cursor-pointer shadow-xs"
                           >
                             <Phone className="w-3.5 h-3.5" />
                           </button>
@@ -374,7 +374,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                             type="button"
                             onClick={() => onChatClick?.(lead, 'whatsapp')}
                             title="WhatsApp / SMS chat"
-                            className="p-1.5 border border-slate-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                            className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-500/40 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all cursor-pointer shadow-xs"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                           </button>
@@ -384,7 +384,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <button
                           onClick={(e) => handleEdit(e, lead)}
                           title="Edit lead"
-                          className="p-1.5 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 rounded-lg text-slate-300 transition-all cursor-pointer"
+                          className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-all cursor-pointer shadow-xs"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -393,7 +393,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <button
                           onClick={(e) => handleDelete(e, lead)}
                           title="Delete lead"
-                          className="p-1.5 border border-slate-800 hover:border-red-500/25 hover:bg-red-500/10 text-red-400 rounded-lg transition-all cursor-pointer"
+                          className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-500/40 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-lg transition-all cursor-pointer shadow-xs"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
