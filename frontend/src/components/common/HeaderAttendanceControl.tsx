@@ -136,7 +136,7 @@ export const HeaderAttendanceControl: React.FC = () => {
 
               {showBreakMenu && (
                 <div className="absolute right-0 mt-1 w-36 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-xl py-1 z-50 animate-fade-in text-xs">
-                  <p className="px-3 py-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                  <p className="px-3 py-1 text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">
                     Take Break
                   </p>
                   {['Tea', 'Lunch', 'Meeting', 'Personal'].map((reason) => (

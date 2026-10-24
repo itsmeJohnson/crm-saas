@@ -54,13 +54,10 @@ export const UsersPage: React.FC = () => {
           {showCreateButton && (
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-white dark:bg-[#0e1017] border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-white rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer"
-              style={{ color: 'var(--text-primary)' }}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer"
             >
-              <UserPlus className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-              <span className="text-gray-900 dark:text-white" style={{ color: 'var(--text-primary)' }}>
-                Create Member
-              </span>
+              <UserPlus className="w-4 h-4 text-brand-500" />
+              <span>Create Member</span>
             </button>
           )}
 

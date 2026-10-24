@@ -47,6 +47,7 @@ export const ModuleGuardRoute: React.FC<ModuleGuardRouteProps> = ({ moduleKey })
     moduleKey === 'admin_core' ||
     moduleKey === 'platform_core' ||
     moduleKey === 'billing' ||
+    moduleKey === 'dashboard' ||
     (crmConfig.enabled_modules && crmConfig.enabled_modules.includes(moduleKey));
 
   if (!isEnabled) {

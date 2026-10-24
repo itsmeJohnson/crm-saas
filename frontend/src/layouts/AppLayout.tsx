@@ -575,9 +575,11 @@ export const AppLayout: React.FC = () => {
           <div className="flex items-center gap-2">
             <HeaderAttendanceControl />
             <button
+              id="theme-toggle-button"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               onClick={toggleTheme}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-              className="p-1.5 rounded-lg border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+              className="p-1.5 rounded-lg border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
             </button>

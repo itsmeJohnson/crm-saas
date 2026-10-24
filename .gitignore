@@ -50,3 +50,7 @@ backend/*.db*
 # Tooling
 .claude/
 scratch/
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
