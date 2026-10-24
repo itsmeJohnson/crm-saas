@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation, matchPath, Outlet } from 'react-router-dom';
-import { Loader2, ShieldAlert, Ban, HelpCircle } from 'lucide-react';
+import { Loader2, ShieldAlert, Ban, HelpCircle, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useMetadataStore } from '../../store/metadataStore';
 import { MODULES_REGISTRY } from '../../routes/moduleRegistry';
@@ -14,14 +14,38 @@ export const ModuleGuardRoute: React.FC<ModuleGuardRouteProps> = ({ moduleKey })
   const user = useAuthStore((state) => state.user);
   const features = useAuthStore((state) => state.features);
   
-  const { loaded: metadataLoaded, crmConfig } = useMetadataStore();
+  const { loaded: metadataLoaded, crmConfig, error, isLoading, fetchBootstrap } = useMetadataStore();
+
+  useEffect(() => {
+    if (user && !metadataLoaded && !isLoading) {
+      fetchBootstrap().catch(() => {});
+    }
+  }, [user, metadataLoaded, isLoading, fetchBootstrap]);
 
   // 1. Authenticate user
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 2. Wait for tenant bootstrap configurations to load
+  // 2. Error handling if bootstrap failed
+  if (error && !metadataLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-300">
+        <ShieldAlert className="w-8 h-8 text-amber-400 mb-3" />
+        <span className="text-sm font-medium tracking-wide mb-1 text-slate-200">Unable to load workspace</span>
+        <span className="text-xs text-slate-400 mb-4 max-w-sm text-center">{error}</span>
+        <button
+          onClick={() => fetchBootstrap(true)}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all shadow-md active:scale-95"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Retry</span>
+        </button>
+      </div>
+    );
+  }
+
+  // 3. Wait for tenant bootstrap configurations to load
   if (!metadataLoaded) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-[var(--text-secondary)]">
