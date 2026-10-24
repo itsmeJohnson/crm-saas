@@ -184,6 +184,18 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         set({ webrtcStatus: status, isMuted: telecmiWebRTC.getIsMuted() });
 
         if (status === 'incoming') {
+          // If the agent is currently placing an outbound call, this incoming SIP leg is the telephony provider bridge connecting back to the agent softphone!
+          const activeDirection = get().callDirection;
+          const activeLifecycle = get().callLifecycle;
+          const isOutboundCallActive = activeDirection === 'OUTBOUND' && (activeLifecycle === 'initiating' || activeLifecycle === 'ringing' || activeLifecycle === 'connected');
+          const isBridgeLegPending = telecmiWebRTC.getIsOutboundPending();
+
+          if (isOutboundCallActive || isBridgeLegPending) {
+            console.log('[WebRTC] Incoming status belongs to active outbound bridge leg. Auto-connecting rather than treating as incoming call.');
+            telecmiWebRTC.answer().catch(() => {});
+            return;
+          }
+
           const incData = (_details || telecmiWebRTC.getIncomingCall()) as any;
           const callerPhone = incData?.from || '';
           const callerName = incData?.name || '';

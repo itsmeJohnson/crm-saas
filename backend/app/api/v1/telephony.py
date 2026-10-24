@@ -2,6 +2,7 @@ import logging
 import re
 import uuid
 from typing import Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request, Response
 from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -513,10 +514,57 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     call_status = str(data.get("Status") or data.get("status") or data.get("event") or data.get("callstatus") or "ANSWER")
 
     # 2. Determine Call Flow: Inbound vs Outbound
-    is_inbound = (
-        direction in ("IVR", "INBOUND")
-        or (source_number and not direction and not recording_url)
+    raw_type = str(data.get("type") or data.get("call_type") or data.get("event") or "").upper()
+    is_explicit_outbound = (
+        direction in ("OUTBOUND", "OUT", "C2C", "CLICK2CALL", "DIALER")
+        or raw_type in ("OUTBOUND", "C2C", "CLICK2CALL", "DIALER", "OUT")
+        or bool(data.get("c2c"))
     )
+
+    is_matching_outbound = False
+    if call_sid:
+        act_res = await db.execute(
+            select(Activity.id).filter(
+                Activity.call_sid == str(call_sid),
+                Activity.call_direction == "OUTBOUND"
+            ).limit(1)
+        )
+        if act_res.scalars().first():
+            is_matching_outbound = True
+
+    # If call_sid wasn't found directly, check if an outbound call activity was initiated to/from this number in last 5 mins
+    if not is_matching_outbound and not is_explicit_outbound:
+        src_digits = re.sub(r"\D", "", str(source_number))[-10:] if source_number else ""
+        dst_digits = re.sub(r"\D", "", str(dest_number))[-10:] if dest_number else ""
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+
+        recent_act_query = select(Activity).filter(
+            Activity.call_direction == "OUTBOUND",
+            Activity.created_at >= recent_cutoff,
+        )
+        recent_res = await db.execute(recent_act_query)
+        for act in recent_res.scalars().all():
+            if act.lead_id:
+                lead_q = await db.execute(select(Lead.phone).filter(Lead.id == act.lead_id))
+                lead_phone = lead_q.scalar_one_or_none()
+                if lead_phone:
+                    lead_digits = re.sub(r"\D", "", lead_phone)[-10:]
+                    if (src_digits and lead_digits == src_digits) or (dst_digits and lead_digits == dst_digits):
+                        is_matching_outbound = True
+                        if act.call_sid != str(call_sid):
+                            act.call_sid = str(call_sid)
+                            db.add(act)
+                            await db.commit()
+                        break
+
+    if is_explicit_outbound or is_matching_outbound:
+        is_inbound = False
+    elif direction in ("IVR", "INBOUND"):
+        is_inbound = True
+    elif source_number and not direction and not recording_url:
+        is_inbound = True
+    else:
+        is_inbound = False
 
     if is_inbound:
         # Inbound Call Flow (Live ringing notification or inbound call report)

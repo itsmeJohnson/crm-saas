@@ -24,6 +24,8 @@ export const InboundCallPopup: React.FC = () => {
   const rejectInboundCall = useDialerStore((s) => s.rejectInboundCall);
   const initWebRTC = useDialerStore((s) => s.initWebRTC);
   const callLifecycle = useDialerStore((s) => s.callLifecycle);
+  const callDirection = useDialerStore((s) => s.callDirection);
+  const currentLead = useDialerStore((s) => s.currentLead);
 
   const [activeSocketCall, setActiveSocketCall] = useState<InboundCallEvent | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
@@ -39,12 +41,12 @@ export const InboundCallPopup: React.FC = () => {
 
   const webrtcStatus = useDialerStore((s) => s.webrtcStatus);
 
-  // When call connects or transitions to disposition, clear ringing popup immediately
+  // When call connects, transitions to disposition, or an outbound call is active, clear ringing popup immediately
   useEffect(() => {
-    if (callLifecycle === 'connected' || callLifecycle === 'disposition') {
+    if (callLifecycle === 'connected' || callLifecycle === 'disposition' || callDirection === 'OUTBOUND') {
       setActiveSocketCall(null);
     }
-  }, [callLifecycle]);
+  }, [callLifecycle, callDirection]);
 
   // When softphone reports call has ended, clear ringing popup
   useEffect(() => {
@@ -140,6 +142,25 @@ export const InboundCallPopup: React.FC = () => {
     const unsubscribe = whatsappRealtime.subscribe((data) => {
       try {
         if (data && data.event === 'inbound_call') {
+          // If the agent is currently placing an outbound call, ignore this event to prevent outgoing calls from ringing as incoming
+          const dialer = useDialerStore.getState();
+          const activeOutboundDigits = (dialer.currentLead?.phone || '').replace(/\D/g, '').slice(-10);
+          const incomingDigits = (data.phone || '').replace(/\D/g, '').slice(-10);
+
+          if (
+            dialer.callDirection === 'OUTBOUND' &&
+            dialer.callLifecycle !== 'idle' &&
+            dialer.callLifecycle !== 'disposition'
+          ) {
+            console.log('[InboundCallPopup] Suppressed inbound popup: active outbound call in progress to', activeOutboundDigits);
+            return;
+          }
+
+          if (activeOutboundDigits && incomingDigits && activeOutboundDigits === incomingDigits) {
+            console.log('[InboundCallPopup] Suppressed inbound popup: matches current lead phone', incomingDigits);
+            return;
+          }
+
           setActiveSocketCall((prev) => {
             // Deduplicate: if already showing for this call, do not replace object reference
             if (prev && (prev.call_sid === data.call_sid || (prev.phone && data.phone && prev.phone === data.phone))) {
@@ -162,6 +183,18 @@ export const InboundCallPopup: React.FC = () => {
   }, [user?.id]);
 
   if (!user || !currentIncoming) return null;
+
+  // Suppress inbound popup if the agent is already engaged in an outbound call
+  const activeOutboundDigits = (currentLead?.phone || '').replace(/\D/g, '').slice(-10);
+  if (
+    callDirection === 'OUTBOUND' &&
+    (callLifecycle === 'initiating' || callLifecycle === 'ringing' || callLifecycle === 'connected')
+  ) {
+    return null;
+  }
+  if (activeOutboundDigits && normalizedPhone && activeOutboundDigits === normalizedPhone) {
+    return null;
+  }
 
   const handleAnswerCall = async () => {
     if (isAnswering) return;

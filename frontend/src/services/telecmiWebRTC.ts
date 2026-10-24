@@ -111,6 +111,10 @@ class TeleCMIWebRTCService {
     return this.incomingCall;
   }
 
+  public getIsOutboundPending(): boolean {
+    return this.isOutboundPending;
+  }
+
   public getConfig(): WebRTCSessionConfig | null {
     return this.config;
   }
