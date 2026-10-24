@@ -236,7 +236,14 @@ class WhatsAppService:
         )
         # Enforce employee-level conversation scoping
         if not self._privileged(actor):
-            query = query.filter(WhatsAppConversation.assigned_user_id == actor.id)
+            query = query.filter(
+                or_(
+                    WhatsAppConversation.assigned_user_id == actor.id,
+                    WhatsAppConversation.assigned_user_id.is_(None),
+                    WhatsAppConversation.lead_id.isnot(None),
+                    WhatsAppConversation.contact_id.isnot(None)
+                )
+            )
             
         conv = (await self.db.execute(query)).scalars().first()
         if not conv:
@@ -253,12 +260,20 @@ class WhatsAppService:
         label_id: uuid.UUID | None = None,
         settings_id: uuid.UUID | None = None,
         skip: int = 0,
-        limit: int = 50
+        limit: int = 50,
+        lead_id: uuid.UUID | None = None
     ) -> list[dict]:
         # Scopes assignment query
         scop_user = assigned_to
+        include_unassigned = False
         if not self._privileged(actor):
-            scop_user = actor.id
+            if lead_id:
+                # If loading a specific lead's conversation thread, don't restrict to assigned_to
+                scop_user = None
+                include_unassigned = False
+            else:
+                scop_user = actor.id
+                include_unassigned = True
 
         from app.repositories.whatsapp_repository import WhatsAppConversationRepository
         repo = WhatsAppConversationRepository(self.db)
@@ -271,7 +286,9 @@ class WhatsAppService:
             label_id=label_id,
             settings_id=settings_id,
             skip=skip,
-            limit=limit
+            limit=limit,
+            lead_id=lead_id,
+            include_unassigned_for_user=include_unassigned
         )
 
         names = await self._names({c.assigned_user_id for c in convs})
@@ -434,7 +451,8 @@ class WhatsAppService:
         phone, links, name = await self._resolve_target(actor, data)
         conv = await self._get_or_create_conversation(actor.organization_id, phone, s.id,
                                                       contact_id=links["contact_id"], lead_id=links["lead_id"],
-                                                      whatsapp_contact_id=links["whatsapp_contact_id"], display_name=name)
+                                                      whatsapp_contact_id=links["whatsapp_contact_id"], display_name=name,
+                                                      actor_id=actor.id)
         
         # Verify composure lease lock
         now_time = _now()
@@ -512,7 +530,8 @@ class WhatsAppService:
         phone, links, name = await self._resolve_target(actor, data)
         conv = await self._get_or_create_conversation(actor.organization_id, phone, s.id,
                                                       contact_id=links["contact_id"], lead_id=links["lead_id"],
-                                                      whatsapp_contact_id=links["whatsapp_contact_id"], display_name=name)
+                                                      whatsapp_contact_id=links["whatsapp_contact_id"], display_name=name,
+                                                      actor_id=actor.id)
         
         tname = data.get("template_name")
         body = data.get("body") or ""
@@ -616,7 +635,8 @@ class WhatsAppService:
         phone, links, name = await self._resolve_target(actor, data)
         conv = await self._get_or_create_conversation(actor.organization_id, phone, s.id,
                                                       contact_id=links["contact_id"], lead_id=links["lead_id"],
-                                                      whatsapp_contact_id=links["whatsapp_contact_id"], display_name=name)
+                                                      whatsapp_contact_id=links["whatsapp_contact_id"], display_name=name,
+                                                      actor_id=actor.id)
         
         if not self._window_open(conv):
             raise HTTPException(
@@ -694,6 +714,25 @@ class WhatsAppService:
         conv = await self.db.get(WhatsAppConversation, msg.conversation_id)
         s = await self.db.get(WhatsAppSettings, conv.whatsapp_settings_id)
         
+        # Ensure conversation phone is unmasked before dispatch
+        if self._is_masked_phone(conv.phone):
+            if conv.lead_id:
+                lead = await self.db.get(Lead, conv.lead_id)
+                if lead and lead.phone and not self._is_masked_phone(lead.phone):
+                    digits = "".join(c for c in lead.phone if c.isdigit())
+                    last10 = digits[-10:] if len(digits) >= 10 else digits
+                    conv.phone = f"91{last10}" if len(last10) == 10 else lead.phone
+                    self.db.add(conv)
+                    await self.db.flush()
+            elif conv.contact_id:
+                c = await self.db.get(Contact, conv.contact_id)
+                if c and c.phone and not self._is_masked_phone(c.phone):
+                    digits = "".join(c for c in c.phone if c.isdigit())
+                    last10 = digits[-10:] if len(digits) >= 10 else digits
+                    conv.phone = f"91{last10}" if len(last10) == 10 else c.phone
+                    self.db.add(conv)
+                    await self.db.flush()
+
         # Decrypt access token for network request
         decrypted_token = decrypt(s.access_token) if s.access_token else ""
         
@@ -1783,9 +1822,37 @@ class WhatsAppService:
         return out
 
     # ================= Helper Methods =================
+    @staticmethod
+    def _is_masked_phone(p: str | None) -> bool:
+        if not p:
+            return True
+        if "•" in p or "*" in p or "x" in p.lower():
+            return True
+        digits = "".join(c for c in p if c.isdigit())
+        return len(digits) < 10
+
     async def _get_or_create_conversation(self, org_id: uuid.UUID, phone: str, settings_id: uuid.UUID,
-                                          contact_id=None, lead_id=None, whatsapp_contact_id=None, display_name=None) -> WhatsAppConversation:
+                                          contact_id=None, lead_id=None, whatsapp_contact_id=None, display_name=None,
+                                          actor_id: uuid.UUID | None = None) -> WhatsAppConversation:
         phone = (phone or "").strip()
+        
+        # Auto-unmask from linked Lead or Contact if phone is masked or invalid
+        if self._is_masked_phone(phone):
+            if lead_id:
+                lead = (await self.db.execute(select(Lead).filter(
+                    Lead.id == lead_id, Lead.organization_id == org_id
+                ))).scalars().first()
+                if lead and lead.phone and not self._is_masked_phone(lead.phone):
+                    phone = lead.phone.strip()
+                    display_name = display_name or lead.title
+            if self._is_masked_phone(phone) and contact_id:
+                c = (await self.db.execute(select(Contact).filter(
+                    Contact.id == contact_id, Contact.organization_id == org_id
+                ))).scalars().first()
+                if c and c.phone and not self._is_masked_phone(c.phone):
+                    phone = c.phone.strip()
+                    display_name = display_name or f"{c.first_name or ''} {c.last_name or ''}".strip()
+
         digits = "".join(c for c in phone if c.isdigit())
         last10 = digits[-10:] if len(digits) >= 10 else digits
         canonical_phone = f"91{last10}" if len(last10) == 10 else phone
@@ -1794,7 +1861,7 @@ class WhatsAppService:
             WhatsAppConversation.phone == phone,
             WhatsAppConversation.phone == canonical_phone,
         ]
-        if last10:
+        if last10 and len(last10) >= 7:
             or_conditions.append(WhatsAppConversation.phone.like(f"%{last10}"))
         if lead_id:
             or_conditions.append(WhatsAppConversation.lead_id == lead_id)
@@ -1812,15 +1879,18 @@ class WhatsAppService:
             conv = WhatsAppConversation(
                 organization_id=org_id,
                 whatsapp_settings_id=settings_id,
-                phone=phone,
+                phone=canonical_phone if not self._is_masked_phone(canonical_phone) else phone,
                 contact_id=contact_id,
                 lead_id=lead_id,
                 whatsapp_contact_id=whatsapp_contact_id,
-                display_name=display_name
+                display_name=display_name,
+                assigned_user_id=actor_id
             )
             self.db.add(conv)
             await self.db.flush()
         else:
+            if self._is_masked_phone(conv.phone) and not self._is_masked_phone(canonical_phone):
+                conv.phone = canonical_phone
             if contact_id and not conv.contact_id:
                 conv.contact_id = contact_id
             if lead_id and not conv.lead_id:
@@ -1829,6 +1899,8 @@ class WhatsAppService:
                 conv.whatsapp_contact_id = whatsapp_contact_id
             if display_name and not conv.display_name:
                 conv.display_name = display_name
+            if actor_id and not conv.assigned_user_id:
+                conv.assigned_user_id = actor_id
         return conv
 
     def _window_open(self, conv: WhatsAppConversation) -> bool:
@@ -1840,39 +1912,43 @@ class WhatsAppService:
         return exp > _now()
 
     async def _resolve_target(self, actor: User, data: dict) -> tuple[str, dict, str | None]:
-        if data.get("conversation_id"):
-            conv = await self.get_conversation(actor, data["conversation_id"])
-            return conv.phone, {"contact_id": conv.contact_id, "lead_id": conv.lead_id, "whatsapp_contact_id": conv.whatsapp_contact_id}, conv.display_name
-            
         phone = (data.get("to_number") or data.get("phone") or "").strip()
         contact_id = data.get("contact_id")
         lead_id = data.get("lead_id")
         whatsapp_contact_id = data.get("whatsapp_contact_id")
         name = None
-        
-        if not phone and lead_id:
+
+        if data.get("conversation_id"):
+            conv = await self.get_conversation(actor, data["conversation_id"])
+            phone = conv.phone
+            contact_id = contact_id or conv.contact_id
+            lead_id = lead_id or conv.lead_id
+            whatsapp_contact_id = whatsapp_contact_id or conv.whatsapp_contact_id
+            name = name or conv.display_name
+            
+        if self._is_masked_phone(phone) and lead_id:
             lead = (await self.db.execute(select(Lead).filter(
                 Lead.id == lead_id, Lead.organization_id == actor.organization_id
             ))).scalars().first()
-            if lead:
-                phone = (lead.phone or "").strip()
-                name = lead.title
-        if not phone and contact_id:
+            if lead and lead.phone and not self._is_masked_phone(lead.phone):
+                phone = lead.phone.strip()
+                name = name or lead.title
+        if self._is_masked_phone(phone) and contact_id:
             c = (await self.db.execute(select(Contact).filter(
                 Contact.id == contact_id, Contact.organization_id == actor.organization_id
             ))).scalars().first()
-            if c:
-                phone = (c.phone or "").strip()
-                name = f"{c.first_name or ''} {c.last_name or ''}".strip()
-        if not phone and whatsapp_contact_id:
+            if c and c.phone and not self._is_masked_phone(c.phone):
+                phone = c.phone.strip()
+                name = name or f"{c.first_name or ''} {c.last_name or ''}".strip()
+        if self._is_masked_phone(phone) and whatsapp_contact_id:
             wc = await self.db.get(WhatsAppContact, whatsapp_contact_id)
-            if wc and wc.organization_id == actor.organization_id:
-                phone = wc.phone
-                name = wc.display_name
+            if wc and wc.organization_id == actor.organization_id and wc.phone and not self._is_masked_phone(wc.phone):
+                phone = wc.phone.strip()
+                name = name or wc.display_name
                 
-        if not phone:
+        if not phone or self._is_masked_phone(phone):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail="No destination number: provide conversation, phone, or linked lead/contact/whatsapp contact.")
+                                detail="No destination number: provide conversation, valid phone, or linked lead/contact.")
         return phone, {"contact_id": contact_id, "lead_id": lead_id, "whatsapp_contact_id": whatsapp_contact_id}, name
 
     async def _daily_sent_count(self, org_id: uuid.UUID, settings_id: uuid.UUID) -> int:

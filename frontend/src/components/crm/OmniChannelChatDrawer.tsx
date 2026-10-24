@@ -7,7 +7,7 @@ import {
   Sparkles, CheckCircle2, FolderPlus, FolderCheck
 } from 'lucide-react';
 import { LeadResponse, leadApi } from '../../services/leadApi';
-import { whatsappApi, WaMessage, QuickReply, WaTemplate } from '../../services/whatsappApi';
+import { whatsappApi, WaMessage, QuickReply, WaTemplate, WaConversation } from '../../services/whatsappApi';
 import { whatsappRealtime } from '../../services/whatsappRealtime';
 import { smsApi, SmsItem } from '../../services/smsApi';
 import { extractErrorMessage } from '../../utils/errors';
@@ -205,13 +205,21 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     setError(null);
     try {
       if (channel === 'whatsapp') {
-        const cleanPhone = lead.phone.replace(/[^0-9]/g, '');
-        const convs = await whatsappApi.conversations({ search: cleanPhone });
-        if (convs.length > 0) {
+        let convs: WaConversation[] = [];
+        if (lead.id) {
+          convs = await whatsappApi.conversations({ lead_id: lead.id });
+        }
+        if (!convs || convs.length === 0) {
+          const cleanPhone = lead.phone.replace(/[^0-9]/g, '');
+          if (cleanPhone && cleanPhone.length >= 7) {
+            convs = await whatsappApi.conversations({ search: cleanPhone });
+          }
+        }
+        if (convs && convs.length > 0) {
           const conv = convs[0];
           setWaConvId(conv.id);
           const thread = await whatsappApi.thread(conv.id);
-          const formatted: ChatMessage[] = thread.messages.map((m: WaMessage) => ({
+          const formatted: ChatMessage[] = (thread.messages || []).map((m: WaMessage) => ({
             id: m.id,
             channel: 'whatsapp',
             direction: m.direction,
@@ -314,6 +322,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     setSending(true);
     setError(null);
     try {
+      const defaultVars = [(lead.first_name || lead.title || 'Customer')];
       const res = await whatsappApi.sendTemplate({
         to_number: lead.phone,
         template_name: tmpl.name,
@@ -321,8 +330,12 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         conversation_id: waConvId || undefined,
         lead_id: lead.id,
         language: tmpl.language || 'en',
-        variables: templateVars.length > 0 ? templateVars : undefined,
+        variables: templateVars.length > 0 ? templateVars : defaultVars,
       });
+
+      if (res?.conversation_id) {
+        setWaConvId(res.conversation_id);
+      }
 
       let displayBody = tmpl.body_text;
       templateVars.forEach((val, idx) => {
@@ -415,12 +428,15 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
       } else {
         // Text-only message
         if (channel === 'whatsapp') {
-          await whatsappApi.sendText({
+          const res = await whatsappApi.sendText({
             body: text.trim(),
             conversation_id: waConvId || undefined,
             to_number: lead.phone,
             lead_id: lead.id,
           });
+          if (res?.conversation_id) {
+            setWaConvId(res.conversation_id);
+          }
         } else {
           await smsApi.send({
             body: text.trim(),

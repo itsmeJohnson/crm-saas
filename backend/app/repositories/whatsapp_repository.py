@@ -88,7 +88,9 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
         label_id: uuid.UUID | None = None,
         settings_id: uuid.UUID | None = None,
         skip: int = 0,
-        limit: int = 50
+        limit: int = 50,
+        lead_id: uuid.UUID | None = None,
+        include_unassigned_for_user: bool = False,
     ) -> Sequence[WhatsAppConversation]:
         from sqlalchemy.orm import selectinload
         query = select(self.model).options(
@@ -98,8 +100,18 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
             self.model.organization_id == organization_id,
             self.model.is_deleted == False
         )
-        if assigned_user_id:
-            query = query.filter(self.model.assigned_user_id == assigned_user_id)
+        if lead_id:
+            query = query.filter(self.model.lead_id == lead_id)
+        elif assigned_user_id:
+            if include_unassigned_for_user:
+                query = query.filter(
+                    or_(
+                        self.model.assigned_user_id == assigned_user_id,
+                        self.model.assigned_user_id.is_(None)
+                    )
+                )
+            else:
+                query = query.filter(self.model.assigned_user_id == assigned_user_id)
         if status:
             query = query.filter(self.model.status == status)
         if settings_id:

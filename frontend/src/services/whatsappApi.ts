@@ -192,7 +192,7 @@ export const whatsappApi = {
   exchangeSignupOAuth: async (code: string, redirectUri: string) =>
     (await api.post<WaSettings[]>('/whatsapp/signup/exchange', { code, redirect_uri: redirectUri })).data,
 
-  conversations: async (params: { status?: string; assigned_to?: string; search?: string; unread_only?: boolean; label_id?: string; settings_id?: string } = {}) =>
+  conversations: async (params: { status?: string; assigned_to?: string; search?: string; unread_only?: boolean; label_id?: string; settings_id?: string; lead_id?: string } = {}) =>
     (await api.get<WaConversation[]>('/whatsapp/conversations', { params })).data,
   thread: async (conversationId: string, params: { skip?: number; limit?: number } = {}) => 
     (await api.get<WaThread>(`/whatsapp/conversations/${conversationId}/thread`, { params })).data,

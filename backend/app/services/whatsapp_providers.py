@@ -549,9 +549,11 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
     async def send_text(self, *, to_number: str, body: str) -> WaSendResult:
         if not (self.effective_userid and self.api_key):
             return WaSendResult(status="failed", error="Gupshup credentials not fully configured (userid and token required)")
-        clean_to = to_number.replace("+", "").replace(" ", "").replace("-", "").strip()
+        clean_to = "".join(c for c in (to_number or "") if c.isdigit())
         if not clean_to.startswith("91") and len(clean_to) == 10:
             clean_to = f"91{clean_to}"
+        if len(clean_to) < 10:
+            return WaSendResult(status="failed", error=f"Invalid destination phone number: {to_number}")
 
         if self._is_gateway:
             # Gupshup Conversation Cloud WhatsApp strictly requires an approved WhatsApp template
@@ -584,9 +586,11 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
     async def send_template(self, *, to_number: str, template_name: str, language: str, variables: list | None = None) -> WaSendResult:
         if not (self.effective_userid and self.api_key):
             return WaSendResult(status="failed", error="Gupshup credentials not fully configured")
-        clean_to = to_number.replace("+", "").replace(" ", "").replace("-", "").strip()
+        clean_to = "".join(c for c in (to_number or "") if c.isdigit())
         if not clean_to.startswith("91") and len(clean_to) == 10:
             clean_to = f"91{clean_to}"
+        if len(clean_to) < 10:
+            return WaSendResult(status="failed", error=f"Invalid destination phone number: {to_number}")
 
         template_id_map = {
             "hiring": "4548035658774661",
@@ -594,10 +598,17 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
             "request_contact_info_1": "1401814018783680",
             "request_contact_info_2": "1401814018783680",
             "request_contact_info_3": "1401814018783680",
+            "lead_greeting": "1401814018783680",
+            "callback_reminder": "1401814018783680",
+            "kyc_document_request": "1401814018783680",
         }
-        resolved_tpl_id = template_id_map.get(str(template_name).strip().lower(), str(template_name).strip())
+        raw_key = str(template_name or "").strip().lower()
+        resolved_tpl_id = template_id_map.get(raw_key, str(template_name).strip())
+        if not resolved_tpl_id.isdigit():
+            resolved_tpl_id = "1401814018783680"
 
         if self._is_gateway:
+            var1_val = str(variables[0]) if (variables and len(variables) > 0 and str(variables[0]).strip()) else "Customer"
             payload = {
                 "send_to": clean_to,
                 "msg_type": "text",
@@ -610,9 +621,10 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
                 "isTemplate": "true",
                 "linkTrackingEnabled": "true",
                 "whatsAppTemplateId": resolved_tpl_id,
+                "var1": var1_val,
             }
-            if variables:
-                for idx, v in enumerate(variables, 1):
+            if variables and len(variables) > 1:
+                for idx, v in enumerate(variables[1:], 2):
                     payload[f"var{idx}"] = str(v)
             return await self._post_gateway(payload)
 

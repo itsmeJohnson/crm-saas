@@ -438,6 +438,7 @@ async def get_whatsapp_monitoring_dashboard(
 async def list_conversations(
     status_filter: Optional[str] = Query(None, alias="status"),
     assigned_to: Optional[uuid.UUID] = None,
+    lead_id: Optional[uuid.UUID] = None,
     search: Optional[str] = None,
     unread_only: bool = False,
     label_id: Optional[uuid.UUID] = None,
@@ -449,7 +450,7 @@ async def list_conversations(
 ):
     service = WhatsAppService(db)
     return await service.list_conversations(
-        current_user, status_filter, assigned_to, search, unread_only, label_id, settings_id, skip, limit
+        current_user, status_filter, assigned_to, search, unread_only, label_id, settings_id, skip, limit, lead_id=lead_id
     )
 
 
