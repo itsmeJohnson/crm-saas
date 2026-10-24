@@ -157,17 +157,17 @@ export const HeaderAttendanceControl: React.FC = () => {
               onClick={() => setShowConfirmPunchOut(true)}
               disabled={loading}
               title="Punch out / End shift"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 transition disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs transition cursor-pointer disabled:opacity-50"
             >
-              <LogOut className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+              <LogOut className="w-3 h-3 text-rose-500" />
               <span className="hidden sm:inline">Punch Out</span>
             </button>
           </div>
         )
       ) : isPunchedOutToday ? (
         <div className="flex items-center gap-1.5">
-          <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
             <span>Shift Ended</span>
           </div>
           <button

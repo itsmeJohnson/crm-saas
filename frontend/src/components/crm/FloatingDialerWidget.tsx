@@ -272,7 +272,7 @@ export const FloatingDialerWidget: React.FC = () => {
                     ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                     : callLifecycle === 'disposition'
                     ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
-                    : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
                 }`}
               >
                 {callLifecycle === 'connected' ? (
@@ -290,9 +290,7 @@ export const FloatingDialerWidget: React.FC = () => {
                     className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
                       callLifecycle === 'connected'
                         ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                        : callLifecycle === 'disposition'
-                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                        : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                        : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                     }`}
                   >
                     {callLifecycle === 'initiating'
@@ -515,8 +513,8 @@ export const FloatingDialerWidget: React.FC = () => {
                     Call ended ({formatDuration(callDuration)}). Log outcome to complete.
                   </p>
                 </div>
-                <span className="text-[9px] bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded-full font-bold">
-                  Mandatory
+                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md font-semibold">
+                  Required
                 </span>
               </div>
 

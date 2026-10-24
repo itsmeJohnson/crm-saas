@@ -373,19 +373,18 @@ export const DialerConsole: React.FC = () => {
 
       {/* Main Split-Pane Workspace */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        
-        {/* LEFT CONTROL PANEL (Cols 1-5) */}
+         {/* LEFT CONTROL PANEL (Cols 1-5) */}
         <div className="md:col-span-5 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-indigo-400" />
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Agent Console
               </h2>
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wider ${
-                agentState === 'IDLE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                agentState === 'ACTIVE_CALLING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wider border ${
+                agentState === 'IDLE' ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700' :
+                agentState === 'ACTIVE_CALLING' ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800' :
+                'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
               }`}>
                 {agentState}
               </span>
@@ -396,43 +395,43 @@ export const DialerConsole: React.FC = () => {
               <div className="space-y-6 py-4">
                 {/* Power-dialer countdown to the next auto-dialed call */}
                 {nextCallCountdown !== null && (
-                  <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl animate-fade-in">
+                  <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 p-4 rounded-xl animate-fade-in">
                     <span className="text-sm font-semibold flex items-center gap-2">
-                      <Phone className="w-4 h-4 animate-pulse" />
+                      <Phone className="w-4 h-4 animate-pulse text-indigo-600" />
                       Power dialer: next call in {nextCallCountdown}s
                     </span>
                     <button
                       type="button"
                       onClick={() => setNextCallCountdown(null)}
-                      className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      className="text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer"
                     >
                       Stop
                     </button>
                   </div>
                 )}
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800/60">
+                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                     <input
                       id="collective-pooling"
                       type="checkbox"
                       checked={collectivePooling}
                       onChange={(e) => handleToggleCollectivePooling(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
                     />
-                    <label htmlFor="collective-pooling" className="text-sm text-slate-300 font-medium cursor-pointer select-none">
+                    <label htmlFor="collective-pooling" className="text-sm text-slate-800 dark:text-slate-200 font-medium cursor-pointer select-none">
                       Enable Collective Pooling (fetch from TL pool)
                     </label>
                   </div>
 
-                  <div className="flex items-center gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800/60">
+                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                     <input
                       id="auto-dial"
                       type="checkbox"
                       checked={autoDial}
                       onChange={(e) => setAutoDial(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
                     />
-                    <label htmlFor="auto-dial" className="text-sm text-slate-300 font-medium cursor-pointer select-none flex-1">
+                    <label htmlFor="auto-dial" className="text-sm text-slate-800 dark:text-slate-200 font-medium cursor-pointer select-none flex-1">
                       Power Dialer (auto-dial next lead)
                     </label>
                     {autoDial && (
@@ -440,7 +439,7 @@ export const DialerConsole: React.FC = () => {
                         aria-label="Power dialer delay"
                         value={powerDelay}
                         onChange={(e) => setPowerDelay(parseInt(e.target.value, 10))}
-                        className="bg-slate-800 border border-slate-700 text-slate-300 text-xs py-1.5 px-2 rounded-lg focus:outline-none"
+                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs py-1.5 px-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value={3}>3s gap</option>
                         <option value={5}>5s gap</option>
@@ -454,29 +453,29 @@ export const DialerConsole: React.FC = () => {
                 <button
                   onClick={handleStartDialing}
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-200 transform active:scale-[0.98] disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold py-3 px-4 rounded-xl shadow-xs transition-all duration-150 transform active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                 >
                   <Play className="w-5 h-5" />
                   Start Dialing Session
                 </button>
 
-                <div className="relative border-t border-slate-800/60 pt-4">
+                <div className="relative border-t border-slate-200 dark:border-slate-800 pt-4">
                   <button
                     onClick={() => setShowBreakMenu(!showBreakMenu)}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 px-4 rounded-xl transition-all duration-200 border border-slate-700/50"
+                    className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2.5 px-4 rounded-xl transition-all duration-150 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
                   >
-                    <Coffee className="w-4 h-4 text-slate-400" />
+                    <Coffee className="w-4 h-4 text-slate-500" />
                     Request Break
                   </button>
 
                   {showBreakMenu && (
-                    <div className="absolute left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-20 animate-fade-in">
+                    <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden z-20 animate-fade-in">
                       {breakOptions.map((opt) => (
                         <button
                           key={opt}
                           onClick={() => handleRequestBreak(opt)}
-                          className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors duration-150"
+                          className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 cursor-pointer"
                         >
                           {opt} Break
                         </button>
@@ -489,24 +488,24 @@ export const DialerConsole: React.FC = () => {
 
             {agentState === 'BREAK' && (
               <div className="space-y-6 py-4 text-center">
-                <div className="inline-flex items-center justify-center p-4 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 mb-2">
+                <div className="inline-flex items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-full text-indigo-600 dark:text-indigo-400 mb-2">
                   <Coffee className="w-10 h-10" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-100">{breakReason} Break</h3>
-                  <p className="text-sm text-slate-400 mt-1">Break countdown remaining</p>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{breakReason} Break</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Break countdown remaining</p>
                 </div>
 
-                <div className="text-4xl font-mono font-bold text-indigo-400 bg-slate-950/80 border border-slate-800/80 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider">
+                <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider">
                   {formatDuration(breakTimeRemaining)}
                 </div>
 
                 <button
                   onClick={handleEndBreak}
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-3 px-4 rounded-xl transition-all duration-200 border border-slate-700"
+                  className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3 px-4 rounded-xl transition-all duration-150 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 text-slate-500" />
                   End Break
                 </button>
               </div>
@@ -514,40 +513,35 @@ export const DialerConsole: React.FC = () => {
 
             {agentState === 'ACTIVE_CALLING' && (
               <div className="space-y-6 py-4 text-center">
-                <div className="inline-flex items-center justify-center p-4 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 mb-2 animate-pulse">
+                <div className="inline-flex items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-full text-indigo-600 dark:text-indigo-400 mb-2 animate-pulse">
                   <Phone className="w-10 h-10" />
                 </div>
                 <div>
                   <div className="flex items-center justify-center gap-2 mb-1.5">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                      callDirection === 'INBOUND'
-                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    }`}>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800">
                       {callDirection === 'INBOUND' ? 'Inbound Customer Call' : 'Outbound Dial'}
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-100">Live Call Active</h3>
-                  <p className="text-sm text-slate-400 mt-1">Do not close this panel during call</p>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Live Call Active</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Do not close this panel during call</p>
                 </div>
 
-                <div className="text-4xl font-mono font-bold text-amber-400 bg-slate-950/80 border border-slate-800/80 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider">
+                <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider shadow-inner">
                   {formatDuration(callDuration)}
                 </div>
 
                 {/* Embedded WebRTC In-Browser Audio Controls */}
-                <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl space-y-3">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5 text-slate-300 font-medium">
-                      <Headphones className="w-3.5 h-3.5 text-brand-400" />
+                    <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold">
+                      <Headphones className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                       Browser Softphone
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full font-semibold uppercase text-[10px] tracking-wider ${
-                      webrtcStatus === 'connected' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse' :
-                      webrtcStatus === 'ringing' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse' :
-                      webrtcStatus === 'calling' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' :
-                      webrtcStatus === 'ended' ? 'bg-slate-700 text-slate-300' :
-                      'bg-slate-800 text-slate-400'
+                    <span className={`px-2 py-0.5 rounded-full font-semibold uppercase text-[10px] tracking-wider border ${
+                      webrtcStatus === 'connected' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 animate-pulse' :
+                      webrtcStatus === 'ringing' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse' :
+                      webrtcStatus === 'calling' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                      'bg-slate-100 text-slate-600 border-slate-200'
                     }`}>
                       {webrtcStatus === 'connected' ? 'Audio Live' :
                        webrtcStatus === 'ringing' ? 'Ringing Remote' :
@@ -560,20 +554,20 @@ export const DialerConsole: React.FC = () => {
                     <button
                       type="button"
                       onClick={toggleMute}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${
                         isMuted
-                          ? 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'
-                          : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 shadow-xs'
                       }`}
                     >
-                      {isMuted ? <MicOff className="w-4 h-4 text-red-400" /> : <Mic className="w-4 h-4 text-emerald-400" />}
+                      {isMuted ? <MicOff className="w-4 h-4 text-rose-600" /> : <Mic className="w-4 h-4 text-slate-600 dark:text-slate-300" />}
                       {isMuted ? 'Unmute Mic' : 'Mute Mic'}
                     </button>
 
                     <button
                       type="button"
                       onClick={hangupWebRTC}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-500 text-white transition-colors cursor-pointer shadow-xs"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white transition-colors cursor-pointer shadow-xs"
                     >
                       <PhoneOff className="w-4 h-4" />
                       Hang Up
@@ -582,17 +576,17 @@ export const DialerConsole: React.FC = () => {
                 </div>
 
                 {/* Queue Break option during active call */}
-                <div className="relative border-t border-slate-800/60 pt-4 mt-4">
+                <div className="relative border-t border-slate-200 dark:border-slate-800 pt-4 mt-4">
                   {pendingBreakReason ? (
-                    <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 text-blue-400 p-3 rounded-xl">
+                    <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 p-3 rounded-xl">
                       <span className="text-sm font-medium flex items-center gap-1.5">
-                        <Coffee className="w-4 h-4" />
+                        <Coffee className="w-4 h-4 text-indigo-600" />
                         Pending Break: {pendingBreakReason}
                       </span>
                       <button
                         type="button"
                         onClick={() => setPendingBreakReason(null)}
-                        className="text-xs text-slate-400 hover:text-slate-200 transition-colors underline cursor-pointer"
+                        className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors underline cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -602,14 +596,14 @@ export const DialerConsole: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowActiveBreakMenu(!showActiveBreakMenu)}
-                        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 px-4 rounded-xl transition-all duration-200 border border-slate-700/50 cursor-pointer"
+                        className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2.5 px-4 rounded-xl transition-all duration-150 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
                       >
-                        <Coffee className="w-4 h-4 text-slate-400" />
+                        <Coffee className="w-4 h-4 text-slate-500" />
                         Take Break After Call
                       </button>
 
                       {showActiveBreakMenu && (
-                        <div className="absolute left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-20 animate-fade-in">
+                        <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden z-20 animate-fade-in">
                           {breakOptions.map((opt) => (
                             <button
                               key={opt}
@@ -618,7 +612,7 @@ export const DialerConsole: React.FC = () => {
                                 setPendingBreakReason(opt);
                                 setShowActiveBreakMenu(false);
                               }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors duration-150 cursor-pointer"
+                              className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 cursor-pointer"
                             >
                               {opt} Break
                             </button>
@@ -631,49 +625,47 @@ export const DialerConsole: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Telephony credentials are configured once, org-wide, by an admin in
-              Settings → Communication → Calling — never per agent. Nothing to
-              set here; the backend applies the org config automatically. */}
         </div>
 
         {/* RIGHT CONTEXT PANEL (Cols 6-12) */}
         <div className="md:col-span-7">
           {agentState !== 'ACTIVE_CALLING' ? (
-            <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-12 text-center shadow-lg border-dashed">
-              <Phone className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-slate-300 font-semibold text-lg">No Active Session</h3>
-              <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-4">
+                <Phone className="w-6 h-6" />
+              </div>
+              <h3 className="text-slate-900 dark:text-slate-100 font-bold text-lg">No Active Session</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 max-w-sm mx-auto">
                 Ready your headpieces, configure collective settings, and click "Start Dialing Session" on the left to push your next assigned lead.
               </p>
             </div>
           ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-fade-in">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
               {/* Lead Details Banner */}
-              <div className="bg-gradient-to-r from-indigo-950/40 to-violet-950/40 border-b border-slate-800 p-6">
+              <div className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/80 p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Active Lead Context</span>
+                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Active Lead Context</span>
                       {isFreshLead ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           <Sparkles className="w-3 h-3" />
                           Fresh Lead • 1st Call
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                           <History className="w-3 h-3" />
                           Follow-Up Call • Attempt #{totalCallTouches + 1}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-100 mt-1">
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
                       {currentLead?.first_name || currentLead?.last_name
                         ? `${currentLead?.first_name || ''} ${currentLead?.last_name || ''}`.trim()
                         : 'Active Call Connected'}
                     </h3>
-                    <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5">
-                      <Building className="w-4 h-4 text-slate-500" />
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                      <Building className="w-4 h-4 text-slate-400" />
                       {currentLead?.title || currentLead?.company_name
                         ? `${currentLead?.title || ''} ${currentLead?.company_name ? `at ${currentLead?.company_name}` : ''}`.trim()
                         : 'In-progress call session'}
@@ -682,14 +674,14 @@ export const DialerConsole: React.FC = () => {
                   
                   {/* Phone & WhatsApp / Document collection trigger */}
                   <div className="flex items-center gap-2">
-                    <div className="bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-xl flex items-center gap-2">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3.5 py-2 rounded-xl flex items-center gap-2 text-slate-900 dark:text-slate-100 font-mono text-xs shadow-xs">
                       <MaskedField value={currentLead?.phone || null} />
                     </div>
                     {currentLead?.phone && (
                       <button
                         type="button"
                         onClick={() => setShowChatDrawer(true)}
-                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+                        className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
                         title="Open WhatsApp chat & collect documents"
                       >
                         <MessageCircle className="w-4 h-4" />
@@ -701,27 +693,27 @@ export const DialerConsole: React.FC = () => {
               </div>
 
               {/* Previous Conversations & Lead History Section */}
-              <div className="border-b border-slate-800 bg-slate-950/40 p-6 space-y-4">
+              <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <History className="w-4 h-4 text-indigo-400" />
-                    <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+                    <History className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                       Previous Conversations &amp; Customer History
                     </h4>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                       {timelineEvents.length} {timelineEvents.length === 1 ? 'interaction' : 'interactions'}
                     </span>
                   </div>
 
                   {/* Filter range buttons (7 days, 30 days, all) */}
-                  <div className="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-lg border border-slate-800">
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => setHistoryFilterDays(7)}
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                         historyFilterDays === 7
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-slate-200'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                     >
                       Last 7 Days
@@ -732,7 +724,7 @@ export const DialerConsole: React.FC = () => {
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                         historyFilterDays === 30
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-slate-200'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                     >
                       Last 30 Days
@@ -743,7 +735,7 @@ export const DialerConsole: React.FC = () => {
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                         historyFilterDays === 'all'
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-slate-200'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                     >
                       All History
@@ -753,30 +745,30 @@ export const DialerConsole: React.FC = () => {
 
                 {/* Status Guidance Banner */}
                 {isFreshLead ? (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-xl p-3.5 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-bold text-emerald-300">Fresh Lead • First-Time Call</p>
-                      <p className="text-xs text-emerald-200/80 mt-0.5">
+                      <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Fresh Lead • First-Time Call</p>
+                      <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
                         This customer has not been contacted before. Introduce the company, verify their interest, and record their response below.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-indigo-950/30 border border-indigo-800/40 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2">
+                  <div className="bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-800/40 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
                         Follow-Up Call • Attempt #{totalCallTouches + 1}
                       </span>
                       {latestPriorCall && (
-                        <span className="text-xs text-slate-300">
+                        <span className="text-xs text-slate-700 dark:text-slate-300">
                           Last called {formatEventTime(latestPriorCall.timestamp)}
                           {resolveActorName(latestPriorCall.actor_user_id) && ` by ${resolveActorName(latestPriorCall.actor_user_id)}`}
                         </span>
                       )}
                     </div>
                     {latestPriorCall?.description && (
-                      <span className="text-xs text-indigo-300 italic truncate max-w-md">
+                      <span className="text-xs text-indigo-700 dark:text-indigo-300 italic truncate max-w-md">
                         "{latestPriorCall.description.split('\n')[0]}"
                       </span>
                     )}
@@ -785,17 +777,17 @@ export const DialerConsole: React.FC = () => {
 
                 {/* Timeline Feed */}
                 {timelineLoading ? (
-                  <div className="py-6 text-center text-xs text-slate-400">Loading conversation history...</div>
+                  <div className="py-6 text-center text-xs text-slate-500">Loading conversation history...</div>
                 ) : filteredHistoryEvents.length === 0 ? (
-                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-400">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       No interactions recorded in the selected period ({historyFilterDays === 'all' ? 'all time' : `past ${historyFilterDays} days`}).
                     </p>
                     {historyFilterDays !== 'all' && timelineEvents.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setHistoryFilterDays('all')}
-                        className="mt-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                        className="mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline cursor-pointer"
                       >
                         View all {timelineEvents.length} older interactions
                       </button>
@@ -806,35 +798,35 @@ export const DialerConsole: React.FC = () => {
                     {visibleHistoryEvents.map((ev) => (
                       <div
                         key={ev.id}
-                        className="bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 hover:border-slate-700/80 transition-colors"
+                        className="bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3 hover:border-slate-300 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-2">
                             {ev.type === 'activity' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                                 <Phone className="w-3 h-3" /> Call
                               </span>
                             ) : ev.type === 'whatsapp' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <MessageCircle className="w-3 h-3" /> WhatsApp
                               </span>
                             ) : ev.type === 'note' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                                 <FileText className="w-3 h-3" /> Note
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                                 <Clock className="w-3 h-3" /> {ev.title}
                               </span>
                             )}
-                            <span className="text-xs font-semibold text-slate-200">
+                            <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                               {ev.title}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500">
                             {resolveActorName(ev.actor_user_id) && (
-                              <span className="bg-slate-800/80 px-2 py-0.5 rounded text-slate-300 font-medium">
+                              <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-700 dark:text-slate-300 font-medium">
                                 Agent: {resolveActorName(ev.actor_user_id)}
                               </span>
                             )}
@@ -843,7 +835,7 @@ export const DialerConsole: React.FC = () => {
                         </div>
 
                         {ev.description && (
-                          <div className="text-xs text-slate-300 bg-slate-950/60 rounded-lg p-2.5 border border-slate-800/60 whitespace-pre-line mt-1">
+                          <div className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-lg p-2.5 border border-slate-200 dark:border-slate-700 whitespace-pre-line mt-1">
                             {ev.description}
                           </div>
                         )}
@@ -855,7 +847,7 @@ export const DialerConsole: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowAllHistory(!showAllHistory)}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors cursor-pointer shadow-xs"
                       >
                         {showAllHistory ? (
                           <>
@@ -878,8 +870,8 @@ export const DialerConsole: React.FC = () => {
               <form onSubmit={handleDispositionSubmit} className="p-6 space-y-6">
                 {/* Disposition Status Grid */}
                 <div className="space-y-3">
-                  <label className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-indigo-400" />
+                  <label className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-indigo-600" />
                     Call Disposition Status
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -894,10 +886,10 @@ export const DialerConsole: React.FC = () => {
                             if (eligible) setTargetStageId(eligible.id);
                           }
                         }}
-                        className={`py-3 px-4 text-sm font-medium rounded-xl border transition-all duration-150 text-center ${
+                        className={`py-2.5 px-3.5 text-xs font-semibold rounded-xl border transition-all duration-150 text-center cursor-pointer ${
                           selectedStatus === opt
-                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-                            : 'bg-slate-800/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/80 hover:border-slate-600'
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs'
                         }`}
                       >
                         {opt}
@@ -908,19 +900,19 @@ export const DialerConsole: React.FC = () => {
 
                 {/* Smooth expansion for Picked Dynamic Pipeline Selector */}
                 {['Picked', 'Interested', 'Answered / Resolved', 'Callback Requested'].includes(selectedStatus || '') && (
-                  <div className="space-y-2 p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl animate-slide-down">
-                    <label htmlFor="pipeline-stage" className="text-xs font-semibold text-indigo-400 uppercase tracking-wider block">
+                  <div className="space-y-2 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 rounded-xl animate-slide-down">
+                    <label htmlFor="pipeline-stage" className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider block">
                       Advance Lead to Pipeline Stage
                     </label>
                     <select
                       id="pipeline-stage"
                       value={targetStageId}
                       onChange={(e) => setTargetStageId(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2.5 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 py-2.5 px-3 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm cursor-pointer shadow-xs"
                     >
                       <option value="" disabled>-- Select Pipeline Stage --</option>
                       {stages
-                        .filter((s) => s.name !== 'Fresh Leads') // typically advance out of fresh
+                        .filter((s) => s.name !== 'Fresh Leads')
                         .map((stage) => (
                           <option key={stage.id} value={stage.id}>
                             {stage.name}
@@ -930,36 +922,36 @@ export const DialerConsole: React.FC = () => {
                   </div>
                 )}
 
-                {/* Follow-up scheduler — shown for Follow-up / Call Back Later (Phase 1) */}
+                {/* Follow-up scheduler */}
                 {isFollowUpOutcome && (
-                  <div className="space-y-4 p-4 bg-brand-500/5 border border-brand-500/15 rounded-xl animate-slide-down">
-                    <p className="text-xs font-bold text-brand-300 uppercase tracking-wider">Schedule Next Follow-up</p>
+                  <div className="space-y-4 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 rounded-xl animate-slide-down">
+                    <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Schedule Next Follow-up</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[11px] font-semibold text-slate-400">Follow-up Date <span className="text-red-400">*</span></label>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Follow-up Date <span className="text-rose-500">*</span></label>
                         <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)}
-                          className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 py-2 px-3 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[11px] font-semibold text-slate-400">Follow-up Time <span className="text-red-400">*</span></label>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Follow-up Time <span className="text-rose-500">*</span></label>
                         <input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)}
-                          className="w-full bg-slate-800 border border-slate-700 text-slate-200 py-2 px-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 py-2 px-3 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500" />
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-semibold text-slate-400">Set a reminder</label>
+                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Set a reminder</label>
                       <button type="button" onClick={() => setReminderEnabled((v) => !v)}
-                        className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${reminderEnabled ? 'bg-emerald-500/70' : 'bg-slate-700'}`}>
+                        className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${reminderEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
                         <span className={`block w-4 h-4 bg-white rounded-full transition-transform mt-0.5 ${reminderEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                       </button>
                     </div>
                     {reminderEnabled && (
                       <div className="space-y-1">
-                        <label className="text-[11px] font-semibold text-slate-400">Remind me before</label>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Remind me before</label>
                         <div className="grid grid-cols-4 gap-2">
                           {[{ l: '15 Min', v: 15 }, { l: '30 Min', v: 30 }, { l: '1 Hour', v: 60 }, { l: '1 Day', v: 1440 }].map((o) => (
                             <button key={o.v} type="button" onClick={() => setReminderBefore(o.v)}
-                              className={`py-2 text-xs font-medium rounded-lg border ${reminderBefore === o.v ? 'bg-brand-600 border-brand-500 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/60'}`}>
+                              className={`py-2 text-xs font-semibold rounded-lg border transition cursor-pointer ${reminderBefore === o.v ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'}`}>
                               {o.l}
                             </button>
                           ))}
@@ -967,11 +959,11 @@ export const DialerConsole: React.FC = () => {
                       </div>
                     )}
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-slate-400">Priority</label>
+                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Priority</label>
                       <div className="grid grid-cols-4 gap-2">
                         {['Low', 'Medium', 'High', 'Critical'].map((p) => (
                           <button key={p} type="button" onClick={() => setFollowUpPriority(p)}
-                            className={`py-2 text-xs font-medium rounded-lg border ${followUpPriority === p ? 'bg-brand-600 border-brand-500 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/60'}`}>
+                            className={`py-2 text-xs font-semibold rounded-lg border transition cursor-pointer ${followUpPriority === p ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'}`}>
                             {p}
                           </button>
                         ))}
@@ -982,9 +974,9 @@ export const DialerConsole: React.FC = () => {
 
                 {/* Call Remarks Textarea */}
                 <div className="space-y-2">
-                  <label htmlFor="remarks" className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-indigo-400" />
-                    {isFollowUpOutcome ? 'Remarks' : 'Call Notes & Remarks'} <span className="text-red-400">*</span>
+                  <label htmlFor="remarks" className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    {isFollowUpOutcome ? 'Remarks' : 'Call Notes & Remarks'} <span className="text-rose-500">*</span>
                   </label>
                   <textarea
                     id="remarks"
@@ -992,16 +984,16 @@ export const DialerConsole: React.FC = () => {
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     placeholder="Enter mandatory call notes describing the outcome, next steps, or specific discussion details..."
-                    className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl py-3 px-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all"
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm transition-all shadow-xs"
                   />
                 </div>
 
                 {/* Form submit button */}
-                <div className="border-t border-slate-800/80 pt-6">
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
                   <button
                     type="submit"
                     disabled={isSubmitDisabled}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/10 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed transform active:scale-[0.98] cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold py-3 px-4 rounded-xl shadow-xs transition-all duration-150 disabled:bg-slate-100 disabled:text-slate-400 disabled:border disabled:border-slate-200 disabled:shadow-none disabled:cursor-not-allowed transform active:scale-[0.98] cursor-pointer"
                   >
                     <CheckCircle className="w-5 h-5" />
                     {isLoading ? 'Saving Disposition...' : 'Save Call Disposition'}
