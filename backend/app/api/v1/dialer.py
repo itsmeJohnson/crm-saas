@@ -86,21 +86,19 @@ async def trigger_provider_call(cfg: dict, customer_number: str, agent_number: s
 
 
 async def check_is_team_leader(user: User, db: AsyncSession) -> bool:
-    if user.role in ("TeamLeader", "Manager"):
+    if user.role in ("SuperAdmin", "OrgAdmin", "Manager", "TeamLeader"):
         return True
     if user.role == "Employee" and user.reporting_to_id:
         parent_res = await db.execute(select(User.role).filter(User.id == user.reporting_to_id))
         parent_role = parent_res.scalar()
-        return parent_role == "Manager"
+        return parent_role in ("Manager", "OrgAdmin", "SuperAdmin")
     return False
 
 
 async def check_is_telecaller(user: User, db: AsyncSession) -> bool:
-    if user.role == "Telecaller":
+    # Any active team member or administrator is permitted to test or place calls
+    if user.role in ("SuperAdmin", "OrgAdmin", "Manager", "TeamLeader", "Telecaller", "Employee"):
         return True
-    if user.role == "Employee":
-        is_tl = await check_is_team_leader(user, db)
-        return not is_tl
     return False
 
 

@@ -646,31 +646,43 @@ export const FloatingDialerWidget: React.FC = () => {
                   />
                 </div>
 
-                {/* Submit Button with Unambiguous Enabled vs Disabled State */}
+                {/* Submit and Skip Buttons */}
                 {(() => {
                   const isSubmitDisabled = isLoading || !remarks.trim() || followUpIncomplete;
                   return (
-                    <button
-                      type="submit"
-                      disabled={isSubmitDisabled}
-                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
-                        isSubmitDisabled
-                          ? 'bg-slate-950 text-slate-400 border border-slate-800 cursor-not-allowed shadow-none'
-                          : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-xs cursor-pointer active:scale-98'
-                      }`}
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Saving Disposition...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          <span>Save & Complete Call</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="submit"
+                        disabled={isSubmitDisabled}
+                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+                          isSubmitDisabled
+                            ? 'bg-slate-950 text-slate-400 border border-slate-800 cursor-not-allowed shadow-none'
+                            : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-xs cursor-pointer active:scale-98'
+                        }`}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Save & Complete Call</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          useDialerStore.getState().resetStore();
+                        }}
+                        className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-medium border border-slate-800 transition-colors cursor-pointer"
+                        title="Skip disposition logging and return to idle"
+                      >
+                        Skip
+                      </button>
+                    </div>
                   );
                 })()}
               </form>

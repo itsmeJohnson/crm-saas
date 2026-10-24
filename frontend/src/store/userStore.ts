@@ -29,6 +29,7 @@ interface UserState {
   updateUser: (userId: string, payload: Parameters<typeof userApi.updateUser>[1]) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   toggleUserStatus: (userId: string, isActive: boolean) => Promise<void>;
+  clearError: () => void;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -36,6 +37,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   invitations: [],
   isLoading: false,
   error: null,
+  clearError: () => set({ error: null }),
   filters: {
     search: '',
     role: 'All',

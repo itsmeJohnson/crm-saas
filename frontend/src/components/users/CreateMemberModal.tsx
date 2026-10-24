@@ -20,9 +20,10 @@ interface CreateFormInput {
 }
 
 export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, onClose }) => {
-  const { createUser, isLoading, error } = useUserStore();
+  const { createUser, isLoading, error, clearError } = useUserStore();
   const currentUser = useAuthStore((state) => state.user);
   const currentOrg = useAuthStore((state) => state.organization);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [reportingUsers, setReportingUsers] = useState<UserResponse[]>([]);
   const [isFetchingManagers, setIsFetchingManagers] = useState(false);
@@ -93,8 +94,17 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
     }
   }, [isOpen, currentUser, isTeamLeader, isManager, setValue]);
 
+  // Clear errors when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalError(null);
+      clearError();
+    }
+  }, [isOpen, clearError]);
+
   const onSubmit = async (data: CreateFormInput) => {
     if (!currentOrg && !currentUser) return;
+    setLocalError(null);
     try {
       const payload: Parameters<typeof createUser>[0] = {
         email: data.email,
@@ -108,8 +118,8 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
       await createUser(payload);
       reset();
       onClose();
-    } catch (err) {
-      // Error handled by store
+    } catch (err: any) {
+      setLocalError(err.message || 'Failed to create user');
     }
   };
 
@@ -185,10 +195,10 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {error && (
+          {(localError || error) && (
             <div className="p-3.5 bg-red-950/20 border border-red-900/30 rounded-xl flex items-start gap-2.5 text-sm text-red-400">
               <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
+              <span>{localError || error}</span>
             </div>
           )}
 
