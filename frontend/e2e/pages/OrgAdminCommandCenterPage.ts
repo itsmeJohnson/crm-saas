@@ -58,15 +58,15 @@ export class OrgAdminCommandCenterPage {
     this.metricCollections = page.locator('text=/Collections|Total Billed/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
     this.metricMonthlyRevenue = page.locator('text=/Monthly|Revenue/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]//div[contains(@class, "text-2xl")]').first();
 
-    // 8 Lifecycle Pipeline Cards
-    this.lifecycleCardMarketing = page.locator('div.bento-card:has-text("Marketing")');
-    this.lifecycleCardLeads = page.locator('div.bento-card:has-text("Leads")');
-    this.lifecycleCardFollowup = page.locator('div.bento-card:has-text("Follow-up")');
-    this.lifecycleCardCallsAppts = page.locator('div.bento-card:has-text("Calls / Appts"), div.bento-card:has-text("Appointments")');
-    this.lifecycleCardContacts = page.locator('div.bento-card:has-text("Contacts"), div.bento-card:has-text("Patients")');
-    this.lifecycleCardCampaigns = page.locator('div.bento-card:has-text("Campaigns"), div.bento-card:has-text("Treatments")');
-    this.lifecycleCardBilling = page.locator('div.bento-card:has-text("Billing")');
-    this.lifecycleCardRetention = page.locator('div.bento-card:has-text("Retention"), div.bento-card:has-text("Recall")');
+    // 8 Lifecycle Pipeline Cards (exact data-testid matching)
+    this.lifecycleCardMarketing = page.locator('[data-testid="lifecycle-card-marketing"]');
+    this.lifecycleCardLeads = page.locator('[data-testid="lifecycle-card-leads"]');
+    this.lifecycleCardFollowup = page.locator('[data-testid="lifecycle-card-follow-up"]');
+    this.lifecycleCardCallsAppts = page.locator('[data-testid="lifecycle-card-calls---appts"], [data-testid="lifecycle-card-appointments"]');
+    this.lifecycleCardContacts = page.locator('[data-testid="lifecycle-card-contacts"], [data-testid="lifecycle-card-patients"]');
+    this.lifecycleCardCampaigns = page.locator('[data-testid="lifecycle-card-campaigns"], [data-testid="lifecycle-card-treatments"]');
+    this.lifecycleCardBilling = page.locator('[data-testid="lifecycle-card-billing"]');
+    this.lifecycleCardRetention = page.locator('[data-testid="lifecycle-card-retention"], [data-testid="lifecycle-card-recall---repeat"]');
 
     // Today's Call Schedule
     this.schedulePanel = page.locator('text=/Today\'s Call Schedule|Today\'s Operatory Schedule/i').locator('xpath=ancestor::div[contains(@class, "bento-card")]').first();

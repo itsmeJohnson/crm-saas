@@ -50,9 +50,9 @@ export class TelecallerCockpitPage {
     this.page = page;
 
     // Header Selectors
-    this.punchInHeaderBtn = page.locator('button:has-text("Punch In")');
-    this.punchOutHeaderBtn = page.locator('button:has-text("Punch Out")');
-    this.resumeShiftHeaderBtn = page.locator('button:has-text("Resume Shift")');
+    this.punchInHeaderBtn = page.locator('header button:has-text("Punch In"), button[title="Punch in to start working"]').first();
+    this.punchOutHeaderBtn = page.locator('header button:has-text("Punch Out"), button[title="Punch out to end work"]').first();
+    this.resumeShiftHeaderBtn = page.locator('header button:has-text("Resume Shift"), button[title="Resume shift"]').first();
     this.attendanceStatusBadge = page.locator('text=/On Duty|On Break|Shift Ended|Off Duty/i').first();
 
     // Hero Metric Ribbon Selectors

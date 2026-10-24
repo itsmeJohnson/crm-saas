@@ -15,7 +15,8 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
 
     // Mock authenticated Telecaller session
     await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'mock-telecaller-token-12345');
+      localStorage.setItem('access_token', 'mock-telecaller-token-12345');
+      localStorage.setItem('refresh_token', 'mock-telecaller-refresh-12345');
       localStorage.setItem('user', JSON.stringify({
         id: '11111111-2222-3333-4444-555555555555',
         email: 'telecaller.agent@johnsonsoftwares.com',
@@ -25,16 +26,97 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
         is_team_leader: false,
         organization_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       }));
+      localStorage.setItem('organization', JSON.stringify({
+        id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        name: 'Johnson Softwares CRM',
+        subscription_status: 'active',
+        crm_config: {
+          industry: 'telecalling',
+          template: 'telecalling',
+          enabled_modules: ['dashboard', 'admin_core', 'platform_core', 'leads', 'contacts', 'companies', 'customers', 'opportunities', 'pipelines', 'activities', 'tasks', 'follow_ups', 'communications', 'billing', 'reports', 'analytics_suite', 'telecalling', 'appointments', 'treatments'],
+        },
+      }));
+      localStorage.setItem('features', JSON.stringify(['all', 'telephony', 'dialer', 'analytics', 'LEAD_MANAGEMENT', 'LEAD_CAPTURE', 'CALLING_INTEGRATION', 'SMS_INTEGRATION', 'WHATSAPP_INTEGRATION', 'COMMUNICATION_CENTER', 'TASK_MANAGEMENT', 'CALENDAR_APPOINTMENTS', 'BILLING_INVOICING']));
     });
 
-    // Mock Telephony & Attendance API routes
+    // Mock Auth Me & Refresh to prevent automatic logout on 401
+    await page.route('**/api/v1/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: {
+            id: '11111111-2222-3333-4444-555555555555',
+            email: 'telecaller.agent@johnsonsoftwares.com',
+            first_name: 'Alex',
+            last_name: 'Caller',
+            role: 'Employee',
+            is_team_leader: false,
+            organization_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'mock-telecaller-token-12345',
+          refresh_token: 'mock-telecaller-refresh-12345',
+        }),
+      });
+    });
+
+    // Mock Metadata Bootstrap
+    await page.route('**/api/v1/metadata/bootstrap', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          metadata_version: 1,
+          custom_fields: [],
+          custom_fields_by_entity: { lead: [] },
+          custom_objects: [],
+          pipelines: [
+            {
+              id: 'p-1',
+              name: 'Telecalling Pipeline',
+              is_default: true,
+              stages: [
+                { id: 's-1', name: 'New', order_position: 1 },
+                { id: 's-2', name: 'Contacted', order_position: 2 },
+              ],
+            },
+          ],
+          crm_config: {
+            industry: 'telecalling',
+            template: 'telecalling',
+            enabled_modules: ['dashboard', 'admin_core', 'platform_core', 'leads', 'contacts', 'companies', 'customers', 'opportunities', 'pipelines', 'activities', 'tasks', 'follow_ups', 'communications', 'billing', 'reports', 'analytics_suite', 'telecalling', 'appointments', 'treatments'],
+          },
+        }),
+      });
+    });
+
+    // Mock Telephony & Attendance API routes (reactive state)
+    let isPunchedInState = false;
+
     await page.route('**/api/v1/attendance/me/today', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           work_date: new Date().toISOString().split('T')[0],
-          record: null, // Initially off duty
+          record: isPunchedInState
+            ? {
+                id: 'att-rec-1',
+                work_date: new Date().toISOString().split('T')[0],
+                clock_in_at: new Date().toISOString(),
+                clock_out_at: null,
+                status: 'present',
+              }
+            : null,
           shift: { name: 'Morning Shift', start_time: '09:00:00', end_time: '18:00:00' },
           on_break: false,
         }),
@@ -42,6 +124,7 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
     });
 
     await page.route('**/api/v1/attendance/clock-in', async (route) => {
+      isPunchedInState = true;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -56,14 +139,28 @@ test.describe('Role 1: Telecaller Agent Cockpit E2E Journey', () => {
       });
     });
 
+    await page.route('**/api/v1/attendance/clock-out', async (route) => {
+      isPunchedInState = false;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'att-rec-1',
+          work_date: new Date().toISOString().split('T')[0],
+          clock_out_at: new Date().toISOString(),
+          status: 'present',
+        }),
+      });
+    });
+
     await page.route('**/api/v1/dashboard/employee-summary', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           employee_name: 'Alex Caller',
-          is_online: true,
-          check_in_at: new Date().toISOString(),
+          is_online: isPunchedInState,
+          check_in_at: isPunchedInState ? new Date().toISOString() : null,
           calls_made_today: 18,
           todays_follow_ups: 6,
           overdue_follow_ups: 1,

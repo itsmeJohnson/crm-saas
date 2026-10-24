@@ -15,7 +15,8 @@ test.describe('Role 2: Org Admin Operations Command Center E2E Journey', () => {
 
     // Mock authenticated OrgAdmin session
     await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'mock-orgadmin-token-67890');
+      localStorage.setItem('access_token', 'mock-orgadmin-token-67890');
+      localStorage.setItem('refresh_token', 'mock-orgadmin-refresh-67890');
       localStorage.setItem('user', JSON.stringify({
         id: '99999999-8888-7777-6666-555555555555',
         email: 'orgadmin@johnsonsoftwares.com',
@@ -24,6 +25,135 @@ test.describe('Role 2: Org Admin Operations Command Center E2E Journey', () => {
         role: 'OrgAdmin',
         organization_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       }));
+      localStorage.setItem('organization', JSON.stringify({
+        id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        name: 'Johnson Softwares CRM',
+        subscription_status: 'active',
+        crm_config: {
+          industry: 'telecalling',
+          template: 'telecalling',
+          enabled_modules: ['dashboard', 'admin_core', 'platform_core', 'leads', 'contacts', 'companies', 'customers', 'opportunities', 'pipelines', 'activities', 'tasks', 'follow_ups', 'communications', 'billing', 'reports', 'analytics_suite', 'telecalling', 'appointments', 'treatments'],
+        },
+      }));
+      localStorage.setItem('features', JSON.stringify(['all', 'telephony', 'dialer', 'analytics', 'LEAD_MANAGEMENT', 'LEAD_CAPTURE', 'CALLING_INTEGRATION', 'SMS_INTEGRATION', 'WHATSAPP_INTEGRATION', 'COMMUNICATION_CENTER', 'TASK_MANAGEMENT', 'CALENDAR_APPOINTMENTS', 'BILLING_INVOICING']));
+    });
+
+    // Mock Auth Me & Refresh to prevent automatic logout on 401
+    await page.route('**/api/v1/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: {
+            id: '99999999-8888-7777-6666-555555555555',
+            email: 'orgadmin@johnsonsoftwares.com',
+            first_name: 'Sarah',
+            last_name: 'Connor',
+            role: 'OrgAdmin',
+            organization_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'mock-orgadmin-token-67890',
+          refresh_token: 'mock-orgadmin-refresh-67890',
+        }),
+      });
+    });
+
+    // Mock Metadata Bootstrap
+    await page.route('**/api/v1/metadata/bootstrap', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          metadata_version: 1,
+          custom_fields: [],
+          custom_fields_by_entity: { lead: [] },
+          custom_objects: [],
+          pipelines: [
+            {
+              id: 'p-1',
+              name: 'Telecalling Pipeline',
+              is_default: true,
+              stages: [
+                { id: 's-1', name: 'New', order_position: 1 },
+                { id: 's-2', name: 'Contacted', order_position: 2 },
+              ],
+            },
+          ],
+          crm_config: {
+            industry: 'telecalling',
+            template: 'telecalling',
+            enabled_modules: ['dashboard', 'admin_core', 'platform_core', 'leads', 'contacts', 'companies', 'customers', 'opportunities', 'pipelines', 'activities', 'tasks', 'follow_ups', 'communications', 'billing', 'reports', 'analytics_suite', 'telecalling', 'appointments', 'treatments'],
+          },
+        }),
+      });
+    });
+
+    // Mock Calendar today
+    await page.route('**/api/v1/calendar/today', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'slot-1', title: 'Consultation with Dr. Mehta', time: '11:00 AM', status: 'In Progress' },
+          { id: 'slot-2', title: 'Product Demo - TechCorp', time: '02:30 PM', status: 'Confirmed' },
+        ]),
+      });
+    });
+
+    // Mock Orders / Treatments
+    await page.route('**/api/v1/customers/orders*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'order-1', order_number: 'CAM-001', total_amount: 150000, status: 'Active' },
+          { id: 'order-2', order_number: 'CAM-002', total_amount: 85000, status: 'Active' },
+        ]),
+      });
+    });
+
+    // Mock Tasks / Followups
+    await page.route('**/api/v1/tasks*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'task-1', title: 'Callback for pricing review', due_date: new Date().toISOString(), status: 'Pending' },
+          { id: 'task-2', title: 'Follow-up on product demo', due_date: new Date().toISOString(), status: 'Pending' },
+        ]),
+      });
+    });
+
+    // Mock Contacts
+    await page.route('**/api/v1/contacts*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'contact-1', name: 'Rajesh Kumar', phone: '+919845011223' },
+          { id: 'contact-2', name: 'Priya Sharma', phone: '+919731244556' },
+        ]),
+      });
+    });
+
+    // Mock Invoices / Collections
+    await page.route('**/api/v1/customers/invoices*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'inv-1', total_amount: 48500, amount_paid: 48500, status: 'Paid' },
+        ]),
+      });
     });
 
     // Mock Analytics, Leads, and Appointments
@@ -123,8 +253,7 @@ test.describe('Role 2: Org Admin Operations Command Center E2E Journey', () => {
     await adminPage.lifecycleCardLeads.first().click();
 
     // 3. Assert system navigates to pre-filtered leads view
-    await page.waitForURL(/\/leads/);
-    expect(page.url()).toContain('/leads');
+    await expect(page).toHaveURL(/\/leads/);
     await expect(page.locator('table, div[data-testid="leads-list"]').first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -160,16 +289,19 @@ test.describe('Role 2: Org Admin Operations Command Center E2E Journey', () => {
       });
     });
 
-    // 2. Trigger mock incoming SIP call webhook directed to lead
-    const response = await page.request.post('/api/v1/telephony/inbound', {
-      data: {
-        caller_phone: '+919876543210',
-        destination_number: '+918000012345',
-        call_status: 'ringing',
-      },
+    // 2. Trigger mock incoming SIP call webhook directed to lead from browser context
+    const resJson = await page.evaluate(async () => {
+      const res = await fetch('/api/v1/telephony/inbound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caller_phone: '+919876543210',
+          destination_number: '+918000012345',
+          call_status: 'ringing',
+        }),
+      });
+      return await res.json();
     });
-
-    const resJson = await response.json();
 
     // 3. Assert that backend routing bypasses offline agent and directs to attend_team_queue
     expect(resJson.routing_reason).toBe('attend_team_queue');
