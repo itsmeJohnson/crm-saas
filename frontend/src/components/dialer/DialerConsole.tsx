@@ -488,24 +488,24 @@ export const DialerConsole: React.FC = () => {
 
             {agentState === 'BREAK' && (
               <div className="space-y-6 py-4 text-center">
-                <div className="inline-flex items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-full text-indigo-600 dark:text-indigo-400 mb-2">
+                <div className="inline-flex items-center justify-center p-4 bg-indigo-50 border border-indigo-200 rounded-full text-indigo-600 mb-2">
                   <Coffee className="w-10 h-10" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{breakReason} Break</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Break countdown remaining</p>
+                  <h3 className="text-xl font-bold text-slate-100">{breakReason} Break</h3>
+                  <p className="text-sm text-slate-400 mt-1">Break countdown remaining</p>
                 </div>
 
-                <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider">
+                <div className="text-4xl font-mono font-bold text-slate-100 bg-slate-950 border border-slate-800 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider shadow-xs">
                   {formatDuration(breakTimeRemaining)}
                 </div>
 
                 <button
                   onClick={handleEndBreak}
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3 px-4 rounded-xl transition-all duration-150 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-950 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-all duration-150 border border-slate-800 shadow-xs cursor-pointer"
                 >
-                  <LogOut className="w-4 h-4 text-slate-500" />
+                  <LogOut className="w-4 h-4 text-slate-400" />
                   End Break
                 </button>
               </div>
@@ -513,28 +513,28 @@ export const DialerConsole: React.FC = () => {
 
             {agentState === 'ACTIVE_CALLING' && (
               <div className="space-y-6 py-4 text-center">
-                <div className="inline-flex items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-full text-indigo-600 dark:text-indigo-400 mb-2 animate-pulse">
+                <div className="inline-flex items-center justify-center p-4 bg-indigo-50 border border-indigo-200 rounded-full text-indigo-600 mb-2 animate-pulse">
                   <Phone className="w-10 h-10" />
                 </div>
                 <div>
                   <div className="flex items-center justify-center gap-2 mb-1.5">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-indigo-50 text-indigo-700 border-indigo-200">
                       {callDirection === 'INBOUND' ? 'Inbound Customer Call' : 'Outbound Dial'}
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Live Call Active</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Do not close this panel during call</p>
+                  <h3 className="text-xl font-bold text-slate-100">Live Call Active</h3>
+                  <p className="text-xs text-slate-400 mt-1">Do not close this panel during call</p>
                 </div>
 
-                <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider shadow-inner">
+                <div className="text-4xl font-mono font-bold text-slate-100 bg-slate-950 border border-slate-800 rounded-2xl py-4 max-w-[200px] mx-auto tracking-wider shadow-xs">
                   {formatDuration(callDuration)}
                 </div>
 
                 {/* Embedded WebRTC In-Browser Audio Controls */}
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
+                <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold">
-                      <Headphones className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
+                      <Headphones className="w-3.5 h-3.5 text-indigo-600" />
                       Browser Softphone
                     </span>
                     <span className={`px-2 py-0.5 rounded-full font-semibold uppercase text-[10px] tracking-wider border ${
@@ -640,31 +640,31 @@ export const DialerConsole: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
               {/* Lead Details Banner */}
-              <div className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/80 p-6">
+              <div className="bg-slate-950/60 border-b border-slate-800 p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Active Lead Context</span>
+                      <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Active Lead Context</span>
                       {isFreshLead ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <Sparkles className="w-3 h-3" />
                           Fresh Lead • 1st Call
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                           <History className="w-3 h-3" />
                           Follow-Up Call • Attempt #{totalCallTouches + 1}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                    <h3 className="text-2xl font-bold text-slate-100 mt-1">
                       {currentLead?.first_name || currentLead?.last_name
                         ? `${currentLead?.first_name || ''} ${currentLead?.last_name || ''}`.trim()
                         : 'Active Call Connected'}
                     </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                    <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5">
                       <Building className="w-4 h-4 text-slate-400" />
                       {currentLead?.title || currentLead?.company_name
                         ? `${currentLead?.title || ''} ${currentLead?.company_name ? `at ${currentLead?.company_name}` : ''}`.trim()
@@ -674,7 +674,7 @@ export const DialerConsole: React.FC = () => {
                   
                   {/* Phone & WhatsApp / Document collection trigger */}
                   <div className="flex items-center gap-2">
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3.5 py-2 rounded-xl flex items-center gap-2 text-slate-900 dark:text-slate-100 font-mono text-xs shadow-xs">
+                    <div className="bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl flex items-center gap-2 text-slate-100 font-mono text-xs shadow-xs">
                       <MaskedField value={currentLead?.phone || null} />
                     </div>
                     {currentLead?.phone && (
@@ -693,27 +693,27 @@ export const DialerConsole: React.FC = () => {
               </div>
 
               {/* Previous Conversations & Lead History Section */}
-              <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">
+              <div className="border-b border-slate-800 bg-slate-900 p-6 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <History className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    <History className="w-4 h-4 text-indigo-600" />
+                    <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
                       Previous Conversations &amp; Customer History
                     </h4>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-950 text-slate-300 border border-slate-800">
                       {timelineEvents.length} {timelineEvents.length === 1 ? 'interaction' : 'interactions'}
                     </span>
                   </div>
 
                   {/* Filter range buttons (7 days, 30 days, all) */}
-                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
                     <button
                       type="button"
                       onClick={() => setHistoryFilterDays(7)}
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                         historyFilterDays === 7
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       Last 7 Days
@@ -724,7 +724,7 @@ export const DialerConsole: React.FC = () => {
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                         historyFilterDays === 30
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       Last 30 Days
@@ -735,7 +735,7 @@ export const DialerConsole: React.FC = () => {
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                         historyFilterDays === 'all'
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       All History
@@ -798,7 +798,7 @@ export const DialerConsole: React.FC = () => {
                     {visibleHistoryEvents.map((ev) => (
                       <div
                         key={ev.id}
-                        className="bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3 hover:border-slate-300 transition-colors"
+                        className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 hover:border-slate-700 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-2">
@@ -811,22 +811,22 @@ export const DialerConsole: React.FC = () => {
                                 <MessageCircle className="w-3 h-3" /> WhatsApp
                               </span>
                             ) : ev.type === 'note' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">
                                 <FileText className="w-3 h-3" /> Note
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">
                                 <Clock className="w-3 h-3" /> {ev.title}
                               </span>
                             )}
-                            <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            <span className="text-xs font-semibold text-slate-100">
                               {ev.title}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
                             {resolveActorName(ev.actor_user_id) && (
-                              <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-700 dark:text-slate-300 font-medium">
+                              <span className="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-slate-300 font-medium">
                                 Agent: {resolveActorName(ev.actor_user_id)}
                               </span>
                             )}
@@ -835,7 +835,7 @@ export const DialerConsole: React.FC = () => {
                         </div>
 
                         {ev.description && (
-                          <div className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-lg p-2.5 border border-slate-200 dark:border-slate-700 whitespace-pre-line mt-1">
+                          <div className="text-xs text-slate-200 bg-slate-900 rounded-lg p-2.5 border border-slate-800 whitespace-pre-line mt-1">
                             {ev.description}
                           </div>
                         )}

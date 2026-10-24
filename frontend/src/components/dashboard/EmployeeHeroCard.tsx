@@ -153,30 +153,30 @@ export const EmployeeHeroCard: React.FC<{
             )
           )}
 
-          <div className="flex items-center gap-5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/80 rounded-xl px-4 py-2">
+          <div className="flex items-center gap-5 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2">
             <div className="text-right">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1 justify-end">
                 <LogIn className="w-3 h-3 text-emerald-500" /> Punch-In
               </p>
-              <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">{fmtTime(checkInAt)}</p>
+              <p className="text-base font-bold text-slate-100 mt-0.5">{fmtTime(checkInAt)}</p>
             </div>
             {isPunchedOutToday && (
               <>
-                <div className="w-[1px] h-7 bg-slate-200 dark:bg-slate-800" />
+                <div className="w-[1px] h-7 bg-slate-800" />
                 <div className="text-right">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1 justify-end">
                     <LogOut className="w-3 h-3 text-rose-500" /> Punch-Out
                   </p>
-                  <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">{fmtTime(checkOutAt)}</p>
+                  <p className="text-base font-bold text-slate-100 mt-0.5">{fmtTime(checkOutAt)}</p>
                 </div>
               </>
             )}
-            <div className="w-[1px] h-7 bg-slate-200 dark:bg-slate-800" />
+            <div className="w-[1px] h-7 bg-slate-800" />
             <div className="text-right">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end">
-                <Clock className="w-3 h-3 text-brand-500" /> {isPunchedOutToday ? 'Worked' : 'Shift Hours'}
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1 justify-end">
+                <Clock className="w-3 h-3 text-indigo-500" /> {isPunchedOutToday ? 'Worked' : 'Shift Hours'}
               </p>
-              <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">{fmtDuration(workingMinutes)}</p>
+              <p className="text-base font-bold text-slate-100 mt-0.5">{fmtDuration(workingMinutes)}</p>
             </div>
           </div>
         </div>
@@ -185,23 +185,23 @@ export const EmployeeHeroCard: React.FC<{
       {/* active agent metrics counter block */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${isPunchedIn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
             {isPunchedIn ? 'Live Agent Metrics • Calling Session Active' : 'Agent Daily Metrics Overview'}
           </p>
           {isPunchedIn && (
-            <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
               Punched In • On Duty
             </span>
           )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs transition-all hover:border-slate-300 dark:hover:border-slate-700">
-              <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1 truncate">
-                <s.icon className={`w-3.5 h-3.5 shrink-0 ${s.isAlert ? 'text-rose-500' : 'text-slate-400 dark:text-slate-500'}`} /> {s.label}
+            <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xs transition-all hover:border-slate-700">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1 truncate">
+                <s.icon className={`w-3.5 h-3.5 shrink-0 ${s.isAlert ? 'text-rose-500' : 'text-slate-400'}`} /> {s.label}
               </p>
-              <p className={`text-2xl font-bold mt-1 ${loading ? 'text-slate-300 dark:text-slate-700 animate-pulse' : s.isAlert ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
+              <p className={`text-2xl font-bold mt-1 ${loading ? 'text-slate-500 animate-pulse' : s.isAlert ? 'text-rose-600' : 'text-slate-100'}`}>
                 {s.value}
               </p>
             </div>

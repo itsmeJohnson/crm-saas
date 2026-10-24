@@ -133,12 +133,12 @@ export const EmployeeDashboard: React.FC = () => {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-600 dark:text-brand-300 text-xs font-semibold rounded-full border border-brand-500/20">
             <Sparkles className="w-3.5 h-3.5" /> My Workspace
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-100 tracking-tight">
             Hi, <span className="gradient-text">{user?.first_name || 'there'}</span>
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xl">Here's your day at a glance — your calling queue, leads, tasks and schedule.</p>
+          <p className="text-slate-400 text-sm max-w-xl">Here's your day at a glance — your calling queue, leads, tasks and schedule.</p>
         </div>
-        <button onClick={load} title="Refresh" className="p-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl text-slate-600 dark:text-slate-400 cursor-pointer bg-slate-50 dark:bg-slate-950/20">
+        <button onClick={load} title="Refresh" className="p-3 border border-slate-800 hover:bg-slate-900 rounded-xl text-slate-400 cursor-pointer bg-slate-950/20">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
@@ -166,11 +166,11 @@ export const EmployeeDashboard: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Telecaller Agent Cockpit</h2>
+                <h2 className="text-lg font-bold text-slate-100">Telecaller Agent Cockpit</h2>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                   isClockedIn 
-                    ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' 
-                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-slate-950 border-slate-800 text-slate-300'
                 }`}>
                   {isClockedIn 
                     ? 'Active • Attendance Verified' 
@@ -179,7 +179,7 @@ export const EmployeeDashboard: React.FC = () => {
                       : 'Punch-In Required to Call'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 {isClockedIn
                   ? 'Your calling queue is active. Auto-dial ready, consecutive call progression, and break management.'
                   : isPunchedOutToday
@@ -209,12 +209,12 @@ export const EmployeeDashboard: React.FC = () => {
             <DialerConsole />
           </div>
         ) : (
-          <div className="py-8 px-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-center space-y-3">
+          <div className="py-8 px-6 bg-slate-950 border border-slate-800 rounded-xl text-center space-y-3">
             <Clock className="w-8 h-8 text-indigo-500 mx-auto" />
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm font-semibold text-slate-100">
               {isPunchedOutToday ? 'Shift Punched Out (Cockpit Paused)' : 'Calling Cockpit is Paused'}
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
               {isPunchedOutToday
                 ? 'Your shift is currently marked as punched out. If you ended it by mistake or want to continue outreach, resume your shift below.'
                 : 'Company policy requires an active attendance punch before starting customer outreach. Punch in above to start your dialing session.'}
