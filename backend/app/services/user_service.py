@@ -159,6 +159,9 @@ class UserService:
             )
         
         role = user_data.get("role", "Employee")
+        if role == "Telecaller":
+            role = "Employee"
+            user_data["role"] = "Employee"
         reporting_to_id = user_data.get("reporting_to_id")
         if reporting_to_id and isinstance(reporting_to_id, str):
             reporting_to_id = uuid.UUID(reporting_to_id)
@@ -217,22 +220,24 @@ class UserService:
             organization_id=actor.organization_id
         )
 
-        # Check global email uniqueness (including soft-deleted users — the email
-        # column is globally unique regardless of is_deleted, so reusing a removed
-        # user's email would violate the constraint and 500; surface a clear 400).
+        # Check global email uniqueness (including soft-deleted users)
         existing = (await self.db.execute(
             select(User).filter(User.email == user_data["email"]))).scalars().first()
+        is_reactivating = False
         if existing:
-            detail = ("This email belongs to a previously removed user. "
-                      "Reactivate that user or use a different email address."
-                      if getattr(existing, "is_deleted", False) else "Email already registered")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+            if getattr(existing, "is_deleted", False) and existing.organization_id == actor.organization_id:
+                # User was previously removed from this organization; reactivate and reassign
+                is_reactivating = True
+            else:
+                detail = ("This email belongs to a previously removed user in another organization."
+                          if getattr(existing, "is_deleted", False) else "Email already registered")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
         # Check phone uniqueness within the organization
         phone = user_data.get("phone")
         if phone:
             existing_phone = await self.user_repo.get_by_phone_in_org(actor.organization_id, phone)
-            if existing_phone:
+            if existing_phone and (not is_reactivating or existing_phone.id != existing.id):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Phone number already in use by another user in your organization"
@@ -255,7 +260,31 @@ class UserService:
         await self._validate_department(actor.organization_id, user_data)
         await self._validate_custom_role(actor.organization_id, user_data)
 
-        user = await self.user_repo.create_user(actor.organization_id, user_data)
+        if is_reactivating:
+            user = existing
+            user.first_name = user_data["first_name"]
+            user.last_name = user_data.get("last_name")
+            user.role = role
+            user.reporting_to_id = reporting_to_id
+            user.seat_number = assigned_seat
+            user.is_active = True
+            user.is_deleted = False
+            user.deleted_at = None
+            user.inactive_reason = None
+            if "hashed_password" in user_data:
+                user.hashed_password = user_data["hashed_password"]
+            if user_data.get("phone"):
+                user.phone = user_data["phone"]
+            if user_data.get("department_id"):
+                user.department_id = user_data["department_id"]
+            if user_data.get("custom_role_id"):
+                user.custom_role_id = user_data["custom_role_id"]
+            user.updated_at = datetime.now(timezone.utc)
+            self.db.add(user)
+            await self.db.flush()
+        else:
+            user = await self.user_repo.create_user(actor.organization_id, user_data)
+
         user.is_team_leader = await self.is_team_leader(user)
 
         # Create Seat Assignment History
@@ -265,7 +294,7 @@ class UserService:
             user_id=user.id,
             action="Assigned",
             performed_by_id=actor.id,
-            remarks="Assigned seat during user creation"
+            remarks="Assigned seat during user reactivation" if is_reactivating else "Assigned seat during user creation"
         )
         self.db.add(history)
         
