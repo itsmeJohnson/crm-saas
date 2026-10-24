@@ -305,6 +305,15 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
               loadConversation();
             }
           }
+        } else if (eventType === 'whatsapp_message_status') {
+          const { message_id, wa_message_id, status } = data;
+          if (status) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                (m.id === message_id || m.id === wa_message_id) ? { ...m, status } : m
+              )
+            );
+          }
         }
       } catch (err) {
         console.error('[OmniChannelChatDrawer] Realtime error:', err);
@@ -315,6 +324,15 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
       unsubscribe();
     };
   }, [isOpen, lead?.id, waConvId, loadConversation]);
+
+  // Periodic poll while drawer is open so double ticks and blue ticks update dynamically
+  useEffect(() => {
+    if (!isOpen || !lead || !lead.phone || channel !== 'whatsapp') return;
+    const interval = setInterval(() => {
+      loadConversation();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isOpen, lead, channel, loadConversation]);
 
   const handleSendTemplate = async (templateToUse?: WaTemplate) => {
     const tmpl = templateToUse || selectedTemplate;

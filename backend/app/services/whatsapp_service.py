@@ -762,7 +762,8 @@ class WhatsAppService:
                 target_tpl_id = tpl_rec.meta_template_id
             
             result = await provider.send_template(to_number=conv.phone, template_name=target_tpl_id,
-                                                  language=language, variables=variables)
+                                                  language=language, variables=variables,
+                                                  body=tpl_rec.body_text if tpl_rec else None)
         else:
             # Fetch attachments
             res_att = await self.db.execute(select(WhatsAppAttachment).filter(WhatsAppAttachment.message_id == msg.id))
@@ -913,7 +914,8 @@ class WhatsAppService:
                     timestamp=dt_stamp
                 )
             elif event_type in ("message-event", "user-event"):
-                wamid = p.get("id")
+                wamid = p.get("gsId") or p.get("id") or (p.get("payload", {}).get("msg_id") if isinstance(p.get("payload"), dict) else None)
+                recipient_id = p.get("destination") or p.get("recipient")
                 raw_st = p.get("type", "").lower()
                 status_map = {
                     "enqueued": "queued",
@@ -924,13 +926,14 @@ class WhatsAppService:
                 }
                 new_status = status_map.get(raw_st, "sent")
                 error_msg = p.get("cause")
-                if wamid:
+                if wamid or recipient_id:
                     await self._process_webhook_status(
                         org_id=org_id,
-                        wamid=wamid,
+                        wamid=wamid or "",
                         new_status=new_status,
                         timestamp=dt_stamp,
-                        error=error_msg
+                        error=error_msg,
+                        recipient_id=recipient_id
                     )
 
             event.status = "processed"
@@ -1051,12 +1054,13 @@ class WhatsAppService:
                     wamid = status_data.get("id")
                     st = status_data.get("status")
                     timestamp = status_data.get("timestamp")
+                    recipient_id = status_data.get("recipient_id")
                     error_data = status_data.get("errors")
                     
                     err_msg = error_data[0].get("message") if error_data else None
                     dt_stamp = datetime.fromtimestamp(int(timestamp), tz=timezone.utc) if timestamp else _now()
                     
-                    await self._process_webhook_status(org_id, wamid, st, dt_stamp, err_msg)
+                    await self._process_webhook_status(org_id, wamid, st, dt_stamp, err_msg, recipient_id=recipient_id)
             
             # Case B: Inbound Message Callback
             elif "messages" in value:
@@ -1134,13 +1138,42 @@ class WhatsAppService:
         await self.db.flush()
         return {"status": event.status, "event_id": event_id}
 
-    async def _process_webhook_status(self, org_id: uuid.UUID, wamid: str, new_status: str, timestamp: datetime, error: str | None) -> None:
-        """Processes delivery and read status updates."""
+    async def _process_webhook_status(self, org_id: uuid.UUID, wamid: str, new_status: str, timestamp: datetime, error: str | None, recipient_id: str | None = None) -> None:
+        """Processes delivery and read status updates with Meta WAMID and recipient fallback."""
         from app.repositories.whatsapp_repository import WhatsAppMessageRepository
         msg_repo = WhatsAppMessageRepository(self.db)
-        msg = await msg_repo.get_by_wamid(org_id, wamid)
+        msg = await msg_repo.get_by_wamid(org_id, wamid) if wamid else None
+        if not msg and wamid:
+            try:
+                msg_uuid = uuid.UUID(wamid)
+                msg = await self.db.get(WhatsAppMessage, msg_uuid)
+            except Exception:
+                pass
+        if not msg and recipient_id:
+            clean_recip = "".join(c for c in recipient_id if c.isdigit())[-10:]
+            if clean_recip:
+                res = await self.db.execute(
+                    select(WhatsAppMessage)
+                    .join(WhatsAppConversation, WhatsAppMessage.conversation_id == WhatsAppConversation.id)
+                    .filter(
+                        WhatsAppMessage.organization_id == org_id,
+                        WhatsAppMessage.direction == "OUTBOUND",
+                        WhatsAppConversation.phone.like(f"%{clean_recip}"),
+                        WhatsAppMessage.created_at >= _now() - timedelta(hours=24)
+                    )
+                    .order_by(WhatsAppMessage.created_at.desc())
+                )
+                candidates = res.scalars().all()
+                ladder = {"queued": 0, "sent": 1, "delivered": 2, "read": 3, "failed": 4}
+                for cand in candidates:
+                    if ladder.get(cand.wa_status, 0) < ladder.get(new_status, 0):
+                        msg = cand
+                        if wamid and not (cand.wa_message_id or "").startswith("wamid."):
+                            cand.wa_message_id = wamid
+                        break
+
         if not msg:
-            logger.warning("Status callback received for unknown message ID: %s", wamid)
+            logger.warning("Status callback received for unknown message ID: %s (recipient: %s)", wamid, recipient_id)
             return
 
         conv = await self.db.get(WhatsAppConversation, msg.conversation_id)

@@ -556,23 +556,39 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
             return WaSendResult(status="failed", error=f"Invalid destination phone number: {to_number}")
 
         if self._is_gateway:
-            # Gupshup Conversation Cloud WhatsApp strictly requires an approved WhatsApp template
-            # For free text messages from agents, we use the approved outreach template with body text
+            # Gupshup Gateway API: send plain text message directly without HSM wrapper
             payload = {
                 "send_to": clean_to,
+                "msg": body,
                 "msg_type": "text",
                 "userid": self.effective_userid,
                 "auth_scheme": "plain",
                 "v": "1.1",
                 "format": "json",
                 "method": "SendMessage",
-                "isHSM": "true",
-                "isTemplate": "true",
-                "linkTrackingEnabled": "true",
-                "whatsAppTemplateId": "1401814018783680",
-                "var1": body[:100] if body else "Customer",
             }
-            return await self._post_gateway(payload)
+            res = await self._post_gateway(payload)
+            if res.status == "sent":
+                return res
+            # If 24-hr session window is closed or template is explicitly required, fall back to outreach template
+            err_lower = (res.error or "").lower()
+            if "template" in err_lower or "window" in err_lower or "session" in err_lower:
+                payload_fallback = {
+                    "send_to": clean_to,
+                    "msg_type": "text",
+                    "userid": self.effective_userid,
+                    "auth_scheme": "plain",
+                    "v": "1.1",
+                    "format": "json",
+                    "method": "SendMessage",
+                    "isHSM": "true",
+                    "isTemplate": "true",
+                    "linkTrackingEnabled": "true",
+                    "whatsAppTemplateId": "1401814018783680",
+                    "var1": "Customer",
+                }
+                return await self._post_gateway(payload_fallback)
+            return res
 
         payload = {
             "channel": "whatsapp",
@@ -583,7 +599,7 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
         }
         return await self._post_msg(f"{self.base_url}/msg", payload)
 
-    async def send_template(self, *, to_number: str, template_name: str, language: str, variables: list | None = None) -> WaSendResult:
+    async def send_template(self, *, to_number: str, template_name: str, language: str, variables: list | None = None, body: str | None = None) -> WaSendResult:
         if not (self.effective_userid and self.api_key):
             return WaSendResult(status="failed", error="Gupshup credentials not fully configured")
         clean_to = "".join(c for c in (to_number or "") if c.isdigit())
@@ -592,41 +608,87 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
         if len(clean_to) < 10:
             return WaSendResult(status="failed", error=f"Invalid destination phone number: {to_number}")
 
-        template_id_map = {
-            "hiring": "4548035658774661",
-            "request_phone_number": "1401814018783680",
-            "request_contact_info_1": "1401814018783680",
-            "request_contact_info_2": "1401814018783680",
-            "request_contact_info_3": "1401814018783680",
-            "lead_greeting": "1401814018783680",
-            "callback_reminder": "1401814018783680",
-            "kyc_document_request": "1401814018783680",
-        }
         raw_key = str(template_name or "").strip().lower()
-        resolved_tpl_id = template_id_map.get(raw_key, str(template_name).strip())
-        if not resolved_tpl_id.isdigit():
-            resolved_tpl_id = "1401814018783680"
+        var1_val = str(variables[0]) if (variables and len(variables) > 0 and str(variables[0]).strip()) else "Customer"
 
+        # Explicit approved Meta HSM templates
         if self._is_gateway:
-            var1_val = str(variables[0]) if (variables and len(variables) > 0 and str(variables[0]).strip()) else "Customer"
-            payload = {
-                "send_to": clean_to,
-                "msg_type": "text",
-                "userid": self.effective_userid,
-                "auth_scheme": "plain",
-                "v": "1.1",
-                "format": "json",
-                "method": "SendMessage",
-                "isHSM": "true",
-                "isTemplate": "true",
-                "linkTrackingEnabled": "true",
-                "whatsAppTemplateId": resolved_tpl_id,
-                "var1": var1_val,
-            }
-            if variables and len(variables) > 1:
-                for idx, v in enumerate(variables[1:], 2):
-                    payload[f"var{idx}"] = str(v)
-            return await self._post_gateway(payload)
+            if raw_key == "hiring" or raw_key == "4548035658774661":
+                payload = {
+                    "send_to": clean_to,
+                    "msg_type": "text",
+                    "userid": self.effective_userid,
+                    "auth_scheme": "plain",
+                    "v": "1.1",
+                    "format": "json",
+                    "method": "SendMessage",
+                    "isHSM": "true",
+                    "isTemplate": "true",
+                    "linkTrackingEnabled": "true",
+                    "whatsAppTemplateId": "4548035658774661",
+                }
+                return await self._post_gateway(payload)
+            elif raw_key in ("request_phone_number", "request_contact_info", "contact_request"):
+                payload = {
+                    "send_to": clean_to,
+                    "msg_type": "text",
+                    "userid": self.effective_userid,
+                    "auth_scheme": "plain",
+                    "v": "1.1",
+                    "format": "json",
+                    "method": "SendMessage",
+                    "isHSM": "true",
+                    "isTemplate": "true",
+                    "linkTrackingEnabled": "true",
+                    "whatsAppTemplateId": "1401814018783680",
+                    "var1": var1_val,
+                }
+                return await self._post_gateway(payload)
+            else:
+                # Custom CRM template text (e.g. lead_greeting, callback_reminder, kyc_document_request)
+                text_content = body or ""
+                if not text_content:
+                    if raw_key == "callback_reminder":
+                        text_content = f"Hello {var1_val}, we tried calling you regarding your inquiry. Please let us know a convenient time to speak."
+                    elif raw_key == "kyc_document_request":
+                        text_content = f"Dear {var1_val}, please send your required KYC documents (Aadhaar / ID proof) on this WhatsApp chat to proceed with your verification."
+                    elif raw_key == "lead_greeting":
+                        text_content = f"Hello {var1_val}, thank you for reaching out to Samartha Sankalpa Solutions. Our team is here to assist you."
+                    else:
+                        text_content = f"Hello {var1_val}, regarding your inquiry with Samartha Sankalpa Solutions."
+                elif variables:
+                    for idx, v in enumerate(variables, 1):
+                        text_content = text_content.replace(f"{{{{{idx}}}}}", str(v))
+
+                payload = {
+                    "send_to": clean_to,
+                    "msg": text_content,
+                    "msg_type": "text",
+                    "userid": self.effective_userid,
+                    "auth_scheme": "plain",
+                    "v": "1.1",
+                    "format": "json",
+                    "method": "SendMessage",
+                }
+                res = await self._post_gateway(payload)
+                if res.status == "sent":
+                    return res
+                # Fallback to outreach template only if session window is closed
+                payload_fallback = {
+                    "send_to": clean_to,
+                    "msg_type": "text",
+                    "userid": self.effective_userid,
+                    "auth_scheme": "plain",
+                    "v": "1.1",
+                    "format": "json",
+                    "method": "SendMessage",
+                    "isHSM": "true",
+                    "isTemplate": "true",
+                    "linkTrackingEnabled": "true",
+                    "whatsAppTemplateId": "1401814018783680",
+                    "var1": var1_val,
+                }
+                return await self._post_gateway(payload_fallback)
 
         payload = {
             "source": self.sender_number,
