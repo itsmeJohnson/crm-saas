@@ -133,7 +133,7 @@ export const EmployeeDashboard: React.FC = () => {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500/10 text-brand-600 dark:text-brand-300 text-xs font-semibold rounded-full border border-brand-500/20">
             <Sparkles className="w-3.5 h-3.5" /> My Workspace
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-100 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
             Hi, <span className="gradient-text">{user?.first_name || 'there'}</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xl">Here's your day at a glance — your calling queue, leads, tasks and schedule.</p>
@@ -154,8 +154,8 @@ export const EmployeeDashboard: React.FC = () => {
       />
 
       {/* Agent Cockpit: Calling Option & Progressive Dialer */}
-      <div className="glass-panel border border-slate-800/90 rounded-2xl p-6 shadow-2xl relative overflow-hidden space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+      <div className="glass-panel border border-slate-200 dark:border-slate-800/90 rounded-2xl p-6 shadow-card relative overflow-hidden space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shadow-lg ${
               isClockedIn 
@@ -168,7 +168,7 @@ export const EmployeeDashboard: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-100">Telecaller Agent Cockpit</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Telecaller Agent Cockpit</h2>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                   isClockedIn 
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 

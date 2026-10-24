@@ -158,7 +158,7 @@ export const DentalDashboard: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-slate-100 tracking-tight">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {isDental ? 'SmileCare Dental Practice' : orgName}
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
@@ -166,7 +166,7 @@ export const DentalDashboard: React.FC = () => {
                 {isDental ? 'Live OPD' : 'Live Operations'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {isDental ? 'Practice Command Center' : 'Telecalling Operations Command Center'} • {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           </div>
@@ -176,7 +176,7 @@ export const DentalDashboard: React.FC = () => {
         <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
           <button
             onClick={loadDashboardData}
-            className="minimal-btn px-3 py-2 text-xs text-slate-300"
+            className="minimal-btn px-3 py-2 text-xs text-slate-700 dark:text-slate-300"
             title="Refresh Real-time Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -191,9 +191,9 @@ export const DentalDashboard: React.FC = () => {
           </button>
           <button
             onClick={() => navigate('/leads')}
-            className="minimal-btn px-3.5 py-2 text-xs text-cyan-400 hover:text-cyan-300"
+            className="minimal-btn px-3.5 py-2 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500"
           >
-            <Zap className="w-3.5 h-3.5 text-cyan-400" />
+            <Zap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             {isDental ? 'New Enquiry' : 'New Lead'}
           </button>
         </div>
@@ -208,12 +208,12 @@ export const DentalDashboard: React.FC = () => {
           data-testid="metric-today-calls"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {isDental ? "Today's Appts" : "Today's Calls"}
             </span>
             <Calendar className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{displayCallsCount}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{displayCallsCount}</div>
           <p className="text-[11px] text-cyan-400 mt-1 font-medium">
             {remainingToday > 0 ? `${remainingToday} remaining` : 'All completed'}
           </p>
@@ -226,12 +226,12 @@ export const DentalDashboard: React.FC = () => {
           data-testid="metric-contacts"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {isDental ? 'Patients' : 'Contacts'}
             </span>
             <Users className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{displayContactsCount}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{displayContactsCount}</div>
           <p className="text-[11px] text-emerald-400 mt-1 font-medium">
             {isDental ? 'Registered' : 'Active Leads'}
           </p>
@@ -244,10 +244,10 @@ export const DentalDashboard: React.FC = () => {
           data-testid="metric-followups"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Follow-ups</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Follow-ups</span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{displayFollowupsCount}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{displayFollowupsCount}</div>
           <p className="text-[11px] text-rose-400 mt-1 font-medium">
             {overdueFollowups > 0 ? `${overdueFollowups} overdue` : 'Up to date'}
           </p>
@@ -260,13 +260,13 @@ export const DentalDashboard: React.FC = () => {
           data-testid="metric-campaigns"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {isDental ? 'Treatments' : 'Campaigns'}
             </span>
             <Activity className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{displayCampaignsCount}</div>
-          <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
+          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{displayCampaignsCount}</div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium truncate">
             {isDental ? 'Active plans' : 'Active pipelines'}
           </p>
         </div>
@@ -278,10 +278,10 @@ export const DentalDashboard: React.FC = () => {
           data-testid="metric-collections"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Collections</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Collections</span>
             <DollarSign className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{formatMoney(displayCollections)}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatMoney(displayCollections)}</div>
           <p className="text-[11px] text-cyan-400 mt-1 font-medium">
             {paidCount} receipt{paidCount === 1 ? '' : 's'} cleared
           </p>
@@ -294,10 +294,10 @@ export const DentalDashboard: React.FC = () => {
           data-testid="metric-monthly"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Monthly</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Monthly</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-100">{formatMoney(displayMonthlyRevenue)}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatMoney(displayMonthlyRevenue)}</div>
           <p className="text-[11px] text-emerald-400 mt-1 font-medium">
             Total billed
           </p>

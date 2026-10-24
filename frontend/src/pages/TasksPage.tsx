@@ -65,17 +65,17 @@ export const TasksPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/60 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800/60 pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">Tasks</h1>
-          <p className="text-sm text-slate-400 mt-1">Plan, assign, and track work with checklists, dependencies &amp; reminders.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Tasks</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Plan, assign, and track work with checklists, dependencies &amp; reminders.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-xl overflow-hidden border border-slate-800">
-            <button onClick={() => setView('list')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold cursor-pointer ${view === 'list' ? 'bg-brand-500/15 text-brand-300' : 'bg-slate-900 text-slate-400'}`}><ListIcon className="w-4 h-4" /> List</button>
-            <button onClick={() => setView('calendar')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold cursor-pointer border-l border-slate-800 ${view === 'calendar' ? 'bg-brand-500/15 text-brand-300' : 'bg-slate-900 text-slate-400'}`}><CalIcon className="w-4 h-4" /> Calendar</button>
+          <div className="flex items-center rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 p-0.5">
+            <button onClick={() => setView('list')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition ${view === 'list' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400'}`}><ListIcon className="w-3.5 h-3.5" /> List</button>
+            <button onClick={() => setView('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition ${view === 'calendar' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400'}`}><CalIcon className="w-3.5 h-3.5" /> Calendar</button>
           </div>
-          <button onClick={() => setModalTask(null)} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-brand-500/20 cursor-pointer">
+          <button onClick={() => setModalTask(null)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer transition">
             <Plus className="w-4 h-4" /> New Task
           </button>
         </div>
@@ -85,32 +85,32 @@ export const TasksPage: React.FC = () => {
         <>
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-48">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks…" className="w-full pl-9 pr-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-brand-500/50" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks…" className="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 placeholder:text-slate-400" />
             </div>
-            <select value={statusF} onChange={(e) => setStatusF(e.target.value)} className="px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200">
+            <select value={statusF} onChange={(e) => setStatusF(e.target.value)} className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-700 dark:text-slate-200 focus:outline-none">
               {['All', 'Todo', 'InProgress', 'Done', 'Cancelled'].map((s) => <option key={s} value={s}>{s === 'All' ? 'All statuses' : s}</option>)}
             </select>
-            <select value={priorityF} onChange={(e) => setPriorityF(e.target.value)} className="px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200">
+            <select value={priorityF} onChange={(e) => setPriorityF(e.target.value)} className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-700 dark:text-slate-200 focus:outline-none">
               {['All', 'Low', 'Medium', 'High', 'Urgent'].map((p) => <option key={p} value={p}>{p === 'All' ? 'All priorities' : p}</option>)}
             </select>
-            <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-300 cursor-pointer select-none">
-              <input type="checkbox" checked={overdue} onChange={(e) => setOverdue(e.target.checked)} className="accent-brand-500" /> Overdue
+            <label className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+              <input type="checkbox" checked={overdue} onChange={(e) => setOverdue(e.target.checked)} className="accent-brand-500 rounded" /> Overdue
             </label>
           </div>
 
-          <div className="glass-panel rounded-2xl border border-slate-800/80 divide-y divide-slate-800/65">
+          <div className="glass-panel rounded-2xl border border-slate-200 dark:border-slate-800/80 divide-y divide-slate-200 dark:divide-slate-800/65 shadow-card overflow-hidden">
             {isLoading ? (
               <div className="py-16 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin inline" /></div>
             ) : tasks.length === 0 ? (
               <div className="py-16 text-center text-sm text-slate-500">No tasks.</div>
             ) : tasks.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-900/30 cursor-pointer" onClick={() => setDetailId(t.id)}>
+              <div key={t.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-900/30 cursor-pointer transition" onClick={() => setDetailId(t.id)}>
                 <button onClick={(e) => { e.stopPropagation(); toggleComplete(t); }} className="shrink-0 cursor-pointer">
-                  {t.status === 'Done' ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <Circle className="w-5 h-5 text-slate-600 hover:text-slate-400" />}
+                  {t.status === 'Done' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 hover:text-slate-500" />}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium ${t.status === 'Done' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>{t.title}</p>
+                  <p className={`text-sm font-semibold ${t.status === 'Done' ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-slate-100'}`}>{t.title}</p>
                   <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                     {t.due_date && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(t.due_date).toLocaleDateString()}</span>}
                     {t.recurrence !== 'none' && <span className="flex items-center gap-1"><Repeat className="w-3 h-3" />{t.recurrence}</span>}
@@ -118,7 +118,7 @@ export const TasksPage: React.FC = () => {
                   </div>
                 </div>
                 <span className={`shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${PRIORITY_COLOR[t.priority] || PRIORITY_COLOR.Medium}`}>{t.priority}</span>
-                <span className="shrink-0 text-[11px] text-slate-400 w-20 text-right">{t.status}</span>
+                <span className="shrink-0 text-[11px] text-slate-500 w-20 text-right">{t.status}</span>
               </div>
             ))}
           </div>

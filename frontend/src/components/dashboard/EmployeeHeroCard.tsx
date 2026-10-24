@@ -82,33 +82,33 @@ export const EmployeeHeroCard: React.FC<{
   ];
 
   return (
-    <div className="glass-panel border border-slate-800/85 rounded-2xl p-6 sm:p-7 relative overflow-hidden">
+    <div className="glass-panel border border-slate-200 dark:border-slate-800/85 rounded-2xl p-6 sm:p-7 relative overflow-hidden shadow-card">
       <div className="absolute top-0 right-0 w-[320px] h-[320px] bg-brand-500/10 rounded-full blur-[90px] pointer-events-none" />
 
       {/* identity + status row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500/30 to-indigo-500/20 border border-brand-500/30 flex items-center justify-center text-xl font-extrabold text-brand-200">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500/20 to-indigo-500/20 border border-brand-500/30 flex items-center justify-center text-xl font-extrabold text-brand-600 dark:text-brand-200">
             {(name || summary?.employee_name || '?').slice(0, 1).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold text-slate-100 leading-tight">
+            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
               {summary?.employee_name || name || 'Welcome'}
             </h2>
             <div className="flex items-center gap-2 mt-1">
               {isPunchedIn ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   Punched In • On Duty
                 </span>
               ) : isPunchedOutToday ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
                   Punched Out • Shift Ended
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-600/20 text-slate-400 border border-slate-700/50">
-                  <span className="w-2 h-2 rounded-full bg-slate-500" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-600/20 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700/50">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
                   Not Punched In
                 </span>
               )}
@@ -123,9 +123,9 @@ export const EmployeeHeroCard: React.FC<{
             <button
               onClick={() => setConfirmPunchOut(true)}
               disabled={actionBusy}
-              className="px-4 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-semibold text-xs rounded-xl shadow-lg transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-semibold text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
-              <LogOut className="w-4 h-4 text-rose-400" />
+              <LogOut className="w-4 h-4 text-rose-500" />
               Punch Out (End Shift)
             </button>
           ) : isPunchedOutToday ? (
@@ -138,7 +138,7 @@ export const EmployeeHeroCard: React.FC<{
                 <RotateCcw className={`w-4 h-4 ${actionBusy ? 'animate-spin' : ''}`} />
                 {actionBusy ? 'Resuming Shift...' : 'Resume Shift (Re-Punch In)'}
               </button>
-              <span className="text-[10px] text-slate-400">Accidentally punched out? Click to resume</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">Accidentally punched out? Click to resume</span>
             </div>
           ) : (
             onClockIn && (
@@ -153,30 +153,30 @@ export const EmployeeHeroCard: React.FC<{
             )
           )}
 
-          <div className="flex items-center gap-5 bg-slate-900/50 border border-slate-800/80 rounded-xl px-4 py-2">
+          <div className="flex items-center gap-5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/80 rounded-xl px-4 py-2">
             <div className="text-right">
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end">
-                <LogIn className="w-3 h-3 text-emerald-400" /> Punch-In
+                <LogIn className="w-3 h-3 text-emerald-500" /> Punch-In
               </p>
-              <p className="text-base font-bold text-slate-100 mt-0.5">{fmtTime(checkInAt)}</p>
+              <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">{fmtTime(checkInAt)}</p>
             </div>
             {isPunchedOutToday && (
               <>
-                <div className="w-[1px] h-7 bg-slate-800" />
+                <div className="w-[1px] h-7 bg-slate-200 dark:bg-slate-800" />
                 <div className="text-right">
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end">
-                    <LogOut className="w-3 h-3 text-rose-400" /> Punch-Out
+                    <LogOut className="w-3 h-3 text-rose-500" /> Punch-Out
                   </p>
-                  <p className="text-base font-bold text-slate-100 mt-0.5">{fmtTime(checkOutAt)}</p>
+                  <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">{fmtTime(checkOutAt)}</p>
                 </div>
               </>
             )}
-            <div className="w-[1px] h-7 bg-slate-800" />
+            <div className="w-[1px] h-7 bg-slate-200 dark:bg-slate-800" />
             <div className="text-right">
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 justify-end">
-                <Clock className="w-3 h-3 text-brand-400" /> {isPunchedOutToday ? 'Worked' : 'Shift Hours'}
+                <Clock className="w-3 h-3 text-brand-500" /> {isPunchedOutToday ? 'Worked' : 'Shift Hours'}
               </p>
-              <p className="text-base font-bold text-slate-100 mt-0.5">{fmtDuration(workingMinutes)}</p>
+              <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">{fmtDuration(workingMinutes)}</p>
             </div>
           </div>
         </div>
@@ -185,23 +185,23 @@ export const EmployeeHeroCard: React.FC<{
       {/* active agent metrics counter block */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${isPunchedIn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${isPunchedIn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
             {isPunchedIn ? 'Live Agent Metrics • Calling Session Active' : 'Agent Daily Metrics Overview'}
           </p>
           {isPunchedIn && (
-            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
               Punched In • On Duty
             </span>
           )}
         </div>
         <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 ${isPunchedIn ? 'p-1 rounded-2xl bg-emerald-500/[0.02] border border-emerald-500/10' : ''}`}>
           {stats.map((s) => (
-            <div key={s.label} className={`bg-slate-950/40 border rounded-xl p-3 transition-all ${isPunchedIn ? 'border-slate-800/80 shadow-sm hover:border-emerald-500/30' : 'border-slate-800/60'}`}>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+            <div key={s.label} className={`bg-slate-50 dark:bg-slate-950/40 border rounded-xl p-3 transition-all ${isPunchedIn ? 'border-slate-200 dark:border-slate-800/80 shadow-xs hover:border-emerald-500/40' : 'border-slate-200 dark:border-slate-800/60'}`}>
+              <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1">
                 <s.icon className={`w-3 h-3 ${s.tone}`} /> {s.label}
               </p>
-              <p className={`text-2xl font-extrabold mt-1 ${loading ? 'text-slate-600 animate-pulse' : s.tone}`}>{s.value}</p>
+              <p className={`text-2xl font-extrabold mt-1 ${loading ? 'text-slate-400 animate-pulse' : s.tone}`}>{s.value}</p>
             </div>
           ))}
         </div>

@@ -40,12 +40,12 @@ export const UsersPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/60 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800/60 pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             User Management
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Manage your organization's team members, roles, status, and pending invitations.
           </p>
         </div>
@@ -54,9 +54,9 @@ export const UsersPage: React.FC = () => {
           {showCreateButton && (
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer"
             >
-              <UserPlus className="w-4 h-4 text-brand-500" />
+              <UserPlus className="w-4 h-4 text-indigo-600 dark:text-brand-400" />
               <span>Create Member</span>
             </button>
           )}
@@ -64,7 +64,7 @@ export const UsersPage: React.FC = () => {
           {showInviteButton && (
             <button
               onClick={() => setIsInviteOpen(true)}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 active:from-brand-700 active:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/20 cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer"
             >
               <Mail className="w-4 h-4" />
               Invite Member
