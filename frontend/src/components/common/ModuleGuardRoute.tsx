@@ -16,11 +16,28 @@ export const ModuleGuardRoute: React.FC<ModuleGuardRouteProps> = ({ moduleKey })
   
   const { loaded: metadataLoaded, crmConfig, error, isLoading, fetchBootstrap } = useMetadataStore();
 
+  const [takingLong, setTakingLong] = React.useState(false);
+
   useEffect(() => {
     if (user && !metadataLoaded && !isLoading) {
       fetchBootstrap().catch(() => {});
     }
   }, [user, metadataLoaded, isLoading, fetchBootstrap]);
+
+  // Safety auto-retry if initial bootstrap stalled
+  useEffect(() => {
+    if (!metadataLoaded) {
+      const timer = setTimeout(() => {
+        setTakingLong(true);
+        if (user) {
+          fetchBootstrap(true).catch(() => {});
+        }
+      }, 4000);
+      return () => clearTimeout(timer);
+    } else {
+      setTakingLong(false);
+    }
+  }, [metadataLoaded, user, fetchBootstrap]);
 
   // 1. Authenticate user
   if (!user) {
@@ -51,6 +68,18 @@ export const ModuleGuardRoute: React.FC<ModuleGuardRouteProps> = ({ moduleKey })
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-[var(--text-secondary)]">
         <Loader2 className="w-8 h-8 animate-spin text-cyan-400 mb-4" />
         <span className="text-sm font-medium tracking-wide">Loading workspace configuration...</span>
+        {takingLong && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <span className="text-xs text-slate-400">Taking a moment to load configuration...</span>
+            <button
+              onClick={() => fetchBootstrap(true)}
+              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Retry Loading</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }

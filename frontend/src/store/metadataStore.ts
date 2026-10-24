@@ -77,7 +77,7 @@ export const useMetadataStore = create<MetadataState>((set, get) => ({
       });
     } catch (err: any) {
       set({
-        error: err.response?.data?.detail || 'Failed to load organization metadata',
+        error: err.response?.data?.detail || err.message || 'Failed to load organization metadata',
         isLoading: false,
       });
     }
