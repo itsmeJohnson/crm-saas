@@ -46,15 +46,23 @@ export const AppLayout: React.FC = () => {
 
   // Sync latest user role & profile from database reactively
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       api.get('/auth/me').then((res) => {
         const freshUser = res.data?.user || (res.data?.role ? res.data : null);
         if (freshUser && freshUser.role) {
           const targetRole = (freshUser.email === 'samarthasankalpa@gmail.com' && freshUser.role === 'SuperAdmin')
             ? 'OrgAdmin'
             : freshUser.role;
-          const merged = { ...user, ...freshUser, role: targetRole };
-          if (merged.role !== user.role || merged.email !== user.email) {
+          const freshIsTL = Boolean(freshUser.is_team_leader);
+          const currentIsTL = Boolean(user.is_team_leader);
+          if (
+            targetRole !== user.role ||
+            freshUser.email !== user.email ||
+            freshIsTL !== currentIsTL ||
+            freshUser.first_name !== user.first_name ||
+            freshUser.last_name !== user.last_name
+          ) {
+            const merged = { ...user, ...freshUser, role: targetRole, is_team_leader: freshIsTL };
             useAuthStore.setState({ user: merged });
             try {
               localStorage.setItem('user', JSON.stringify(merged));
@@ -63,7 +71,7 @@ export const AppLayout: React.FC = () => {
         }
       }).catch(() => {});
     }
-  }, [user]);
+  }, [user?.id, user?.is_team_leader, user?.role]);
 
   // Strategy A (Web Persistence): Accidental Refresh / Navigation Guard
   useEffect(() => {
@@ -352,31 +360,36 @@ export const AppLayout: React.FC = () => {
       SuperAdmin: 'Super Admin',
       OrgAdmin: 'Practice Admin',
       Manager: 'Clinic Manager',
+      TeamLeader: 'Lead Dentist',
       Employee: user?.is_team_leader ? 'Lead Dentist' : 'Attending Dentist',
     },
     real_estate: {
       SuperAdmin: 'Super Admin',
       OrgAdmin: 'Agency Owner',
       Manager: 'Agency Manager',
+      TeamLeader: 'Lead Agent',
       Employee: user?.is_team_leader ? 'Lead Agent' : 'Sales Agent',
     },
     insurance: {
       SuperAdmin: 'Super Admin',
       OrgAdmin: 'Agency Owner',
       Manager: 'Agency Manager',
+      TeamLeader: 'Lead Underwriter',
       Employee: user?.is_team_leader ? 'Lead Underwriter' : 'Insurance Agent',
     },
     telecalling: {
       SuperAdmin: 'Super Admin',
       OrgAdmin: 'Org Admin',
       Manager: 'Floor Manager',
-      Employee: user?.is_team_leader ? 'Team Lead' : 'Telecaller',
+      TeamLeader: 'Team Lead',
+      Employee: user?.is_team_leader ? 'Team Lead' : 'Sales Agent',
     },
     generic: {
       SuperAdmin: 'Super Admin',
       OrgAdmin: 'Org Admin',
       Manager: 'Manager',
-      Employee: user?.is_team_leader ? 'Lead Employee' : 'Staff Member',
+      TeamLeader: 'Team Lead',
+      Employee: user?.is_team_leader ? 'Team Lead' : 'Sales Agent',
     }
   };
 

@@ -44,6 +44,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const initials = `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || 'U';
 
+  const userDisplayRole = user.role === 'Employee'
+    ? (user.is_team_leader ? 'Team Leader' : 'Sales Agent')
+    : user.role === 'TeamLeader'
+      ? 'Team Leader'
+      : user.role === 'OrgAdmin'
+        ? 'Organization Admin'
+        : user.role === 'SuperAdmin'
+          ? 'Super Admin'
+          : user.role;
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUpdatingProfile(true);
@@ -124,7 +134,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <h2 className="text-base font-bold text-[var(--text-primary)] leading-tight flex items-center gap-2">
                 {user.first_name} {user.last_name}
                 <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  {user.role}
+                  {userDisplayRole}
                 </span>
               </h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -271,7 +281,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Assigned Seat / Role
                   </span>
                   <p className="text-sm font-semibold text-[var(--text-primary)] mt-1">
-                    {user.seat_number ? `Seat #${user.seat_number}` : 'Standard Seat'} • {user.role}
+                    {user.seat_number ? `Seat #${user.seat_number}` : 'Standard Seat'} • {userDisplayRole}
                   </p>
                 </div>
               </div>

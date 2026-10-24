@@ -50,10 +50,13 @@ const safeParse = <T>(key: string, fallback: T): T => {
       const u = parsed as any;
       if (u.email === 'samarthasankalpa@gmail.com' && u.role === 'SuperAdmin') {
         u.role = 'OrgAdmin';
-        try {
-          localStorage.setItem('user', JSON.stringify(u));
-        } catch {}
       }
+      if (u.role === 'Employee' && u.email === 'johnsondev02@gmail.com' && u.is_team_leader) {
+        u.is_team_leader = false;
+      }
+      try {
+        localStorage.setItem('user', JSON.stringify(u));
+      } catch {}
     }
     return parsed;
   } catch {
