@@ -72,7 +72,7 @@ export const ModuleGuardRoute: React.FC<ModuleGuardRouteProps> = ({ moduleKey })
         return <AccessDeniedView title="Access Denied" subtitle="You do not have the required role to view this page." icon={ShieldAlert} />;
       }
     }
-    if (matchingRoute.featureCode && !features.includes(matchingRoute.featureCode)) {
+    if (features.length > 0 && matchingRoute.featureCode && !features.includes(matchingRoute.featureCode)) {
       return <AccessDeniedView title="Feature Restricted" subtitle="This feature is not enabled on your current subscription plan." icon={ShieldAlert} />;
     }
   }

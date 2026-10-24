@@ -31,14 +31,41 @@ async def validate_import_rows(
             val = row.get(col_name, "").strip() if col_name else ""
             mapped_values[std_field] = val
 
+        first_name = mapped_values.get("first_name", "")
         last_name = mapped_values.get("last_name", "")
         title = mapped_values.get("title", "")
         email = mapped_values.get("email", "")
         phone = mapped_values.get("phone", "")
+        company_name = mapped_values.get("company_name", "")
         
+        # Smart full name splitting if user mapped a "Name" column to first_name
+        if first_name and not last_name:
+            parts = first_name.strip().split(maxsplit=1)
+            if len(parts) == 2:
+                first_name, last_name = parts[0], parts[1]
+                mapped_values["first_name"] = first_name
+                mapped_values["last_name"] = last_name
+            else:
+                last_name = first_name
+                mapped_values["last_name"] = last_name
+
+        # Fallback if both name fields are empty but company/phone exists
+        if not last_name and not first_name:
+            if company_name or phone or email:
+                first_name = "Lead"
+                last_name = company_name or (phone[-4:] if phone else "Prospect")
+                mapped_values["first_name"] = first_name
+                mapped_values["last_name"] = last_name
+
+        # Generate friendly Lead Title if title column is absent
+        if not title:
+            name_combined = f"{first_name} {last_name}".strip()
+            title = f"Lead - {name_combined}" if name_combined else (company_name or phone or "Telecalling Lead")
+            mapped_values["title"] = title
+
         # Check Required Columns
         if not last_name:
-            row_errors.append("Last Name is a required field and is missing")
+            row_errors.append("Name or Last Name is a required field and is missing")
         if not title:
             row_errors.append("Job Title/Lead Title is a required field and is missing")
             

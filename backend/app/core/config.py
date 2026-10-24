@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     # Redis
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
+    TELEPHONY_ENCRYPTION_KEY: str = "YqUFhZmtAsiakLSb4rG4VTC5qW4UhTW92BzC1B4VGsk="
     REDIS_URL: str | None = None
 
     @field_validator("REDIS_URL", mode="before")

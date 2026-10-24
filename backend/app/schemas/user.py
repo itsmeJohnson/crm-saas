@@ -20,6 +20,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     first_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, max_length=100)
+    phone: str | None = Field(None, max_length=50)
     is_active: bool | None = None
     role: str | None = Field(None, pattern="^(OrgAdmin|Manager|TeamLeader|Employee)$")
     reporting_to_id: uuid.UUID | None = None

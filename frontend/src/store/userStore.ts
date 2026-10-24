@@ -110,7 +110,13 @@ export const useUserStore = create<UserState>((set, get) => ({
       // Refresh list of users
       await get().fetchUsers();
     } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || 'Failed to create user';
+      const detail = err.response?.data?.detail;
+      let errorMsg = 'Failed to create user';
+      if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errorMsg = detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+      }
       set({ error: errorMsg, isLoading: false });
       throw new Error(errorMsg);
     }

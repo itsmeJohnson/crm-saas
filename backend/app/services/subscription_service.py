@@ -186,7 +186,7 @@ class SubscriptionService:
                     detail=f"No available seats. Your subscription has a limit of {limit} Licensed Seats. Please purchase additional seats or replace an existing inactive employee."
                 )
 
-        if role not in ["OrgAdmin", "Manager", "Employee"]:
+        if role not in ["OrgAdmin", "Manager", "TeamLeader", "Employee"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid user role: {role}"

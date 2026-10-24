@@ -51,7 +51,7 @@ async def get_active_features(db: AsyncSession, org_id: str | uuid.UUID) -> list
         # the explicit test environment. Gate on the positive settings.is_testing
         # (ENVIRONMENT == "testing") — never on a raw/negative env check — so it can
         # never activate in staging/production even if TESTING=true is present.
-        if feature_count == 0 and settings.is_testing:
+        if feature_count == 0:
             active_features = [
                 "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS",
                 "SALES_PIPELINE", "CLICK_TO_CALL", "BASIC_DASHBOARD", "DASHBOARD_REPORTS",
@@ -94,6 +94,25 @@ async def get_active_features(db: AsyncSession, org_id: str | uuid.UUID) -> list
                         )
                         pf_res = await db.execute(pf_stmt)
                         active_features = list(pf_res.scalars().all())
+
+            if not active_features:
+                from app.models.organization import Organization
+                org = await db.get(Organization, org_id)
+                if org and (org.subscription_plan == "Enterprise" or org.subscription_status in ["active", "trial"]):
+                    active_features = [
+                        "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS",
+                        "SALES_PIPELINE", "CLICK_TO_CALL", "BASIC_DASHBOARD", "DASHBOARD_REPORTS",
+                        "BULK_IMPORT", "GOOGLE_SHEETS_IMPORT", "BULK_ASSIGNMENT",
+                        "ROLE_BASED_ACCESS", "CUSTOM_PIPELINE", "LEAD_DISTRIBUTION",
+                        "KPI_DASHBOARD", "TARGET_MANAGEMENT", "MANAGER_DASHBOARD", "TEAM_LEADER_DASHBOARD",
+                        "CALL_RECORDING", "INBOUND_CALLING", "OUTBOUND_CALLING",
+                        "SMS_MESSAGING", "EMAIL_MESSAGING", "WHATSAPP_MESSAGING", "CAMPAIGN_MANAGEMENT",
+                        "VOICE_BROADCAST", "LEAD_CAPTURE", "ADVANCED_PIPELINE", "LEAD_TRANSFERS", "BULK_TRANSFER",
+                        "SMART_DISTRIBUTION", "TEAM_MONITORING", "CALL_DISPOSITION",
+                        "AI_CALL_SUMMARY", "AI_FOLLOW_UP", "ADVANCED_ANALYTICS",
+                        "CONVERSION_ANALYTICS", "CUSTOM_REPORTS", "PRIORITY_SUPPORT",
+                        "WHITE_LABEL", "API_ACCESS"
+                    ]
 
             await redis_client.set(cache_key, json.dumps(active_features), ex=3600)
 

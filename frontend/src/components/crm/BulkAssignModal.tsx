@@ -53,7 +53,7 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
       };
 
       const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
-      if (user && (user.role === 'SuperAdmin' || user.role === 'OrgAdmin' || user.role === 'Manager' || isTL)) {
+      if (user && (user.role === 'SuperAdmin' || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'TeamLeader' || isTL)) {
         fetchEmployees();
       }
     }

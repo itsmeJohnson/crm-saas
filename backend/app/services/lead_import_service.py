@@ -27,15 +27,15 @@ from app.services.import_.validation_engine import validate_import_rows
 
 # Define mappings and aliases for auto-matching
 MAPPING_ALIASES = {
-    "first_name": ["first name", "given name", "fname", "first"],
+    "first_name": ["first name", "given name", "fname", "first", "name", "full name", "lead name", "customer name", "contact name", "client name", "prospect name"],
     "last_name": ["last name", "surname", "lname", "last"],
-    "email": ["email", "email address", "mail", "email_address"],
-    "phone": ["phone", "telephone", "phone number", "mobile", "phone_number"],
-    "company_name": ["company", "organization", "org", "company name", "company_name"],
-    "title": ["title", "job title", "position", "role", "job_title"],
-    "value": ["value", "deal value", "deal_value", "opportunity value", "amount", "price", "deal amount", "deal_amount"],
-    "source": ["source", "lead source", "lead_source", "channel"],
-    "city": ["city", "town", "location", "municipality"]
+    "email": ["email", "email address", "mail", "email_address", "e-mail", "contact email"],
+    "phone": ["phone", "telephone", "phone number", "mobile", "phone_number", "contact number", "cell", "cell phone", "mobile number", "whatsapp number"],
+    "company_name": ["company", "organization", "org", "company name", "company_name", "business", "business name", "firm", "agency"],
+    "title": ["title", "job title", "position", "role", "job_title", "lead title", "requirement", "product", "service", "inquiry"],
+    "value": ["value", "deal value", "deal_value", "opportunity value", "amount", "price", "deal amount", "deal_amount", "budget"],
+    "source": ["source", "lead source", "lead_source", "channel", "campaign", "medium"],
+    "city": ["city", "town", "location", "municipality", "state", "address"]
 }
 
 def calculate_mapping_confidence(header: str, field_name: str) -> float:
@@ -393,6 +393,8 @@ class LeadImportService:
         from app.services.user_service import UserService
         from sqlalchemy import select
         user_service = UserService(self.db)
+        assignable_ids = await user_service.get_assignable_user_ids(actor)
+
         if assignment_mode == "SPECIFIC_USER":
             if not assigned_user_id:
                 raise HTTPException(
@@ -400,19 +402,17 @@ class LeadImportService:
                     detail="Assigned user ID is required when assignment mode is SPECIFIC_USER"
                 )
             target_user = await self.user_repo.get_user_by_id(actor.organization_id, assigned_user_id)
-            if not target_user or not target_user.is_active or target_user.role != "Employee":
+            if not target_user or not target_user.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid assignee. User must be an active employee in your organization."
+                    detail="Invalid assignee. User must be an active team member in your organization."
                 )
-            # Verify if downline of actor
-            if actor.role not in ["SuperAdmin", "OrgAdmin"]:
-                downline_ids = await user_service.get_downline_user_ids(actor)
-                if target_user.id not in downline_ids:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"User {target_user.id} is not in your downline reporting chain"
-                    )
+            # Verify if within assignable scope of actor
+            if target_user.id not in assignable_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"User {target_user.id} is not within your assignable team members"
+                )
 
         target_users = []
         if assignment_mode == "MULTIPLE_USERS":
@@ -421,17 +421,15 @@ class LeadImportService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Assigned user IDs are required when assignment mode is MULTIPLE_USERS"
                 )
-            # Verify all assignee_ids are downlines of actor
-            if actor.role not in ["SuperAdmin", "OrgAdmin"]:
-                downline_ids = await user_service.get_downline_user_ids(actor)
-                for uid in assigned_user_ids:
-                    if uid not in downline_ids:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail=f"User {uid} is not in your downline reporting chain"
-                        )
+            # Verify all assignee_ids are within assignable scope of actor
+            for uid in assigned_user_ids:
+                if uid not in assignable_ids:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"User {uid} is not within your assignable team members"
+                    )
             
-            # Fetch active employees
+            # Fetch active assignable users
             users_query = select(User).filter(
                 User.id.in_(assigned_user_ids),
                 User.is_deleted == False,

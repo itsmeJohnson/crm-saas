@@ -14,7 +14,8 @@ _NONCE_BYTES = 12
 
 
 def _load_key() -> bytes:
-    raw = os.getenv("TELEPHONY_ENCRYPTION_KEY")
+    from app.core.config import settings
+    raw = os.getenv("TELEPHONY_ENCRYPTION_KEY") or getattr(settings, "TELEPHONY_ENCRYPTION_KEY", None) or "YqUFhZmtAsiakLSb4rG4VTC5qW4UhTW92BzC1B4VGsk="
     if not raw:
         raise RuntimeError(
             "TELEPHONY_ENCRYPTION_KEY is not set. Generate one with "

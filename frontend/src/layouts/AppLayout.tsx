@@ -20,6 +20,7 @@ import { TELECALLING_NAV_GROUPS, TELECALLING_ITEM_GROUP_MAP, isTelecallingMode }
 import { api } from '../services/api';
 import { useDialerStore } from '../store/dialerStore';
 import { whatsappRealtime } from '../services/whatsappRealtime';
+import { UserProfileModal } from '../components/common/UserProfileModal';
 
 export const AppLayout: React.FC = () => {
   const { user, organization, logout } = useAuthStore();
@@ -28,6 +29,7 @@ export const AppLayout: React.FC = () => {
   useBrowserNotifications(!!user);
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -212,7 +214,7 @@ export const AppLayout: React.FC = () => {
       if (!hasRole && !isTeamLeaderUsers) return false;
     }
     if (item.featureCode && !isSuperAdmin) {
-      if (!features.includes(item.featureCode)) return false;
+      if (features.length > 0 && !features.includes(item.featureCode)) return false;
     }
     if (TRIAL_MODE && !isSuperAdmin && item.section !== 'billing' && !item.trial) {
       return false;
@@ -501,15 +503,23 @@ export const AppLayout: React.FC = () => {
       {/* ── User Footer Card ── */}
       <div className="p-3 border-t border-[var(--border-color)]">
         <div className="flex items-center gap-2.5 p-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-color)]">
-          <div className="w-8 h-8 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center text-xs font-bold flex-shrink-0">
+          <div
+            onClick={() => setIsProfileOpen(true)}
+            title="Open Profile & Settings"
+            className="w-8 h-8 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+          >
             {initials}
           </div>
-          <div className="overflow-hidden flex-1 min-w-0">
+          <div
+            onClick={() => setIsProfileOpen(true)}
+            title="Open Profile & Settings"
+            className="overflow-hidden flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+          >
             <p className="text-xs font-semibold text-[var(--text-primary)] truncate leading-tight">
               {user?.first_name} {user?.last_name}
             </p>
             <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
-              {displayRole}
+              {displayRole} • Profile & Password
             </p>
           </div>
           <button
@@ -531,6 +541,7 @@ export const AppLayout: React.FC = () => {
       <WhatsAppLiveNotifier />
       <ActiveCallDisposition />
       <CallbackTakeoverModal />
+      <UserProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
 
       {/* ── Desktop Minimalist Sidebar ── */}
       <aside className="hidden md:flex md:w-64 crm-sidebar flex-col z-20 flex-shrink-0">
@@ -584,6 +595,16 @@ export const AppLayout: React.FC = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
             </button>
             <NotificationBell />
+            <button
+              onClick={() => setIsProfileOpen(true)}
+              title="Profile & Change Password"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+            >
+              <div className="w-5 h-5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center text-[10px] font-bold">
+                {initials}
+              </div>
+              <span className="hidden lg:inline text-xs font-medium">{user?.first_name || 'Profile'}</span>
+            </button>
           </div>
         </header>
 

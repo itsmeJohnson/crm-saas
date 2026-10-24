@@ -193,12 +193,18 @@ class UserService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Managers can only create Team Leaders and Sales Agents / Employees"
                 )
+            if not reporting_to_id:
+                reporting_to_id = actor.id
+                user_data["reporting_to_id"] = actor.id
         elif actor.role in ("SuperAdmin", "OrgAdmin"):
             if role not in ("OrgAdmin", "Manager", "TeamLeader", "Employee"):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Invalid role level"
                 )
+            if not reporting_to_id and role != "OrgAdmin":
+                reporting_to_id = actor.id
+                user_data["reporting_to_id"] = actor.id
         
         PermissionService.check_user_management_permission(
             actor, role, reporting_to_id, is_tl

@@ -88,7 +88,7 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
         setValue('reporting_to_id', currentUser.id);
       } else {
         setValue('role', 'Employee');
-        setValue('reporting_to_id', '');
+        setValue('reporting_to_id', currentUser.id);
       }
     }
   }, [isOpen, currentUser, isTeamLeader, isManager, setValue]);
@@ -149,15 +149,14 @@ export const CreateMemberModal: React.FC<CreateMemberModalProps> = ({ isOpen, on
       return reportingUsers.filter((u) => u.role === 'Manager' || u.role === 'OrgAdmin' || u.role === 'SuperAdmin');
     }
     if (selectedRole === 'Employee') {
-      // Employees report to Team Leaders or Managers
-      const leaders = reportingUsers.filter(
-        (u) => u.role === 'TeamLeader' || (u.role === 'Employee' && u.is_team_leader) || u.role === 'Manager'
+      // Employees can report to Team Leaders, Managers, or Organization Administrators
+      const eligible = reportingUsers.filter(
+        (u) => u.role === 'TeamLeader' || (u.role === 'Employee' && u.is_team_leader) || u.role === 'Manager' || u.role === 'OrgAdmin' || u.role === 'SuperAdmin'
       );
-      if (leaders.length > 0) {
-        return leaders;
+      if (currentUser && !eligible.some(u => u.id === currentUser.id)) {
+        eligible.unshift(currentUser as UserResponse);
       }
-      // If agency only has OrgAdmin appointed so far, allow selecting OrgAdmin
-      return reportingUsers.filter((u) => u.role === 'OrgAdmin' || u.role === 'SuperAdmin');
+      return eligible;
     }
     return [];
   };

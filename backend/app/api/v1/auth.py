@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.schemas.auth import (
     RegisterTenantRequest, LoginRequest, Token, RefreshTokenRequest,
     AuthMeResponse, ForgotPasswordRequest, ResetPasswordRequest,
+    ChangePasswordRequest,
     MFAVerifyRequest, MFASetupResponse, MFAEnableResponse, MFAStatusResponse
 )
 from app.schemas.trial_request import TrialRequestCreate
@@ -333,6 +334,19 @@ async def me(
             pf_res = await db.execute(pf_stmt)
             feature_codes = list(pf_res.scalars().all())
 
+    # Fallback to standard enterprise features if subscriptions/features table is unseeded or empty
+    if not feature_codes:
+        feature_codes = [
+            "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS", "SALES_PIPELINE", "CLICK_TO_CALL",
+            "BASIC_DASHBOARD", "DASHBOARD_REPORTS", "BULK_IMPORT", "GOOGLE_SHEETS_IMPORT", "BULK_ASSIGNMENT",
+            "ROLE_BASED_ACCESS", "CUSTOM_PIPELINE", "LEAD_DISTRIBUTION", "KPI_DASHBOARD", "TARGET_MANAGEMENT",
+            "MANAGER_DASHBOARD", "TEAM_LEADER_DASHBOARD", "CALL_RECORDING", "INBOUND_CALLING", "OUTBOUND_CALLING",
+            "SMS_MESSAGING", "EMAIL_MESSAGING", "WHATSAPP_MESSAGING", "CAMPAIGN_MANAGEMENT", "VOICE_BROADCAST",
+            "LEAD_CAPTURE", "ADVANCED_PIPELINE", "LEAD_TRANSFERS", "BULK_TRANSFER", "SMART_DISTRIBUTION",
+            "TEAM_MONITORING", "CALL_DISPOSITION", "AI_CALL_SUMMARY", "AI_FOLLOW_UP", "ADVANCED_ANALYTICS",
+            "CONVERSION_ANALYTICS", "CUSTOM_REPORTS", "PRIORITY_SUPPORT", "WHITE_LABEL", "API_ACCESS"
+        ]
+
     return AuthMeResponse(
         user=UserResponse.model_validate(current_user),
         organization=OrganizationResponse.model_validate(org),
@@ -346,8 +360,11 @@ async def forgot_password(
 ):
     from app.core.config import settings
 
-    # Always return the same response body to prevent email enumeration.
-    GENERIC_RESPONSE = {"detail": "If your email is registered, you will receive a password reset link shortly."}
+    # Always return consistent response body to prevent email enumeration.
+    GENERIC_RESPONSE = {
+        "detail": "If your email is registered, a 6-digit OTP verification code has been sent to your email address.",
+        "email": payload.email
+    }
 
     query = select(User).where(
         User.email == payload.email,
@@ -572,20 +589,25 @@ async def reset_password(
     from app.core.security import hash_token, get_password_hash
     from app.services.audit_service import AuditService
 
-    hashed_token = hash_token(payload.token)
+    hashed_token = hash_token(payload.token.strip())
     now = datetime.now(timezone.utc)
-    query = select(User).where(
+    
+    conditions = [
         User.reset_token == hashed_token,
         User.reset_token_expires > now,
         User.is_deleted == False
-    )
+    ]
+    if payload.email:
+        conditions.append(User.email == payload.email)
+
+    query = select(User).where(*conditions)
     res = await db.execute(query)
     user = res.scalar_one_or_none()
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired password reset token"
+            detail="Invalid or expired OTP verification code. Please request a new OTP."
         )
 
     user.hashed_password = get_password_hash(payload.password)
@@ -599,7 +621,43 @@ async def reset_password(
         actor_id=user.id,
         organization_id=user.organization_id,
         event_type="AUTH_PASSWORD_RESET",
-        description="Password reset completed — all existing sessions invalidated",
+        description="Password reset completed via OTP — all existing sessions invalidated",
     )
-    return {"detail": "Password has been reset successfully"}
+    return {"detail": "Password has been reset successfully. Please log in with your new password."}
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Change account password for authenticated users from console profile."""
+    from app.core.security import verify_password, get_password_hash
+    from app.services.audit_service import AuditService
+
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect. Please verify and try again."
+        )
+
+    if verify_password(payload.new_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be identical to your current password."
+        )
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    current_user.token_version = (current_user.token_version or 1) + 1
+    await db.commit()
+
+    await AuditService(db).log_event(
+        actor_id=current_user.id,
+        organization_id=current_user.organization_id,
+        event_type="AUTH_PASSWORD_CHANGED",
+        description="User updated account password from profile console",
+    )
+    return {"detail": "Password changed successfully."}
+
 

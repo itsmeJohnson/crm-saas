@@ -45,8 +45,13 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 class ResetPasswordRequest(BaseModel):
-    token: str = Field(..., description="The password reset token")
+    token: str = Field(..., description="The password reset 6-digit OTP or token")
     password: str = Field(..., min_length=8, description="The new password")
+    email: EmailStr | None = Field(None, description="Optional email to verify matching OTP")
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, description="Current account password")
+    new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")
 
 # ---------- MFA Schemas ----------
 

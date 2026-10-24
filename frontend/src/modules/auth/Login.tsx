@@ -51,6 +51,18 @@ export const Login: React.FC = () => {
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (resendCooldown > 0) {
+      timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   // Forms
   const {
@@ -158,18 +170,37 @@ export const Login: React.FC = () => {
     setError(null);
     setDemoToken(null);
     try {
+      setForgotEmail(data.email);
       const res = await api.post('/auth/forgot-password', data);
-      setDemoToken(res.data.token);
-      setSuccess(res.data.detail || 'Password reset link sent successfully! Please check your email.');
+      setDemoToken(res.data.token || null);
+      setResendCooldown(30);
+      setSuccess(res.data.detail || '6-digit OTP verification code sent! Please check your email.');
       setTimeout(() => {
         setStep('reset');
         setSuccess(null);
         if (res.data.token) {
           resetFormReset({ token: res.data.token, password: '', confirmPassword: '' });
         }
-      }, 900);
+      }, 700);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to request password reset code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onResendOTP = async () => {
+    if (!forgotEmail || resendCooldown > 0) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await api.post('/auth/forgot-password', { email: forgotEmail });
+      setDemoToken(res.data.token || null);
+      setResendCooldown(30);
+      setSuccess('A new 6-digit OTP verification code has been sent to your email.');
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to resend OTP.');
     } finally {
       setIsLoading(false);
     }
@@ -179,14 +210,18 @@ export const Login: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await api.post('/auth/reset-password', data);
+      await api.post('/auth/reset-password', {
+        token: data.token.trim(),
+        password: data.password,
+        email: forgotEmail || undefined
+      });
       setSuccess('Your password has been reset successfully! Redirecting to login...');
       setDemoToken(null);
       resetFormReset();
       setTimeout(() => {
         setStep('login');
         setSuccess(null);
-      }, 900);
+      }, 1200);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to reset password. Please verify the code.');
     } finally {
@@ -383,8 +418,8 @@ export const Login: React.FC = () => {
           </div>
 
           <div>
-            <h3 className="text-lg font-bold text-slate-100 mb-1">Reset Password</h3>
-            <p className="text-xs text-slate-400 mb-4">Enter your email and we'll generate a reset code for you.</p>
+            <h3 className="text-lg font-bold text-slate-100 mb-1">Reset Password via Email OTP</h3>
+            <p className="text-xs text-slate-400 mb-4">Enter your registered email address. We will send a secure 6-digit verification code (OTP) to your inbox.</p>
           </div>
 
           <div>
@@ -396,6 +431,7 @@ export const Login: React.FC = () => {
                 {...forgotRegister('email')}
                 className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input ${forgotErrors.email ? 'border-red-500/50' : ''}`}
                 placeholder="user@example.com"
+                autoFocus
               />
             </div>
             {forgotErrors.email && <p className="mt-1.5 text-xs text-red-400">{forgotErrors.email.message}</p>}
@@ -409,61 +445,83 @@ export const Login: React.FC = () => {
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Generating Code...
+                Sending OTP...
               </>
             ) : (
-              'Send Reset Code'
+              'Send 6-Digit OTP'
             )}
           </button>
         </form>
       )}
 
-      {/* STEP 3: RESET PASSWORD */}
+      {/* STEP 3: RESET PASSWORD VIA OTP */}
       {step === 'reset' && (
         <form onSubmit={handleResetSubmit(onResetSubmit)} className="space-y-5">
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setSuccess(null);
-                setStep('forgot');
-              }}
-              className="p-1 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="w-4.5 h-4.5" />
-            </button>
-            <span className="text-sm font-semibold text-slate-300">Back</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setSuccess(null);
+                  setStep('forgot');
+                }}
+                className="p-1 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4.5 h-4.5" />
+              </button>
+              <span className="text-sm font-semibold text-slate-300">Change Email</span>
+            </div>
+            {forgotEmail && (
+              <span className="text-xs text-brand-400 font-mono font-medium truncate max-w-[180px]">
+                {forgotEmail}
+              </span>
+            )}
           </div>
 
           <div>
-            <h3 className="text-lg font-bold text-slate-100 mb-1">Set New Password</h3>
-            <p className="text-xs text-slate-400 mb-4">Specify and confirm your new password below.</p>
+            <h3 className="text-lg font-bold text-slate-100 mb-1">Verify OTP & Set New Password</h3>
+            <p className="text-xs text-slate-400 mb-2">
+              Enter the 6-digit OTP code sent to your email, followed by your new password.
+            </p>
           </div>
 
           {demoToken && (
             <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs rounded-xl space-y-1">
               <p className="font-semibold flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                Demo Reset Code (SMTP Disabled):
+                Demo 6-Digit OTP (SMTP Disabled in Dev):
               </p>
-              <p className="font-mono text-sm tracking-wider select-all bg-slate-950/40 p-2 rounded border border-slate-800 text-center font-bold text-slate-200 mt-1.5">
+              <p className="font-mono text-base tracking-[0.3em] select-all bg-slate-950/40 p-2 rounded border border-slate-800 text-center font-bold text-amber-200 mt-1.5">
                 {demoToken}
               </p>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Verification Code / Reset Token
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                6-Digit Email OTP
+              </label>
+              <button
+                type="button"
+                onClick={onResendOTP}
+                disabled={resendCooldown > 0 || isLoading}
+                className="text-xs text-brand-400 hover:text-brand-300 disabled:opacity-50 transition-colors font-medium cursor-pointer"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+              </button>
+            </div>
             <div className="relative">
               <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
+                inputMode="numeric"
+                maxLength={6}
                 {...resetRegister('token')}
-                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input font-mono tracking-wider ${resetErrors.token ? 'border-red-500/50' : ''}`}
-                placeholder="Enter 6-digit OTP or reset token"
+                className={`w-full !pl-10 pr-4 py-3 rounded-xl glass-input font-mono tracking-[0.4em] text-center text-lg ${resetErrors.token ? 'border-red-500/50' : ''}`}
+                placeholder="000000"
+                autoFocus
               />
             </div>
             {resetErrors.token && <p className="mt-1.5 text-xs text-red-400">{resetErrors.token.message}</p>}
@@ -471,23 +529,41 @@ export const Login: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">New Password</label>
-            <input
-              type="password"
-              {...resetRegister('password')}
-              className={`w-full px-4 py-3 rounded-xl glass-input ${resetErrors.password ? 'border-red-500/50' : ''}`}
-              placeholder="•••••••• (Min 8 chars)"
-            />
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                {...resetRegister('password')}
+                className={`w-full px-4 py-3 pr-10 rounded-xl glass-input ${resetErrors.password ? 'border-red-500/50' : ''}`}
+                placeholder="•••••••• (Min 8 chars)"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {resetErrors.password && <p className="mt-1.5 text-xs text-red-400">{resetErrors.password.message}</p>}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Confirm New Password</label>
-            <input
-              type="password"
-              {...resetRegister('confirmPassword')}
-              className={`w-full px-4 py-3 rounded-xl glass-input ${resetErrors.confirmPassword ? 'border-red-500/50' : ''}`}
-              placeholder="•••••••• (Min 8 chars)"
-            />
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                {...resetRegister('confirmPassword')}
+                className={`w-full px-4 py-3 pr-10 rounded-xl glass-input ${resetErrors.confirmPassword ? 'border-red-500/50' : ''}`}
+                placeholder="•••••••• (Min 8 chars)"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {resetErrors.confirmPassword && <p className="mt-1.5 text-xs text-red-400">{resetErrors.confirmPassword.message}</p>}
           </div>
 
@@ -502,7 +578,7 @@ export const Login: React.FC = () => {
                 Resetting Password...
               </>
             ) : (
-              'Reset Password'
+              'Verify OTP & Reset Password'
             )}
           </button>
         </form>

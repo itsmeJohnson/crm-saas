@@ -444,8 +444,8 @@ class WhatsAppService:
         
         is_internal = data.get("is_internal", False)
         
-        # Check 24-hour customer window for free-form customer messages
-        if not is_internal and not self._window_open(conv):
+        # Check 24-hour customer window for free-form customer messages (exempt mock provider)
+        if not is_internal and s.provider != "mock" and not self._window_open(conv):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="The 24-hour customer window is closed. Send a template message to re-open the thread."
@@ -576,6 +576,7 @@ class WhatsAppService:
         await self.db.flush()
         await self._sync_activity(msg, conv, actor.id)
         
+        conv.window_expires_at = now_time + timedelta(hours=24)
         conv.last_outbound_at = now_time
         conv.last_message_at = now_time
         self.db.add(conv)

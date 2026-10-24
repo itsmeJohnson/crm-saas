@@ -122,30 +122,43 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   };
 
   const stagePill = (lead: LeadResponse) => {
-    const name = lead.stage?.name || lead.status;
-    const color = lead.stage?.color || (name === 'Converted' ? '#10B981' : name === 'Lost' ? '#EF4444' : '#6366F1');
+    const rawName = (lead.stage?.name || lead.status || 'New').trim();
+    const lower = rawName.toLowerCase();
+    let style = 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30'; // Fresh Leads / New default
+
+    if (lower.includes('contact')) {
+      style = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30';
+    } else if (lower.includes('interest') || lower.includes('qualif') || lower.includes('nurtur')) {
+      style = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30';
+    } else if (lower.includes('meet') || lower.includes('demo') || lower.includes('proposal')) {
+      style = 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30';
+    } else if (lower.includes('won') || lower.includes('convert')) {
+      style = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30';
+    } else if (lower.includes('lost') || lower.includes('disqualif')) {
+      style = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30';
+    }
+
     return (
       <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800/80 text-slate-200 border border-slate-700/80 shadow-2xs"
-        title={name}
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-2xs ${style}`}
+        title={rawName}
       >
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        {name}
+        {rawName}
       </span>
     );
   };
 
-  const priorityPill = (priority: string) => {
-    const isUrgent = priority === 'Urgent';
-    const isHigh = priority === 'High';
+  const priorityPill = (priority?: string) => {
+    const p = priority || 'Medium';
+    let pillStyle = 'bg-subtle text-muted border border-default'; // Low default
+    if (p === 'High' || p === 'Urgent') {
+      pillStyle = 'bg-status-danger-bg text-status-danger-fg border border-status-danger-fg/20';
+    } else if (p === 'Medium') {
+      pillStyle = 'bg-status-warning-bg text-status-warning-fg border border-status-warning-fg/20';
+    }
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-        <span
-          className={`w-2 h-2 rounded-full ${
-            isUrgent ? 'bg-rose-500' : isHigh ? 'bg-amber-500' : priority === 'Low' ? 'bg-slate-400' : 'bg-blue-500'
-          }`}
-        />
-        <span className="text-slate-700 dark:text-slate-300">{priority || 'Medium'}</span>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${pillStyle}`}>
+        {p}
       </span>
     );
   };
@@ -154,16 +167,16 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     const o = ownerFor(lead);
     return (
       <div className="flex items-center gap-2 min-w-0">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${o ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-brand-500/15 dark:text-brand-300 dark:border-brand-500/25' : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'}`}>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${o ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-brand-500/15 dark:text-brand-300 dark:border-brand-500/25' : 'bg-subtle text-muted border border-default'}`}>
           {o ? initialsOf(o.first_name, o.last_name, 'U') : '—'}
         </div>
-        <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{ownerName(lead)}</span>
+        <span className="text-xs text-body truncate">{ownerName(lead)}</span>
       </div>
     );
   };
 
   const renderSortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />;
+    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3 text-muted opacity-60" />;
     return sortOrder === 'asc' ? (
       <ChevronUp className="w-3 h-3 text-indigo-600 dark:text-brand-400" />
     ) : (
@@ -173,9 +186,9 @@ export const LeadTable: React.FC<LeadTableProps> = ({
 
   if (isLoading && leads.length === 0) {
     return (
-      <div className="p-16 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 shadow-xs">
+      <div className="p-16 rounded-xl border border-default bg-card flex flex-col items-center justify-center text-muted shadow-xs">
         <Loader2 className="w-8 h-8 text-indigo-600 dark:text-brand-500 animate-spin mb-4" />
-        <p className="text-sm font-medium">Loading leads…</p>
+        <p className="text-sm font-medium text-strong">Loading leads…</p>
       </div>
     );
   }
@@ -192,14 +205,23 @@ export const LeadTable: React.FC<LeadTableProps> = ({
 
   if (leads.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 py-16 px-6 flex flex-col items-center justify-center text-center shadow-xs">
-        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-3">
+      <div className="rounded-xl border border-default bg-card py-16 px-6 flex flex-col items-center justify-center text-center shadow-xs">
+        <div className="w-12 h-12 rounded-xl bg-subtle border border-default text-muted flex items-center justify-center mb-3">
           <Inbox className="w-6 h-6" />
         </div>
-        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No leads found</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-          Try clearing your filters or create a new lead opportunity to start your pipeline.
+        <p className="text-sm font-bold text-strong">No leads found in pipeline</p>
+        <p className="text-xs text-muted mt-1 max-w-sm">
+          Try clearing your search filters or import leads to start your pipeline.
         </p>
+        <button
+          onClick={() => {
+            const importBtn = document.querySelector<HTMLButtonElement>('[title*="Import"]');
+            if (importBtn) importBtn.click();
+          }}
+          className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs"
+        >
+          Import leads
+        </button>
       </div>
     );
   }
@@ -210,25 +232,25 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     onSelectLeads(checked ? [...selectedLeadIds, id] : selectedLeadIds.filter((x) => x !== id));
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+    <div className="bg-card rounded-xl border border-default overflow-hidden shadow-xs">
       {/* Desktop / Tablet Table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[850px]">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
+            <tr className="border-b border-default bg-table-header">
               {!hideCheckboxes && (
                 <th className="w-10 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={allSelected}
                     onChange={(e) => toggleAll(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-slate-700 text-brand-500 bg-slate-950 focus:ring-brand-500/25 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-default text-indigo-600 bg-card focus:ring-indigo-500/25 cursor-pointer"
                   />
                 </th>
               )}
               <th
                 onClick={() => handleSort('title')}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
+                className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted cursor-pointer hover:text-strong select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Lead</span>
@@ -237,7 +259,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('stage')}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
+                className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted cursor-pointer hover:text-strong select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Stage</span>
@@ -246,7 +268,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('value')}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 text-right cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
+                className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted text-right cursor-pointer hover:text-strong select-none"
               >
                 <div className="flex items-center justify-end gap-1.5">
                   <span>Value</span>
@@ -255,7 +277,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('priority')}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
+                className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted cursor-pointer hover:text-strong select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Priority</span>
@@ -264,7 +286,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('owner')}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
+                className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted cursor-pointer hover:text-strong select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Owner</span>
@@ -273,53 +295,56 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('created_at')}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 select-none"
+                className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted cursor-pointer hover:text-strong select-none"
               >
                 <div className="flex items-center gap-1.5">
                   <span>Created</span>
                   {renderSortIcon('created_at')}
                 </div>
               </th>
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 text-right">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted text-right">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+          <tbody className="divide-y border-default bg-card">
             {sortedLeads.map((lead) => {
               const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
+              const isSelected = selectedLeadIds.includes(lead.id);
               return (
                 <tr
                   key={lead.id}
                   onClick={() => onRowClick(lead)}
-                  className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                  className={`transition-colors cursor-pointer group ${
+                    isSelected ? 'bg-selected' : 'bg-card hover:bg-hover'
+                  }`}
                 >
                   {!hideCheckboxes && (
                     <td className="w-10 px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        checked={selectedLeadIds.includes(lead.id)}
+                        checked={isSelected}
                         onChange={(e) => toggleOne(lead.id, e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500/25 cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border-default text-indigo-600 bg-card focus:ring-indigo-500/25 cursor-pointer"
                       />
                     </td>
                   )}
 
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-600 dark:text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                      <div className="w-8 h-8 rounded-lg bg-subtle border border-default text-strong flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                         {initialsOf(lead.title?.[0], lead.title?.[1], 'LD')}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
+                        <p className="text-sm font-semibold text-strong group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
                           {lead.title}
                         </p>
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          {contactFullName && <span className="text-slate-700 dark:text-slate-300 font-medium truncate">{contactFullName}</span>}
-                          {contactFullName && lead.company_name && <span className="text-slate-300 dark:text-slate-600">•</span>}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted mt-0.5">
+                          {contactFullName && <span className="text-body font-medium truncate">{contactFullName}</span>}
+                          {contactFullName && lead.company_name && <span className="text-muted">•</span>}
                           {lead.company_name && (
-                            <span className="inline-flex items-center gap-1 truncate text-slate-500 dark:text-slate-400">
-                              <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="inline-flex items-center gap-1 truncate text-muted">
+                              <Building2 className="w-3 h-3 text-muted shrink-0" />
                               {lead.company_name}
                             </span>
                           )}
@@ -345,7 +370,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   <td className="px-4 py-3 align-middle">{stagePill(lead)}</td>
 
                   <td className="px-4 py-3 align-middle text-right font-mono">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-200">
+                    <span className="text-xs font-bold text-strong">
                       {lead.value !== null ? formatMoney(lead.value) : '—'}
                     </span>
                   </td>
@@ -355,7 +380,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                   <td className="px-4 py-3 align-middle">{ownerBadge(lead)}</td>
 
                   <td className="px-4 py-3 align-middle">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{relativeTime(lead.created_at)}</span>
+                    <span className="text-xs text-muted whitespace-nowrap">{relativeTime(lead.created_at)}</span>
                   </td>
 
                   <td className="px-4 py-3 text-right align-middle" onClick={(e) => e.stopPropagation()}>
@@ -366,7 +391,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                             type="button"
                             onClick={() => onCallClick?.(lead.id)}
                             title={`Call ${lead.phone}`}
-                            className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-500/40 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all cursor-pointer shadow-xs"
+                            className="p-1.5 border border-default hover:border-emerald-300 dark:hover:border-emerald-500/40 bg-card hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all cursor-pointer shadow-xs"
                           >
                             <Phone className="w-3.5 h-3.5" />
                           </button>
@@ -374,7 +399,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                             type="button"
                             onClick={() => onChatClick?.(lead, 'whatsapp')}
                             title="WhatsApp / SMS chat"
-                            className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-500/40 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all cursor-pointer shadow-xs"
+                            className="p-1.5 border border-default hover:border-emerald-300 dark:hover:border-emerald-500/40 bg-card hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all cursor-pointer shadow-xs"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                           </button>
@@ -384,7 +409,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <button
                           onClick={(e) => handleEdit(e, lead)}
                           title="Edit lead"
-                          className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-all cursor-pointer shadow-xs"
+                          className="p-1.5 border border-default hover:border-slate-300 dark:hover:border-slate-600 bg-card hover:bg-hover rounded-lg text-body transition-all cursor-pointer shadow-xs"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -393,7 +418,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <button
                           onClick={(e) => handleDelete(e, lead)}
                           title="Delete lead"
-                          className="p-1.5 border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-500/40 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-lg transition-all cursor-pointer shadow-xs"
+                          className="p-1.5 border border-default hover:border-rose-300 dark:hover:border-rose-500/40 bg-card hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-lg transition-all cursor-pointer shadow-xs"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -410,64 +435,67 @@ export const LeadTable: React.FC<LeadTableProps> = ({
       {/* Mobile: card list */}
       <div className="md:hidden">
         {!hideCheckboxes && sortedLeads.length > 0 && (
-          <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950/80 border-b border-slate-800 text-xs">
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-subtle border-b border-default text-xs">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={(e) => toggleAll(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 cursor-pointer"
+                className="w-4 h-4 rounded border-default text-indigo-600 bg-card cursor-pointer"
               />
-              <span className="font-semibold text-slate-200">Select All ({sortedLeads.length})</span>
+              <span className="font-semibold text-strong">Select All ({sortedLeads.length})</span>
             </label>
             {selectedLeadIds.length > 0 && (
-              <span className="text-brand-400 font-semibold">{selectedLeadIds.length} selected</span>
+              <span className="text-indigo-600 dark:text-brand-400 font-semibold">{selectedLeadIds.length} selected</span>
             )}
           </div>
         )}
 
-        <div className="divide-y divide-slate-800/70">
+        <div className="divide-y divide-default">
           {sortedLeads.map((lead) => {
             const contactFullName = `${lead.first_name || ''} ${lead.last_name}`.trim();
+            const isSelected = selectedLeadIds.includes(lead.id);
             return (
               <div
                 key={lead.id}
                 onClick={() => onRowClick(lead)}
-                className="p-3.5 active:bg-slate-900/60 transition-colors cursor-pointer space-y-2.5"
+                className={`p-3.5 transition-colors cursor-pointer space-y-2.5 ${
+                  isSelected ? 'bg-selected' : 'bg-card hover:bg-hover'
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
                     {!hideCheckboxes && (
                       <input
                         type="checkbox"
-                        checked={selectedLeadIds.includes(lead.id)}
+                        checked={isSelected}
                         onChange={(e) => { e.stopPropagation(); toggleOne(lead.id, e.target.checked); }}
-                        className="w-4 h-4 rounded border-slate-700 text-brand-500 bg-slate-950 cursor-pointer shrink-0"
+                        className="w-4 h-4 rounded border-default text-indigo-600 bg-card cursor-pointer shrink-0"
                       />
                     )}
                     <div>
-                      <p className="text-xs font-bold text-slate-100">{lead.title}</p>
-                      <p className="text-[11px] text-slate-400">{lead.company_name || contactFullName}</p>
+                      <p className="text-xs font-bold text-strong">{lead.title}</p>
+                      <p className="text-[11px] text-muted">{lead.company_name || contactFullName}</p>
                     </div>
                   </div>
                   <div className="text-right font-mono">
-                    <span className="text-xs font-bold text-emerald-400">
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                       {lead.value !== null ? formatMoney(lead.value) : '—'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-800/60">
+                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-default">
                   <div className="flex items-center gap-2">
                     {stagePill(lead)}
                     {priorityPill(lead.priority)}
                   </div>
-                  <span className="text-[11px] text-slate-400">{relativeTime(lead.created_at)}</span>
+                  <span className="text-[11px] text-muted">{relativeTime(lead.created_at)}</span>
                 </div>
 
                 {/* Mobile Quick Action Buttons */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-xs">
-                  <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                <div className="flex items-center justify-between pt-1 border-t border-default text-xs">
+                  <div className="text-[11px] text-muted truncate max-w-[140px]">
                     {ownerName(lead)}
                   </div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -476,7 +504,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onCallClick?.(lead.id)}
-                          className="p-1.5 text-emerald-400 border border-slate-800 hover:bg-emerald-500/10 rounded-lg"
+                          className="p-1.5 text-emerald-600 dark:text-emerald-400 border border-default hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg"
                           title="Call Lead"
                         >
                           <Phone className="w-3.5 h-3.5" />
@@ -484,7 +512,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onChatClick?.(lead, 'whatsapp')}
-                          className="p-1.5 text-emerald-400 border border-slate-800 hover:bg-emerald-500/10 rounded-lg"
+                          className="p-1.5 text-emerald-600 dark:text-emerald-400 border border-default hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg"
                           title="WhatsApp Chat"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
@@ -493,7 +521,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     )}
                     <button
                       onClick={(e) => handleEdit(e, lead)}
-                      className="p-1.5 text-slate-300 border border-slate-800 hover:bg-slate-800 rounded-lg"
+                      className="p-1.5 text-body border border-default hover:bg-hover rounded-lg"
                       title="Edit Lead"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -501,7 +529,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                     {canDeleteLead && (
                       <button
                         onClick={(e) => handleDelete(e, lead)}
-                        className="p-1.5 text-red-400 border border-slate-800 hover:bg-red-500/10 rounded-lg"
+                        className="p-1.5 text-rose-600 dark:text-rose-400 border border-default hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg"
                         title="Delete Lead"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

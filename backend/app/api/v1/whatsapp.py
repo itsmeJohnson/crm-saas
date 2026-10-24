@@ -293,7 +293,53 @@ async def list_whatsapp_templates(
             WhatsAppTemplate.is_deleted == False
         ).order_by(WhatsAppTemplate.name)
     )
-    return res.scalars().all()
+    items = list(res.scalars().all())
+    if not items:
+        defaults = [
+            WhatsAppTemplate(
+                organization_id=current_user.organization_id,
+                name="hiring",
+                category="UTILITY",
+                language="en",
+                status="APPROVED",
+                meta_template_id="hiring",
+                body_text='Hi, thanks for your interest in telecaller hiring. We have received your application. Your interview is scheduled on Monday at Samartha Sankalpa OPC Pvt Ltd Location: Kengeri. Please reply with "CONFIRM" to confirm your slot.',
+            ),
+            WhatsAppTemplate(
+                organization_id=current_user.organization_id,
+                name="lead_greeting",
+                category="MARKETING",
+                language="en",
+                status="APPROVED",
+                meta_template_id="lead_greeting",
+                body_text="Hello {{1}}, thank you for reaching out to Samartha Sankalpa Solutions. Our team is here to assist you.",
+            ),
+            WhatsAppTemplate(
+                organization_id=current_user.organization_id,
+                name="kyc_document_request",
+                category="UTILITY",
+                language="en",
+                status="APPROVED",
+                meta_template_id="kyc_document_request",
+                body_text="Dear {{1}}, please send your required KYC documents (Aadhaar / ID proof) on this WhatsApp chat to proceed with your verification.",
+            ),
+            WhatsAppTemplate(
+                organization_id=current_user.organization_id,
+                name="callback_reminder",
+                category="UTILITY",
+                language="en",
+                status="APPROVED",
+                meta_template_id="callback_reminder",
+                body_text="Hello {{1}}, we tried calling you regarding your inquiry. Please let us know a convenient time to speak.",
+            ),
+        ]
+        for t in defaults:
+            db.add(t)
+        await db.commit()
+        for t in defaults:
+            await db.refresh(t)
+        items = defaults
+    return items
 
 
 

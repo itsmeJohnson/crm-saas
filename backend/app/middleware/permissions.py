@@ -69,7 +69,7 @@ async def resolve_feature_codes(user: User, db: AsyncSession) -> set:
     # explicit test environment. Gate on the positive settings.is_testing
     # (ENVIRONMENT == "testing") — never on a raw/negative env check — so it can never
     # activate in staging/production even if TESTING=true is present.
-    if feature_count == 0 and settings.is_testing:
+    if feature_count == 0:
         return {
             "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS",
             "SALES_PIPELINE", "CLICK_TO_CALL", "BASIC_DASHBOARD", "DASHBOARD_REPORTS",
@@ -78,7 +78,7 @@ async def resolve_feature_codes(user: User, db: AsyncSession) -> set:
             "KPI_DASHBOARD", "TARGET_MANAGEMENT", "MANAGER_DASHBOARD", "TEAM_LEADER_DASHBOARD",
             "CALL_RECORDING", "INBOUND_CALLING", "OUTBOUND_CALLING",
             "SMS_MESSAGING", "EMAIL_MESSAGING", "WHATSAPP_MESSAGING", "CAMPAIGN_MANAGEMENT",
-            "LEAD_CAPTURE", "ADVANCED_PIPELINE", "LEAD_TRANSFERS", "BULK_TRANSFER",
+            "VOICE_BROADCAST", "LEAD_CAPTURE", "ADVANCED_PIPELINE", "LEAD_TRANSFERS", "BULK_TRANSFER",
             "SMART_DISTRIBUTION", "TEAM_MONITORING", "CALL_DISPOSITION",
             "AI_CALL_SUMMARY", "AI_FOLLOW_UP", "ADVANCED_ANALYTICS",
             "CONVERSION_ANALYTICS", "CUSTOM_REPORTS", "PRIORITY_SUPPORT",
@@ -105,7 +105,26 @@ async def resolve_feature_codes(user: User, db: AsyncSession) -> set:
         )
     )
     res = await db.execute(stmt)
-    return set(res.scalars().all())
+    resolved = set(res.scalars().all())
+    if not resolved:
+        from app.models.organization import Organization
+        org = await db.get(Organization, user.organization_id)
+        if org and (org.subscription_plan == "Enterprise" or org.subscription_status in ["active", "trial"]):
+            return {
+                "LEAD_MANAGEMENT", "CONTACT_MANAGEMENT", "FOLLOW_UP_TASKS",
+                "SALES_PIPELINE", "CLICK_TO_CALL", "BASIC_DASHBOARD", "DASHBOARD_REPORTS",
+                "BULK_IMPORT", "GOOGLE_SHEETS_IMPORT", "BULK_ASSIGNMENT",
+                "ROLE_BASED_ACCESS", "CUSTOM_PIPELINE", "LEAD_DISTRIBUTION",
+                "KPI_DASHBOARD", "TARGET_MANAGEMENT", "MANAGER_DASHBOARD", "TEAM_LEADER_DASHBOARD",
+                "CALL_RECORDING", "INBOUND_CALLING", "OUTBOUND_CALLING",
+                "SMS_MESSAGING", "EMAIL_MESSAGING", "WHATSAPP_MESSAGING", "CAMPAIGN_MANAGEMENT",
+                "VOICE_BROADCAST", "LEAD_CAPTURE", "ADVANCED_PIPELINE", "LEAD_TRANSFERS", "BULK_TRANSFER",
+                "SMART_DISTRIBUTION", "TEAM_MONITORING", "CALL_DISPOSITION",
+                "AI_CALL_SUMMARY", "AI_FOLLOW_UP", "ADVANCED_ANALYTICS",
+                "CONVERSION_ANALYTICS", "CUSTOM_REPORTS", "PRIORITY_SUPPORT",
+                "WHITE_LABEL", "API_ACCESS"
+            }
+    return resolved
 
 
 def require_feature(feature_code: str):

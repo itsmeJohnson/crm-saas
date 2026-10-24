@@ -10,6 +10,9 @@ export interface User {
   is_active: boolean;
   is_verified: boolean;
   is_team_leader?: boolean;
+  phone?: string | null;
+  seat_number?: string | number | null;
+  mfa_enabled?: boolean;
 }
 
 export interface Organization {
@@ -32,6 +35,7 @@ interface AuthState {
   organization: Organization | null;
   features: string[];
   setAuth: (user: User, organization: Organization, features: string[], accessToken: string, refreshToken: string) => void;
+  setUser: (user: User) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   logout: () => void;
 }
@@ -77,6 +81,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     // New session (possibly a different tenant/vertical): drop any cached
     // metadata so the org's crm_config — and its vertical skin — re-resolves.
     useMetadataStore.getState().reset();
+  },
+
+  setUser: (user) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    set({ user });
   },
 
   setTokens: (accessToken, refreshToken) => {

@@ -335,26 +335,26 @@ export const LeadsPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Unified Executive Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-slate-800/80 pb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-default pb-4">
         {/* Left: Title + Deal Count + View Switcher + Metric Toggle */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-100">
+            <h1 className="text-2xl font-bold tracking-tight text-strong">
               Leads & Enquiries
             </h1>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/80 font-mono">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-subtle text-muted border border-default font-mono">
               {report?.total_leads ?? leads.length}
             </span>
           </div>
 
           {/* View toggle: Table / Kanban */}
-          <div className="flex items-center p-0.5 bg-slate-950 border border-slate-800 rounded-lg shadow-2xs">
+          <div className="flex items-center p-0.5 bg-subtle border border-default rounded-lg shadow-2xs">
             <button
               onClick={() => setView('table')}
               className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                 view === 'table'
-                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-2xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-card text-brand-600 dark:text-brand-400 border border-default shadow-xs'
+                  : 'text-muted hover:text-strong'
               }`}
               title="Table view"
             >
@@ -364,8 +364,8 @@ export const LeadsPage: React.FC = () => {
               onClick={() => setView('kanban')}
               className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                 view === 'kanban'
-                  ? 'bg-slate-900 text-brand-400 border border-slate-700/80 shadow-2xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-card text-brand-600 dark:text-brand-400 border border-default shadow-xs'
+                  : 'text-muted hover:text-strong'
               }`}
               title="Kanban board"
             >
@@ -376,16 +376,16 @@ export const LeadsPage: React.FC = () => {
           {/* Compact Metrics Toggle Pill */}
           <button
             onClick={() => setShowMetrics(!showMetrics)}
-            className="flex items-center gap-2 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-2 px-2.5 py-1 text-xs font-medium rounded-lg bg-card hover:bg-hover border border-default text-body transition-all cursor-pointer shadow-xs"
             title="Toggle detailed KPI cards"
           >
-            <span className="text-emerald-400 font-semibold">{formatMoney(salesKPIs.activePipelineValue)}</span>
-            <span className="text-slate-500">·</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{formatMoney(salesKPIs.activePipelineValue)}</span>
+            <span className="text-muted">·</span>
             <span>{salesKPIs.winRate}% Win</span>
             {showMetrics ? (
-              <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronUp className="w-3.5 h-3.5 text-muted" />
             ) : (
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-muted" />
             )}
           </button>
         </div>
@@ -395,18 +395,18 @@ export const LeadsPage: React.FC = () => {
           {/* Auto assignment quick settings */}
           {isPrivileged && <AssignmentSettings />}
 
-          {/* Import Leads Button (Downward Arrow icon with CSV / XLSX badge - NO TEXT CLIPPING) */}
+          {/* Import Leads Button */}
           {isPrivileged && (
             <button
               onClick={() => setIsImportOpen(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-700/80 hover:border-brand-500/60 hover:bg-slate-800 rounded-lg text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+              className="group flex items-center gap-1.5 px-3 py-1.5 bg-card border border-default hover:border-brand-500/60 hover:bg-hover rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
               title="Import leads from CSV, Excel (.xlsx), or Google Sheets"
             >
-              <Download className="w-3.5 h-3.5 text-brand-400 group-hover:translate-y-0.5 transition-transform" />
-              <span className="text-slate-200 group-hover:text-brand-400 transition-colors">
+              <Download className="w-3.5 h-3.5 text-brand-500 group-hover:translate-y-0.5 transition-transform" />
+              <span className="text-strong group-hover:text-brand-500 transition-colors">
                 Import
               </span>
-              <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-brand-500/15 text-brand-400 border border-brand-500/30">
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-brand-500/15 text-brand-600 dark:text-brand-400 border border-brand-500/30">
                 CSV/XLSX
               </span>
             </button>
@@ -417,12 +417,12 @@ export const LeadsPage: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800 rounded-lg text-xs font-semibold text-slate-200 shadow-2xs transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-card border border-default hover:bg-hover rounded-lg text-xs font-semibold text-strong shadow-xs transition-all cursor-pointer"
                 title="Export and configuration options"
               >
-                <MoreHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                <MoreHorizontal className="w-3.5 h-3.5 text-muted" />
                 <span>Actions</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <ChevronDown className="w-3 h-3 text-muted" />
               </button>
 
               {isActionsMenuOpen && (
@@ -504,9 +504,9 @@ export const LeadsPage: React.FC = () => {
       {showMetrics && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 animate-in fade-in duration-200">
           {/* 1. Active Pipeline Value */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div className="bg-card border border-default rounded-xl p-4 shadow-xs hover:border-strong transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Active Pipeline
               </span>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
@@ -514,19 +514,19 @@ export const LeadsPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatMoney(salesKPIs.activePipelineValue)}
+              <p className="text-2xl font-bold text-strong tracking-tight">
+                {formatMoney(salesKPIs.activePipelineValue || 0)}
               </p>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {salesKPIs.activeDealsCount} active deals in funnel
+            <p className="text-[11px] text-muted mt-1">
+              {salesKPIs.activeDealsCount ?? 0} active deals in funnel
             </p>
           </div>
 
           {/* 2. Weighted Sales Forecast */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div className="bg-card border border-default rounded-xl p-4 shadow-xs hover:border-strong transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Weighted Forecast
               </span>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20">
@@ -534,19 +534,19 @@ export const LeadsPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatMoney(salesKPIs.weightedForecast)}
+              <p className="text-2xl font-bold text-strong tracking-tight">
+                {formatMoney(salesKPIs.weightedForecast || 0)}
               </p>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-[11px] text-muted mt-1">
               Probability-adjusted
             </p>
           </div>
 
           {/* 3. Won Revenue This Month */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div className="bg-card border border-default rounded-xl p-4 shadow-xs hover:border-strong transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Won This Month
               </span>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-teal-50 text-teal-600 border border-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:border-teal-500/20">
@@ -554,19 +554,19 @@ export const LeadsPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatMoney(salesKPIs.wonRevenueThisMonth)}
+              <p className="text-2xl font-bold text-strong tracking-tight">
+                {formatMoney(salesKPIs.wonRevenueThisMonth || 0)}
               </p>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {salesKPIs.wonDealsCount} deals closed won
+            <p className="text-[11px] text-muted mt-1">
+              {salesKPIs.wonDealsCount ?? 0} deals closed won
             </p>
           </div>
 
           {/* 4. Win Rate */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div className="bg-card border border-default rounded-xl p-4 shadow-xs hover:border-strong transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Win Rate
               </span>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20">
@@ -574,37 +574,37 @@ export const LeadsPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {salesKPIs.winRate}%
+              <p className="text-2xl font-bold text-strong tracking-tight">
+                {salesKPIs.winRate ?? 0}%
               </p>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-[11px] text-muted mt-1">
               Won vs total closed
             </p>
           </div>
 
           {/* 5. Overdue Follow-ups */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div className="bg-card border border-default rounded-xl p-4 shadow-xs hover:border-strong transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Overdue Follow-ups
               </span>
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                 salesKPIs.overdueFollowupsCount > 0
-                  ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20'
-                  : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                  ? 'bg-status-danger-bg text-status-danger-fg border border-status-danger-fg/20'
+                  : 'bg-subtle text-muted border border-default'
               }`}>
                 <AlertTriangle className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
               <p className={`text-2xl font-bold tracking-tight ${
-                salesKPIs.overdueFollowupsCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'
+                salesKPIs.overdueFollowupsCount > 0 ? 'text-status-danger-fg' : 'text-strong'
               }`}>
-                {salesKPIs.overdueFollowupsCount}
+                {salesKPIs.overdueFollowupsCount ?? 0}
               </p>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-[11px] text-muted mt-1">
               {salesKPIs.overdueFollowupsCount > 0 ? 'Requires attention' : 'All follow-ups current'}
             </p>
           </div>
@@ -628,7 +628,7 @@ export const LeadsPage: React.FC = () => {
                   value={filters.source}
                   onChange={(e) => setFilters({ source: e.target.value })}
                   placeholder="Filter source..."
-                  className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
+                  className="w-full px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-strong placeholder:text-muted focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
                 />
               </div>
 
@@ -647,7 +647,7 @@ export const LeadsPage: React.FC = () => {
                       <select
                         value={val}
                         onChange={(e) => update(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
+                        className="w-full px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-strong focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
                       >
                         <option value="">{f.label}: All</option>
                         {normalizeFieldOptions(f.options).map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -658,7 +658,7 @@ export const LeadsPage: React.FC = () => {
                         value={val}
                         onChange={(e) => update(e.target.value)}
                         placeholder={f.label}
-                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
+                        className="w-full px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-strong placeholder:text-muted focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all"
                       />
                     )}
                   </div>
@@ -666,7 +666,7 @@ export const LeadsPage: React.FC = () => {
               })}
 
               {/* Include archived toggle */}
-              <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none shrink-0 shadow-2xs">
+              <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-body cursor-pointer select-none shrink-0 shadow-2xs">
                 <input
                   type="checkbox"
                   checked={filters.include_archived}
@@ -686,9 +686,9 @@ export const LeadsPage: React.FC = () => {
             <select
               value={filters.status}
               onChange={(e) => setFilters({ status: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
+              className="w-full px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-strong focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
             >
-              <option value="All">All Statuses</option>
+              <option value="All">All stages</option>
               <option value="New">New</option>
               <option value="Contacted">Contacted</option>
               <option value="Qualified">Qualified</option>
@@ -702,9 +702,9 @@ export const LeadsPage: React.FC = () => {
             <select
               value={filters.assigned_user_id}
               onChange={(e) => setFilters({ assigned_user_id: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
+              className="w-full px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-strong focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
             >
-              <option value="All">All Owners</option>
+              <option value="All">All owners</option>
               {activeUsers.map(u => (
                 <option key={u.id} value={u.id}>
                   {`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email}
@@ -718,9 +718,9 @@ export const LeadsPage: React.FC = () => {
             <select
               value={filters.priority}
               onChange={(e) => setFilters({ priority: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
+              className="w-full px-2.5 py-1.5 bg-card border border-default rounded-lg text-xs text-strong focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-2xs transition-all cursor-pointer"
             >
-              <option value="All">All Priorities</option>
+              <option value="All">All priorities</option>
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>

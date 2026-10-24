@@ -410,28 +410,28 @@ export const DialerConsole: React.FC = () => {
                   </div>
                 )}
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-3 bg-card p-4 rounded-xl border border-default shadow-xs">
                     <input
                       id="collective-pooling"
                       type="checkbox"
                       checked={collectivePooling}
                       onChange={(e) => handleToggleCollectivePooling(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 bg-card border-default rounded focus:ring-indigo-500"
                     />
-                    <label htmlFor="collective-pooling" className="text-sm text-slate-800 dark:text-slate-200 font-medium cursor-pointer select-none">
+                    <label htmlFor="collective-pooling" className="text-sm text-strong font-medium cursor-pointer select-none">
                       Enable Collective Pooling (fetch from TL pool)
                     </label>
                   </div>
 
-                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-3 bg-card p-4 rounded-xl border border-default shadow-xs">
                     <input
                       id="auto-dial"
                       type="checkbox"
                       checked={autoDial}
                       onChange={(e) => setAutoDial(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 bg-card border-default rounded focus:ring-indigo-500"
                     />
-                    <label htmlFor="auto-dial" className="text-sm text-slate-800 dark:text-slate-200 font-medium cursor-pointer select-none flex-1">
+                    <label htmlFor="auto-dial" className="text-sm text-strong font-medium cursor-pointer select-none flex-1">
                       Power Dialer (auto-dial next lead)
                     </label>
                     {autoDial && (
@@ -439,7 +439,7 @@ export const DialerConsole: React.FC = () => {
                         aria-label="Power dialer delay"
                         value={powerDelay}
                         onChange={(e) => setPowerDelay(parseInt(e.target.value, 10))}
-                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs py-1.5 px-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                        className="bg-card border border-default text-strong text-xs py-1.5 px-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value={3}>3s gap</option>
                         <option value={5}>5s gap</option>

@@ -37,7 +37,7 @@ class TenantConfigurationResolver:
 
         default_modules = BUSINESS_TEMPLATES.get(template_enum, BUSINESS_TEMPLATES[IndustryType.TELECALLING])
 
-        if org.enabled_modules is not None:
+        if org.enabled_modules:
             if isinstance(org.enabled_modules, list):
                 enabled_modules = list(set(org.enabled_modules))
             else:

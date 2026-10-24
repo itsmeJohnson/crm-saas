@@ -74,17 +74,17 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
       const fetchEmployees = async () => {
         setIsLoadingEmployees(true);
         try {
-          const data = await userApi.getUsers({ limit: 100, role: 'Employee', is_active: true });
+          const data = await userApi.getAssignableUsers();
           setEmployees(data);
         } catch (err) {
-          console.error('Failed to fetch employees', err);
+          console.error('Failed to fetch assignable employees', err);
         } finally {
           setIsLoadingEmployees(false);
         }
       };
 
       const isTL = useAnalyticsStore.getState().dashboardData?.role === 'TeamLeader';
-      if (!user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || isTL) {
+      if (!user || user.role === 'OrgAdmin' || user.role === 'Manager' || user.role === 'SuperAdmin' || user.role === 'TeamLeader' || isTL) {
         fetchEmployees();
       }
     } else {
