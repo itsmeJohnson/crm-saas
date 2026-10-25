@@ -224,26 +224,6 @@ async def get_next_lead(
 
     # 4.5. Trigger click-to-call via the ORG's telephony config (not client creds).
     call_sid = f"outbound-{uuid.uuid4()}"
-    cfg = await load_org_calling_config(db, actor)
-    if config_ready(cfg):
-        # Integrated calling is a paid feature — plans without it (e.g. Core CRM)
-        # can use the dialer console with their own phone but not trigger calls here.
-        from app.dependencies.feature_guard import tenant_has_feature
-        if not await tenant_has_feature(db, actor, "OUTBOUND_CALLING"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Integrated outbound calling is not included in your plan. Please upgrade to enable click-to-call."
-            )
-        try:
-            agent_phone = payload.agent_phone_number or actor.phone or (cfg or {}).get("user_uuid")
-            call_sid = await trigger_provider_call(cfg, lead.phone, agent_phone, call_sid)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Outbound calling failed to initiate: {str(e)}"
-            )
-
-    # Pre-create outbound call activity
     from app.models.activity import Activity
     new_call_activity = Activity(
         organization_id=actor.organization_id,
@@ -258,6 +238,36 @@ async def get_next_lead(
         call_direction="OUTBOUND"
     )
     db.add(new_call_activity)
+    await db.commit()
+    await db.refresh(new_call_activity)
+
+    cfg = await load_org_calling_config(db, actor)
+    if config_ready(cfg):
+        # Integrated calling is a paid feature — plans without it (e.g. Core CRM)
+        # can use the dialer console with their own phone but not trigger calls here.
+        from app.dependencies.feature_guard import tenant_has_feature
+        if not await tenant_has_feature(db, actor, "OUTBOUND_CALLING"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Integrated outbound calling is not included in your plan. Please upgrade to enable click-to-call."
+            )
+        try:
+            agent_phone = payload.agent_phone_number or actor.phone or (cfg or {}).get("user_uuid")
+            provider_sid = await trigger_provider_call(cfg, lead.phone, agent_phone, call_sid)
+            if provider_sid and provider_sid != call_sid:
+                new_call_activity.call_sid = str(provider_sid)
+                call_sid = provider_sid
+                db.add(new_call_activity)
+                await db.commit()
+        except Exception as e:
+            new_call_activity.status = "Failed"
+            new_call_activity.description = f"Outbound call initiation failed: {str(e)}"
+            db.add(new_call_activity)
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Outbound calling failed to initiate: {str(e)}"
+            )
 
     # 4.6. Fire call_logged workflow rules against the lead
     from app.services.workflow_service import WorkflowService
@@ -386,20 +396,8 @@ async def call_lead(
         )
 
     call_sid = f"outbound-{uuid.uuid4()}"
-    try:
-        # For WebRTC calling (TeleCMI), route the agent leg to user_uuid extension so softphone rings
-        agent_phone = (cfg or {}).get("user_uuid") or payload.agent_phone_number or actor.phone or "5001_33339071"
-        call_sid = await trigger_provider_call(cfg, lead.phone, agent_phone, call_sid)
-    except Exception as e:
-        logger.error(f"Failed to place outbound call: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Outbound calling failed to initiate: {str(e)}",
-        )
-
-    # 4. Record the outbound call attempt as an Activity.
     from app.models.activity import Activity
-    db.add(Activity(
+    call_act = Activity(
         organization_id=actor.organization_id,
         activity_type="Call",
         subject=f"Outbound Call to {lead.first_name or ''} {lead.last_name or ''}".strip(),
@@ -410,7 +408,30 @@ async def call_lead(
         created_by=actor.id,
         call_sid=str(call_sid),
         call_direction="OUTBOUND",
-    ))
+    )
+    db.add(call_act)
+    await db.commit()
+    await db.refresh(call_act)
+
+    try:
+        # For WebRTC calling (TeleCMI), route the agent leg to user_uuid extension so softphone rings
+        agent_phone = (cfg or {}).get("user_uuid") or payload.agent_phone_number or actor.phone or "5001_33339071"
+        provider_sid = await trigger_provider_call(cfg, lead.phone, agent_phone, call_sid)
+        if provider_sid and provider_sid != call_sid:
+            call_act.call_sid = str(provider_sid)
+            call_sid = provider_sid
+            db.add(call_act)
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Failed to place outbound call: {e}")
+        call_act.status = "Failed"
+        call_act.description = f"Outbound call initiation failed: {str(e)}"
+        db.add(call_act)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Outbound calling failed to initiate: {str(e)}",
+        )
 
     # 5. Fire call_logged workflow rules, then flip the agent to ACTIVE_CALLING.
     from app.services.workflow_service import WorkflowService

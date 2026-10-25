@@ -138,6 +138,20 @@ async def _handle_incoming_call_event(
     if not last_10:
         return {"status": "ignored", "reason": "No valid caller phone"}
 
+    # 0. Check if caller_phone belongs to organization caller ID or agent extension
+    t_settings_res = await db.execute(select(TelephonySettings).filter(TelephonySettings.is_active == True))
+    all_tele = t_settings_res.scalars().all()
+    org_phone_numbers = set()
+    for ts in all_tele:
+        if ts.default_caller_id:
+            org_phone_numbers.add(re.sub(r"\D", "", str(ts.default_caller_id))[-10:])
+        if ts.user_uuid:
+            org_phone_numbers.add(str(ts.user_uuid).strip().lower())
+
+    if last_10 in org_phone_numbers or str(caller_phone).lower() in org_phone_numbers:
+        logger.info(f"Ignored inbound call event: caller {caller_phone} is organization virtual number or agent.")
+        return {"status": "ignored", "reason": "Caller is organization caller ID or agent"}
+
     # 1. Search for existing lead matching the phone
     query = select(Lead).filter(
         Lead.is_deleted == False,
@@ -514,12 +528,39 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     call_status = str(data.get("Status") or data.get("status") or data.get("event") or data.get("callstatus") or "ANSWER")
 
     # 2. Determine Call Flow: Inbound vs Outbound
+    extra = data.get("extra_params") or data.get("custom_params") or {}
+    if isinstance(extra, str):
+        try:
+            import json
+            extra = json.loads(extra)
+        except Exception:
+            extra = {}
+    extra_dir = str(extra.get("direction") or extra.get("call_direction") or "").upper()
     raw_type = str(data.get("type") or data.get("call_type") or data.get("event") or "").upper()
+
     is_explicit_outbound = (
         direction in ("OUTBOUND", "OUT", "C2C", "CLICK2CALL", "DIALER")
         or raw_type in ("OUTBOUND", "C2C", "CLICK2CALL", "DIALER", "OUT")
+        or extra_dir in ("OUTBOUND", "OUT")
+        or str(extra.get("call_type") or "").lower() == "c2c"
         or bool(data.get("c2c"))
     )
+
+    # Check if source_number or destination_number is our organization's virtual number or agent
+    t_res = await db.execute(select(TelephonySettings).filter(TelephonySettings.is_active == True))
+    org_numbers = set()
+    for ts in t_res.scalars().all():
+        if ts.default_caller_id:
+            org_numbers.add(re.sub(r"\D", "", str(ts.default_caller_id))[-10:])
+        if ts.user_uuid:
+            org_numbers.add(str(ts.user_uuid).strip().lower())
+
+    src_digits = re.sub(r"\D", "", str(source_number))[-10:] if source_number else ""
+    dst_digits = re.sub(r"\D", "", str(dest_number))[-10:] if dest_number else ""
+
+    # If call originates FROM our virtual number or agent extension, it is ALWAYS an outbound call!
+    if (src_digits and src_digits in org_numbers) or str(source_number).lower() in org_numbers:
+        is_explicit_outbound = True
 
     is_matching_outbound = False
     if call_sid:
@@ -532,16 +573,14 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
         if act_res.scalars().first():
             is_matching_outbound = True
 
-    # If call_sid wasn't found directly, check if an outbound call activity was initiated to/from this number in last 5 mins
+    # If call_sid wasn't found directly, check if an outbound call activity was initiated to/from this number in last 10 mins
     if not is_matching_outbound and not is_explicit_outbound:
-        src_digits = re.sub(r"\D", "", str(source_number))[-10:] if source_number else ""
-        dst_digits = re.sub(r"\D", "", str(dest_number))[-10:] if dest_number else ""
-        recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
 
         recent_act_query = select(Activity).filter(
             Activity.call_direction == "OUTBOUND",
             Activity.created_at >= recent_cutoff,
-        )
+        ).order_by(Activity.created_at.desc())
         recent_res = await db.execute(recent_act_query)
         for act in recent_res.scalars().all():
             if act.lead_id:
@@ -562,7 +601,10 @@ async def _process_unified_telephony_webhook(request: Request, db: AsyncSession)
     elif direction in ("IVR", "INBOUND"):
         is_inbound = True
     elif source_number and not direction and not recording_url:
-        is_inbound = True
+        if (src_digits and src_digits in org_numbers) or str(source_number).lower() in org_numbers:
+            is_inbound = False
+        else:
+            is_inbound = True
     else:
         is_inbound = False
 

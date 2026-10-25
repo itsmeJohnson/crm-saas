@@ -128,6 +128,10 @@ class TeleCMIProvider(TelephonyProvider):
             "extra_params": {
                 "crm": True,
                 "source": "Samartha Sankalpa Solutions CRM",
+                "direction": "OUTBOUND",
+                "call_direction": "OUTBOUND",
+                "call_type": "c2c",
+                "flow": "click2call",
             }
         }
 

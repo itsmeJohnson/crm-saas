@@ -149,8 +149,7 @@ export const InboundCallPopup: React.FC = () => {
 
           if (
             dialer.callDirection === 'OUTBOUND' &&
-            dialer.callLifecycle !== 'idle' &&
-            dialer.callLifecycle !== 'disposition'
+            dialer.callLifecycle !== 'idle'
           ) {
             console.log('[InboundCallPopup] Suppressed inbound popup: active outbound call in progress to', activeOutboundDigits);
             return;
@@ -185,13 +184,10 @@ export const InboundCallPopup: React.FC = () => {
   if (!user || !currentIncoming) return null;
 
   // Suppress inbound popup if the agent is already engaged in an outbound call
-  const activeOutboundDigits = (currentLead?.phone || '').replace(/\D/g, '').slice(-10);
-  if (
-    callDirection === 'OUTBOUND' &&
-    (callLifecycle === 'initiating' || callLifecycle === 'ringing' || callLifecycle === 'connected')
-  ) {
+  if (callDirection === 'OUTBOUND') {
     return null;
   }
+  const activeOutboundDigits = (currentLead?.phone || '').replace(/\D/g, '').slice(-10);
   if (activeOutboundDigits && normalizedPhone && activeOutboundDigits === normalizedPhone) {
     return null;
   }

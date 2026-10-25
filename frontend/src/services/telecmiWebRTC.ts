@@ -237,12 +237,17 @@ class TeleCMIWebRTCService {
         if (this.isOutboundPending) {
           console.log('[WebRTC] Auto-answering agent leg for outbound Click-to-Call to:', this.activeCallNumber);
           this.clearOutboundPending();
-          try {
-            this.piopiy.answer();
-            this.notify('connected');
-          } catch (e) {
-            console.error('[WebRTC] Error auto-answering outbound call leg:', e);
-          }
+          this.ensureAudioElement();
+          this.ensureMicrophonePermission().then(() => {
+            try {
+              if (this.piopiy) {
+                this.piopiy.answer();
+                this.notify('connected');
+              }
+            } catch (e) {
+              console.error('[WebRTC] Error auto-answering outbound call leg:', e);
+            }
+          });
           return;
         }
 

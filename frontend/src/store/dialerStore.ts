@@ -294,7 +294,26 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             return;
           }
 
-          // Scenario 2: Active conversation ended (either party hung up) OR Outbound call concluded -> Proceed to Disposition Wrap-Up
+          // Scenario 2A: Outbound call dropped before connection established (duration <= 1 and never connected)
+          if (isOutbound && !wasConnected && finalDuration <= 1) {
+            console.log('[Dialer] Outbound call dropped before connecting. Returning cleanly to idle without locking into wrap-up.');
+            set({
+              callLifecycle: 'idle',
+              incomingCall: null,
+              agentState: 'IDLE',
+              callDirection: null,
+              webrtcStatus: 'registered',
+              error: 'Call disconnected before connecting. You can retry placing the call.',
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('crm_dialer_lifecycle');
+              localStorage.removeItem('crm_dialer_call_direction');
+              localStorage.removeItem('crm_dialer_start_time');
+            }
+            return;
+          }
+
+          // Scenario 2B: Active conversation ended (either party hung up) -> Proceed to Disposition Wrap-Up
           if (wasConnected || isOutbound) {
             let lead = get().currentLead;
             if (!lead && typeof localStorage !== 'undefined') {
