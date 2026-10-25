@@ -115,9 +115,9 @@ def send_email(to_email: str, subject: str, template_name: str, context: dict) -
             port = 465  # Auto-correct if SSL flag set with wrong port
 
         if use_ssl:
-            server = smtplib.SMTP_SSL(settings.SMTP_HOST, port)
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, port, timeout=20.0)
         else:
-            server = smtplib.SMTP(settings.SMTP_HOST, port)
+            server = smtplib.SMTP(settings.SMTP_HOST, port, timeout=20.0)
             if settings.SMTP_TLS:
                 server.starttls()
 
