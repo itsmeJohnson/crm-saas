@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { dialerApi, CallCreds } from '../services/dialerApi';
 import { LeadResponse, leadApi } from '../services/leadApi';
 import { telecmiWebRTC, WebRTCPhoneStatus } from '../services/telecmiWebRTC';
+import { whatsappRealtime } from '../services/whatsappRealtime';
 
 export type AgentState = 'IDLE' | 'ACTIVE_CALLING' | 'BREAK';
 export type CallLifecycle = 'idle' | 'initiating' | 'ringing' | 'connected' | 'disposition';
@@ -168,6 +169,52 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   initWebRTC: async () => {
     if (!isWebRTCSubscribed) {
       isWebRTCSubscribed = true;
+
+      whatsappRealtime.subscribe((data) => {
+        if (!data) return;
+        const eventType = data.type || data.event;
+        if (eventType === 'call_ended' || eventType === 'inbound_call_ended') {
+          console.log('[Dialer] Remote call_ended event received via WebSocket:', data);
+          const currentCallLifecycle = get().callLifecycle;
+          if (currentCallLifecycle === 'connected') {
+            telecmiWebRTC.hangup();
+            stopTimer();
+            const finalDuration = typeof data.duration === 'number' && data.duration > 0
+              ? Math.max(get().callDuration || 0, data.duration)
+              : (get().callDuration || 0);
+
+            set({
+              callLifecycle: 'disposition',
+              callDuration: finalDuration,
+              webrtcStatus: 'ended',
+              incomingCall: null,
+              agentState: 'ACTIVE_CALLING',
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+            }
+          } else if (currentCallLifecycle === 'initiating' || currentCallLifecycle === 'ringing') {
+            telecmiWebRTC.hangup();
+            stopTimer();
+            set({
+              callLifecycle: 'idle',
+              incomingCall: null,
+              agentState: 'IDLE',
+              callDirection: null,
+              callDuration: 0,
+              webrtcStatus: 'registered',
+              error: 'Call ended before connection was established.',
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('crm_dialer_lifecycle');
+              localStorage.removeItem('crm_dialer_current_lead');
+              localStorage.removeItem('crm_dialer_call_direction');
+              localStorage.removeItem('crm_dialer_start_time');
+            }
+          }
+        }
+      });
+
       telecmiWebRTC.subscribe((status, _details) => {
         set({ webrtcStatus: status, isMuted: telecmiWebRTC.getIsMuted() });
 

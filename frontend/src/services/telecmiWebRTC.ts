@@ -287,6 +287,15 @@ class TeleCMIWebRTCService {
         this.notify('ended', data);
       });
 
+      this.piopiy.on('disconnected', (data: any) => {
+        console.log('[WebRTC] Call disconnected event:', data);
+        this.clearOutboundPending();
+        this.activeCallNumber = null;
+        this.incomingCall = null;
+        this.isMuted = false;
+        this.notify('ended', data);
+      });
+
       this.piopiy.on('missedCall', (data: any) => {
         console.log('[WebRTC] Inbound missed call event:', data);
         this.clearOutboundPending();

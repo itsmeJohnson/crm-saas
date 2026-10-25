@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { dashboardApi } from '../../services/dashboardApi';
@@ -93,6 +94,19 @@ export const FloatingDialerWidget: React.FC = () => {
       setDispositionCategory('Interested');
     }
   }, [currentLead?.id, callLifecycle]);
+
+  const location = useLocation();
+  const isEmbeddedCockpitPage =
+    location.pathname === '/' ||
+    location.pathname === '/workspace' ||
+    location.pathname.startsWith('/calling') ||
+    location.pathname.startsWith('/dialer');
+
+  // If on a page with an embedded full dialer console (Cockpit Dashboard or Calling page),
+  // do not duplicate with the floating dialer widget!
+  if (isEmbeddedCockpitPage) {
+    return null;
+  }
 
   // ── INBOUND RINGING IS MANAGED EXCLUSIVELY BY InboundCallPopup ──
   // If an incoming call is ringing or un-answered, do NOT show the floating dialer widget.

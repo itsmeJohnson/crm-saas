@@ -444,6 +444,22 @@ async def _handle_outbound_call_report(
         db.add(activity)
         await db.commit()
         logger.info(f"Updated call recording for activity_id={activity.id}, call_sid={call_sid}")
+
+        # Broadcast call_ended to organization WebSocket so agent's dialer ends immediately!
+        disconnect_payload = {
+            "type": "call_ended",
+            "event": "call_ended",
+            "call_sid": str(call_sid),
+            "duration": duration,
+            "lead_id": str(activity.lead_id) if activity.lead_id else None,
+            "assigned_user_id": str(activity.assigned_user_id) if activity.assigned_user_id else None,
+            "status": "Completed"
+        }
+        try:
+            await ws_manager.broadcast_to_organization(disconnect_payload, activity.organization_id, db)
+        except Exception as e:
+            logger.warning(f"Failed to broadcast outbound call_ended: {e}")
+
         return {"status": "updated", "activity_id": str(activity.id)}
 
     logger.warning(f"No existing activity found matching call_sid={call_sid}")
