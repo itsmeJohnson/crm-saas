@@ -119,6 +119,8 @@ export const AppLayout: React.FC = () => {
   const isManagerOrTL = effectiveRole === 'Manager' || effectiveRole === 'TeamLeader' || (effectiveRole === 'Employee' && user?.is_team_leader);
 
   const TELECALLER_ALLOWED_ITEMS = new Set([
+    'Dashboard',
+    'My Workspace',
     'Leads & Enquiries',
     'Phone Calling',
     'WhatsApp Center',
@@ -159,7 +161,7 @@ export const AppLayout: React.FC = () => {
   const NAV_GROUPS = (inTelecalling || isBaselineTelecaller || isSuperAdmin || isManagerOrTL)
     ? TELECALLING_NAV_GROUPS
     : [
-        'Clinical Operations', 'Patient Engagement', 'Clinic Management',
+        'Workspace', 'Clinical Operations', 'Patient Engagement', 'Clinic Management',
         'Growth & Analytics', 'Administration'
       ];
 
@@ -334,6 +336,7 @@ export const AppLayout: React.FC = () => {
       'Clinic Settings': 'Portfolio Settings',
     },
     telecalling: {
+      'Dashboard': 'My Workspace',
       'Patients Directory': 'Contacts Directory',
       'Dentists & Surgeons': 'Telecallers',
       'Treatment Plans': 'Deals',
@@ -344,6 +347,7 @@ export const AppLayout: React.FC = () => {
       'Appointments': 'Meetings',
     },
     generic: {
+      'Dashboard': 'My Workspace',
       'Patients Directory': 'Contacts Directory',
       'Dentists & Surgeons': 'Staff Directory',
       'Treatment Plans': 'Sales Deals',
@@ -423,8 +427,13 @@ export const AppLayout: React.FC = () => {
     <div className="flex flex-col h-full select-none bg-[var(--bg-sidebar)]">
       {/* ── Modern Enterprise Brand Header ── */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/15 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0 shadow-xs">
+        <Link
+          to="/"
+          onClick={() => setIsMobileOpen(false)}
+          title="Return to Workspace / Dashboard"
+          className="flex items-center gap-3 hover:opacity-85 transition cursor-pointer group min-w-0"
+        >
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/15 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0 shadow-xs group-hover:scale-105 transition-transform">
             {BrandIcon()}
           </div>
           <div className="min-w-0">
@@ -439,7 +448,7 @@ export const AppLayout: React.FC = () => {
                 : 'Telecalling Suite'}
             </span>
           </div>
-        </div>
+        </Link>
         <button
           onClick={() => setIsMobileOpen(false)}
           className="md:hidden p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -593,6 +602,16 @@ export const AppLayout: React.FC = () => {
               <span className="text-xs text-[var(--text-secondary)]">
                 {industry === 'healthcare_dental' ? 'Dr. Johnson Dev • Main Operatory' : `${displayRole} • ${getSubSuiteLabel()}`}
               </span>
+              {location.pathname !== '/' && (
+                <Link
+                  to="/"
+                  title="Return to Workspace / Dashboard"
+                  className="hidden md:inline-flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-lg border border-indigo-500/25 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                >
+                  <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>My Workspace</span>
+                </Link>
+              )}
             </div>
           </div>
 

@@ -4,6 +4,7 @@
  */
 
 export const TELECALLING_NAV_GROUPS = [
+  "Workspace",
   "Platform Administration",
   "Global Settings",
   "Lead Management",
@@ -14,6 +15,10 @@ export const TELECALLING_NAV_GROUPS = [
 ];
 
 export const TELECALLING_ITEM_GROUP_MAP: Record<string, string> = {
+  // Workspace (Home / Cockpit)
+  "Dashboard": "Workspace",
+  "My Workspace": "Workspace",
+
   // Platform Administration (SuperAdmin Root)
   "Tenants Directory": "Platform Administration",
   "Trial Requests": "Platform Administration",
@@ -39,7 +44,6 @@ export const TELECALLING_ITEM_GROUP_MAP: Record<string, string> = {
   "Communications": "Dialer Console",
 
   // Campaign Analytics
-  "Dashboard": "Campaign Analytics",
   "Marketing ROI": "Campaign Analytics",
   "Team Analytics": "Campaign Analytics",
   "Sales Analytics": "Campaign Analytics",
