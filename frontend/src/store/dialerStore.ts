@@ -99,22 +99,10 @@ const getInitialLead = (): LeadResponse | null => {
 };
 
 const getInitialLifecycle = (): CallLifecycle => {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const cached = localStorage.getItem('crm_dialer_lifecycle') as CallLifecycle;
-    if (['initiating', 'ringing', 'connected', 'disposition'].includes(cached)) {
-      return cached;
-    }
-  }
   return 'idle';
 };
 
 const getInitialAgentState = (): AgentState => {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const cachedLifecycle = localStorage.getItem('crm_dialer_lifecycle');
-    if (['initiating', 'ringing', 'connected', 'disposition'].includes(cachedLifecycle as string)) {
-      return 'ACTIVE_CALLING';
-    }
-  }
   return 'IDLE';
 };
 
@@ -294,65 +282,17 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             return;
           }
 
-          // Scenario 2A: Outbound call dropped before connection established (duration <= 1 and never connected)
-          if (isOutbound && !wasConnected && finalDuration <= 1) {
-            console.log('[Dialer] Outbound call dropped before connecting. Returning cleanly to idle without locking into wrap-up.');
+          // Scenario 2A: Call ended or dropped before connection was ever established
+          if (!wasConnected) {
+            console.log('[Dialer] Call ended before establishing connection. Returning cleanly to idle.');
             set({
               callLifecycle: 'idle',
               incomingCall: null,
               agentState: 'IDLE',
               callDirection: null,
+              callDuration: 0,
               webrtcStatus: 'registered',
-              error: 'Call disconnected before connecting. You can retry placing the call.',
-            });
-            if (typeof localStorage !== 'undefined') {
-              localStorage.removeItem('crm_dialer_lifecycle');
-              localStorage.removeItem('crm_dialer_call_direction');
-              localStorage.removeItem('crm_dialer_start_time');
-            }
-            return;
-          }
-
-          // Scenario 2B: Active conversation ended (either party hung up) -> Proceed to Disposition Wrap-Up
-          if (wasConnected || isOutbound) {
-            let lead = get().currentLead;
-            if (!lead && typeof localStorage !== 'undefined') {
-              try {
-                const cached = localStorage.getItem('crm_dialer_current_lead');
-                if (cached) lead = JSON.parse(cached);
-              } catch {}
-            }
-            if (!lead) {
-              const activeNum = telecmiWebRTC.getActiveCallNumber() || 'Customer';
-              lead = {
-                id: `call-${Date.now()}`,
-                first_name: activeNum,
-                last_name: '',
-                phone: activeNum,
-                title: 'Inbound Call',
-                status: 'Contacted',
-              } as any;
-            }
-
-            set({
-              callLifecycle: 'disposition',
-              currentLead: lead,
-              webrtcStatus: 'ended',
-              incomingCall: null,
-              agentState: 'ACTIVE_CALLING',
-            });
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem('crm_dialer_lifecycle', 'disposition');
-              localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
-            }
-          } else {
-            set({
-              callLifecycle: 'idle',
-              incomingCall: null,
-              currentLead: null,
-              agentState: 'IDLE',
-              callDirection: null,
-              webrtcStatus: 'registered'
+              error: isOutbound ? 'Call ended before connection was established.' : null,
             });
             if (typeof localStorage !== 'undefined') {
               localStorage.removeItem('crm_dialer_lifecycle');
@@ -360,6 +300,39 @@ export const useDialerStore = create<DialerState>((set, get) => ({
               localStorage.removeItem('crm_dialer_call_direction');
               localStorage.removeItem('crm_dialer_start_time');
             }
+            return;
+          }
+
+          // Scenario 2B: Active conversation ended (call was connected) -> Proceed to Disposition Wrap-Up
+          let lead = get().currentLead;
+          if (!lead && typeof localStorage !== 'undefined') {
+            try {
+              const cached = localStorage.getItem('crm_dialer_current_lead');
+              if (cached) lead = JSON.parse(cached);
+            } catch {}
+          }
+          if (!lead) {
+            const activeNum = telecmiWebRTC.getActiveCallNumber() || 'Customer';
+            lead = {
+              id: `call-${Date.now()}`,
+              first_name: activeNum,
+              last_name: '',
+              phone: activeNum,
+              title: 'Inbound Call',
+              status: 'Contacted',
+            } as any;
+          }
+
+          set({
+            callLifecycle: 'disposition',
+            currentLead: lead,
+            webrtcStatus: 'ended',
+            incomingCall: null,
+            agentState: 'ACTIVE_CALLING',
+          });
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+            localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
           }
         } else if (status === 'idle') {
           // Never wipe out an active incoming ringing call or connected conversation on background idle events!
@@ -550,11 +523,13 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
 
     const nowStr = new Date().toISOString();
+    stopTimer();
     set({
       currentLead: lead,
       agentState: 'ACTIVE_CALLING',
       callLifecycle: 'initiating',
       callDirection: 'OUTBOUND',
+      callDuration: 0,
       stateTimestamp: nowStr,
       isLoading: false,
       isKeypadOpen: false,
@@ -570,8 +545,6 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       localStorage.setItem('crm_dialer_lifecycle', 'initiating');
       localStorage.setItem('crm_dialer_start_time', nowStr);
     }
-
-    startTimer(set, 0);
 
     try {
       const serverLead = await dialerApi.callLead(leadId, { ...(creds || {}) });

@@ -29,7 +29,6 @@ import {
 
 export const FloatingDialerWidget: React.FC = () => {
   const {
-    agentState,
     callLifecycle,
     currentLead,
     callDuration,
@@ -55,9 +54,9 @@ export const FloatingDialerWidget: React.FC = () => {
   const [showChatDrawer, setShowChatDrawer] = useState(false);
   const [dockSide, setDockSide] = useState<'right' | 'left'>(() => {
     if (typeof localStorage !== 'undefined') {
-      return (localStorage.getItem('crm_dialer_dock') as 'right' | 'left') || 'right';
+      return (localStorage.getItem('crm_dialer_dock') as 'right' | 'left') || 'left';
     }
-    return 'right';
+    return 'left';
   });
 
   const toggleDock = () => {
@@ -102,8 +101,8 @@ export const FloatingDialerWidget: React.FC = () => {
     return null;
   }
 
-  // If there is no active lead and we are idle, don't show the widget
-  if (!currentLead && callLifecycle === 'idle' && agentState !== 'ACTIVE_CALLING') {
+  // If we are in idle state, do not render the widget
+  if (callLifecycle === 'idle') {
     return null;
   }
 
