@@ -889,16 +889,18 @@ export const LeadsPage: React.FC = () => {
             <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-white dark:bg-slate-900 shrink-0">
               <div className="flex items-center gap-3 overflow-hidden min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/20 dark:border-indigo-500/30 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 text-sm shrink-0 shadow-xs">
-                  {(detailLead.title || detailLead.first_name || 'LE').substring(0, 2).toUpperCase()}
+                  {((detailLead.first_name || detailLead.title || 'LE')).substring(0, 2).toUpperCase()}
                 </div>
                 <div className="overflow-hidden min-w-0">
                   <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
-                    {detailLead.title || `${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'Lead'}
+                    {`${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || detailLead.title || 'Lead'}
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 truncate">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">
-                      {`${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() || 'No Name'}
-                    </span>
+                    {detailLead.title && detailLead.title !== `${detailLead.first_name || ''} ${detailLead.last_name || ''}`.trim() && (
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">
+                        {detailLead.title}
+                      </span>
+                    )}
                     {detailLead.company_name && (
                       <>
                         <span className="text-slate-300 dark:text-slate-600">•</span>
@@ -928,7 +930,7 @@ export const LeadsPage: React.FC = () => {
                   <button
                     onClick={() => handleManualCall(detailLead.id)}
                     title="Place a call to this lead"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
                   >
                     <Phone className="w-3.5 h-3.5 text-white" />
                     <span>Call</span>
@@ -976,39 +978,39 @@ export const LeadsPage: React.FC = () => {
               )}
 
               {/* Telecalling Quick Call Disposition Logger */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
+              <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <PhoneCall className="w-4 h-4 text-indigo-600 dark:text-brand-400" />
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Log Call Disposition</span>
+                    <PhoneCall className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Log Call Disposition</span>
                   </div>
                   <span className="text-[10px] text-slate-500 font-medium">One-click telecalling outcome</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     onClick={() => handleLogDisposition('Connected - Interested')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:border-emerald-500/30 dark:text-emerald-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:border-emerald-500/30 dark:text-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Interested
                   </button>
                   <button
                     onClick={() => handleLogDisposition('Callback Scheduled')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <Clock className="w-3.5 h-3.5" />
                     Callback
                   </button>
                   <button
                     onClick={() => handleLogDisposition('No Answer / Busy')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:border-amber-500/30 dark:text-amber-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:border-amber-500/30 dark:text-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <AlertTriangle className="w-3.5 h-3.5" />
                     No Answer
                   </button>
                   <button
                     onClick={() => handleLogDisposition('Not Interested')}
-                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:border-rose-500/30 dark:text-rose-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 px-2.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:border-rose-500/30 dark:text-rose-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <X className="w-3.5 h-3.5" />
                     Not Interested
@@ -1023,7 +1025,7 @@ export const LeadsPage: React.FC = () => {
               </div>
 
               {/* Quick Details Card */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+              <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                 <div>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Opportunity Value</p>
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5 flex items-center gap-1.5">

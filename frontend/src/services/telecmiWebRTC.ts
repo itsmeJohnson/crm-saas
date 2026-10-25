@@ -238,16 +238,14 @@ class TeleCMIWebRTCService {
           console.log('[WebRTC] Auto-answering agent leg for outbound Click-to-Call to:', this.activeCallNumber);
           this.clearOutboundPending();
           this.ensureAudioElement();
-          this.ensureMicrophonePermission().then(() => {
-            try {
-              if (this.piopiy) {
-                this.piopiy.answer();
-                this.notify('ringing');
-              }
-            } catch (e) {
-              console.error('[WebRTC] Error auto-answering outbound call leg:', e);
+          try {
+            if (this.piopiy) {
+              this.piopiy.answer();
+              this.notify('ringing');
             }
-          });
+          } catch (e) {
+            console.error('[WebRTC] Error auto-answering outbound call leg:', e);
+          }
           return;
         }
 
@@ -378,9 +376,24 @@ class TeleCMIWebRTCService {
     this.ensureAudioElement();
     await this.ensureMicrophonePermission();
 
+    this.activeCallNumber = digits;
     this.setOutboundPending(digits);
     this.notify('calling', { phone: digits });
-    console.log('[WebRTC] Outbound pending bridge leg registered for:', digits);
+    console.log('[WebRTC] Initiating outbound call for:', digits);
+
+    // If PIOPIY client is registered, place the call directly via WebRTC
+    if (this.piopiy && this.status === 'registered' && typeof this.piopiy.call === 'function') {
+      try {
+        console.log('[WebRTC] Placing direct WebRTC piopiy.call to:', digits);
+        this.piopiy.call(digits);
+        return true;
+      } catch (err) {
+        console.warn('[WebRTC] Direct piopiy.call error, will bridge via C2C:', err);
+      }
+    } else if (this.config && (!this.piopiy || this.status === 'idle' || this.status === 'error')) {
+      console.log('[WebRTC] Client not registered, re-initializing session before dialing...');
+      this.init(this.config);
+    }
     return true;
   }
 

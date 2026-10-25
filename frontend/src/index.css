@@ -83,17 +83,17 @@
 
 /* ── Option A: Modern Light Enterprise (Primary Default Theme) ──────────────── */
 .light {
-  --slate-950: 248 250 252;
-  --slate-900: 255 255 255;
-  --slate-800: 226 232 240; /* #E2E8F0 - crisp card outlines & table dividers */
-  --slate-700: 203 213 225; /* #CBD5E1 - strong borders & focused inputs */
-  --slate-600: 148 163 184;
-  --slate-500: 100 116 139; /* #64748B - muted text & column headers */
-  --slate-400:  71  85 105; /* #475569 - secondary text */
-  --slate-300:  51  65  85; /* #334155 - body text */
-  --slate-200:  30  41  59; /* #1E293B - section headers */
-  --slate-100:  15  23  42; /* #0F172A - primary headings & titles */
-  --slate-50:    2   6  23;
+  --slate-50:  248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600:  71  85 105;
+  --slate-700:  51  65  85;
+  --slate-800:  30  41  59;
+  --slate-900:  15  23  42;
+  --slate-950:   2   6  23;
 
   /* Modern Light Enterprise Palette */
   --bg-app:         #f8fafc; /* Crisp Slate 50 page canvas */

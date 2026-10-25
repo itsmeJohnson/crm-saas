@@ -455,7 +455,9 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             : (_details?.message || 'Call failed due to WebRTC error.');
 
           let currentLeadObj = get().currentLead;
-          if (currentLeadObj) {
+          const wasActiveCall = get().callLifecycle === 'connected' || get().callLifecycle === 'ringing';
+
+          if (wasActiveCall && currentLeadObj) {
             const dir = get().callDirection || 'OUTBOUND';
             const callSessionId = `call-err-${Date.now()}`;
             set({
@@ -485,6 +487,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             set({
               error: errMsg,
               callLifecycle: 'idle',
+              isDispositionModalOpen: false,
               incomingCall: null,
               agentState: 'IDLE',
               callDirection: null,
@@ -819,8 +822,9 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       isKeypadOpen: false,
     });
 
-    if (lead?.phone) {
-      telecmiWebRTC.setOutboundPending(lead.phone);
+    const dialPhone = lead?.phone;
+    if (dialPhone) {
+      telecmiWebRTC.makeCall(dialPhone).catch((e) => console.warn('[WebRTC] Direct call trigger error:', e));
     }
 
     if (typeof localStorage !== 'undefined' && lead) {
@@ -834,8 +838,8 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       const serverLead = await dialerApi.callLead(leadId, { ...(creds || {}) });
       if (serverLead) {
         set({ currentLead: serverLead });
-        if (serverLead.phone) {
-          telecmiWebRTC.setOutboundPending(serverLead.phone);
+        if (serverLead.phone && !dialPhone) {
+          telecmiWebRTC.makeCall(serverLead.phone).catch((e) => console.warn('[WebRTC] Direct call trigger error:', e));
         }
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('crm_dialer_current_lead', JSON.stringify(serverLead));
