@@ -954,32 +954,63 @@ class WhatsAppService:
         if payload.get("app") and not payload.get("entry"):
             return await self.handle_gupshup_webhook(payload, raw_body=raw_body)
 
-        # 1. Deduplication using Event ID (Meta events contain a unique ID)
-        event_id = payload.get("entry", [{}])[0].get("id") or str(uuid.uuid4())
-        
-        # Extract verify token/webhook verification if signature provided
+        # Extract metadata and changes from entry
         phone_number_id = None
         waba_id = None
         entry = payload.get("entry", [])
+        changes = []
+        value = {}
+        field = None
         if entry:
             waba_id = entry[0].get("id")
             changes = entry[0].get("changes", [])
             if changes:
-                phone_number_id = changes[0].get("value", {}).get("metadata", {}).get("phone_number_id")
+                field = changes[0].get("field")
+                value = changes[0].get("value", {})
+                phone_number_id = value.get("metadata", {}).get("phone_number_id")
 
         if not phone_number_id and not waba_id:
             return {"status": "ignored", "reason": "Missing Meta phone number ID or WABA ID."}
 
-        # Resolve organization settings matching phone_number_id or business_account_id
+        # Deduplication using unique event identifier (never use account-level waba_id as event_id)
+        event_id = None
+        if "messages" in value and value["messages"]:
+            first_msg_id = value["messages"][0].get("id")
+            if first_msg_id:
+                event_id = f"msg_{first_msg_id}"
+        elif "statuses" in value and value["statuses"]:
+            first_st = value["statuses"][0]
+            st_id = first_st.get("id")
+            st_val = first_st.get("status")
+            st_ts = first_st.get("timestamp") or ""
+            if st_id:
+                event_id = f"status_{st_id}_{st_val}_{st_ts}"
+        
+        if not event_id:
+            import hashlib
+            raw_hash = hashlib.md5(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+            event_id = f"evt_{raw_hash}"
+
+        # Resolve organization settings matching phone_number_id, business_account_id, or active default
+        s = None
         if phone_number_id:
             res_s = await self.db.execute(select(WhatsAppSettings).filter(
                 WhatsAppSettings.phone_number_id == phone_number_id,
                 WhatsAppSettings.is_deleted == False
             ))
             s = res_s.scalars().first()
-        else:
+
+        if not s and waba_id:
             res_s = await self.db.execute(select(WhatsAppSettings).filter(
-                WhatsAppSettings.business_account_id == waba_id,
+                (WhatsAppSettings.business_account_id == waba_id) |
+                (WhatsAppSettings.business_account_id == "2000270886"),
+                WhatsAppSettings.is_deleted == False
+            ))
+            s = res_s.scalars().first()
+
+        if not s:
+            res_s = await self.db.execute(select(WhatsAppSettings).filter(
+                WhatsAppSettings.is_default == True,
                 WhatsAppSettings.is_deleted == False
             ))
             s = res_s.scalars().first()
@@ -1057,7 +1088,13 @@ class WhatsAppService:
                     recipient_id = status_data.get("recipient_id")
                     error_data = status_data.get("errors")
                     
-                    err_msg = error_data[0].get("message") if error_data else None
+                    err_msg = None
+                    if error_data and isinstance(error_data, list) and len(error_data) > 0:
+                        first_err = error_data[0]
+                        err_code = first_err.get("code")
+                        err_title = first_err.get("title")
+                        err_text = first_err.get("message") or first_err.get("error_data", {}).get("details") or err_title or str(first_err)
+                        err_msg = f"[{err_code}] {err_text}" if err_code else str(err_text)
                     dt_stamp = datetime.fromtimestamp(int(timestamp), tz=timezone.utc) if timestamp else _now()
                     
                     await self._process_webhook_status(org_id, wamid, st, dt_stamp, err_msg, recipient_id=recipient_id)

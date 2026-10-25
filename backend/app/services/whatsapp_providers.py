@@ -556,8 +556,9 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
             return WaSendResult(status="failed", error=f"Invalid destination phone number: {to_number}")
 
         if self._is_gateway:
-            # Gupshup Gateway API: send plain text message directly without HSM wrapper
+            # Gupshup Gateway API: send plain text message directly on WhatsApp channel
             payload = {
+                "channel": "whatsapp",
                 "send_to": clean_to,
                 "msg": body,
                 "msg_type": "text",
@@ -574,8 +575,10 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
             err_lower = (res.error or "").lower()
             if "template" in err_lower or "window" in err_lower or "session" in err_lower:
                 payload_fallback = {
+                    "channel": "whatsapp",
                     "send_to": clean_to,
-                    "msg_type": "text",
+                    "msg": "Hi, we would like to have your phone number on file.",
+                    "msg_type": "HSM",
                     "userid": self.effective_userid,
                     "auth_scheme": "plain",
                     "v": "1.1",
@@ -613,25 +616,57 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
 
         # Explicit approved Meta HSM templates
         if self._is_gateway:
-            if raw_key == "hiring" or raw_key == "4548035658774661":
-                payload = {
+            if raw_key in ("hiring", "4548035658774661"):
+                hiring_body = body or (
+                    "Hi, thanks for your interest in telecaller hiring. We have received your application. "
+                    "Your interview is scheduled on Monday at Samartha Sankalpa OPC Pvt Ltd Location: Kengeri. "
+                    "Please reply with \"CONFIRM\" to confirm your slot."
+                )
+                payload_media = {
+                    "channel": "whatsapp",
                     "send_to": clean_to,
-                    "msg_type": "text",
+                    "userid": self.effective_userid,
+                    "auth_scheme": "plain",
+                    "v": "1.1",
+                    "format": "json",
+                    "method": "SENDMEDIAMESSAGE",
+                    "msg_type": "IMAGE",
+                    "media_url": "https://crm.samarthasankalpa.com/logo.png",
+                    "caption": hiring_body,
+                    "msg": hiring_body,
+                    "isTemplate": "true",
+                    "isHSM": "true",
+                    "footer": "Contact 9353527253",
+                    "whatsAppTemplateId": "4548035658774661",
+                }
+                res = await self._post_gateway(payload_media)
+                if res.status == "sent":
+                    return res
+                # Fallback to SendMessage HSM
+                payload_text = {
+                    "channel": "whatsapp",
+                    "send_to": clean_to,
                     "userid": self.effective_userid,
                     "auth_scheme": "plain",
                     "v": "1.1",
                     "format": "json",
                     "method": "SendMessage",
-                    "isHSM": "true",
+                    "msg_type": "HSM",
+                    "msg": hiring_body,
                     "isTemplate": "true",
+                    "isHSM": "true",
                     "linkTrackingEnabled": "true",
                     "whatsAppTemplateId": "4548035658774661",
                 }
-                return await self._post_gateway(payload)
-            elif raw_key in ("request_phone_number", "request_contact_info", "contact_request"):
+                return await self._post_gateway(payload_text)
+
+            elif raw_key in ("request_phone_number", "request_contact_info", "contact_request", "1401814018783680"):
+                req_body = body or "Hi, we would like to have your phone number on file."
                 payload = {
+                    "channel": "whatsapp",
                     "send_to": clean_to,
-                    "msg_type": "text",
+                    "msg": req_body,
+                    "msg_type": "HSM",
                     "userid": self.effective_userid,
                     "auth_scheme": "plain",
                     "v": "1.1",
@@ -661,6 +696,7 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
                         text_content = text_content.replace(f"{{{{{idx}}}}}", str(v))
 
                 payload = {
+                    "channel": "whatsapp",
                     "send_to": clean_to,
                     "msg": text_content,
                     "msg_type": "text",
@@ -675,8 +711,10 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
                     return res
                 # Fallback to outreach template only if session window is closed
                 payload_fallback = {
+                    "channel": "whatsapp",
                     "send_to": clean_to,
-                    "msg_type": "text",
+                    "msg": "Hi, we would like to have your phone number on file.",
+                    "msg_type": "HSM",
                     "userid": self.effective_userid,
                     "auth_scheme": "plain",
                     "v": "1.1",
@@ -693,7 +731,7 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
         payload = {
             "source": self.sender_number,
             "destination": clean_to,
-            "template": json.dumps({"id": resolved_tpl_id, "params": [str(v) for v in (variables or [])]}),
+            "template": json.dumps({"id": raw_key, "params": [str(v) for v in (variables or [])]}),
         }
         return await self._post_msg(f"{self.base_url}/template/msg", payload)
 
@@ -702,6 +740,13 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
             mid = f"gupshup-mock-{uuid.uuid4()}"
             logger.info("[GUPSHUP MOCK GATEWAY] Sent to %s: %s", data.get("send_to"), mid)
             return WaSendResult(status="sent", message_id=mid)
+
+        # Enforce required Gupshup WhatsApp Gateway protocol fields
+        data.setdefault("channel", "whatsapp")
+        data.setdefault("userid", self.effective_userid)
+        data.setdefault("auth_scheme", "plain")
+        data.setdefault("v", "1.1")
+        data.setdefault("format", "json")
 
         url = "https://mediaapi.smsgupshup.com/GatewayAPI/rest"
         headers = {
@@ -731,8 +776,31 @@ class GupshupWhatsAppProvider(WhatsAppProvider):
             return WaSendResult(status="failed", error=f"Gupshup Gateway connection failure: {exc}"[:500])
 
     async def send_media(self, *, to_number: str, media_url: str, media_type: str, caption: str | None = None, file_name: str | None = None) -> WaSendResult:
-        if not (self.app_name and self.api_key and self.sender_number):
+        if not (self.effective_userid and self.api_key):
             return WaSendResult(status="failed", error="Gupshup credentials not fully configured")
+        clean_to = to_number.replace("+", "").replace(" ", "").replace("-", "").strip()
+        if not clean_to.startswith("91") and len(clean_to) == 10:
+            clean_to = f"91{clean_to}"
+
+        if self._is_gateway:
+            mtype_val = "IMAGE" if media_type == "image" else ("DOCUMENT" if media_type in ("document", "file", "pdf") else "VIDEO")
+            payload = {
+                "channel": "whatsapp",
+                "send_to": clean_to,
+                "userid": self.effective_userid,
+                "auth_scheme": "plain",
+                "v": "1.1",
+                "format": "json",
+                "method": "SENDMEDIAMESSAGE",
+                "msg_type": mtype_val,
+                "media_url": media_url,
+            }
+            if caption:
+                payload["caption"] = caption
+                payload["msg"] = caption
+            if file_name:
+                payload["filename"] = file_name
+            return await self._post_gateway(payload)
         clean_to = to_number.replace("+", "").replace(" ", "").replace("-", "").strip()
         
         # Build Gupshup media message payload
