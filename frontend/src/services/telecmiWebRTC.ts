@@ -337,7 +337,11 @@ class TeleCMIWebRTCService {
         console.log('[WebRTC] Answering incoming call session...');
         this.piopiy.answer();
         this.incomingCall = null;
-        this.notify('connected');
+        if (this.isOutboundPending) {
+          this.notify('ringing');
+        } else {
+          this.notify('connected');
+        }
       }
     } catch (e) {
       console.error('[WebRTC] Failed to answer incoming call:', e);

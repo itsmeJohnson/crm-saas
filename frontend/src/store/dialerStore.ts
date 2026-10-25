@@ -329,9 +329,9 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             return;
           }
 
-          // Scenario 2A: Call ended or dropped before connection was ever established
-          if (!wasConnected) {
-            console.log('[Dialer] Call ended before establishing connection. Returning cleanly to idle.');
+          // Scenario 2A: Call ended or dropped before connection was ever established or ended with 0 duration
+          if (!wasConnected || finalDuration === 0) {
+            console.log('[Dialer] Call ended before connection or with 0s duration. Returning cleanly to idle.');
             set({
               callLifecycle: 'idle',
               incomingCall: null,
@@ -339,7 +339,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
               callDirection: null,
               callDuration: 0,
               webrtcStatus: 'registered',
-              error: isOutbound ? 'Call ended before connection was established.' : null,
+              error: isOutbound ? (get().error || 'Call ended before connection was established.') : null,
             });
             if (typeof localStorage !== 'undefined') {
               localStorage.removeItem('crm_dialer_lifecycle');
@@ -380,6 +380,27 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem('crm_dialer_lifecycle', 'disposition');
             localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
+          }
+        } else if (status === 'error') {
+          console.warn('[Dialer] WebRTC error encountered:', _details);
+          const isMicError = _details?.type === 'mediaFailed' || String(_details?.message || '').toLowerCase().includes('micro') || String(_details?.message || '').toLowerCase().includes('permission');
+          const errMsg = isMicError
+            ? 'Microphone access is required to place calls. Please click the permissions icon in your browser address bar and allow Microphone.'
+            : (_details?.message || 'Call failed due to WebRTC error.');
+          set({
+            error: errMsg,
+            callLifecycle: 'idle',
+            incomingCall: null,
+            agentState: 'IDLE',
+            callDirection: null,
+            callDuration: 0,
+            webrtcStatus: 'registered',
+          });
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('crm_dialer_lifecycle');
+            localStorage.removeItem('crm_dialer_current_lead');
+            localStorage.removeItem('crm_dialer_call_direction');
+            localStorage.removeItem('crm_dialer_start_time');
           }
         } else if (status === 'idle') {
           // Never wipe out an active incoming ringing call or connected conversation on background idle events!
@@ -445,13 +466,27 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   hangupWebRTC: () => {
     telecmiWebRTC.hangup();
     stopTimer();
-    if (get().currentLead) {
+    const wasConnected = get().callLifecycle === 'connected';
+    const finalDuration = get().callDuration || 0;
+    if (get().currentLead && wasConnected && finalDuration > 0) {
       set({ callLifecycle: 'disposition' });
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('crm_dialer_lifecycle', 'disposition');
       }
     } else {
-      set({ callLifecycle: 'idle', agentState: 'IDLE' });
+      set({
+        callLifecycle: 'idle',
+        agentState: 'IDLE',
+        callDirection: null,
+        callDuration: 0,
+        incomingCall: null,
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('crm_dialer_lifecycle');
+        localStorage.removeItem('crm_dialer_current_lead');
+        localStorage.removeItem('crm_dialer_call_direction');
+        localStorage.removeItem('crm_dialer_start_time');
+      }
     }
   },
 
