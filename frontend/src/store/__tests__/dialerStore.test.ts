@@ -49,7 +49,7 @@ describe('dialerStore', () => {
     expect(state.isLoading).toBe(false);
   });
 
-  it('starts calling successfully, updates lead, and runs active call timer', async () => {
+  it('starts calling successfully, updates lead, and runs active call timer upon connect', async () => {
     const mockLead = {
       id: 'lead-123',
       first_name: 'John',
@@ -63,11 +63,12 @@ describe('dialerStore', () => {
     const stateAfterCall = useDialerStore.getState();
     expect(stateAfterCall.currentLead).toEqual(mockLead);
     expect(stateAfterCall.agentState).toBe('ACTIVE_CALLING');
+    expect(stateAfterCall.callLifecycle).toBe('initiating');
     expect(stateAfterCall.callDuration).toBe(0);
 
-    // Advance timers by 5 seconds
+    // Timer does not run while merely initiating
     vi.advanceTimersByTime(5000);
-    expect(useDialerStore.getState().callDuration).toBe(5);
+    expect(useDialerStore.getState().callDuration).toBe(0);
   });
 
   it('submits disposition successfully, stops timer, and resets state to IDLE', async () => {
@@ -93,10 +94,10 @@ describe('dialerStore', () => {
       remarks: 'No answer',
     });
 
-    expect(dialerApi.submitDisposition).toHaveBeenCalledWith('lead-123', {
+    expect(dialerApi.submitDisposition).toHaveBeenCalledWith('lead-123', expect.objectContaining({
       status: 'Busy',
       remarks: 'No answer',
-    });
+    }));
 
     const state = useDialerStore.getState();
     expect(state.currentLead).toBeNull();

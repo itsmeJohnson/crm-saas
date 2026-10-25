@@ -47,7 +47,15 @@ export const dialerApi = {
     payload: {
       status: string;
       remarks: string;
+      call_sid?: string;
+      call_duration?: number;
+      call_direction?: string;
+      technical_status?: string;
+      follow_up_date?: string;
+      follow_up_time?: string;
+      follow_up_priority?: string;
       custom_pipeline_stage_id?: string;
+      dispatch_omnichannel_followup?: boolean;
     }
   ) => {
     const response = await api.post<LeadResponse>(`/dialer/leads/${leadId}/disposition`, payload);

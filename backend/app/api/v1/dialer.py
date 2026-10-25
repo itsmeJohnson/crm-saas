@@ -375,6 +375,11 @@ async def call_lead(
         )
     if not lead.phone:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This lead has no phone number.")
+    if lead.status == "Do Not Call":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This lead is marked as 'Do Not Call'. Outbound calling is restricted."
+        )
 
     # 3. Integrated click-to-call is a paid feature and needs org telephony config.
     cfg = await load_org_calling_config(db, actor)

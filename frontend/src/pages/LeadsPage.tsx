@@ -55,7 +55,7 @@ export const LeadsPage: React.FC = () => {
     try {
       await callSpecificLead(leadId);
     } catch (e: any) {
-      setCallError(e.response?.data?.detail || 'Failed to place the call.');
+      setCallError(e.response?.data?.detail || e.message || 'Failed to place the call.');
     }
   };
 

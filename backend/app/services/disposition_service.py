@@ -48,90 +48,170 @@ class DispositionService:
             db.add(lead)
 
         previous_stage_id = lead.stage_id
+        status_val = payload.status.value
 
         # 3. Processing logic by status
-        if payload.status in {CallDispositionStatus.RNR, CallDispositionStatus.SWITCH_OFF, CallDispositionStatus.BUSY}:
-            # System actions: increment count, delay availability, check drop threshold
+        is_unanswered_retry = status_val in (
+            "RNR — Ringing No Response", "RNR", "Busy", "Switched Off", "Switch Off",
+            "Not Reachable", "Call Rejected"
+        )
+        is_invalid_number = status_val in (
+            "Number Does Not Exist", "Not Exist", "Wrong Number", "Out of Service", "Spam / Junk"
+        )
+        is_followup = status_val in ("Follow-up Required", "Callback Scheduled", "Callback Requested")
+        is_interested = status_val in ("Interested", "Picked — Connected", "Picked", "Answered", "Converted / Successful")
+        is_lost = status_val in ("Not Interested", "Do Not Call")
+
+        if is_unanswered_retry:
             lead.call_attempts_count += 1
             lead.available_at = datetime.now(timezone.utc) + timedelta(hours=2)
-            
             if lead.call_attempts_count > 4:
-                # Auto-move to "Dropped" stage
                 dropped_query = select(PipelineStage).filter(
                     PipelineStage.organization_id == lead.organization_id,
-                    PipelineStage.name == "Dropped",
+                    PipelineStage.name.ilike("%dropped%"),
                     PipelineStage.is_deleted == False
-                )
+                ).limit(1)
                 dropped_res = await db.execute(dropped_query)
-                dropped_stage = dropped_res.scalar()
+                dropped_stage = dropped_res.scalar_one_or_none()
                 if dropped_stage:
                     lead.stage_id = dropped_stage.id
-                
-        elif payload.status in {CallDispositionStatus.NOT_EXIST, CallDispositionStatus.OUT_OF_SERVICE, CallDispositionStatus.INBOUND_SPAM}:
-            # Invalid entry or Spam: immediate drop
+        elif is_invalid_number:
             dropped_query = select(PipelineStage).filter(
                 PipelineStage.organization_id == lead.organization_id,
-                PipelineStage.name == "Dropped",
+                PipelineStage.name.ilike("%dropped%") | PipelineStage.name.ilike("%lost%"),
                 PipelineStage.is_deleted == False
-            )
+            ).limit(1)
             dropped_res = await db.execute(dropped_query)
-            dropped_stage = dropped_res.scalar()
+            dropped_stage = dropped_res.scalar_one_or_none()
             if dropped_stage:
                 lead.stage_id = dropped_stage.id
-            
-        elif payload.status in {CallDispositionStatus.PICKED, CallDispositionStatus.INBOUND_RESOLVED, CallDispositionStatus.INBOUND_CALLBACK, CallDispositionStatus.INBOUND_INTERESTED}:
-            # Successful connection or inbound match: advance to specified custom stage if provided
-            if payload.custom_pipeline_stage_id:
-                custom_stage_query = select(PipelineStage).filter(
-                    PipelineStage.id == payload.custom_pipeline_stage_id,
-                    PipelineStage.organization_id == lead.organization_id,
-                    PipelineStage.is_deleted == False
+        elif status_val == "Not Interested":
+            lost_query = select(PipelineStage).filter(
+                PipelineStage.organization_id == lead.organization_id,
+                PipelineStage.name.ilike("%not interested%") | PipelineStage.name.ilike("%lost%"),
+                PipelineStage.is_deleted == False
+            ).limit(1)
+            lost_res = await db.execute(lost_query)
+            lost_stage = lost_res.scalar_one_or_none()
+            if lost_stage:
+                lead.stage_id = lost_stage.id
+        elif status_val == "Converted / Successful":
+            won_query = select(PipelineStage).filter(
+                PipelineStage.organization_id == lead.organization_id,
+                PipelineStage.name.ilike("%won%") | PipelineStage.name.ilike("%converted%"),
+                PipelineStage.is_deleted == False
+            ).limit(1)
+            won_res = await db.execute(won_query)
+            won_stage = won_res.scalar_one_or_none()
+            if won_stage:
+                lead.stage_id = won_stage.id
+        elif status_val == "Interested" and not payload.custom_pipeline_stage_id:
+            int_query = select(PipelineStage).filter(
+                PipelineStage.organization_id == lead.organization_id,
+                PipelineStage.name.ilike("%interested%") | PipelineStage.name.ilike("%qualified%"),
+                PipelineStage.is_deleted == False
+            ).limit(1)
+            int_res = await db.execute(int_query)
+            int_stage = int_res.scalar_one_or_none()
+            if int_stage:
+                lead.stage_id = int_stage.id
+
+        if payload.custom_pipeline_stage_id:
+            custom_stage_query = select(PipelineStage).filter(
+                PipelineStage.id == payload.custom_pipeline_stage_id,
+                PipelineStage.organization_id == lead.organization_id,
+                PipelineStage.is_deleted == False
+            )
+            custom_res = await db.execute(custom_stage_query)
+            custom_stage = custom_res.scalar_one_or_none()
+            if not custom_stage:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="The specified custom pipeline stage does not exist in this organization."
                 )
-                custom_res = await db.execute(custom_stage_query)
-                custom_stage = custom_res.scalar()
-                if not custom_stage:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="The specified custom pipeline stage does not exist in this organization."
-                    )
-                lead.stage_id = custom_stage.id
+            lead.stage_id = custom_stage.id
 
-        # Update lead status to match the disposition status
-        lead.status = payload.status.value
+        # Update lead status
+        lead.status = status_val
 
-        # 3.5. Update latest Call activity for this lead
+        # Handle scheduled follow-up
+        follow_up_dt = None
+        follow_up_display = ""
+        if payload.follow_up_date and payload.follow_up_time:
+            follow_up_display = f"{payload.follow_up_date} at {payload.follow_up_time}"
+            try:
+                dt_raw = f"{str(payload.follow_up_date).strip()}T{str(payload.follow_up_time).strip()}"
+                follow_up_dt = datetime.fromisoformat(dt_raw).replace(tzinfo=timezone.utc)
+                lead.available_at = follow_up_dt
+                
+                # Create LeadReminder for notification & callback engine
+                from app.models.lead_reminder import LeadReminder
+                reminder = LeadReminder(
+                    organization_id=lead.organization_id,
+                    lead_id=lead.id,
+                    user_id=actor.id,
+                    remind_at=follow_up_dt,
+                    note=f"Scheduled Callback ({status_val}): {payload.remarks}",
+                    is_sent=False,
+                    created_by=actor.id
+                )
+                db.add(reminder)
+            except Exception as dt_err:
+                pass
+
+        # 3.5. Update latest Call activity for this lead (or find by call_sid for idempotency)
         from app.models.activity import Activity
-        activity_query = select(Activity).filter(
-            Activity.lead_id == lead.id,
-            Activity.activity_type == "Call",
-            Activity.assigned_user_id == actor.id
-        ).order_by(Activity.created_at.desc()).limit(1)
-        
-        act_res = await db.execute(activity_query)
-        latest_call_activity = act_res.scalar()
-        
-        remarks_str = payload.remarks or ""
-        desc_str = f"Disposition: {payload.status.value}\nRemarks: {remarks_str}"
-        
+        latest_call_activity = None
+        if payload.call_sid:
+            act_by_sid = await db.execute(
+                select(Activity).filter(
+                    Activity.call_sid == str(payload.call_sid),
+                    Activity.organization_id == actor.organization_id
+                )
+            )
+            latest_call_activity = act_by_sid.scalars().first()
+
+        if not latest_call_activity:
+            activity_query = select(Activity).filter(
+                Activity.lead_id == lead.id,
+                Activity.activity_type == "Call",
+                Activity.organization_id == actor.organization_id
+            ).order_by(Activity.created_at.desc()).limit(1)
+            act_res = await db.execute(activity_query)
+            latest_call_activity = act_res.scalar_one_or_none()
+
+        mins = (payload.call_duration or 0) // 60
+        secs = (payload.call_duration or 0) % 60
+        dur_str = f"{mins:02d}:{secs:02d}"
+        follow_up_line = f"\nFollow-up: {follow_up_display}" if follow_up_display else ""
+        desc_str = f"Outcome: {status_val}\nDuration: {dur_str}\nRemarks: {payload.remarks}{follow_up_line}"
+
         if latest_call_activity:
             latest_call_activity.status = "Completed"
-            latest_call_activity.subject = f"Call: {payload.status.value}"
+            latest_call_activity.subject = f"{payload.call_direction or latest_call_activity.call_direction or 'Outbound'} Call — {status_val}"
             latest_call_activity.description = desc_str
-            latest_call_activity.call_disposition = payload.status.value
+            latest_call_activity.call_disposition = status_val
+            if payload.call_duration is not None and payload.call_duration > 0:
+                latest_call_activity.call_duration = payload.call_duration
+            if follow_up_dt:
+                latest_call_activity.due_date = follow_up_dt
             db.add(latest_call_activity)
         else:
             # Fallback: create completed activity
             new_call_activity = Activity(
                 organization_id=lead.organization_id,
                 activity_type="Call",
-                subject=f"Call: {payload.status.value}",
+                subject=f"{payload.call_direction or 'Outbound'} Call — {status_val}",
                 description=desc_str,
                 status="Completed",
                 assigned_user_id=actor.id,
                 lead_id=lead.id,
                 created_by=actor.id,
-                call_direction="OUTBOUND",
-                call_disposition=payload.status.value
+                call_direction=payload.call_direction or "OUTBOUND",
+                call_disposition=status_val,
+                call_duration=payload.call_duration or 0,
+                call_sid=str(payload.call_sid) if payload.call_sid else None,
+                due_date=follow_up_dt
             )
             db.add(new_call_activity)
 

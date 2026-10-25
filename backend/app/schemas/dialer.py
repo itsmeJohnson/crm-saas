@@ -38,59 +38,116 @@ class AgentStateResponse(BaseModel):
     metadata: Dict[str, Any]
 
 class CallDispositionStatus(str, Enum):
-    RNR = "RNR"
-    SWITCH_OFF = "Switch Off"
+    # Professional Telecalling Agency Dispositions
+    PICKED_CONNECTED = "Picked — Connected"
+    RNR = "RNR — Ringing No Response"
     BUSY = "Busy"
+    SWITCHED_OFF = "Switched Off"
+    NOT_REACHABLE = "Not Reachable"
+    CALL_REJECTED = "Call Rejected"
+    WRONG_NUMBER = "Wrong Number"
+    NUMBER_NOT_EXIST = "Number Does Not Exist"
+    INTERESTED = "Interested"
+    NOT_INTERESTED = "Not Interested"
+    FOLLOW_UP_REQUIRED = "Follow-up Required"
+    CALLBACK_SCHEDULED = "Callback Scheduled"
+    CONVERTED = "Converted / Successful"
+    LANGUAGE_BARRIER = "Language Barrier"
+    DO_NOT_CALL = "Do Not Call"
+    TECHNICAL_FAILURE = "Technical Failure"
+
+    # Historical & Inbound Aliases (Backwards Compatibility)
+    PICKED = "Picked"
+    SWITCH_OFF = "Switch Off"
     NOT_EXIST = "Not Exist"
     OUT_OF_SERVICE = "Out of Service"
-    PICKED = "Picked"
-    # Aliases and Inbound statuses
     ANSWERED = "Answered"
     NO_ANSWER = "No Answer"
-    SWITCHED_OFF = "Switched Off"
-    WRONG_NUMBER = "Wrong Number"
     INBOUND_RESOLVED = "Answered / Resolved"
     INBOUND_CALLBACK = "Callback Requested"
-    INBOUND_INTERESTED = "Interested"
-    INBOUND_NOT_INTERESTED = "Not Interested"
+    INBOUND_INTERESTED = "Inbound Interested"
+    INBOUND_NOT_INTERESTED = "Inbound Not Interested"
     INBOUND_SPAM = "Spam / Junk"
 
 class CallDispositionRequest(BaseModel):
     status: CallDispositionStatus
-    remarks: str = Field(..., min_length=1, description="Remarks are required and must not be empty.")
-    custom_pipeline_stage_id: Optional[uuid.UUID] = Field(default=None, description="Pipeline stage to advance to when status is Picked or Interested.")
-    dispatch_omnichannel_followup: bool = Field(default=False, description="Whether to trigger 2-second WhatsApp rich follow-up with intelligent SMS carrier fallback.")
+    remarks: str = Field(..., description="Mandatory remarks (min 3 chars, max 1,000 chars).")
+    call_sid: Optional[str] = Field(default=None, description="Unique call/session ID for deduplication.")
+    call_duration: Optional[int] = Field(default=0, ge=0, description="Connected duration in seconds.")
+    call_direction: Optional[str] = Field(default="OUTBOUND", description="Call direction: OUTBOUND or INBOUND.")
+    technical_status: Optional[str] = Field(default=None, description="Technical status from provider/WebRTC: connected, ringing_no_answer, failed, busy.")
+    follow_up_date: Optional[str] = Field(default=None, description="YYYY-MM-DD for follow-up or callback.")
+    follow_up_time: Optional[str] = Field(default=None, description="HH:MM for follow-up or callback.")
+    follow_up_priority: Optional[str] = Field(default="Medium", description="Low, Medium, High, or Urgent.")
+    custom_pipeline_stage_id: Optional[uuid.UUID] = Field(default=None, description="Pipeline stage to advance to.")
+    dispatch_omnichannel_followup: bool = Field(default=False, description="Trigger instant WhatsApp/SMS follow-up.")
     followup_template_name: Optional[str] = None
     followup_custom_note: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
-    def normalize_status(cls, data: Any) -> Any:
+    def normalize_and_validate_payload(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            # 1. Normalize Status
             raw_status = data.get("status")
             if isinstance(raw_status, str):
                 normalized = raw_status.strip()
                 status_map = {
-                    "Answered": "Picked",
-                    "Answered (Connected)": "Picked",
-                    "Connected": "Picked",
-                    "No Answer": "RNR",
-                    "No Answer / Ringing Not Responded": "RNR",
-                    "Switched Off": "Switch Off",
-                    "Switched Off / Out of Coverage": "Switch Off",
-                    "Wrong Number": "Not Exist",
-                    "Wrong Number / Does Not Exist": "Not Exist",
-                    "Callback": "Callback Requested",
-                    "Callback Scheduled": "Callback Requested",
+                    "Picked": "Picked — Connected",
+                    "Answered": "Picked — Connected",
+                    "Answered (Connected)": "Picked — Connected",
+                    "Connected": "Picked — Connected",
+                    "RNR": "RNR — Ringing No Response",
+                    "No Answer": "RNR — Ringing No Response",
+                    "No Answer / Ringing Not Responded": "RNR — Ringing No Response",
+                    "Switch Off": "Switched Off",
+                    "Switched Off / Out of Coverage": "Switched Off",
+                    "Not Exist": "Number Does Not Exist",
+                    "Wrong Number / Does Not Exist": "Number Does Not Exist",
+                    "Callback": "Callback Scheduled",
+                    "Callback Requested": "Callback Scheduled",
+                    "Follow-up": "Follow-up Required",
+                    "Follow-up Scheduled": "Follow-up Required",
                     "Interested / Qualified": "Interested",
+                    "Converted": "Converted / Successful",
+                    "Failed": "Technical Failure",
                 }
                 data["status"] = status_map.get(normalized, normalized)
-        return data
 
-    @model_validator(mode="after")
-    def validate_picked_stage(self) -> "CallDispositionRequest":
-        # Keep pipeline stage optional; leads remain in current stage if not moved
-        return self
+            # 2. Validate Remarks (mandatory >= 3 characters after trimming)
+            raw_remarks = data.get("remarks")
+            if raw_remarks is None or not isinstance(raw_remarks, str) or len(raw_remarks.strip()) < 3:
+                raise ValueError("Remarks are mandatory and must be at least 3 characters after trimming whitespace.")
+            if len(raw_remarks.strip()) > 1000:
+                raise ValueError("Remarks cannot exceed 1,000 characters.")
+            data["remarks"] = raw_remarks.strip()
+
+            # 3. Validate Follow-up Date/Time if required
+            status_val = data.get("status")
+            is_followup = status_val in (
+                "Follow-up Required", "Callback Scheduled",
+                CallDispositionStatus.FOLLOW_UP_REQUIRED.value, CallDispositionStatus.CALLBACK_SCHEDULED.value
+            )
+            if is_followup:
+                f_date = data.get("follow_up_date")
+                f_time = data.get("follow_up_time")
+                if not f_date or not str(f_date).strip():
+                    raise ValueError("Follow-up date is required for callbacks and scheduled follow-ups.")
+                if not f_time or not str(f_time).strip():
+                    raise ValueError("Follow-up time is required for callbacks and scheduled follow-ups.")
+
+                # Ensure date/time is not in the past
+                try:
+                    from datetime import datetime, timezone
+                    dt_str = f"{str(f_date).strip()}T{str(f_time).strip()}"
+                    parsed_dt = datetime.fromisoformat(dt_str).replace(tzinfo=timezone.utc)
+                    if parsed_dt < datetime.now(timezone.utc):
+                        raise ValueError("Follow-up date and time cannot be in the past.")
+                except ValueError as ve:
+                    if "past" in str(ve):
+                        raise
+                    # Ignore format parse if simple date
+        return data
 
 class InboundLeadLookupRequest(BaseModel):
     phone: str

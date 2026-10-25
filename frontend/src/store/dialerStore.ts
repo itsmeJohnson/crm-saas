@@ -8,14 +8,30 @@ export type AgentState = 'IDLE' | 'ACTIVE_CALLING' | 'BREAK';
 export type CallLifecycle = 'idle' | 'initiating' | 'ringing' | 'connected' | 'disposition';
 export type NetworkStatus = 'online' | 'unstable';
 
+export interface DispositionSession {
+  call_sid: string;
+  lead: LeadResponse | null;
+  duration: number;
+  direction: 'INBOUND' | 'OUTBOUND';
+  technical_status: 'connected' | 'ringing_no_answer' | 'busy' | 'failed';
+  startTime: string;
+  endTime: string;
+  submitted: boolean;
+}
+
 export interface CallDispositionPayload {
   status: string;
   disposition_category?: string;
   remarks: string;
+  call_sid?: string;
+  call_duration?: number;
+  call_direction?: string;
+  technical_status?: string;
   custom_pipeline_stage_id?: string;
   follow_up_date?: string;
   follow_up_time?: string;
   follow_up_priority?: 'Low' | 'Medium' | 'High' | 'Urgent';
+  dispatch_omnichannel_followup?: boolean;
 }
 
 interface DialerState {
@@ -34,6 +50,8 @@ interface DialerState {
   isMuted: boolean;
   isKeypadOpen: boolean;
   isReconnecting: boolean;
+  isDispositionModalOpen: boolean;
+  dispositionSession: DispositionSession | null;
   incomingCall: {
     from: string;
     name?: string;
@@ -50,6 +68,8 @@ interface DialerState {
   sendDTMF: (digit: string | number) => void;
   hangupWebRTC: () => void;
   cancelInitiatingCall: () => void;
+  openDispositionModal: () => void;
+  closeDispositionModal: () => void;
   fetchCurrentState: () => Promise<void>;
   startCalling: (
     collectivePooling?: boolean,
@@ -152,10 +172,13 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   isKeypadOpen: false,
   isReconnecting: false,
   incomingCall: null,
+  isDispositionModalOpen: false,
+  dispositionSession: null,
 
   setIncomingCall: (call) => set({ incomingCall: call }),
 
   rejectInboundCall: () => {
+    stopTimer();
     telecmiWebRTC.reject();
     set({ incomingCall: null, callLifecycle: 'idle', callDirection: null, currentLead: null });
   },
@@ -168,6 +191,30 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     telecmiWebRTC.sendDTMF(digit);
   },
 
+  openDispositionModal: () => {
+    set({ isDispositionModalOpen: true });
+  },
+
+  closeDispositionModal: () => {
+    stopTimer();
+    set({
+      isDispositionModalOpen: false,
+      callLifecycle: 'idle',
+      agentState: 'IDLE',
+      currentLead: null,
+      callDirection: null,
+      callDuration: 0,
+      dispositionSession: null,
+      error: null,
+    });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('crm_dialer_lifecycle');
+      localStorage.removeItem('crm_dialer_current_lead');
+      localStorage.removeItem('crm_dialer_call_direction');
+      localStorage.removeItem('crm_dialer_start_time');
+    }
+  },
+
   initWebRTC: async () => {
     if (!isWebRTCSubscribed) {
       isWebRTCSubscribed = true;
@@ -177,27 +224,50 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         const eventType = data.type || data.event;
         if (eventType === 'call_ended' || eventType === 'inbound_call_ended') {
           console.log('[Dialer] Remote call_ended event received via WebSocket:', data);
+          stopTimer();
+          telecmiWebRTC.hangup();
           const currentCallLifecycle = get().callLifecycle;
-          if (currentCallLifecycle === 'connected') {
-            telecmiWebRTC.hangup();
-            stopTimer();
-            const finalDuration = typeof data.duration === 'number' && data.duration > 0
-              ? Math.max(get().callDuration || 0, data.duration)
-              : (get().callDuration || 0);
+          const finalDuration = typeof data.duration === 'number' && data.duration > 0
+            ? Math.max(get().callDuration || 0, data.duration)
+            : (get().callDuration || 0);
+
+          let currentLeadObj = get().currentLead;
+          if (!currentLeadObj && typeof localStorage !== 'undefined') {
+            try {
+              const cached = localStorage.getItem('crm_dialer_current_lead');
+              if (cached) currentLeadObj = JSON.parse(cached);
+            } catch {}
+          }
+
+          if (currentLeadObj) {
+            const dir = get().callDirection || 'OUTBOUND';
+            const callSessionId = data.call_id || data.call_sid || `call-ws-${Date.now()}`;
+            const techStatus = currentCallLifecycle === 'connected' ? 'connected' : 'ringing_no_answer';
 
             set({
               callLifecycle: 'disposition',
+              isDispositionModalOpen: true,
               callDuration: finalDuration,
               webrtcStatus: 'ended',
               incomingCall: null,
               agentState: 'ACTIVE_CALLING',
+              currentLead: currentLeadObj,
+              dispositionSession: {
+                call_sid: callSessionId,
+                lead: currentLeadObj,
+                duration: finalDuration,
+                direction: dir,
+                technical_status: techStatus,
+                startTime: get().stateTimestamp || new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                submitted: false,
+              }
             });
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+              localStorage.setItem('crm_dialer_current_lead', JSON.stringify(currentLeadObj));
             }
-          } else if (currentCallLifecycle === 'initiating' || currentCallLifecycle === 'ringing') {
-            telecmiWebRTC.hangup();
-            stopTimer();
+          } else {
             set({
               callLifecycle: 'idle',
               incomingCall: null,
@@ -205,7 +275,6 @@ export const useDialerStore = create<DialerState>((set, get) => ({
               callDirection: null,
               callDuration: 0,
               webrtcStatus: 'registered',
-              error: 'Call ended before connection was established.',
             });
             if (typeof localStorage !== 'undefined') {
               localStorage.removeItem('crm_dialer_lifecycle');
@@ -320,6 +389,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
               currentLead: null,
               agentState: 'IDLE',
               callDirection: null,
+              callDuration: 0,
               webrtcStatus: 'registered'
             });
             if (typeof localStorage !== 'undefined') {
@@ -331,28 +401,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
             return;
           }
 
-          // Scenario 2A: Call ended or dropped before connection was ever established or ended with 0 duration
-          if (!wasConnected || finalDuration === 0) {
-            console.log('[Dialer] Call ended before connection or with 0s duration. Returning cleanly to idle.');
-            set({
-              callLifecycle: 'idle',
-              incomingCall: null,
-              agentState: 'IDLE',
-              callDirection: null,
-              callDuration: 0,
-              webrtcStatus: 'registered',
-              error: isOutbound ? (get().error || 'Call ended before connection was established.') : null,
-            });
-            if (typeof localStorage !== 'undefined') {
-              localStorage.removeItem('crm_dialer_lifecycle');
-              localStorage.removeItem('crm_dialer_current_lead');
-              localStorage.removeItem('crm_dialer_call_direction');
-              localStorage.removeItem('crm_dialer_start_time');
-            }
-            return;
-          }
-
-          // Scenario 2B: Active conversation ended (call was connected) -> Proceed to Disposition Wrap-Up
+          // Outbound call attempt (connected, unanswered RNR, busy) or answered inbound call -> Open Mandatory Disposition!
           let lead = get().currentLead;
           if (!lead && typeof localStorage !== 'undefined') {
             try {
@@ -367,46 +416,90 @@ export const useDialerStore = create<DialerState>((set, get) => ({
               first_name: activeNum,
               last_name: '',
               phone: activeNum,
-              title: 'Inbound Call',
+              title: 'Call Session',
               status: 'Contacted',
             } as any;
           }
 
+          const callSessionId = typeof callId === 'string' && callId.length > 5 ? callId : `call-${Date.now()}`;
+          const techStatus = wasConnected ? 'connected' : (wasRinging ? 'ringing_no_answer' : 'failed');
+
           set({
             callLifecycle: 'disposition',
+            isDispositionModalOpen: true,
             currentLead: lead,
             webrtcStatus: 'ended',
             incomingCall: null,
             agentState: 'ACTIVE_CALLING',
+            dispositionSession: {
+              call_sid: callSessionId,
+              lead,
+              duration: finalDuration,
+              direction: dir,
+              technical_status: techStatus,
+              startTime: get().stateTimestamp || new Date().toISOString(),
+              endTime: new Date().toISOString(),
+              submitted: false,
+            }
           });
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem('crm_dialer_lifecycle', 'disposition');
             localStorage.setItem('crm_dialer_current_lead', JSON.stringify(lead));
           }
         } else if (status === 'error') {
+          stopTimer();
           console.warn('[Dialer] WebRTC error encountered:', _details);
           const isMicError = _details?.type === 'mediaFailed' || String(_details?.message || '').toLowerCase().includes('micro') || String(_details?.message || '').toLowerCase().includes('permission');
           const errMsg = isMicError
             ? 'Microphone access is required to place calls. Please click the permissions icon in your browser address bar and allow Microphone.'
             : (_details?.message || 'Call failed due to WebRTC error.');
-          set({
-            error: errMsg,
-            callLifecycle: 'idle',
-            incomingCall: null,
-            agentState: 'IDLE',
-            callDirection: null,
-            callDuration: 0,
-            webrtcStatus: 'registered',
-          });
-          if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem('crm_dialer_lifecycle');
-            localStorage.removeItem('crm_dialer_current_lead');
-            localStorage.removeItem('crm_dialer_call_direction');
-            localStorage.removeItem('crm_dialer_start_time');
+
+          let currentLeadObj = get().currentLead;
+          if (currentLeadObj) {
+            const dir = get().callDirection || 'OUTBOUND';
+            const callSessionId = `call-err-${Date.now()}`;
+            set({
+              callLifecycle: 'disposition',
+              isDispositionModalOpen: true,
+              currentLead: currentLeadObj,
+              webrtcStatus: 'ended',
+              incomingCall: null,
+              agentState: 'ACTIVE_CALLING',
+              error: errMsg,
+              dispositionSession: {
+                call_sid: callSessionId,
+                lead: currentLeadObj,
+                duration: 0,
+                direction: dir,
+                technical_status: 'failed',
+                startTime: get().stateTimestamp || new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                submitted: false,
+              }
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+              localStorage.setItem('crm_dialer_current_lead', JSON.stringify(currentLeadObj));
+            }
+          } else {
+            set({
+              error: errMsg,
+              callLifecycle: 'idle',
+              incomingCall: null,
+              agentState: 'IDLE',
+              callDirection: null,
+              callDuration: 0,
+              webrtcStatus: 'registered',
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('crm_dialer_lifecycle');
+              localStorage.removeItem('crm_dialer_current_lead');
+              localStorage.removeItem('crm_dialer_call_direction');
+              localStorage.removeItem('crm_dialer_start_time');
+            }
           }
         } else if (status === 'idle') {
-          // Never wipe out an active incoming ringing call or connected conversation on background idle events!
-          const isBusy = get().callLifecycle === 'ringing' || Boolean(get().incomingCall) || get().callLifecycle === 'connected' || get().callLifecycle === 'disposition';
+          const isBusy = get().callLifecycle === 'ringing' || Boolean(get().incomingCall) || get().callLifecycle === 'connected' || get().callLifecycle === 'disposition' || get().isDispositionModalOpen;
           if (!isBusy && (!get().currentLead || get().callLifecycle === 'idle')) {
             set({ callLifecycle: 'idle', incomingCall: null, webrtcStatus: 'registered' });
           }
@@ -447,21 +540,47 @@ export const useDialerStore = create<DialerState>((set, get) => ({
 
   cancelInitiatingCall: () => {
     telecmiWebRTC.hangup();
+    telecmiWebRTC.clearOutboundPending();
     stopTimer();
-    set({
-      agentState: 'IDLE',
-      callLifecycle: 'idle',
-      currentLead: null,
-      callDuration: 0,
-      callDirection: null,
-      stateTimestamp: null,
-      isLoading: false,
-    });
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('crm_dialer_current_lead');
-      localStorage.removeItem('crm_dialer_call_direction');
-      localStorage.removeItem('crm_dialer_lifecycle');
-      localStorage.removeItem('crm_dialer_start_time');
+    const currentLeadObj = get().currentLead;
+    if (currentLeadObj) {
+      const callSessionId = `call-cancel-${Date.now()}`;
+      set({
+        callLifecycle: 'disposition',
+        isDispositionModalOpen: true,
+        webrtcStatus: 'ended',
+        agentState: 'ACTIVE_CALLING',
+        dispositionSession: {
+          call_sid: callSessionId,
+          lead: currentLeadObj,
+          duration: 0,
+          direction: 'OUTBOUND',
+          technical_status: 'ringing_no_answer',
+          startTime: get().stateTimestamp || new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          submitted: false,
+        }
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(currentLeadObj));
+      }
+    } else {
+      set({
+        agentState: 'IDLE',
+        callLifecycle: 'idle',
+        currentLead: null,
+        callDuration: 0,
+        callDirection: null,
+        stateTimestamp: null,
+        isLoading: false,
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('crm_dialer_current_lead');
+        localStorage.removeItem('crm_dialer_call_direction');
+        localStorage.removeItem('crm_dialer_lifecycle');
+        localStorage.removeItem('crm_dialer_start_time');
+      }
     }
   },
 
@@ -470,10 +589,30 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     stopTimer();
     const wasConnected = get().callLifecycle === 'connected';
     const finalDuration = get().callDuration || 0;
-    if (get().currentLead && wasConnected && finalDuration > 0) {
-      set({ callLifecycle: 'disposition' });
+    const currentLeadObj = get().currentLead;
+    const dir = get().callDirection || 'OUTBOUND';
+    const callSessionId = `call-${Date.now()}`;
+
+    if (currentLeadObj) {
+      set({
+        callLifecycle: 'disposition',
+        isDispositionModalOpen: true,
+        webrtcStatus: 'ended',
+        agentState: 'ACTIVE_CALLING',
+        dispositionSession: {
+          call_sid: callSessionId,
+          lead: currentLeadObj,
+          duration: finalDuration,
+          direction: dir,
+          technical_status: wasConnected ? 'connected' : 'ringing_no_answer',
+          startTime: get().stateTimestamp || new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          submitted: false,
+        }
+      });
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('crm_dialer_lifecycle', 'disposition');
+        localStorage.setItem('crm_dialer_current_lead', JSON.stringify(currentLeadObj));
       }
     } else {
       set({
@@ -513,7 +652,18 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           try { lead = JSON.parse(cachedLead); } catch {}
         }
         direction = (localStorage.getItem('crm_dialer_call_direction') as any) || direction;
-        lifecycle = (localStorage.getItem('crm_dialer_lifecycle') as any) || (data.state === 'ACTIVE_CALLING' ? 'connected' : 'idle');
+        const cachedLifecycle = localStorage.getItem('crm_dialer_lifecycle');
+        if (cachedLifecycle === 'disposition') {
+          lifecycle = 'disposition';
+        } else if (cachedLifecycle === 'connected' && telecmiWebRTC.getActiveCallNumber()) {
+          lifecycle = 'connected';
+        } else if (cachedLifecycle === 'initiating' || cachedLifecycle === 'ringing') {
+          lifecycle = cachedLifecycle as any;
+        } else if (data.state === 'ACTIVE_CALLING' && lead) {
+          lifecycle = 'disposition';
+        } else {
+          lifecycle = 'idle';
+        }
         startTime = localStorage.getItem('crm_dialer_start_time');
       }
 
@@ -546,11 +696,30 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         isReconnecting: false,
       });
 
-      if (isLiveActive && lifecycle === 'connected') {
+      if (lifecycle === 'connected' && telecmiWebRTC.getActiveCallNumber()) {
         startTimer(set, elapsed);
-      } else if (!isLiveActive) {
+      } else {
         stopTimer();
-        set({ callDuration: 0 });
+        if (lifecycle !== 'disposition') {
+          set({ callDuration: 0 });
+        }
+      }
+
+      // If call is in disposition, open the disposition modal
+      if (lifecycle === 'disposition' && lead) {
+        set({
+          isDispositionModalOpen: true,
+          dispositionSession: get().dispositionSession || {
+            call_sid: `call-resume-${Date.now()}`,
+            lead,
+            duration: elapsed,
+            direction: direction || 'OUTBOUND',
+            technical_status: 'connected',
+            startTime: startTime || new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            submitted: false,
+          }
+        });
       }
     } catch (err: any) {
       const errMsg = err.response?.data?.detail || err.message || 'Failed to fetch agent state';
@@ -560,6 +729,12 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   },
 
   startCalling: async (collectivePooling = false, creds?: CallCreds) => {
+    if (get().callLifecycle === 'disposition' || get().isDispositionModalOpen) {
+      const errMsg = 'Please complete and save the pending call disposition before dialing the next lead.';
+      set({ error: errMsg, isDispositionModalOpen: true });
+      throw new Error(errMsg);
+    }
+
     set({ isLoading: true, error: null });
     try {
       const lead = await dialerApi.getNextLead({
@@ -572,6 +747,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         agentState: 'ACTIVE_CALLING',
         callLifecycle: 'initiating',
         callDirection: 'OUTBOUND',
+        callDuration: 0,
         stateTimestamp: nowStr,
         isLoading: false,
         isKeypadOpen: false,
@@ -584,7 +760,6 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         localStorage.setItem('crm_dialer_start_time', nowStr);
       }
 
-      startTimer(set, 0);
       if (lead && lead.phone) {
         telecmiWebRTC.setOutboundPending(lead.phone);
         telecmiWebRTC.makeCall(lead.phone).catch((e) => console.warn('[WebRTC] Call trigger error:', e));
@@ -597,6 +772,14 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   },
 
   callSpecificLead: async (leadId: string, creds?: CallCreds) => {
+    if (get().callLifecycle === 'disposition' || get().isDispositionModalOpen) {
+      const pendingLead = get().currentLead || get().dispositionSession?.lead;
+      const pendingName = pendingLead ? `${pendingLead.first_name || ''} ${pendingLead.last_name || ''}`.trim() : 'previous lead';
+      const errMsg = `Please complete and save the post-call disposition for ${pendingName} before placing a new call.`;
+      set({ error: errMsg, isDispositionModalOpen: true });
+      throw new Error(errMsg);
+    }
+
     set({ isLoading: true, error: null });
 
     // Request microphone permission on user gesture (click event)
@@ -668,7 +851,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       } else if (err.message) {
         errMsg = String(err.message);
       }
-      set({ error: errMsg, isLoading: false, callLifecycle: 'idle' });
+      set({ error: errMsg, isLoading: false, callLifecycle: 'idle', agentState: 'IDLE' });
       telecmiWebRTC.clearOutboundPending();
       stopTimer();
       throw err;
@@ -735,7 +918,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
   },
 
   submitDisposition: async (dispositionData: CallDispositionPayload) => {
-    let lead = get().currentLead;
+    let lead = get().currentLead || get().dispositionSession?.lead;
     if (!lead && typeof localStorage !== 'undefined') {
       const cachedLead = localStorage.getItem('crm_dialer_current_lead');
       if (cachedLead) {
@@ -744,6 +927,7 @@ export const useDialerStore = create<DialerState>((set, get) => ({
     }
 
     set({ isLoading: true, error: null });
+    stopTimer();
     telecmiWebRTC.hangup();
 
     try {
@@ -765,10 +949,19 @@ export const useDialerStore = create<DialerState>((set, get) => ({
           }
         }
 
+        const sess = get().dispositionSession;
         await dialerApi.submitDisposition(targetLeadId, {
           status: dispositionData.status,
           remarks: dispositionData.remarks,
+          call_sid: dispositionData.call_sid || sess?.call_sid,
+          call_duration: dispositionData.call_duration ?? sess?.duration ?? get().callDuration ?? 0,
+          call_direction: dispositionData.call_direction || sess?.direction || get().callDirection || 'OUTBOUND',
+          technical_status: dispositionData.technical_status || sess?.technical_status,
+          follow_up_date: dispositionData.follow_up_date,
+          follow_up_time: dispositionData.follow_up_time,
+          follow_up_priority: dispositionData.follow_up_priority,
           custom_pipeline_stage_id: dispositionData.custom_pipeline_stage_id,
+          dispatch_omnichannel_followup: dispositionData.dispatch_omnichannel_followup,
         });
       } else {
         await dialerApi.updateState({ state: 'IDLE' });
@@ -780,6 +973,8 @@ export const useDialerStore = create<DialerState>((set, get) => ({
         callDuration: 0,
         agentState: 'IDLE',
         callLifecycle: 'idle',
+        isDispositionModalOpen: false,
+        dispositionSession: null,
         callDirection: null,
         stateTimestamp: null,
         isLoading: false,
@@ -891,6 +1086,8 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       error: null,
       callDirection: null,
       isKeypadOpen: false,
+      isDispositionModalOpen: false,
+      dispositionSession: null,
     });
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('crm_dialer_current_lead');
