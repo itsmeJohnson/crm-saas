@@ -1148,6 +1148,7 @@ export const LeadsPage: React.FC = () => {
         isOpen={isChatOpen}
         initialChannel={chatChannel}
         onClose={() => setIsChatOpen(false)}
+        onCallClick={handleManualCall}
       />
     </div>
   );

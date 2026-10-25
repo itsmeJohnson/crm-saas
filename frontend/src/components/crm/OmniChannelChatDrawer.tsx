@@ -12,12 +12,14 @@ import { whatsappRealtime } from '../../services/whatsappRealtime';
 import { smsApi, SmsItem } from '../../services/smsApi';
 import { extractErrorMessage } from '../../utils/errors';
 import { useAuthStore } from '../../store/authStore';
+import { useDialerStore } from '../../store/dialerStore';
 
 interface OmniChannelChatDrawerProps {
   lead: LeadResponse | null;
   isOpen: boolean;
   onClose: () => void;
   initialChannel?: 'whatsapp' | 'sms';
+  onCallClick?: (leadId: string) => void;
 }
 
 interface ChatMessage {
@@ -114,9 +116,21 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
   isOpen,
   onClose,
   initialChannel = 'whatsapp',
+  onCallClick,
 }) => {
   const { user } = useAuthStore();
   const [channel, setChannel] = useState<'whatsapp' | 'sms'>(initialChannel);
+
+  const handleCallClick = () => {
+    if (!lead?.id) return;
+    if (onCallClick) {
+      onCallClick(lead.id);
+    } else {
+      useDialerStore.getState().callSpecificLead(lead.id).catch((err: any) => {
+        console.error('[OmniChannelChatDrawer] Dialer call failed:', err);
+      });
+    }
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -638,13 +652,14 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
 
           <div className="flex items-center gap-1.5 shrink-0">
             {lead.phone && (
-              <a
-                href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
-                title="Direct Phone Call"
-                className="p-2 border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl transition cursor-pointer"
+              <button
+                type="button"
+                onClick={handleCallClick}
+                title="Call via CRM Dialer"
+                className="p-2 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl transition cursor-pointer"
               >
                 <Phone className="w-4 h-4" />
-              </a>
+              </button>
             )}
             <a
               href={`https://wa.me/${lead.phone?.replace(/[^0-9]/g, '')}`}
