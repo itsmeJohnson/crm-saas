@@ -74,6 +74,7 @@ export const CallDispositionModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState<boolean>(false);
   const [phoneCopied, setPhoneCopied] = useState<boolean>(false);
+  const [activeCategory, setActiveCategory] = useState<'All' | 'Connected' | 'Unanswered' | 'Invalid / System'>('All');
 
   // Load stages on mount
   useEffect(() => {
@@ -243,8 +244,6 @@ export const CallDispositionModal: React.FC = () => {
     setShowCloseConfirm(false);
     closeDispositionModal();
   };
-
-  const [activeCategory, setActiveCategory] = useState<'All' | 'Connected' | 'Unanswered' | 'Invalid / System'>('All');
 
   // Min date for follow-up date input is today
   const todayStr = new Date().toISOString().split('T')[0];
