@@ -11,6 +11,7 @@ import { whatsappApi, WaMessage, QuickReply, WaTemplate, WaConversation } from '
 import { whatsappRealtime } from '../../services/whatsappRealtime';
 import { smsApi, SmsItem } from '../../services/smsApi';
 import { extractErrorMessage } from '../../utils/errors';
+import { useAuthStore } from '../../store/authStore';
 
 interface OmniChannelChatDrawerProps {
   lead: LeadResponse | null;
@@ -114,6 +115,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
   onClose,
   initialChannel = 'whatsapp',
 }) => {
+  const { user } = useAuthStore();
   const [channel, setChannel] = useState<'whatsapp' | 'sms'>(initialChannel);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -199,10 +201,13 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
   }, []);
 
   // Load conversation history for current lead & channel
-  const loadConversation = useCallback(async () => {
+  // `silent` mode keeps the current message list mounted to completely avoid UI flickering during background re-syncs
+  const loadConversation = useCallback(async (silent: boolean = false) => {
     if (!lead || !lead.phone) return;
-    setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       if (channel === 'whatsapp') {
         let convs: WaConversation[] = [];
@@ -253,10 +258,12 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     } catch (err: any) {
       console.warn('Could not load chat messages:', err);
     } finally {
-      setLoading(false);
-      setTimeout(() => scrollToBottom('auto'), 100);
+      if (!silent) {
+        setLoading(false);
+        setTimeout(() => scrollToBottom('auto'), 100);
+      }
     }
-  }, [lead, channel]);
+  }, [lead?.id, lead?.phone, channel]);
 
   useEffect(() => {
     if (isOpen && lead) {
@@ -264,11 +271,17 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
       whatsappApi.listQuickReplies().then(setQuickReplies).catch(() => {});
       loadTemplates();
     }
-  }, [isOpen, lead, channel, loadConversation, loadTemplates]);
+  }, [isOpen, lead?.id, channel, loadConversation, loadTemplates]);
 
   // Real-time listener for incoming WhatsApp replies and status confirmations
   useEffect(() => {
     if (!isOpen || !lead) return;
+
+    if (user?.id) {
+      whatsappRealtime.connect(user.id);
+    }
+
+    const leadLast10 = (lead.phone || '').replace(/[^0-9]/g, '').slice(-10);
 
     const unsubscribe = whatsappRealtime.subscribe((data) => {
       try {
@@ -278,9 +291,18 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
           const incomingMsg = data.message;
           const msgLeadId = data.lead_id;
           const msgConvId = data.conversation_id;
+          const rawPhone = data.phone || data.from_number || (incomingMsg && incomingMsg.phone) || '';
+          const msgLast10 = rawPhone.replace(/[^0-9]/g, '').slice(-10);
 
-          const isMatch = (msgLeadId && msgLeadId === lead.id) || (waConvId && msgConvId === waConvId);
+          const isMatch =
+            (msgLeadId && msgLeadId === lead.id) ||
+            (waConvId && msgConvId === waConvId) ||
+            (leadLast10 && msgLast10 && leadLast10 === msgLast10);
+
           if (isMatch) {
+            if (msgConvId && !waConvId) {
+              setWaConvId(msgConvId);
+            }
             if (incomingMsg) {
               setMessages((prev) => {
                 if (prev.some((m) => m.id === incomingMsg.id)) {
@@ -303,7 +325,7 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
               });
               setTimeout(() => scrollToBottom('smooth'), 50);
             } else {
-              loadConversation();
+              loadConversation(true);
             }
           }
         } else if (eventType === 'whatsapp_message_status') {
@@ -324,16 +346,16 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
     return () => {
       unsubscribe();
     };
-  }, [isOpen, lead?.id, waConvId, loadConversation]);
+  }, [isOpen, lead?.id, lead?.phone, waConvId, loadConversation, user?.id]);
 
-  // Periodic poll while drawer is open so double ticks and blue ticks update dynamically
+  // Periodic silent poll while drawer is open so double ticks and blue ticks update dynamically with zero UI flicker
   useEffect(() => {
     if (!isOpen || !lead || !lead.phone || channel !== 'whatsapp') return;
     const interval = setInterval(() => {
-      loadConversation();
+      loadConversation(true);
     }, 5000);
     return () => clearInterval(interval);
-  }, [isOpen, lead, channel, loadConversation]);
+  }, [isOpen, lead?.id, lead?.phone, channel, loadConversation]);
 
   const handleSendTemplate = async (templateToUse?: WaTemplate) => {
     const tmpl = templateToUse || selectedTemplate;
@@ -456,26 +478,35 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
           if (res?.conversation_id) {
             setWaConvId(res.conversation_id);
           }
+          const newMsg: ChatMessage = {
+            id: res?.id || `local-${Date.now()}`,
+            channel: 'whatsapp',
+            direction: 'OUTBOUND',
+            body: res?.body || text.trim(),
+            status: res?.wa_status || 'sent',
+            created_at: res?.created_at || new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, newMsg]);
         } else {
-          await smsApi.send({
+          const res = await smsApi.send({
             body: text.trim(),
             to_number: lead.phone,
             lead_id: lead.id,
           });
+          const newMsg: ChatMessage = {
+            id: (res as any)?.id || `local-${Date.now()}`,
+            channel: 'sms',
+            direction: 'OUTBOUND',
+            body: text.trim(),
+            status: 'sent',
+            created_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, newMsg]);
         }
 
-        const newMsg: ChatMessage = {
-          id: `local-${Date.now()}`,
-          channel,
-          direction: 'OUTBOUND',
-          body: text.trim(),
-          status: 'sent',
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, newMsg]);
         setText('');
         setTimeout(() => {
-          loadConversation();
+          loadConversation(true);
         }, 1000);
       }
 
@@ -501,15 +532,21 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
           conversation_id: waConvId || undefined,
           lead_id: lead.id,
         });
+        if (res?.conversation_id) {
+          setWaConvId(res.conversation_id);
+        }
         const newMsg: ChatMessage = {
-          id: res.id || `local-${Date.now()}`,
+          id: res?.id || `local-${Date.now()}`,
           channel: 'whatsapp',
           direction: 'OUTBOUND',
           body: messageText.trim(),
-          status: res.wa_status || 'sent',
-          created_at: new Date().toISOString(),
+          status: res?.wa_status || 'sent',
+          created_at: res?.created_at || new Date().toISOString(),
         };
         setMessages((prev) => [...prev, newMsg]);
+        setTimeout(() => {
+          loadConversation(true);
+        }, 1000);
       } else {
         const res = await smsApi.send({
           to_number: lead.phone,
@@ -517,11 +554,11 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
           lead_id: lead.id,
         });
         const newMsg: ChatMessage = {
-          id: res.id || `local-${Date.now()}`,
+          id: (res as any)?.id || `local-${Date.now()}`,
           channel: 'sms',
           direction: 'OUTBOUND',
           body: messageText.trim(),
-          status: res.sms_status || 'sent',
+          status: 'sent',
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, newMsg]);
