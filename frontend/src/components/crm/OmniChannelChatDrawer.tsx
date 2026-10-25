@@ -211,8 +211,9 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         }
         if (!convs || convs.length === 0) {
           const cleanPhone = lead.phone.replace(/[^0-9]/g, '');
-          if (cleanPhone && cleanPhone.length >= 7) {
-            convs = await whatsappApi.conversations({ search: cleanPhone });
+          const searchVal = cleanPhone.startsWith('91') && cleanPhone.length > 2 ? cleanPhone.slice(2) : cleanPhone;
+          if (searchVal && searchVal.length >= 5) {
+            convs = await whatsappApi.conversations({ search: searchVal });
           }
         }
         if (convs && convs.length > 0) {
@@ -473,6 +474,9 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         };
         setMessages((prev) => [...prev, newMsg]);
         setText('');
+        setTimeout(() => {
+          loadConversation();
+        }, 1000);
       }
 
       setTimeout(() => scrollToBottom('smooth'), 50);

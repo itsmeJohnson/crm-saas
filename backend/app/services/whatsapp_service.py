@@ -1926,7 +1926,7 @@ class WhatsAppService:
                 conv.phone = canonical_phone
             if contact_id and not conv.contact_id:
                 conv.contact_id = contact_id
-            if lead_id and not conv.lead_id:
+            if lead_id:
                 conv.lead_id = lead_id
             if whatsapp_contact_id and not conv.whatsapp_contact_id:
                 conv.whatsapp_contact_id = whatsapp_contact_id

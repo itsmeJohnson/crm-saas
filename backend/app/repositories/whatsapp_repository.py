@@ -101,13 +101,27 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
             self.model.is_deleted == False
         )
         if lead_id:
-            query = query.filter(self.model.lead_id == lead_id)
+            from app.models.lead import Lead
+            lead_obj = await self.db.get(Lead, lead_id)
+            if lead_obj and lead_obj.phone:
+                digits = "".join(c for c in lead_obj.phone if c.isdigit())
+                last10 = digits[-10:] if len(digits) >= 10 else digits
+                query = query.filter(
+                    or_(
+                        self.model.lead_id == lead_id,
+                        self.model.phone.like(f"%{last10}%") if last10 else False
+                    )
+                )
+            else:
+                query = query.filter(self.model.lead_id == lead_id)
         elif assigned_user_id:
             if include_unassigned_for_user:
                 query = query.filter(
                     or_(
                         self.model.assigned_user_id == assigned_user_id,
-                        self.model.assigned_user_id.is_(None)
+                        self.model.assigned_user_id.is_(None),
+                        self.model.lead_id.isnot(None),
+                        self.model.contact_id.isnot(None)
                     )
                 )
             else:
@@ -125,13 +139,17 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
                 whatsapp_conversation_labels.c.label_id == label_id
             )
         if search:
-            search_str = f"%{search}%"
-            query = query.filter(
-                or_(
-                    self.model.phone.ilike(search_str),
-                    self.model.display_name.ilike(search_str)
-                )
-            )
+            clean_search = "".join(c for c in search if c.isdigit())
+            no_91 = clean_search[2:] if clean_search.startswith("91") and len(clean_search) > 2 else clean_search
+            conditions = [
+                self.model.phone.ilike(f"%{search}%"),
+                self.model.display_name.ilike(f"%{search}%")
+            ]
+            if clean_search and clean_search != search:
+                conditions.append(self.model.phone.ilike(f"%{clean_search}%"))
+            if no_91 and no_91 != clean_search:
+                conditions.append(self.model.phone.ilike(f"%{no_91}%"))
+            query = query.filter(or_(*conditions))
         query = query.order_by(self.model.is_pinned.desc(), self.model.last_message_at.desc().nullslast()).offset(skip).limit(limit)
         result = await self.db.execute(query)
         return result.scalars().all()
