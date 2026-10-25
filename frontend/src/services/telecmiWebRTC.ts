@@ -242,7 +242,7 @@ class TeleCMIWebRTCService {
             try {
               if (this.piopiy) {
                 this.piopiy.answer();
-                this.notify('connected');
+                this.notify('ringing');
               }
             } catch (e) {
               console.error('[WebRTC] Error auto-answering outbound call leg:', e);
