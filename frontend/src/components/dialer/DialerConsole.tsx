@@ -4,7 +4,6 @@ import {
   Coffee, 
   Play, 
   CheckCircle, 
-  AlertCircle, 
   Clock, 
   Building, 
   FileText,
@@ -23,6 +22,7 @@ import {
 import { useDialerStore } from '../../store/dialerStore';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { MaskedField } from '../common/MaskedField';
+import { MicrophonePermissionAlert } from '../crm/MicrophonePermissionAlert';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAnalyticsStore } from '../../store/analyticsStore';
 import { dashboardApi } from '../../services/dashboardApi';
@@ -366,10 +366,7 @@ export const DialerConsole: React.FC = () => {
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Error alert banner */}
       {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl animate-fade-in">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p className="text-sm font-medium">{error}</p>
-        </div>
+        <MicrophonePermissionAlert error={error} />
       )}
 
       {/* Main Split-Pane Workspace */}

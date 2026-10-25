@@ -27,6 +27,7 @@ import {
   Radio,
   ArrowLeftRight,
 } from 'lucide-react';
+import { MicrophonePermissionAlert } from './MicrophonePermissionAlert';
 
 export const FloatingDialerWidget: React.FC = () => {
   const {
@@ -395,9 +396,7 @@ export const FloatingDialerWidget: React.FC = () => {
               </div>
 
               {error && (
-                <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs px-3 py-1.5 rounded-lg">
-                  {error}
-                </div>
+                <MicrophonePermissionAlert error={error} compact />
               )}
 
               <div className="pt-1">

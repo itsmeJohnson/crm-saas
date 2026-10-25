@@ -63,6 +63,8 @@ interface DialerState {
     leadId: string,
     creds?: CallCreds
   ) => Promise<void>;
+  requestMicrophonePermission: () => Promise<boolean>;
+  clearError: () => void;
   resetStore: () => void;
 }
 
@@ -596,6 +598,23 @@ export const useDialerStore = create<DialerState>((set, get) => ({
 
   callSpecificLead: async (leadId: string, creds?: CallCreds) => {
     set({ isLoading: true, error: null });
+
+    // Request microphone permission on user gesture (click event)
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream.getTracks().forEach((t) => t.stop());
+      }
+    } catch (micErr: any) {
+      console.warn('[Dialer] Microphone check on user click:', micErr);
+      set({
+        error: 'Microphone access is required to place calls. Click "Enable Microphone" below or allow access in your browser settings.',
+        isLoading: false,
+        callLifecycle: 'idle',
+      });
+      return;
+    }
+
     let lead: any = null;
     try {
       console.log('[Dialer] Placing click-to-call to lead:', leadId);
@@ -829,6 +848,33 @@ export const useDialerStore = create<DialerState>((set, get) => ({
       set({ error: errMsg, isLoading: false });
       throw err;
     }
+  },
+
+  requestMicrophonePermission: async (): Promise<boolean> => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream.getTracks().forEach((track) => track.stop());
+        set({ error: null });
+        return true;
+      }
+      set({ error: 'Audio recording devices are not supported by this browser.' });
+      return false;
+    } catch (err: any) {
+      console.warn('[Dialer] Microphone request rejected:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        set({
+          error: 'Microphone access is blocked in your browser settings. Please click the lock icon in your address bar, switch Microphone to "Allow", and reload.',
+        });
+      } else {
+        set({ error: `Microphone access error: ${err.message || 'Permission denied'}` });
+      }
+      return false;
+    }
+  },
+
+  clearError: () => {
+    set({ error: null });
   },
 
   resetStore: () => {

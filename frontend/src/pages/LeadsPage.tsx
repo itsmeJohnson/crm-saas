@@ -31,6 +31,7 @@ import { BulkAssignModal } from '../components/crm/BulkAssignModal';
 import { LeadTransferModal } from '../components/crm/LeadTransferModal';
 import { useDialerStore } from '../store/dialerStore';
 import { api } from '../services/api';
+import { MicrophonePermissionAlert } from '../components/crm/MicrophonePermissionAlert';
 
 export const LeadsPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -334,6 +335,11 @@ export const LeadsPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* Top alert for dialer / microphone permission issues if drawer is closed */}
+      {!isDetailOpen && dialerError && (
+        <MicrophonePermissionAlert error={dialerError} />
+      )}
+
       {/* Unified Executive Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-default pb-4">
         {/* Left: Title + Deal Count + View Switcher + Metric Toggle */}
@@ -957,11 +963,16 @@ export const LeadsPage: React.FC = () => {
             {/* Scrollable details view */}
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {(callError || dialerError) && agentState !== 'ACTIVE_CALLING' && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400 rounded-xl text-xs">
-                  {typeof (callError || dialerError) === 'string'
-                    ? (callError || dialerError)
-                    : JSON.stringify(callError || dialerError)}
-                </div>
+                <MicrophonePermissionAlert
+                  error={
+                    typeof (callError || dialerError) === 'string'
+                      ? (callError || dialerError)
+                      : JSON.stringify(callError || dialerError)
+                  }
+                  onClearError={() => {
+                    setCallError(null);
+                  }}
+                />
               )}
 
               {/* Telecalling Quick Call Disposition Logger */}
