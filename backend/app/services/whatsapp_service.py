@@ -820,6 +820,10 @@ class WhatsAppService:
 
     async def handle_gupshup_webhook(self, payload: dict, token: str | None = None, raw_body: bytes | None = None) -> dict:
         """Processes Gupshup Enterprise WhatsApp Webhook events (inbound messages, message-event/DLRs)."""
+        # Meta format (v3) compatibility: if Gupshup posts in Meta format (with entry / changes)
+        if payload.get("entry") or payload.get("object") == "whatsapp_business_account":
+            return await self.handle_webhook(payload, raw_body=raw_body)
+
         app_name = payload.get("app")
         event_type = payload.get("type")
         p = payload.get("payload", {})
