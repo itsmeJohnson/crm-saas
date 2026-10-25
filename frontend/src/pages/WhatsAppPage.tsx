@@ -279,11 +279,14 @@ export const WhatsAppPage: React.FC = () => {
     setSending(true);
     setError(null);
     try {
-      await whatsappApi.sendText({
+      const res = await whatsappApi.sendText({
         conversation_id: thread.conversation.id,
         body,
         is_internal: isInternal
       });
+      if (res?.wa_status === 'failed') {
+        setError(res?.error || 'Message delivery failed. Note: If the 24-hr customer service window is closed, Meta requires sending an approved template message first.');
+      }
       setBody('');
       setIsInternal(false);
       await refreshThread();

@@ -492,6 +492,9 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
           if (res?.conversation_id) {
             setWaConvId(res.conversation_id);
           }
+          if (res?.wa_status === 'failed') {
+            setError(res?.error || 'Message delivery failed. Note: If the 24-hr customer service window is closed, Meta requires sending an approved template message first.');
+          }
           const newMsg: ChatMessage = {
             id: res?.id || `local-${Date.now()}`,
             channel: 'whatsapp',
@@ -548,6 +551,9 @@ export const OmniChannelChatDrawer: React.FC<OmniChannelChatDrawerProps> = ({
         });
         if (res?.conversation_id) {
           setWaConvId(res.conversation_id);
+        }
+        if (res?.wa_status === 'failed') {
+          setError(res?.error || 'Message delivery failed. Note: If the 24-hr customer service window is closed, Meta requires sending an approved template message first.');
         }
         const newMsg: ChatMessage = {
           id: res?.id || `local-${Date.now()}`,

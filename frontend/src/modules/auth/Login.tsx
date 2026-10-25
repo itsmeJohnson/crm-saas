@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -306,15 +306,6 @@ export const Login: React.FC = () => {
             >
               Forgot Password?
             </button>
-          </div>
-
-          <div className="text-center pt-4 border-t border-slate-800/40 mt-4">
-            <p className="text-slate-400 text-sm">
-              New to CRM Enterprise?{' '}
-              <Link to="/register" className="text-brand-400 hover:text-brand-300 font-semibold transition-all">
-                Start 14-Day Free Trial
-              </Link>
-            </p>
           </div>
         </form>
       )}

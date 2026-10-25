@@ -21,6 +21,7 @@ from app.middleware.permissions import check_is_team_leader, require_role
 from datetime import datetime, timedelta, timezone
 import secrets
 import json
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -56,6 +57,12 @@ async def public_register(
     creates the OrgAdmin, and returns a session so the user is logged in immediately.
     Rate-limited by the auth-sensitive bucket in RateLimiterMiddleware.
     """
+    if not settings.ENABLE_PUBLIC_REGISTRATION and not settings.is_testing:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public registration is disabled. Please contact your CRM administrator for account access."
+        )
+
     # Force trial regardless of what the client sends — a public signup can never
     # self-provision a paid/active subscription without going through billing.
     request.is_trial = True
@@ -92,6 +99,12 @@ async def trial_register(
     Public trial registration request. Submits full name, company name, email,
     and phone number. Saves the request as PENDING for admin approval.
     """
+    if not settings.ENABLE_PUBLIC_REGISTRATION and not settings.is_testing:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public trial registration is disabled. Please contact your CRM administrator for account access."
+        )
+
     from app.models.trial_request import TrialRequest
     from app.services.audit_service import AuditService
 

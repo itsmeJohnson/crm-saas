@@ -6,7 +6,6 @@ import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './modules/auth/Login';
-import { Register } from './modules/auth/Register';
 import { LegalPage } from './pages/legal/LegalPage';
 import { PricingPage } from './pages/PricingPage';
 import { LandingPageView } from './pages/LandingPageView';
@@ -43,7 +42,8 @@ export const App: React.FC = () => {
             {/* Public Routes */}
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<Login />} />
+              <Route path="/register" element={<Navigate to="/login" replace />} />
             </Route>
 
             {/* Public marketing / pricing storefront (no auth) */}

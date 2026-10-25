@@ -85,9 +85,10 @@ def send_email(to_email: str, subject: str, template_name: str, context: dict) -
 
     # Check if SMTP is configured
     if not settings.SMTP_HOST:
-        logger.info(f"[EMAIL MOCK] Sending email to {to_email}")
-        logger.info(f"Subject: {subject}")
-        logger.info(f"Body (HTML): {html_content[:500]}...")
+        logger.warning(
+            "[EMAIL SERVICE - NO SMTP CONFIG] Email requested for %s (subject=%r), but SMTP_HOST is not configured in environment. Message content logged for audit: %s",
+            to_email, subject, html_content[:300]
+        )
         return
 
     # Determine effective from address (SMTP_FROM_* overrides EMAILS_FROM_*)
@@ -124,7 +125,7 @@ def send_email(to_email: str, subject: str, template_name: str, context: dict) -
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.sendmail(from_email, [to_email], msg.as_string())
         server.quit()
-        logger.info(f"Successfully sent email to {to_email}")
+        logger.info("[EMAIL SERVICE] Successfully submitted email to %s via host=%s port=%s", to_email, settings.SMTP_HOST, port)
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email} via SMTP: {e}")
+        logger.error("[EMAIL SERVICE] Failed to deliver email to %s via host=%s port=%s: %s", to_email, settings.SMTP_HOST, getattr(settings, 'SMTP_PORT', None), str(e))
         # Don't raise so the main flow isn't blocked by email failure

@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # When true, public trial signups are provisioned immediately (no manual
     # SuperAdmin approval). SuperAdmin retains full suspend/delete/restore control.
     TRIAL_AUTO_APPROVE: bool = True
+    # When false, public trial self-registration (/trial-request) is safely disabled.
+    ENABLE_PUBLIC_REGISTRATION: bool = False
 
     # Database
     POSTGRES_SERVER: str = "db"
